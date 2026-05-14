@@ -4,8 +4,9 @@ import { useUpdateTradeMutation } from '@/hooks/useTradeMutation'
 import { useToastStore } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { formatCurrency, formatDate } from '@/utils/format'
-import { Loader2, Plus, Pencil, Trash2, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import type { BackendTradeStatus } from '@/types'
+import { Loader2, Plus, Pencil, Trash2, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { useState, useCallback } from 'react'
 
 const statusBadge: Record<string, string> = {
   draft: 'bg-accent-muted text-accent',
@@ -17,9 +18,24 @@ export function TradesPage() {
   const addToast = useToastStore((s) => s.addToast)
   const { openCreateTrade, openEditTrade } = useAppStore()
   const [page, setPage] = useState(1)
+  const [symbolFilter, setSymbolFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const hasFilters = symbolFilter !== '' || statusFilter !== ''
+
+  const clearFilters = useCallback(() => {
+    setSymbolFilter('')
+    setStatusFilter('')
+    setPage(1)
+  }, [])
 
   const skip = (page - 1) * 100
-  const { data, isLoading, error } = useTradesQuery({ skip, limit: 100 })
+  const { data, isLoading, error } = useTradesQuery({
+    status: statusFilter ? (statusFilter as BackendTradeStatus) : undefined,
+    symbol: symbolFilter || undefined,
+    skip,
+    limit: 100,
+  })
   const updateMutation = useUpdateTradeMutation()
   const totalPages = data ? Math.ceil(data.total / 100) : 0
 
@@ -51,6 +67,39 @@ export function TradesPage() {
           <Plus className="w-4 h-4" />
           New Trade
         </GlassButton>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative w-full sm:w-44">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-faint pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search symbol..."
+            value={symbolFilter}
+            onChange={(e) => { setSymbolFilter(e.target.value); setPage(1) }}
+            className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 pl-8 pr-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+          className="w-full sm:w-36 rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer"
+        >
+          <option value="">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="analytics">Analytics</option>
+        </select>
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear filters
+          </button>
+        )}
       </div>
 
       {/* Table card */}

@@ -11,16 +11,13 @@ export function formatDate(date: Date | string | number): string {
   return `${day}-${month}-${year}`
 }
 
-/**
- * Format a number as Indian Rupees currency
- */
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
+const CURRENCY_SYMBOLS: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' }
+
+export function formatCurrency(v: string | number, currency = 'INR') {
+  const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '')) || 0);
+  if (isNaN(n)) return `${CURRENCY_SYMBOLS[currency] || ''}0`;
+  const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
+  return `${symbol}${n > 1000 && currency === 'INR' ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 /**
