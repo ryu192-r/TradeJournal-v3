@@ -1,0 +1,572 @@
+"""AI Coach router — endpoints for generating and retrieving trading insights."""
+
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
+
+from app.schemas.coach import (
+    AskCoachRequest,
+    CoachReviewListItem,
+    CoachReviewListResponse,
+    CoachReviewRequest,
+    CoachReviewResponse,
+    TradeInsightRequest,
+    WeeklyReviewRequest,
+    PatternDetectionRequest,
+    PatternDetectionResponse,
+    PatternResult,
+    RuleReminderRequest,
+    RuleReminderResponse,
+)
+from app.services.ai_coach import ai_coach, review_cache, review_cache_key, trade_to_dict, compute_summary_stats, compute_setup_performance
+from app.db.database import get_db
+from app.models.coach_review import CoachReview
+from app.models.trade import Trade
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+_now = lambda: datetime.now(timezone.utc)
+
+router = APIRouter(prefix="/coach", tags=["ai-coach"])
+
+# ──────────────────────── helpers ────────────────────────
+
+
+def _get_trades_for_period(db: Session, start: datetime, end: datetime) -> List[Trade]:
+    """Fetch non-deleted trades within a date range."""
+    stmt = (
+        select(Trade)
+        .where(
+            Trade.entry_time >= start,
+            Trade.entry_time <= end,
+            Trade.status != "deleted",
+        )
+        .order_by(Trade.entry_time.asc())
+    )
+    return list(db.scalars(stmt).all())
+
+
+# ──────────────────────── endpoints ────────────────────────
+
+
+@router.post(
+    "/review/daily",
+    response_model=CoachReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "No trades found in period"},
+        500: {"description": "AI generation failed"},
+    },
+)
+async def generate_daily_review(
+    request: CoachReviewRequest,
+    db: Session = Depends(get_db),
+) -> CoachReviewResponse:
+    """Generate an AI-powered daily review for a period."""
+    now = _now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    period_start = request.period_start or today.replace(
+        hour=3, minute=45
+    )
+    period_end = request.period_end or today.replace(
+        hour=10, minute=0
+    )
+
+    # Cache check
+    trade_ids_str = ",".join(str(i) for i in (request.trade_ids or []))
+    cache_key = review_cache_key(
+        "daily", period_start.isoformat(), period_end.isoformat(), trade_ids_str
+    )
+
+    cached = review_cache.get(cache_key)
+    if cached:
+        content, trades_count = cached
+        return CoachReviewResponse(
+            insight=content,
+            review_type="daily",
+            trades_analyzed=trades_count,
+            model_used="cached",
+            generated_at=_now().isoformat(),
+        )
+
+    # Fetch trades
+    trades = _get_trades_for_period(db, period_start, period_end)
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No trades found between {period_start.date()} and {period_end.date()}",
+        )
+
+    if request.trade_ids:
+        trades = [t for t in trades if t.id in request.trade_ids]
+        if not trades:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"None of the requested trade IDs found: {request.trade_ids}",
+            )
+
+    trade_data = [trade_to_dict(t) for t in trades]
+    summary_stats = compute_summary_stats(trades)
+
+    try:
+        insight = await ai_coach.generate_daily_review(
+            trades=trade_data,
+            summary_stats=summary_stats,
+        )
+    except Exception as e:
+        logger.error("daily_review_generation_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate review: {str(e)}",
+        )
+
+    review_cache.set(cache_key, insight, trades_analyzed=len(trades))
+
+    # Persist in DB
+    db_review = CoachReview(
+        review_type="daily",
+        content=insight,
+        period_start=period_start,
+        period_end=period_end,
+        trade_ids=[t.id for t in trades],
+        summary_stats=summary_stats,
+        model_used="ollama",
+        prompt_template="daily_review",
+    )
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+
+    logger.info("daily_review_generated", review_id=db_review.id, trade_count=len(trades))
+
+    return CoachReviewResponse(
+        insight=insight,
+        review_type="daily",
+        trades_analyzed=len(trades),
+        model_used="ollama",
+        generated_at=(
+            db_review.created_at.isoformat()
+            if db_review.created_at
+            else _now().isoformat()
+        ),
+    )
+
+
+@router.post(
+    "/review/weekly",
+    response_model=CoachReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "No trades found in period"},
+        500: {"description": "AI generation failed"},
+    },
+)
+async def generate_weekly_review(
+    request: WeeklyReviewRequest,
+    db: Session = Depends(get_db),
+) -> CoachReviewResponse:
+    """Generate a weekly performance review."""
+    now = _now()
+    period_end = request.period_end or now
+    period_start = request.period_start or (period_end - timedelta(days=7))
+
+    trades = _get_trades_for_period(db, period_start, period_end)
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No trades found in the week of {period_start.date()}",
+        )
+
+    trade_data = [trade_to_dict(t) for t in trades]
+    summary_stats = compute_summary_stats(trades)
+    setup_performance = compute_setup_performance(trades)
+
+    cache_key = review_cache_key(
+        "weekly", period_start.isoformat(), period_end.isoformat()
+    )
+    cached = review_cache.get(cache_key)
+    if cached:
+        content, trades_count = cached
+        return CoachReviewResponse(
+            insight=content,
+            review_type="weekly",
+            trades_analyzed=trades_count,
+            model_used="cached",
+            generated_at=_now().isoformat(),
+        )
+
+    try:
+        insight = await ai_coach.generate_weekly_review(
+            trades=trade_data,
+            summary_stats=summary_stats,
+            setup_performance=setup_performance,
+        )
+    except Exception as e:
+        logger.error("weekly_review_generation_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate review: {str(e)}",
+        )
+
+    review_cache.set(cache_key, insight, trades_analyzed=len(trades))
+
+    db_review = CoachReview(
+        review_type="weekly",
+        content=insight,
+        period_start=period_start,
+        period_end=period_end,
+        trade_ids=[t.id for t in trades],
+        summary_stats=summary_stats,
+        model_used="ollama",
+        prompt_template="weekly_review",
+    )
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+
+    return CoachReviewResponse(
+        insight=insight,
+        review_type="weekly",
+        trades_analyzed=len(trades),
+        model_used="ollama",
+        generated_at=(
+            db_review.created_at.isoformat()
+            if db_review.created_at
+            else _now().isoformat()
+        ),
+    )
+
+
+@router.post(
+    "/insight",
+    response_model=CoachReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Trades not found"},
+        422: {"description": "Validation error — no trade IDs"},
+        500: {"description": "AI generation failed"},
+    },
+)
+async def generate_trade_insight(
+    request: TradeInsightRequest,
+    db: Session = Depends(get_db),
+) -> CoachReviewResponse:
+    """Generate one-off analysis for specific trades."""
+    stmt = (
+        select(Trade)
+        .where(
+            Trade.id.in_(request.trade_ids),
+            Trade.status != "deleted",
+        )
+    )
+    trades = list(db.scalars(stmt).all())
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No valid trades found for IDs: {request.trade_ids}",
+        )
+
+    trade_data = [trade_to_dict(t) for t in trades]
+
+    try:
+        insight = await ai_coach.generate_trade_insight(
+            trades=trade_data,
+            context=request.context or "",
+        )
+    except Exception as e:
+        logger.error("trade_insight_generation_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate insight: {str(e)}",
+        )
+
+    db_review = CoachReview(
+        review_type="insight",
+        content=insight,
+        trade_ids=request.trade_ids,
+        model_used="ollama",
+        prompt_template="trade_insight",
+    )
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+
+    return CoachReviewResponse(
+        insight=insight,
+        review_type="insight",
+        trades_analyzed=len(trades),
+        model_used="ollama",
+        generated_at=(
+            db_review.created_at.isoformat()
+            if db_review.created_at
+            else _now().isoformat()
+        ),
+    )
+
+
+@router.post(
+    "/ask",
+    response_model=CoachReviewResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        500: {"description": "AI generation failed"},
+    },
+)
+async def ask_coach(
+    request: AskCoachRequest,
+    db: Session = Depends(get_db),
+) -> CoachReviewResponse:
+    """Free-form question to the AI coach — 'Ask the Coach' tab."""
+    trade_data: list[dict] = []
+    summary_stats: dict = {}
+
+    if request.trade_ids:
+        stmt = select(Trade).where(Trade.id.in_(request.trade_ids), Trade.status != "deleted")
+        trades = list(db.scalars(stmt).all())
+        trade_data = [trade_to_dict(t) for t in trades]
+        summary_stats = compute_summary_stats(trades)
+    elif request.period_start and request.period_end:
+        trades = _get_trades_for_period(db, request.period_start, request.period_end)
+        trade_data = [trade_to_dict(t) for t in trades]
+        summary_stats = compute_summary_stats(trades)
+
+    try:
+        answer = await ai_coach.ask_coach(
+            question=request.question,
+            trade_data=trade_data if trade_data else None,
+            summary_stats=summary_stats if summary_stats else None,
+        )
+    except Exception as e:
+        logger.error("coach_question_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to answer question: {str(e)}",
+        )
+
+    db_review = CoachReview(
+        review_type="answer",
+        content=answer,
+        trade_ids=request.trade_ids or [t["id"] for t in trade_data],
+        model_used="ollama",
+        prompt_template="ask_coach",
+    )
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+
+    return CoachReviewResponse(
+        insight=answer,
+        review_type="answer",
+        trades_analyzed=len(trade_data),
+        model_used="ollama",
+        generated_at=(
+            db_review.created_at.isoformat()
+            if db_review.created_at
+            else _now().isoformat()
+        ),
+    )
+
+
+@router.post(
+    "/patterns",
+    response_model=PatternDetectionResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "No trades found in period"},
+        500: {"description": "Pattern detection failed"},
+    },
+)
+async def detect_patterns(
+    request: PatternDetectionRequest,
+    db: Session = Depends(get_db),
+) -> PatternDetectionResponse:
+    """Detect recurring behavioral patterns in recent trades."""
+    now = _now()
+    period_end = now
+    period_start = now - timedelta(days=request.lookback_days)
+
+    trades = _get_trades_for_period(db, period_start, period_end)
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No trades found in the last {request.lookback_days} days",
+        )
+
+    trade_data = [trade_to_dict(t) for t in trades]
+    summary_stats = compute_summary_stats(trades)
+
+    try:
+        raw_patterns = await ai_coach.detect_patterns(
+            trades=trade_data,
+            summary_stats=summary_stats,
+            lookback_days=request.lookback_days,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pattern detection failed: {str(e)}",
+        )
+    except Exception as e:
+        logger.error("pattern_detection_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pattern detection failed: {str(e)}",
+        )
+
+    patterns = [
+        PatternResult(
+            name=p.get("name", "Unknown"),
+            severity=p.get("severity", "neutral"),
+            description=p.get("description", ""),
+            evidence=p.get("evidence", ""),
+            suggestion=p.get("suggestion"),
+        )
+        for p in raw_patterns
+    ]
+
+    return PatternDetectionResponse(
+        patterns=patterns,
+        trades_analyzed=len(trades),
+        lookback_days=request.lookback_days,
+        model_used="ollama",
+        generated_at=_now().isoformat(),
+    )
+
+
+@router.post(
+    "/rule-reminders",
+    response_model=RuleReminderResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "No trades found in period"},
+        500: {"description": "Rule check failed"},
+    },
+)
+async def check_rule_reminders(
+    request: RuleReminderRequest,
+    db: Session = Depends(get_db),
+) -> RuleReminderResponse:
+    """Check recent trades against trading rules and generate reminders."""
+    now = _now()
+    period_end = now
+    period_start = now - timedelta(days=request.lookback_days)
+
+    trades = _get_trades_for_period(db, period_start, period_end)
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No trades found in the last {request.lookback_days} days",
+        )
+
+    trade_data = [trade_to_dict(t) for t in trades]
+
+    try:
+        reminder = await ai_coach.check_rule_reminders(
+            trades=trade_data,
+            rules=request.rules,
+        )
+    except Exception as e:
+        logger.error("rule_reminder_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Rule check failed: {str(e)}",
+        )
+
+    rules_count = len(request.rules) if request.rules else 5  # 5 default rules
+
+    return RuleReminderResponse(
+        reminder=reminder,
+        trades_analyzed=len(trades),
+        rules_checked=rules_count,
+        model_used="ollama",
+        generated_at=_now().isoformat(),
+    )
+
+
+@router.get("/reviews", response_model=CoachReviewListResponse)
+async def list_reviews(
+    review_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> CoachReviewListResponse:
+    """List past AI-generated reviews with optional filtering."""
+    query = db.query(CoachReview)
+    if review_type:
+        query = query.filter(CoachReview.review_type == review_type)
+
+    total = query.count()
+    reviews = query.order_by(CoachReview.created_at.desc()).offset(skip).limit(limit).all()
+
+    return CoachReviewListResponse(
+        total=total,
+        items=[
+            CoachReviewListItem(
+                id=r.id,
+                review_type=r.review_type,
+                content_preview=r.content[:200] + "..." if len(r.content) > 200 else r.content,
+                period_start=r.period_start,
+                period_end=r.period_end,
+                trades_analyzed=len(r.trade_ids or []),
+                model_used=r.model_used or "ollama",
+                created_at=r.created_at,
+            )
+            for r in reviews
+        ],
+    )
+
+
+@router.get("/reviews/{review_id}", response_model=CoachReviewResponse)
+def get_review(
+    review_id: int,
+    db: Session = Depends(get_db),
+) -> CoachReviewResponse:
+    """Get a specific review by ID."""
+    review = db.get(CoachReview, review_id)
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Review not found",
+        )
+
+    return CoachReviewResponse(
+        insight=review.content,
+        review_type=review.review_type,
+        trades_analyzed=len(review.trade_ids or []),
+        model_used=review.model_used or "ollama",
+        generated_at=(
+            review.created_at.isoformat()
+            if review.created_at
+            else _now().isoformat()
+        ),
+    )
+
+
+@router.delete(
+    "/reviews/{review_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        404: {"description": "Review not found"},
+    },
+)
+def delete_review(
+    review_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete a specific review by ID."""
+    review = db.get(CoachReview, review_id)
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Review not found",
+        )
+
+    db.delete(review)
+    db.commit()
+    logger.info("review_deleted", review_id=review_id)

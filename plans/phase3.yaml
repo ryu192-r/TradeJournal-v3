@@ -1,0 +1,252 @@
+---
+# Trading Journal v3 — Phase 3 Plan
+# Features: Daily Journal, Setup Playbook, Trade Ideas, Analytics,
+#           Capital/Account, AI Coach, Telegram Bot, Dhan Webhook, Export
+#
+# Run with: python3 scripts/kanban_batch.py plans/phase3.yaml
+board: tjv3
+workspace: "dir:/root/projects/Trading Journal v3"
+
+tasks:
+  # ──────────────────────────────────────────────
+  # WAVE 1: Model/Schema layer (backend → nous, unlimited)
+  # ──────────────────────────────────────────────
+  - id: T12
+    title: "Daily Journal model"
+    assignee: backend
+    body: |
+      Create DailyJournal SQLAlchemy model. File: backend/app/models/daily_journal.py
+
+      Fields: id, date (unique index), pre_trade_notes (Text), post_trade_notes (Text),
+      trade_count (Integer), total_pnl (Numeric 18,8), avg_r_multiple (Numeric 10,4),
+      win_rate (Float), mood_rating (Integer 1-5), mood_notes (Text),
+      rules_followed (Boolean), rules_violated (String 200),
+      lessons_learned (Text), created_at, updated_at.
+
+      Relationships: user_id (FK to users).
+
+  - id: T13
+    title: "Setup Playbook model + endpoints"
+    assignee: backend
+    body: |
+      Create SetupPlaybook SQLAlchemy model and CRUD endpoints.
+      Model file: backend/app/models/setup_playbook.py (already exists from Phase 1, verify fields).
+      Router: backend/app/routers/setup_playbook.py
+
+      Fields: id, name (unique), description (Text), setup_type (String),
+      win_rate (Float), avg_pnl (Numeric), examples (JSON),
+      notes (Text), created_at, updated_at.
+
+      Endpoints: POST/GET/PUT/DELETE /api/v1/setups, GET /api/v1/setups/stats.
+      Use existing Sync Session (get_db). Register in routers/base.py.
+
+  - id: T14
+    title: "Trade Ideas model + endpoints"
+    assignee: backend
+    body: |
+      Create TradeIdea endpoints for tracking market ideas before trading.
+      Router: backend/app/routers/trade_ideas.py
+
+      Fields: id, symbol, direction, entry_price_target (Numeric),
+      stop_price (Numeric), target_price (Numeric), thesis (Text),
+      status (draft/active/traded/archived), traded_trade_id (FK, nullable),
+      created_at, updated_at, triggered_at.
+
+      Endpoints: POST /api/v1/ideas, GET /api/v1/ideas?status=active,
+      PUT /api/v1/ideas/{id}, POST /api/v1/ideas/{id}/trade (link to actual trade).
+      Register in routers/base.py.
+
+  - id: T15
+    title: "Capital/Account tracking endpoints"
+    assignee: backend
+    body: |
+      Create Account + CapitalEvent endpoints for net capital tracking.
+      Model files: backend/app/models/account.py, backend/app/models/capital_event.py
+      (already exist from Phase 1, verify fields).
+      Router: backend/app/routers/capital.py
+
+      Endpoints: POST /api/v1/capital (record deposit/withdrawal),
+      GET /api/v1/capital/history, GET /api/v1/capital/current,
+      POST /api/v1/accounts, GET /api/v1/accounts.
+
+      Capital events: date, type (deposit/withdrawal), amount (Numeric),
+      notes (Text), account_id (FK).
+      Register in routers/base.py.
+
+  - id: T16
+    title: "Dhan Webhook handler"
+    assignee: backend
+    body: |
+      Create Dhan webhook endpoint for stop-loss hit notifications.
+      Router: backend/app/routers/dhan_webhook.py
+
+      Endpoints: POST /api/v1/webhooks/dhan (receive Dhan order fill events).
+      Parse webhook payload, match against open trades by symbol+direction,
+      update trade status, log SL hit event.
+
+      Add trade status transition: analytics → 'closed_sl_hit' or 'closed_target_hit'.
+      Add trade field: exit_reason (String: stop_loss, target, manual, trailing).
+      Update models/trade.py with new field. Register in routers/base.py.
+
+  - id: T17
+    title: "Telegram Bot — full implementation"
+    assignee: backend
+    body: |
+      Implement Telegram bot (python-telegram-bot) for Trade Journal.
+      Files: bot/bot.py, bot/handlers.py, bot/middleware.py
+
+      Features:
+      1. Daily PnL summary at market close (auto-message to chat)
+      2. /pnl command — last 7 days PnL, win rate, best/worst trade
+      3. /journal command — today's journal entry summary
+      4. /setup command — setup performance leaderboard
+      5. Free-form trade logging: "Bought RELIANCE 50 @ 2650.50 SL 2620 TGT 2750 VWAP bounce"
+      6. Parse free-form text → create trade via backend API
+      7. Reminder: "You have 3 open trades — check stops!"
+
+      Use python-telegram-bot v20+. Connect to backend via REST API.
+      Parse user input with regex patterns for trade creation.
+      Store bot token and chat ID from env vars.
+
+  # ──────────────────────────────────────────────
+  # WAVE 2: Frontend forms (frontend → Ollama, stagger 2 at a time)
+  # ──────────────────────────────────────────────
+  - id: T18
+    title: "Daily Journal frontend form"
+    assignee: frontend
+    parents: [T12]
+    body: |
+      Create Daily Journal form component.
+      File: frontend/src/components/journal/DailyJournalForm.tsx
+
+      Multi-step form:
+      Step 1: Pre-trade notes, mood rating (1-5 slider), trade count
+      Step 2: Post-trade notes, rules followed/violated, lessons learned
+      Step 3: PnL summary (auto-calculated from trades for the day)
+
+      Use react-hook-form + zod validation. Glass UI components.
+      Connect to POST/PUT /api/v1/journal endpoints.
+      Auto-fill trade_count and total_pnl from today's trades.
+
+  - id: T19
+    title: "Setup Playbook frontend page"
+    assignee: frontend
+    parents: [T13]
+    body: |
+      Create Setup Playbook UI page.
+      Files: frontend/src/components/playbook/PlaybookList.tsx,
+             frontend/src/components/playbook/PlaybookCard.tsx,
+             frontend/src/components/playbook/PlaybookForm.tsx
+
+      Features:
+      - Grid of setup cards (name, win rate badge, avg PnL)
+      - Add/edit setup form (glass UI)
+      - Setup detail modal with examples and notes
+      - Connect to POST/GET/PUT /api/v1/setups endpoints
+
+  - id: T20
+    title: "Trade Ideas frontend page"
+    assignee: frontend
+    parents: [T14]
+    body: |
+      Create Trade Ideas UI page.
+      Files: frontend/src/components/ideas/IdeasList.tsx,
+             frontend/src/components/ideas/IdeaCard.tsx,
+             frontend/src/components/ideas/IdeaForm.tsx
+
+      Features:
+      - Kanban-like board: Draft → Active → Traded → Archived
+      - Add idea form with target entry/stop/target
+      - Click "Execute" to convert idea to actual trade
+      - Color coding by status (yellow=active, green=traded, gray=archived)
+
+  - id: T21
+    title: "Analytics Dashboard frontend"
+    assignee: frontend
+    parents: [T23]
+    body: |
+      Create Analytics Dashboard page with charts and stats.
+      Files: frontend/src/components/analytics/AnalyticsDashboard.tsx,
+             frontend/src/components/analytics/EquityCurve.tsx,
+             frontend/src/components/analytics/StatsCards.tsx
+
+      Features:
+      - Equity curve chart (simple SVG line chart from data points)
+      - Stats grid: total PnL, win rate, best trade, worst trade, avg R, streak
+      - Setup performance table (sorted by win rate)
+      - Monthly PnL bar chart
+      - Connect to GET /api/v1/analytics/* endpoints
+
+  # ──────────────────────────────────────────────
+  # WAVE 3: Analytics/Stats layer (data → heavy SQL)
+  # ──────────────────────────────────────────────
+  - id: T22
+    title: "Analytics — equity curve and PnL stats"
+    assignee: data
+    parents: [T12]
+    body: |
+      Create analytics endpoint for equity curve and PnL statistics.
+      Router: backend/app/routers/analytics.py
+      Service: backend/app/services/analytics_service.py
+
+      Endpoints: GET /api/v1/analytics/equity-curve (daily data points),
+      GET /api/v1/analytics/summary (total PnL, win rate, best/worst, avg R, streak),
+      GET /api/v1/analytics/monthly (monthly PnL bars).
+
+      Use SQLAlchemy ORM queries, not raw SQL. Cache results if possible.
+      Register in routers/base.py.
+
+  - id: T23
+    title: "Analytics — setup performance and streak tracking"
+    assignee: data
+    parents: [T12, T13]
+    body: |
+      Create analytics endpoint for setup performance and streak tracking.
+      Router: backend/app/routers/analytics.py (extend existing)
+      Service: backend/app/services/analytics_service.py (extend existing)
+
+      Endpoints: GET /api/v1/analytics/setups (group by setup, win rate, avg PnL),
+      GET /api/v1/analytics/streaks (current win/loss streak, longest streaks),
+      GET /api/v1/analytics/tags (performance by tag).
+
+      Use GROUP BY setup/stops/tags. Calculate streaks from ordered trades.
+      Register in routers/base.py if not already done in T22.
+
+  # ──────────────────────────────────────────────
+  # WAVE 4: AI Coach + Export (independent)
+  # ──────────────────────────────────────────────
+  - id: T24
+    title: "AI Coach — Ollama integration service"
+    assignee: backend
+    body: |
+      Create AI Coach service using Ollama Cloud integration.
+      Files: backend/app/services/ai_coach.py, backend/app/routers/coach.py
+
+      Features:
+      1. End-of-day review prompt: "Based on today's 5 trades (data), what patterns do you see?"
+      2. Weekly summary prompt: analyze week's PnL, setup performance, rule adherence
+      3. Pattern detection: "You've lost 3 trades in a row — consider stepping back"
+      4. Rule reminder: "Your Setup Playbook says avoid first 30min — you violated this"
+
+      Use Ollama Cloud API via HTTP requests. Prompt templates in backend/app/prompts/.
+      Cache responses for 24h. Don't block UI — async background processing.
+
+      Endpoints: POST /api/v1/coach/review (generate daily review),
+      GET /api/v1/coach/reviews (list past reviews),
+      POST /api/v1/coach/insight (one-off analysis of specific trade(s)).
+      Register in routers/base.py.
+
+  - id: T25
+    title: "Export/Backup service — CSV + Telegram"
+    assignee: devops
+    body: |
+      Create export service with CSV export and Telegram daily backup.
+      Files: backend/app/services/export_service.py, backend/app/routers/export.py
+
+      Features:
+      1. GET /api/v1/export/csv?from=&to= → download all trades as CSV
+      2. POST /api/v1/export/backup → trigger Telegram backup (send CSV to user)
+      3. Automated daily backup at market close (cron-like, triggered by endpoint)
+
+      CSV format: match T10 CSV import format (round-trip compatible).
+      Telegram: send file to chat_id with summary text ("Day 45, +₹2,350, 60% WR").

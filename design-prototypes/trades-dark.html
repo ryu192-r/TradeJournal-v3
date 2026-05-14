@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeJournal — Trades · Dark</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500;6..72,600;6..72,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0e1016;
+  --bg-el: #131621;
+  --bg-card: #181c2a;
+  --bg-card-h: #1d2133;
+  --bg-elev: #1c2030;
+  --ink: #e8e5df;
+  --ink-2: #d4d0c8;
+  --ink-4: #a8a39a;
+  --ink-5: #6e685e;
+  --ink-3: #4a4540;
+  --ink-1: #2a2720;
+  --acc: #c97a3f;
+  --acc-l: #d9915a;
+  --acc-m: rgba(201,122,63,.15);
+  --acc-f: rgba(201,122,63,.07);
+  --grn: #4ade80;
+  --grn-m: rgba(74,222,128,.15);
+  --grn-f: rgba(74,222,128,.08);
+  --red: #f87171;
+  --red-m: rgba(248,113,113,.15);
+  --red-f: rgba(248,113,113,.08);
+  --blu: #6ba3d6;
+  --blu-f: rgba(107,163,214,.12);
+  --gold: #d4a94a;
+  --gold-f: rgba(212,169,74,.12);
+  --bor: rgba(255,255,255,.06);
+  --bor-m: rgba(255,255,255,.1);
+  --sh-1: 0 1px 4px rgba(0,0,0,.25);
+  --sh-2: 0 4px 20px rgba(0,0,0,.35);
+  --out: cubic-bezier(.4,0,.2,1);
+  --spr: cubic-bezier(.34,1.56,.64,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body {
+  font-family: 'Inter',-apple-system,sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+::-webkit-scrollbar{width:6px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18)}
+
+/* ═══ APP ═══ */
+.app { display:flex; min-height:100vh; }
+.main { flex:1; min-width:0; padding:2rem 2.5rem 3.5rem 3rem; max-width:calc(100vw - 232px); }
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  width:232px;background:var(--bg-el);border-right:1px solid var(--bor);
+  height:100vh;position:sticky;top:0;display:flex;flex-direction:column;flex-shrink:0;
+}
+.sb-top { padding:1.375rem 1.25rem 1.125rem;border-bottom:1px solid var(--bor); }
+.logo { display:flex;align-items:center;gap:.625rem; }
+.logo-ico { width:32px;height:32px;border-radius:8px;background:var(--acc-m);display:flex;align-items:center;justify-content:center; }
+.logo-ico svg { width:17px;height:17px;color:var(--acc); }
+.logo-n { font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:1.1rem;letter-spacing:-.025rem;color:var(--ink); }
+.nav { flex:1;padding:.625rem;display:flex;flex-direction:column;gap:2px; }
+.nb {
+  display:flex;align-items:center;gap:.625rem;padding:.5625rem .8125rem;border-radius:8px;
+  font-size:.8125rem;font-weight:500;color:var(--ink-4);background:none;border:none;cursor:pointer;
+  transition:all 120ms var(--out);text-align:left;width:100%;
+}
+.nb svg { width:15px;height:15px;opacity:.4;transition:opacity 120ms var(--out); }
+.nb:hover { background:var(--acc-f);color:var(--ink-2); } .nb:hover svg { opacity:.7; }
+.nb.a { background:var(--acc-m);color:var(--acc);font-weight:600; } .nb.a svg { opacity:1; }
+.sb-ft { padding:.875rem 1.25rem;border-top:1px solid var(--bor);display:flex;align-items:center;gap:.75rem; }
+.av { width:30px;height:30px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.625rem;font-weight:700;font-family:'Newsreader',sans-serif;flex-shrink:0; }
+.av-n { font-size:.8125rem;font-weight:600;color:var(--ink-2);line-height:1.2; }
+.av-s { font-size:.625rem;color:var(--ink-3);display:flex;align-items:center;gap:.3125rem; }
+.dl { width:5px;height:5px;border-radius:50%;background:var(--ink-3); }
+.dl.o { background:var(--grn);animation:pulse 2s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+/* ═══ TOPBAR ═══ */
+.topbar { display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.875rem;gap:1rem; }
+.session { display:inline-flex;align-items:center;gap:.4375rem;padding:.25rem .75rem;border-radius:7px;font-size:.625rem;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.5rem; }
+.session.closed { background:rgba(255,255,255,.06);color:var(--ink-5); }
+.session .dot { width:6px;height:6px;border-radius:50%;background:var(--ink-3); }
+.ptitle { font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:1.875rem;letter-spacing:-.025em;line-height:1.15;color:var(--ink); }
+.psub { font-size:.8125rem;color:var(--ink-5);margin-top:.0625rem; }
+.topbar-r { display:flex;align-items:center;gap:.625rem;flex-shrink:0; }
+.btn { padding:.5rem 1rem;border-radius:9px;font-size:.8125rem;font-weight:500;cursor:pointer;transition:all 120ms var(--spr);border:1px solid transparent;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:.4375rem;white-space:nowrap; }
+.btn svg { width:14px;height:14px; }
+.btn-ac { background:var(--acc);color:#fff;box-shadow:0 2px 8px rgba(201,122,63,.25); }
+.btn-ac:hover { background:var(--acc-l);transform:translateY(-2px);box-shadow:0 4px 16px rgba(201,122,63,.3); }
+.btn-gh { background:transparent;color:var(--ink-4);border-color:var(--bor-m); }
+.btn-gh:hover { background:var(--acc-f);border-color:var(--acc);color:var(--acc);transform:translateY(-1px); }
+
+@keyframes ci { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
+
+/* ═══ FILTER BAR ═══ */
+.filter-bar { display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap;animation:ci .28s var(--out) both; }
+.filter-chip { padding:.375rem .75rem;border-radius:7px;font-size:.75rem;font-weight:500;cursor:pointer;transition:all 120ms var(--out);border:1px solid var(--bor);background:var(--bg-card);color:var(--ink-4);font-family:'Inter',sans-serif; }
+.filter-chip:hover { border-color:var(--acc);color:var(--acc);background:var(--acc-f); }
+.filter-chip.active { background:var(--acc-m);color:var(--acc);border-color:var(--acc);font-weight:600; }
+.filter-sep { width:1px;height:20px;background:var(--bor);margin:0 .25rem; }
+.search-box { margin-left:auto;display:flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:7px;border:1px solid var(--bor);background:var(--bg-card);transition:all 120ms var(--out); }
+.search-box:focus-within { border-color:var(--acc);box-shadow:0 0 0 2px var(--acc-m); }
+.search-box svg { width:14px;height:14px;color:var(--ink-3);flex-shrink:0; }
+.search-box input { border:none;outline:none;background:transparent;font-size:.75rem;font-family:'Inter',sans-serif;color:var(--ink);width:140px; }
+.search-box input::placeholder { color:var(--ink-5); }
+.sort-btn { display:flex;align-items:center;gap:.25rem;padding:.375rem .625rem;border-radius:7px;font-size:.75rem;font-weight:500;cursor:pointer;transition:all 120ms var(--out);border:1px solid var(--bor);background:var(--bg-card);color:var(--ink-4);font-family:'Inter',sans-serif; }
+.sort-btn:hover { border-color:var(--acc);color:var(--acc); }
+.sort-btn .arrow { font-size:.625rem;color:var(--ink-5); }
+
+/* ═══ TRADES FULL ═══ */
+.trd-full { animation:ci .3s var(--out) .25s both; }
+.trd-card { background:var(--bg-card);border:1px solid var(--bor);border-radius:14px;overflow:hidden; }
+.trd-scroll { overflow-x:auto; max-height:70vh; overflow-y:auto; }
+
+.trd-header { display:flex; min-width:1020px; padding:.875rem 1.125rem; font-size:.625rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-5); border-bottom:1px solid var(--bor); background:var(--bg-elev); }
+.trd-row { display:flex; align-items:center; min-width:1020px; padding:.8125rem 1.125rem; border-bottom:1px solid var(--bor); font-size:.8125rem; opacity:0; transform:translateY(3px); transition:opacity .2s var(--spr),transform .2s var(--spr); }
+.trd-row.show { opacity:1; transform:translateY(0); }
+.trd-row.open-row { border-left:3px solid var(--acc); }
+.trd-row:hover { background:var(--acc-f); }
+.trd-header > span, .trd-row > span { flex-shrink:0; }
+
+.sym { font-weight:600;color:var(--ink);display:flex;align-items:center;gap:.5rem;letter-spacing:.01em; }
+.sym-dot { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
+.sym-dot.g { background:var(--grn);box-shadow:0 0 6px rgba(74,222,128,.35); }
+.sym-dot.r { background:var(--red);box-shadow:0 0 6px rgba(248,113,113,.3); }
+.sym-dot.b { background:var(--blu);box-shadow:0 0 6px rgba(107,163,214,.35); }
+.dir-tag { font-family:'JetBrains Mono',monospace;font-size:.625rem;font-weight:600;padding:.1875rem .5rem;border-radius:5px;letter-spacing:.04em;text-transform:uppercase;display:inline-block;width:fit-content; }
+.dir-tag.l { background:var(--grn-f);color:var(--grn); }
+.dir-tag.s { background:var(--red-f);color:var(--red); }
+.d { font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-4); }
+.d.g { color:var(--grn);font-weight:600; }
+.d.r { color:var(--red);font-weight:600; }
+.exit-tag { font-family:'JetBrains Mono',monospace;font-size:.625rem;font-weight:500;padding:.1875rem .5rem;border-radius:5px;letter-spacing:.02em;white-space:nowrap; }
+.exit-tag.tp { background:var(--grn-f);color:var(--grn); }
+.exit-tag.sl { background:var(--red-f);color:var(--red); }
+.exit-tag.mn { background:var(--acc-f);color:var(--acc); }
+.exit-tag.op { background:var(--blu-f);color:var(--blu); }
+.note-txt { color:var(--ink-5);font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0; }
+
+.trd-summary { display:flex;align-items:center;min-width:1020px;padding:.875rem 1rem;font-size:.75rem;border-bottom:1px solid var(--bor);background:var(--acc-f);font-weight:600; }
+.trd-summary .ss { flex-shrink:0; }
+
+@media(max-width:900px) {
+  .sidebar { display:none; }
+  .main { padding:1.25rem; }
+  .filter-bar { gap:.375rem; }
+  .search-box { margin-left:0;flex:1;margin-top:.5rem; }
+  .search-box input { width:100%; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="sb-top">
+    <div class="logo"><div class="logo-ico"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div><span class="logo-n">TradeJournal</span></div>
+  </div>
+  <nav class="nav">
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Dashboard</button>
+    <button class="nb a"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Trades</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>Journal</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Playbook</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>Review</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>Ideas</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Settings</button>
+  </nav>
+  <div class="sb-ft"><div class="av">RC</div><div><div class="av-n">Ryu Chan</div><div class="av-s"><div class="dl"></div>Market closed</div></div></div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="session closed"><div class="dot"></div>Closed · Opens 9:15 AM IST</div>
+      <div class="ptitle">Trades</div>
+      <div class="psub">May 2026 · 42 trades · Net ₹48,320</div>
+    </div>
+    <div class="topbar-r">
+      <button class="btn btn-gh"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Export</button>
+      <button class="btn btn-ac"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>New Trade</button>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <button class="filter-chip active">All (42)</button>
+    <button class="filter-chip">Long (34)</button>
+    <button class="filter-chip">Short (5)</button>
+    <button class="filter-chip">Open (2)</button>
+    <button class="filter-chip">Closed (40)</button>
+    <div class="filter-sep"></div>
+    <button class="sort-btn">Sort: Date <span class="arrow">↓</span></button>
+    <button class="sort-btn">P&L <span class="arrow">↓</span></button>
+    <button class="sort-btn">Symbol <span class="arrow">↑</span></button>
+    <div class="search-box">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input type="text" placeholder="Search symbol…">
+    </div>
+  </div>
+
+  <!-- TRADES TABLE -->
+  <div class="trd-full">
+    <div class="trd-card">
+      <div class="trd-scroll">
+        <div class="trd-header">
+          <span style="width:85px">Symbol</span><span style="width:56px">Dir</span><span style="width:95px">Entry Date</span><span style="width:90px">Entry ₹</span><span style="width:95px">Exit Date</span><span style="width:90px">Exit ₹</span><span style="width:45px">Qty</span><span style="width:90px">P&L</span><span style="width:50px">R</span><span style="width:72px">Hold</span><span style="width:64px">Exit</span><span style="flex:1;min-width:160px">Notes</span>
+        </div>
+        <div class="trd-summary">
+          <span class="ss" style="width:85px">Totals</span>
+          <span class="ss" style="width:56px">42t</span>
+          <span class="ss" style="width:95px"></span>
+          <span class="ss" style="width:90px"></span>
+          <span class="ss" style="width:95px"></span>
+          <span class="ss" style="width:90px"></span>
+          <span class="ss" style="width:45px"></span>
+          <span class="ss d g" style="width:90px">+₹48,320</span>
+          <span class="ss d g" style="width:50px">+0.52R</span>
+          <span class="ss" style="width:72px">3h42m</span>
+          <span class="ss" style="width:64px;"></span>
+          <span class="ss" style="flex:1;min-width:160px">64.3% WR · PF 1.82</span>
+        </div>
+        <div class="trd-row open-row">
+          <span class="sym" style="width:85px"><span class="sym-dot b"></span>BANKNIFTY</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">9:30</span></span>
+          <span class="d" style="width:90px">₹52,340</span>
+          <span style="width:95px"><span class="d" style="display:block;color:var(--blu)">—</span></span>
+          <span class="d" style="width:90px">—</span>
+          <span class="d" style="width:45px">25</span>
+          <span class="d g" style="width:90px">+₹1,875</span>
+          <span class="d g" style="width:50px">+0.22</span>
+          <span class="d" style="width:72px">2h 10m</span>
+          <span style="width:64px"><span class="exit-tag op">Open</span></span>
+          <span class="note-txt">BN breakout play. Running.</span>
+        </div>
+        <div class="trd-row open-row">
+          <span class="sym" style="width:85px"><span class="sym-dot b"></span>SBI</span>
+          <span class="dir-tag s" style="width:56px">SHORT</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">10:15</span></span>
+          <span class="d" style="width:90px">₹815.40</span>
+          <span style="width:95px"><span class="d" style="display:block;color:var(--blu)">—</span></span>
+          <span class="d" style="width:90px">—</span>
+          <span class="d" style="width:45px">120</span>
+          <span class="d r" style="width:90px">-₹480</span>
+          <span class="d r" style="width:50px">-0.08</span>
+          <span class="d" style="width:72px">1h 30m</span>
+          <span style="width:64px"><span class="exit-tag op">Open</span></span>
+          <span class="note-txt">Resistance short. Needs patience.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>RELIANCE</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">9:15</span></span>
+          <span class="d" style="width:90px">₹2,847.50</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">11:30</span></span>
+          <span class="d" style="width:90px">₹2,912.00</span>
+          <span class="d" style="width:45px">50</span>
+          <span class="d g" style="width:90px">+₹3,225</span>
+          <span class="d g" style="width:50px">+0.82</span>
+          <span class="d" style="width:72px">2h 15m</span>
+          <span style="width:64px"><span class="exit-tag tp">Target</span></span>
+          <span class="note-txt">Clean breakout above 2840 resistance. Held entry well.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot r"></span>INFY</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">10:00</span></span>
+          <span class="d" style="width:90px">₹1,523.80</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">10:45</span></span>
+          <span class="d" style="width:90px">₹1,498.20</span>
+          <span class="d" style="width:45px">50</span>
+          <span class="d r" style="width:90px">-₹1,280</span>
+          <span class="d r" style="width:50px">-0.32</span>
+          <span class="d" style="width:72px">45m</span>
+          <span style="width:64px"><span class="exit-tag sl">Stop</span></span>
+          <span class="note-txt">Stopped out after gap-down. Should have waited for confirmation.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>TCS</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">14:10</span></span>
+          <span class="d" style="width:90px">₹3,890.00</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">13 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">9:50</span></span>
+          <span class="d" style="width:90px">₹3,962.50</span>
+          <span class="d" style="width:45px">60</span>
+          <span class="d g" style="width:90px">+₹4,350</span>
+          <span class="d g" style="width:50px">+1.12</span>
+          <span class="d" style="width:72px">19h 40m</span>
+          <span style="width:64px"><span class="exit-tag tp">Target</span></span>
+          <span class="note-txt">Carried overnight. Gap-up at open hit target immediately.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>HDFC BANK</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">13:20</span></span>
+          <span class="d" style="width:90px">₹1,687.25</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">15:10</span></span>
+          <span class="d" style="width:90px">₹1,720.50</span>
+          <span class="d" style="width:45px">60</span>
+          <span class="d g" style="width:90px">+₹2,000</span>
+          <span class="d g" style="width:50px">+0.75</span>
+          <span class="d" style="width:72px">1h 50m</span>
+          <span style="width:64px"><span class="exit-tag tp">Target</span></span>
+          <span class="note-txt">Pullback to 20 EMA bounce. Clean entry.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>ICICI BANK</span>
+          <span class="dir-tag s" style="width:56px">SHORT</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">9:20</span></span>
+          <span class="d" style="width:90px">₹1,102.40</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">14:40</span></span>
+          <span class="d" style="width:90px">₹1,087.60</span>
+          <span class="d" style="width:45px">100</span>
+          <span class="d g" style="width:90px">+₹1,480</span>
+          <span class="d g" style="width:50px">+0.42</span>
+          <span class="d" style="width:72px">5h 20m</span>
+          <span style="width:64px"><span class="exit-tag mn">Manual</span></span>
+          <span class="note-txt">Shorted resistance at 1100. Exited manually on volume spike.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot r"></span>AXIS BANK</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">12:05</span></span>
+          <span class="d" style="width:90px">₹1,245.30</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">12 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">12:35</span></span>
+          <span class="d" style="width:90px">₹1,238.70</span>
+          <span class="d" style="width:45px">60</span>
+          <span class="d r" style="width:90px">-₹396</span>
+          <span class="d r" style="width:50px">-0.15</span>
+          <span class="d" style="width:72px">30m</span>
+          <span style="width:64px"><span class="exit-tag sl">Stop</span></span>
+          <span class="note-txt">Fake breakout. Should have waited for candle close.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>WIPRO</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">7 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">9:45</span></span>
+          <span class="d" style="width:90px">₹498.65</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">8 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">14:55</span></span>
+          <span class="d" style="width:90px">₹512.80</span>
+          <span class="d" style="width:45px">600</span>
+          <span class="d g" style="width:90px">+₹8,520</span>
+          <span class="d g" style="width:50px">+1.40</span>
+          <span class="d" style="width:72px">1d 5h</span>
+          <span style="width:64px"><span class="exit-tag tp">Target</span></span>
+          <span class="note-txt">Best trade of the week. Strong momentum.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>ITC</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">8 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">10:20</span></span>
+          <span class="d" style="width:90px">₹437.20</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">8 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">11:45</span></span>
+          <span class="d" style="width:90px">₹443.80</span>
+          <span class="d" style="width:45px">200</span>
+          <span class="d g" style="width:90px">+₹1,320</span>
+          <span class="d g" style="width:50px">+0.38</span>
+          <span class="d" style="width:72px">1h 25m</span>
+          <span style="width:64px"><span class="exit-tag mn">Manual</span></span>
+          <span class="note-txt">Defensive FMCG play. Quick scalp.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot r"></span>HCLTECH</span>
+          <span class="dir-tag s" style="width:56px">SHORT</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">7 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">15:10</span></span>
+          <span class="d" style="width:90px">₹1,562.30</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">7 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">15:25</span></span>
+          <span class="d" style="width:90px">₹1,578.00</span>
+          <span class="d" style="width:45px">60</span>
+          <span class="d r" style="width:90px">-₹942</span>
+          <span class="d r" style="width:50px">-0.20</span>
+          <span class="d" style="width:72px">15m</span>
+          <span style="width:64px"><span class="exit-tag sl">Stop</span></span>
+          <span class="note-txt">Late entry. Market reversed fast against short thesis.</span>
+        </div>
+        <div class="trd-row t">
+          <span class="sym" style="width:85px"><span class="sym-dot g"></span>TECHM</span>
+          <span class="dir-tag l" style="width:56px">LONG</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">6 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">10:30</span></span>
+          <span class="d" style="width:90px">₹1,186.50</span>
+          <span style="width:95px"><span class="d" style="display:block;font-weight:500">9 May</span><span class="d" style="font-size:.6875rem;color:var(--ink-5)">14:35</span></span>
+          <span class="d" style="width:90px">₹1,215.30</span>
+          <span class="d" style="width:45px">200</span>
+          <span class="d g" style="width:90px">+₹5,760</span>
+          <span class="d g" style="width:50px">+1.08</span>
+          <span class="d" style="width:72px">3d 4h</span>
+          <span style="width:64px"><span class="exit-tag tp">Target</span></span>
+          <span class="note-txt">Swing trade. Held through 3 days. IT sector rotated.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.trd-row').forEach((r, i) => {
+    setTimeout(() => { r.classList.add('show'); }, 500 + i * 80);
+  });
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+from fastapi import APIRouter
+from app.routers import health, trades, dhan, dhan_webhook, csv_import, capital_events, accounts, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(auth.router, tags=["auth"])
+api_router.include_router(health.router, prefix="/health", tags=["health"])
+api_router.include_router(trades.router, tags=["trades"])
+api_router.include_router(dhan.router, tags=["dhan-sync"])
+api_router.include_router(dhan_webhook.router, tags=["dhan-webhook"])
+api_router.include_router(csv_import.router, tags=["csv-import"])
+api_router.include_router(capital_events.router, tags=["capital-events"])
+api_router.include_router(accounts.router, tags=["accounts"])
+api_router.include_router(coach.router, tags=["ai-coach"])
+api_router.include_router(setup_playbook.router, tags=["setup-playbook"])
+api_router.include_router(export.router, tags=["export"])
+api_router.include_router(analytics.router, tags=["analytics"])
+api_router.include_router(trade_ideas.router, tags=["trade-ideas"])
+api_router.include_router(daily_journal.router, tags=["daily-journal"])
+api_router.include_router(ai_settings.router, tags=["ai-settings"])

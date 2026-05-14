@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeJournal — Journal · Light</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500;6..72,600;6..72,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg:#f2ece4;--bg-el:#faf6f0;--bg-card:rgba(255,253,249,.92);--bg-card-h:rgba(255,253,249,.98);
+  --ink:#121212;--ink-2:#252525;--ink-4:#4a4a4a;--ink-5:#6e6e6e;--ink-3:#a8a8a8;--ink-1:#c8c8c8;
+  --acc:#b85c38;--acc-l:#cf7a58;--acc-m:rgba(184,92,56,.12);--acc-f:rgba(184,92,56,.06);
+  --grn:#3d8b5c;--grn-m:rgba(61,139,92,.15);--grn-f:rgba(61,139,92,.07);
+  --red:#b84038;--red-m:rgba(184,64,56,.15);--red-f:rgba(184,64,56,.07);
+  --blu:#5b7fa5;--blu-f:rgba(91,127,165,.10);--gold:#c4a035;--gold-f:rgba(196,160,53,.10);
+  --bor:rgba(0,0,0,.06);--bor-m:rgba(0,0,0,.10);--sh-1:0 1px 2px rgba(0,0,0,.03);--sh-2:0 3px 12px rgba(0,0,0,.05);
+  --out:cubic-bezier(.4,0,.2,1);--spr:cubic-bezier(.34,1.56,.64,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px;z-index:0;}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.08);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.15)}
+.app{display:flex;min-height:100vh;position:relative;z-index:1;}.main{flex:1;min-width:0;padding:2rem 2.5rem 3.5rem 3rem;max-width:calc(100vw - 232px);}
+@keyframes ci{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.sidebar{width:232px;background:var(--bg-el);border-right:1px solid var(--bor);height:100vh;position:sticky;top:0;display:flex;flex-direction:column;flex-shrink:0;}
+.sb-top{padding:1.375rem 1.25rem 1.125rem;border-bottom:1px solid var(--bor);}
+.logo{display:flex;align-items:center;gap:.625rem;}.logo-ico{width:32px;height:32px;border-radius:8px;background:var(--acc-m);display:flex;align-items:center;justify-content:center;}.logo-ico svg{width:17px;height:17px;color:var(--acc);}.logo-n{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:1.1rem;letter-spacing:-.025rem;color:var(--ink);}
+.nav{flex:1;padding:.625rem;display:flex;flex-direction:column;gap:2px;}
+.nb{display:flex;align-items:center;gap:.625rem;padding:.5625rem .8125rem;border-radius:8px;font-size:.8125rem;font-weight:500;color:var(--ink-5);background:none;border:none;cursor:pointer;transition:all 120ms var(--out);text-align:left;width:100%;}
+.nb svg{width:15px;height:15px;opacity:.55;transition:opacity 120ms var(--out);}.nb:hover{background:var(--acc-f);color:var(--ink-2);}.nb:hover svg{opacity:.8;}.nb.a{background:var(--acc-m);color:var(--acc);font-weight:600;}.nb.a svg{opacity:1;}
+.sb-ft{padding:.875rem 1.25rem;border-top:1px solid var(--bor);display:flex;align-items:center;gap:.75rem;}
+.av{width:30px;height:30px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.625rem;font-weight:700;font-family:'Newsreader',sans-serif;flex-shrink:0;}.av-n{font-size:.8125rem;font-weight:600;color:var(--ink-2);}.av-s{font-size:.625rem;color:var(--ink-3);display:flex;align-items:center;gap:.3125rem;}
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.75rem;}.ptitle{font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:1.75rem;letter-spacing:-.025em;line-height:1.15;color:var(--ink);}.psub{font-size:.8125rem;color:var(--ink-5);margin-top:.0625rem;}
+.btn{padding:.5rem 1rem;border-radius:9px;font-size:.8125rem;font-weight:500;cursor:pointer;transition:all 120ms var(--spr);border:1px solid transparent;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:.4375rem;white-space:nowrap;}.btn svg{width:14px;height:14px;}.btn-ac{background:var(--acc);color:#fff;box-shadow:var(--sh-1);}.btn-ac:hover{background:var(--acc-l);transform:translateY(-2px);}
+.btn-gh{background:transparent;color:var(--ink-4);border-color:var(--bor-m);}.btn-gh:hover{background:var(--acc-f);border-color:var(--acc);color:var(--acc);}
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}.month-title{font-family:'Newsreader',Georgia,serif;font-size:1.125rem;color:var(--ink);font-weight:600;}.month-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--bor);background:var(--bg-card);color:var(--ink-4);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 100ms var(--out);}.month-btn:hover{background:var(--acc-f);color:var(--acc);border-color:var(--acc);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.375rem;animation:ci .4s var(--out) both;}
+.cal-day-name{font-size:.625rem;font-weight:600;color:var(--ink-3);text-align:center;padding:.375rem 0;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
+.day-card{background:var(--bg-card);border:1px solid var(--bor);border-radius:12px;padding:.75rem .625rem;min-height:90px;cursor:pointer;transition:all 150ms var(--out);animation:ci .3s var(--out) both;position:relative;overflow:hidden;}.day-card:hover{box-shadow:var(--sh-2);transform:translateY(-2px);border-color:var(--bor-m);background:var(--bg-card-h);}
+.day-card.empty{background:transparent;border:1px solid transparent;cursor:default;animation:none;}.day-card.empty:hover{box-shadow:none;transform:none;}
+.day-num{font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600;color:var(--ink-2);margin-bottom:.375rem;}
+.day-card.today .day-num{color:var(--acc);font-weight:700;}
+.day-pnl{font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600;margin-bottom:.25rem;}.day-pnl.g{color:var(--grn);}.day-pnl.r{color:var(--red);}.day-pnl.o{color:var(--gold);}
+.day-meta{font-size:.625rem;color:var(--ink-5);margin-bottom:.375rem;}
+.day-dots{display:flex;gap:2px;}.day-dots span{width:4px;height:4px;border-radius:50%;}.day-dots span.g{background:var(--grn);}.day-dots span.r{background:var(--red);}
+.entry-panel{position:fixed;top:0;right:-520px;width:480px;max-width:90vw;height:100vh;background:var(--bg-el);border-left:1px solid var(--bor);padding:2rem 1.75rem;overflow-y:auto;transition:right .3s var(--out);z-index:100;box-shadow:-8px 0 32px rgba(0,0,0,.1);}
+.entry-panel.open{right:0;}.entry-close{position:absolute;top:1.25rem;right:1.25rem;width:32px;height:32px;border-radius:8px;border:1px solid var(--bor);background:var(--bg-card);color:var(--ink-4);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 100ms var(--out);}.entry-close:hover{background:var(--red-f);color:var(--red);border-color:var(--red);}
+.entry-date{font-family:'Newsreader',Georgia,serif;font-size:1.25rem;color:var(--ink);margin-bottom:.25rem;}
+.entry-stats{display:flex;gap:.75rem;margin-bottom:1.25rem;}.entry-stat{font-family:'JetBrains Mono',monospace;font-size:.8125rem;}.entry-stat.g{color:var(--grn);}.entry-stat.r{color:var(--red);}
+.entry-section{margin-bottom:1.25rem;}.entry-label{font-size:.6875rem;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;display:flex;align-items:center;gap:.375rem;}.entry-label svg{width:12px;height:12px;color:var(--acc);opacity:.6;}
+.mood-row{display:flex;gap:.375rem;margin-bottom:.5rem;}.mood-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--bor);background:var(--bg-card);font-size:1.125rem;cursor:pointer;transition:all 100ms var(--out);display:flex;align-items:center;justify-content:center;}.mood-btn:hover,.mood-btn.active{border-color:var(--acc);background:var(--acc-f);transform:scale(1.1);}
+.entry-text{width:100%;min-height:80px;background:var(--bg-card);border:1px solid var(--bor);border-radius:10px;padding:.875rem;color:var(--ink);font-family:'Inter',sans-serif;font-size:.8125rem;line-height:1.6;resize:vertical;outline:none;transition:border-color 120ms var(--out);}.entry-text:focus{border-color:var(--acc);}.entry-text::placeholder{color:var(--ink-3);}
+.tags-row{display:flex;flex-wrap:wrap;gap:.375rem;}.tag{padding:.25rem .5rem;border-radius:5px;font-size:.6875rem;font-weight:500;border:1px solid var(--bor);color:var(--ink-4);cursor:pointer;transition:all 100ms var(--out);background:var(--bg-card);}.tag.active,.tag:hover{border-color:var(--acc);color:var(--acc);background:var(--acc-f);}
+.ai-box{background:var(--bg-card);border:1px solid var(--bor);border-radius:10px;padding:.875rem;}.ai-box p{font-size:.8125rem;line-height:1.6;color:var(--ink-4);font-style:italic;}.ai-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .375rem;border-radius:4px;font-size:.625rem;font-weight:600;background:var(--acc-m);color:var(--acc);margin-bottom:.5rem;}
+.overlay{position:fixed;inset:0;background:var(--ink);z-index:50;opacity:0;pointer-events:none;transition:opacity .3s var(--out);}.overlay.open{opacity:.15;pointer-events:auto;}
+@media(max-width:900px){.sidebar{display:none;}.main{padding:1.25rem !important;}.entry-panel{width:100%;max-width:none;}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="sb-top"><div class="logo"><div class="logo-ico"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div><span class="logo-n">TradeJournal</span></div></div>
+  <nav class="nav">
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Dashboard</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Trades</button>
+    <button class="nb a"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>Journal</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Playbook</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>Review</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>Ideas</button>
+    <button class="nb"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Settings</button>
+  </nav>
+  <div class="sb-ft"><div class="av">RC</div><div><div class="av-n">Ryu Chan</div><div class="av-s">Market closed</div></div></div>
+</aside>
+<main class="main">
+  <div class="topbar"><div><div class="ptitle">Journal</div><div class="psub">Your daily trading diary · 18 entries this month</div></div></div>
+  <div class="month-nav">
+    <button class="month-btn"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>
+    <span class="month-title">May 2026</span>
+    <button class="month-btn"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-day-name">Mon</div><div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div><div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div><div class="cal-day-name">Sat</div><div class="cal-day-name">Sun</div>
+    <div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div>
+    <div class="day-card" style="animation-delay:30ms"><div class="day-num">4</div><div class="day-pnl g">+₹3.2k</div><div class="day-meta">3 trades</div><div class="day-dots"><span class="g"></span><span class="g"></span><span class="r"></span></div></div>
+    <div class="day-card" style="animation-delay:50ms"><div class="day-num">5</div><div class="day-pnl g">+₹8.5k</div><div class="day-meta">1 trade</div><div class="day-dots"><span class="g"></span></div></div>
+    <div class="day-card empty"></div><div class="day-card empty"></div>
+    <div class="day-card" style="animation-delay:80ms"><div class="day-num">6</div><div class="day-pnl g">+₹5.7k</div><div class="day-meta">1 trade</div><div class="day-dots"><span class="g"></span></div></div>
+    <div class="day-card" style="animation-delay:100ms"><div class="day-num">7</div><div class="day-pnl r">-₹942</div><div class="day-meta">2 trades</div><div class="day-dots"><span class="g"></span><span class="r"></span></div></div>
+    <div class="day-card" style="animation-delay:120ms"><div class="day-num">8</div><div class="day-pnl g">+₹1.3k</div><div class="day-meta">1 trade</div><div class="day-dots"><span class="g"></span></div></div>
+    <div class="day-card" style="animation-delay:140ms"><div class="day-num">9</div><div class="day-pnl r">-₹3.1k</div><div class="day-meta">4 trades</div><div class="day-dots"><span class="r"></span><span class="r"></span><span class="r"></span><span class="g"></span></div></div>
+    <div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div>
+    <div class="day-card" style="animation-delay:180ms"><div class="day-num">10</div><div class="day-pnl g">+₹2.0k</div><div class="day-meta">1 trade</div><div class="day-dots"><span class="g"></span></div></div>
+    <div class="day-card" style="animation-delay:200ms"><div class="day-num">11</div><div class="day-pnl g">+₹4.3k</div><div class="day-meta">1 trade</div><div class="day-dots"><span class="g"></span></div></div>
+    <div class="day-card" style="animation-delay:220ms"><div class="day-num">12</div><div class="day-pnl g">+₹3.1k</div><div class="day-meta">4 trades</div><div class="day-dots"><span class="g"></span><span class="g"></span><span class="g"></span><span class="r"></span></div></div>
+    <div class="day-card today" style="animation-delay:240ms"><div class="day-num">13</div><div class="day-pnl g">+₹1.9k</div><div class="day-meta">2 trades</div><div class="day-dots"><span class="g"></span><span class="r"></span></div></div>
+    <div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div>
+    <div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div>
+    <div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div><div class="day-card empty"></div>
+  </div>
+</main>
+<div class="overlay" id="overlay" onclick="closeEntry()"></div>
+<div class="entry-panel" id="entryPanel">
+  <button class="entry-close" onclick="closeEntry()"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+  <div class="entry-date">Tue, 12 May 2026</div>
+  <div class="entry-stats"><span class="entry-stat g">+₹3,084 · 4 trades</span><span class="entry-stat">3W / 1L</span></div>
+  <div class="entry-section">
+    <div class="entry-label"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>How was today?</div>
+    <div class="mood-row">
+      <button class="mood-btn" title="Great">😤</button><button class="mood-btn active" title="Good">😊</button><button class="mood-btn" title="Okay">😐</button><button class="mood-btn" title="Bad">😞</button><button class="mood-btn" title="Terrible">😡</button>
+    </div>
+  </div>
+  <div class="entry-section">
+    <div class="entry-label"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>Trade Summary</div>
+    <textarea class="entry-text" placeholder="What happened today?">4 trades today. ICICI short worked perfectly — entered at 1100 resistance, exited on volume spike at 14:40. HDFC pullback to 20 EMA was clean. Axis was a fake breakout — should have waited for candle close.</textarea>
+  </div>
+  <div class="entry-section">
+    <div class="entry-label"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3"/></svg>Tags</div>
+    <div class="tags-row">
+      <span class="tag active">Followed Rules</span><span class="tag active">Good Patience</span><span class="tag">FOMO</span><span class="tag">Impulsive</span><span class="tag active">Clean Setup</span><span class="tag">Revenge</span>
+    </div>
+  </div>
+  <div class="entry-section">
+    <div class="entry-label"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>Lesson Learned</div>
+    <textarea class="entry-text" placeholder="What will you do differently?">Need to stop entering before 10am on low conviction — morning chop is eating my edge.</textarea>
+  </div>
+  <div class="entry-section">
+    <div class="ai-badge"><svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg> AI Coach</div>
+    <div class="ai-box"><p>Good day — 3 wins from 4 trades is solid. Your one loss (Axis) was due to impatience, not bad analysis. Consider a "no trades before 10 AM" rule. Your best trades happen after 10:30.</p></div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.day-card:not(.empty)').forEach(c=>c.addEventListener('click',()=>{document.getElementById('entryPanel').classList.add('open');document.getElementById('overlay').classList.add('open');}));
+function closeEntry(){document.getElementById('entryPanel').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+</script>
+</body>
+</html>
