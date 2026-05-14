@@ -13,6 +13,7 @@ import { SetupPlaybookPage } from '@/components/playbook/SetupPlaybookPage'
 import { TradeIdeasPage } from '@/components/ideas/TradeIdeasPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { AnalyticsDashboardPage } from '@/pages/AnalyticsDashboardPage'
+import { CapitalPage } from '@/pages/CapitalPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useEffect } from 'react'
@@ -65,6 +66,7 @@ function App() {
               {activeView === 'journal' && <ErrorBoundary name="Journal"><JournalPage /></ErrorBoundary>}
               {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
               {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
+              {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}
               {activeView === 'review' && <ErrorBoundary name="Review"><TradeReviewStream /></ErrorBoundary>}
               {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
             </main>

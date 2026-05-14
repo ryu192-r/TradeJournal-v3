@@ -2,7 +2,7 @@
 import apiClient from '@/lib/api'
 import type { ApiTrade, ApiTradeListResponse, BackendTradeStatus } from '@/types'
 import type { DailyJournal, DailyJournalPayload } from '@/types'
-import type { FullDashboardPayload } from '@/types'
+import type { FullDashboardPayload, CapitalDashboardPayload } from '@/types'
 import type {
   SetupPlaybookItem, SetupPlaybookListResponse,
   SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload,
@@ -146,6 +146,12 @@ export function getAiProviders() {
 
 export function saveAiConfig(config: AiConfigSaveRequest) {
   return apiClient.put<AiConfigResponse>('/ai/config', config).then(r => r.data)
+}
+
+// ───────────────────────── Capital Dashboard ─────────────────────────
+
+export function getCapitalDashboard() {
+  return apiClient.get<CapitalDashboardPayload>('/accounts/capital-dashboard').then(r => r.data)
 }
 
 export function testAiConnection() {

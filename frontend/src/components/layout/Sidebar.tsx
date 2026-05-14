@@ -9,6 +9,7 @@ import {
   Lightbulb,
   Menu,
   Settings,
+  TrendingUp,
 } from 'lucide-react'
 import { type ReactNode } from 'react'
 
@@ -19,6 +20,7 @@ const navItems = [
   { id: 'playbook' as const, label: 'Playbook', icon: ClipboardList },
   { id: 'review' as const, label: 'Review', icon: BarChart3 },
   { id: 'ideas' as const, label: 'Ideas', icon: Lightbulb },
+  { id: 'capital' as const, label: 'Capital', icon: TrendingUp },
   { id: 'settings' as const, label: 'Settings', icon: Settings },
 ]
 

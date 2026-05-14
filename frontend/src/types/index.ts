@@ -278,6 +278,27 @@ export interface HoldingPeriodEntry {
   pnl: string | null
 }
 
+export interface CapitalDashboardPayload {
+  net_equity: string
+  total_deposits: string
+  total_withdrawals: string
+  total_realized_pnl: string
+  unrealized_pnl: string
+  current_balance: string
+  initial_balance: string
+  total_trades: number
+  win_rate: number | null
+  best_trade: string
+  worst_trade: string
+  average_win: string
+  average_loss: string
+  profit_factor: number | null
+  equity_curve: { date: string; equity: string }[]
+  events: { date: string; type: string; amount: string; description: string | null }[]
+  tiers: { name: string; min: string; max: string | null; current: boolean; progress_pct: number | null }[]
+  progress_to_next_tier: number | null
+}
+
 export interface FullDashboardPayload {
   kpi: AnalyticsKpi
   setup_performance: SetupPerformanceItem[]
