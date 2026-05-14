@@ -10,6 +10,7 @@ from .milestone import Milestone
 from .account import Account
 from .coach_review import CoachReview
 from .user import User
+from .tier_config import TierConfig
 
 __all__ = [
     'Base',
@@ -24,5 +25,6 @@ __all__ = [
     'Milestone',
     'Account',
     'CoachReview',
-    'User'
+    'User',
+    'TierConfig'
 ]

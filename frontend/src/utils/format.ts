@@ -13,11 +13,29 @@ export function formatDate(date: Date | string | number): string {
 
 const CURRENCY_SYMBOLS: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' }
 
+/**
+ * Format a number in Indian style: ₹ 1,50,000 or ₹ 1.5L or ₹ 1.2Cr
+ */
 export function formatCurrency(v: string | number, currency = 'INR') {
   const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '')) || 0);
   if (isNaN(n)) return `${CURRENCY_SYMBOLS[currency] || ''}0`;
   const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
-  return `${symbol}${n > 1000 && currency === 'INR' ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  if (currency !== 'INR') {
+    return `${symbol}${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  }
+  // Indian formatting: lakh / crore
+  const absN = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (absN >= 1_00_00_000) {
+    return `${sign}${symbol}${(absN / 1_00_00_000).toFixed(2)}Cr`;
+  }
+  if (absN >= 1_00_000) {
+    return `${sign}${symbol}${(absN / 1_00_000).toFixed(2)}L`;
+  }
+  if (absN >= 1_000) {
+    return `${sign}${symbol}${(absN / 1_000).toFixed(1)}k`;
+  }
+  return `${sign}${symbol}${absN.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 /**

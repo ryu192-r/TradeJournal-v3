@@ -36,10 +36,10 @@ function MiniBarChart({ winRate, tradeCount }: { winRate: string | null; tradeCo
             height: `${bar.height}px`,
             background:
               bar.outcome === 'win'
-                ? 'var(--color-profit, #4ade80)'
+                ? 'var(--profit, #4ade80)'
                 : bar.outcome === 'loss'
-                  ? 'var(--color-loss, #f87171)'
-                  : 'var(--color-faint, rgba(255,255,255,0.12))',
+                  ? 'var(--loss, #f87171)'
+                  : 'var(--border)',
           }}
         />
       ))}
@@ -68,8 +68,8 @@ function ChevronDownIcon({ expanded }: { expanded: boolean }) {
 function EntryCheckIcon() {
   return (
     <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-      <circle cx="10" cy="10" r="3" fill="var(--color-accent, #c97a3f)" opacity="0.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 10l1.5 1.5L13 8.5" stroke="var(--color-accent, #c97a3f)" strokeWidth="1.5" fill="none" />
+      <circle cx="10" cy="10" r="3" fill="var(--accent)" opacity="0.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 10l1.5 1.5L13 8.5" stroke="var(--accent)" strokeWidth="1.5" fill="none" />
     </svg>
   )
 }
@@ -137,7 +137,6 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
           : 'border-border hover:border-border/80',
       )}
       style={{
-        backgroundColor: 'var(--color-bg-card, #181c2a)',
         animationDelay: `${staggerDelay}ms`,
       }}
     >
@@ -214,7 +213,7 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
             <div key={i} className="flex items-start gap-2 text-[.75rem] font-medium text-text-muted">
               <span
                 className="mt-[0.3rem] w-1 h-1 rounded-full shrink-0"
-                style={{ backgroundColor: 'var(--color-accent, #c97a3f)', opacity: 0.4 }}
+                style={{ backgroundColor: 'var(--accent)', opacity: 0.4 }}
               />
               <span className="truncate">{rule}</span>
             </div>

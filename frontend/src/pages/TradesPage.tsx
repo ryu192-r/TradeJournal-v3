@@ -113,7 +113,7 @@ export function TradesPage() {
 
         {error && (
           <div className="py-16 text-center">
-            <p className="text-sm text-[#f87171]">Failed to load trades.</p>
+            <p className="text-sm text-loss">Failed to load trades.</p>
             <p className="text-xs text-text-muted mt-1">{error.message}</p>
           </div>
         )}
@@ -122,7 +122,7 @@ export function TradesPage() {
           <div className="overflow-x-auto scrollbar-thin">
             <table className="min-w-full text-sm whitespace-nowrap">
               <thead>
-                <tr className="bg-[#131621] text-left">
+                <tr className="bg-bg-low text-left">
                   <th className="px-5 py-3 text-[.6875rem] font-medium text-text-muted uppercase tracking-widest">Symbol</th>
                   <th className="px-5 py-3 text-[.6875rem] font-medium text-text-muted uppercase tracking-widest">Dir</th>
                   <th className="px-5 py-3 text-[.6875rem] font-medium text-text-muted uppercase tracking-widest">Entry</th>
@@ -145,7 +145,7 @@ export function TradesPage() {
                     return (
                       <tr
                         key={trade.id}
-                        className="transition-colors hover:bg-[#1d2133]"
+                        className="transition-colors hover:bg-bg-card-h"
                       >
                         {/* Symbol */}
                         <td className="px-5 py-3 font-medium text-text-heading">
@@ -154,7 +154,7 @@ export function TradesPage() {
 
                         {/* Direction */}
                         <td className="px-5 py-3">
-                          <span className={`inline-flex items-center gap-1 font-medium ${isLong ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                          <span className={`inline-flex items-center gap-1 font-medium ${isLong ? 'text-profit' : 'text-loss'}`}>
                             {isLong
                               ? <ArrowUpRight className="w-[14px] h-[14px]" />
                               : <ArrowDownRight className="w-[14px] h-[14px]" />
@@ -197,7 +197,7 @@ export function TradesPage() {
 
                         {/* Status badge */}
                         <td className="px-5 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[.625rem] font-medium capitalize ${statusBadge[trade.status] || 'bg-white/5 text-text-muted'}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[.625rem] font-medium capitalize ${statusBadge[trade.status] || 'bg-text-faint text-text-muted'}`}>
                             {trade.status}
                           </span>
                         </td>
@@ -209,8 +209,8 @@ export function TradesPage() {
                               trade.pnl == null
                                 ? 'text-text-muted'
                                 : isProfit
-                                  ? 'text-[#4ade80]'
-                                  : 'text-[#f87171]'
+                                  ? 'text-profit'
+                                  : 'text-loss'
                             }`}
                           >
                             {pnlText}
@@ -229,7 +229,7 @@ export function TradesPage() {
                             </button>
                             <button
                               onClick={() => handleDelete(trade.id)}
-                              className="p-1.5 rounded-md text-text-muted hover:text-[#f87171] hover:bg-[#f87171]/10 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md text-text-muted hover:text-loss hover:bg-loss-muted transition-colors cursor-pointer"
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />

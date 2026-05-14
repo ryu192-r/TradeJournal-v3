@@ -59,11 +59,11 @@ function pnlNum(v: string | null): number {
 const CHART_MARGINS = { top: 10, right: 20, left: 0, bottom: 0 }
 
 const COLORS = {
-  profit: '#4ade80',
-  loss: '#f87171',
-  accent: '#c97a3f',
-  text: '#a8a39a',
-  grid: 'rgba(255,255,255,.06)',
+  profit: 'var(--profit)',
+  loss: 'var(--loss)',
+  accent: 'var(--accent)',
+  text: 'var(--text)',
+  grid: 'var(--border)',
 }
 
 const CARD_CLASS = 'bg-card rounded-2xl border border-border p-5'

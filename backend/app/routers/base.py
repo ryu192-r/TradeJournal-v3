@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import health, trades, dhan, dhan_webhook, csv_import, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings
+from app.routers import health, trades, dhan, dhan_webhook, csv_import, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, tags=["auth"])
@@ -18,3 +18,4 @@ api_router.include_router(analytics.router, tags=["analytics"])
 api_router.include_router(trade_ideas.router, tags=["trade-ideas"])
 api_router.include_router(daily_journal.router, tags=["daily-journal"])
 api_router.include_router(ai_settings.router, tags=["ai-settings"])
+api_router.include_router(tier_config.router, tags=["tier-config"])

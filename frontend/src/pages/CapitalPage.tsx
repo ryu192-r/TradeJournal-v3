@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import { getCapitalDashboard } from '@/lib/endpoints'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getCapitalDashboard, getTierConfig, saveTierConfig } from '@/lib/endpoints'
 import type { CapitalDashboardPayload } from '@/types'
 import { formatCurrency, parseDecimal } from '@/utils/format'
-import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, AlertTriangle } from 'lucide-react'
+import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, AlertTriangle, Settings, Plus, Trash2, Save } from 'lucide-react'
 import {
   AreaChart,
   Area,
@@ -17,11 +18,11 @@ import { GlassBadge } from '@/components/ui/GlassBadge'
 const CARD_CLASS = 'bg-card rounded-2xl border border-border p-5'
 const CARD_STATIC = `${CARD_CLASS} animate-card-in`
 const COLORS = {
-  profit: '#4ade80',
-  loss: '#f87171',
-  accent: '#c97a3f',
-  text: '#a8a39a',
-  grid: 'rgba(255,255,255,.06)',
+  profit: 'var(--profit)',
+  loss: 'var(--loss)',
+  accent: 'var(--accent)',
+  text: 'var(--text)',
+  grid: 'var(--border)',
 }
 
 function pnlNum(v: string | null): number {
@@ -311,6 +312,126 @@ function CapitalTiersSection({ data }: { data: CapitalDashboardPayload }) {
   )
 }
 
+function TierEditor() {
+  const queryClient = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['tier-config'],
+    queryFn: getTierConfig,
+    staleTime: Infinity,
+  })
+  const [tiers, setTiers] = useState<
+    { name: string; min_amount: string; max_amount: string | null; sort_order: number }[]
+  >([])
+
+  useEffect(() => {
+    if (data) {
+      setTiers(data.items.map((t, i) => ({ ...t, sort_order: i })))
+    }
+  }, [data])
+
+  const mutation = useMutation({
+    mutationFn: saveTierConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tier-config'] })
+      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+    },
+  })
+
+  const updateTier = (idx: number, field: 'name' | 'min_amount' | 'max_amount', value: string) => {
+    const next = [...tiers]
+    if (field === 'max_amount' && value === '') {
+      next[idx] = { ...next[idx], max_amount: null }
+    } else {
+      next[idx] = { ...next[idx], [field]: value }
+    }
+    setTiers(next)
+  }
+
+  const addTier = () => {
+    const prev = tiers[tiers.length - 1]
+    const nextMin = prev?.max_amount != null && prev.max_amount !== '' ? prev.max_amount : String((Number(prev?.min_amount) || 0) + 100000)
+    setTiers([...tiers, { name: 'New Tier', min_amount: nextMin, max_amount: null, sort_order: tiers.length }])
+  }
+
+  const removeTier = (idx: number) => {
+    if (tiers.length <= 1) return
+    setTiers(tiers.filter((_, i) => i !== idx))
+  }
+
+  const handleSave = () => {
+    mutation.mutate(tiers.map((t, i) => ({ ...t, sort_order: i })))
+  }
+
+  if (isLoading) return <div className={`${CARD_STATIC} h-40 animate-pulse`} />
+
+  return (
+    <div className={`${CARD_STATIC} space-y-4`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings className="w-4 h-4 text-accent" />
+          <h3 className="text-sm font-medium text-text-heading font-display">Tier Settings</h3>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+        >
+          <Save className="w-3.5 h-3.5" />
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {tiers.map((tier, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <input
+              value={tier.name}
+              onChange={(e) => updateTier(idx, 'name', e.target.value)}
+              className="w-32 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              placeholder="Tier name"
+            />
+            <input
+              value={tier.min_amount}
+              onChange={(e) => updateTier(idx, 'min_amount', e.target.value)}
+              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              placeholder="Min ₹"
+              type="number"
+            />
+            <input
+              value={tier.max_amount ?? ''}
+              onChange={(e) => updateTier(idx, 'max_amount', e.target.value)}
+              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              placeholder="Max ₹ (empty = ∞)"
+              type="number"
+            />
+            <button
+              onClick={() => removeTier(idx)}
+              className="p-1 rounded-md hover:bg-loss-muted transition-colors"
+              title="Remove tier"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-loss" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={addTier}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border-medium px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-heading hover:border-text-muted transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Add Tier
+      </button>
+
+      {mutation.isError && (
+        <div className="text-xs text-loss font-data">
+          {mutation.error instanceof Error ? mutation.error.message : 'Failed to save tiers'}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CapitalPage() {
   const { data, isLoading, error } = useQuery<CapitalDashboardPayload>({
     queryKey: ['capital-dashboard'],
@@ -377,6 +498,7 @@ export function CapitalPage() {
       <EquityCurveSection data={data} />
       <CapitalEventsTable data={data} />
       <CapitalTiersSection data={data} />
+      <TierEditor />
     </div>
   )
 }

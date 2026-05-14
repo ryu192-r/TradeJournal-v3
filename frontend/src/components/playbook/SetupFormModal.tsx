@@ -147,35 +147,35 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
   if (!open) return null
 
   const btnPrimary =
-    'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#c97a3f] text-white hover:bg-[#d9915a] transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+    'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
   const btnGhost =
-    'inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-[#a8a39a] hover:text-[#e8e5df] hover:bg-[rgba(201,122,63,.07)] transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+    'inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
   const btnDangerIcon =
-    'p-1.5 rounded-md hover:bg-[rgba(248,113,113,.15)] text-[#6e685e] hover:text-[#f87171] transition-colors cursor-pointer shrink-0'
+    'p-1.5 rounded-md hover:bg-loss-muted text-text-muted hover:text-loss transition-colors cursor-pointer shrink-0'
   const inputCls =
-    'w-full rounded-lg border border-[rgba(255,255,255,.10)] bg-[#1c2030]/50 px-3 py-2 text-sm text-[#e8e5df] placeholder:text-[#4a4540] focus:outline-none focus:border-[#c97a3f]/50 focus:ring-1 focus:ring-[#c97a3f]/20 transition-all duration-[150ms] ease-out disabled:opacity-50 disabled:cursor-not-allowed'
-  const labelCls = 'block text-xs font-medium text-[#6e685e] mb-1.5'
+    'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-[150ms] ease-out disabled:opacity-50 disabled:cursor-not-allowed'
+  const labelCls = 'block text-xs font-medium text-text-muted mb-1.5'
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-2xl my-8">
-        <div className="bg-[#181c2a] rounded-2xl border border-[rgba(255,255,255,.06)] p-6 relative">
+        <div className="bg-bg-card rounded-2xl border border-border p-6 relative">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-[#1c2030]/50 text-[#6e685e] hover:text-[#a8a39a] transition-colors cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-bg-elevated/50 text-text-muted hover:text-text transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
 
-          <h2 className="font-display text-xl text-[#e8e5df] mb-1 pr-8">
+          <h2 className="font-display text-xl text-text-heading mb-1 pr-8">
             {isEdit ? 'Edit Setup' : 'New Setup'}
           </h2>
-          <p className="text-sm text-[#6e685e] mb-6">
+          <p className="text-sm text-text-muted mb-6">
             {isEdit ? `Editing ${setup?.name}` : 'Define a new setup playbook entry with tactics, conditions, and rules.'}
           </p>
 
           {error && (
-            <div className="mb-4 rounded-lg bg-[rgba(248,113,113,.15)] border border-[#f87171]/20 px-3 py-2 text-sm text-[#f87171]">{error}</div>
+            <div className="mb-4 rounded-lg bg-loss-muted border border-loss/20 px-3 py-2 text-sm text-loss">{error}</div>
           )}
 
           <div className="space-y-5">
@@ -206,17 +206,17 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
             {/* Tactics (accordion) */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-[#6e685e]">Tactics</label>
+                <label className="text-xs font-medium text-text-muted">Tactics</label>
                 <button className={btnGhost} onClick={addTactic} disabled={isPending}>
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
               <div className="space-y-2">
                 {tactics.map((tactic, ti) => (
-                  <div key={ti} className="rounded-lg border border-[rgba(255,255,255,.06)] bg-[#1c2030]/30 overflow-hidden">
+                  <div key={ti} className="rounded-lg border border-border bg-bg-elevated/30 overflow-hidden">
                     <button
                       onClick={() => setExpandedTactic(expandedTactic === ti ? null : ti)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-[#e8e5df] hover:bg-[#1c2030]/40 transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-text-heading hover:bg-bg-elevated/40 transition-colors cursor-pointer"
                     >
                       <span className="truncate">
                         {tactic.name.trim() || `Tactic ${ti + 1}`}
@@ -228,17 +228,17 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
                               e.stopPropagation()
                               removeTactic(ti)
                             }}
-                            className="p-1 rounded hover:bg-[rgba(248,113,113,.15)] text-[#6e685e] hover:text-[#f87171] cursor-pointer"
+                            className="p-1 rounded hover:bg-loss-muted text-text-muted hover:text-loss cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {expandedTactic === ti ? <ChevronUp className="w-4 h-4 text-[#6e685e]" /> : <ChevronDown className="w-4 h-4 text-[#6e685e]" />}
+                        {expandedTactic === ti ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />}
                       </div>
                     </button>
 
                     {expandedTactic === ti && (
-                      <div className="px-3 pb-3 space-y-3 border-t border-[rgba(255,255,255,.06)]">
+                      <div className="px-3 pb-3 space-y-3 border-t border-border">
                         <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                             <label className={labelCls}>Tactic Name</label>
@@ -273,7 +273,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-[#6e685e] mb-1.5">Conditions</label>
+                          <label className="block text-xs font-medium text-text-muted mb-1.5">Conditions</label>
                           <div className="space-y-2">
                             {tactic.conditions.map((cond, ci) => (
                               <div key={ci} className="flex items-center gap-2">
@@ -320,7 +320,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
             {/* Ideal Conditions */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-[#6e685e]">Ideal Conditions</label>
+                <label className="text-xs font-medium text-text-muted">Ideal Conditions</label>
                 <button className={btnGhost} onClick={() => addItem(idealConditions, setIdealConditions)} disabled={isPending}>
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
@@ -348,7 +348,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
 
             {/* Risk Profile */}
             <div>
-              <label className="text-xs font-medium text-[#6e685e] mb-2 block">Risk Profile</label>
+              <label className="text-xs font-medium text-text-muted mb-2 block">Risk Profile</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>Max Risk %</label>
@@ -388,7 +388,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
             {/* Rules */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-[#6e685e]">Rules</label>
+                <label className="text-xs font-medium text-text-muted">Rules</label>
                 <button className={btnGhost} onClick={() => addItem(rules, setRules)} disabled={isPending}>
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
@@ -415,7 +415,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[rgba(255,255,255,.06)]">
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border">
             <button className={btnGhost} onClick={onClose} disabled={isPending}>Cancel</button>
             <button className={btnPrimary} onClick={handleSubmit} disabled={isPending}>
               {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Setup'}

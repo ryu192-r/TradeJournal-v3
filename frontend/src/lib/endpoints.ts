@@ -154,6 +154,16 @@ export function getCapitalDashboard() {
   return apiClient.get<CapitalDashboardPayload>('/accounts/capital-dashboard').then(r => r.data)
 }
 
+// ───────────────────────── Tier Config ─────────────────────────
+
+export function getTierConfig() {
+  return apiClient.get<{ items: { id?: number; name: string; min_amount: string; max_amount: string | null; sort_order: number }[] }>('/tier-config').then(r => r.data)
+}
+
+export function saveTierConfig(tiers: { name: string; min_amount: string; max_amount: string | null; sort_order: number }[]) {
+  return apiClient.put<{ items: { id?: number; name: string; min_amount: string; max_amount: string | null; sort_order: number }[] }>('/tier-config', tiers).then(r => r.data)
+}
+
 export function testAiConnection() {
   return apiClient.post<TestResponse>('/ai/test').then(r => r.data)
 }

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_serializer
 from app.models.account import Account
 from app.models.capital_event import CapitalEvent
 from app.models.trade import Trade
+from app.models.tier_config import TierConfig
 from app.db.database import get_db
 from app.utils.logging import get_logger
 from app.utils.decimal_utils import ensure_decimal
@@ -78,18 +79,38 @@ class CapitalDashboardResponse(BaseModel):
 
 # ───────────────────────── Capital Tiers ─────────────────────────
 
-TIERS = [
-    {"name": "Survival", "min": Decimal("0"), "max": Decimal("400000")},
-    {"name": "Growth", "min": Decimal("400000"), "max": Decimal("1000000")},
+DEFAULT_TIERS = [
+    {"name": "Survival", "min": Decimal("0"), "max": Decimal("200000")},
+    {"name": "Growth", "min": Decimal("200000"), "max": Decimal("1000000")},
     {"name": "Scaling", "min": Decimal("1000000"), "max": Decimal("5000000")},
     {"name": "Freedom", "min": Decimal("5000000"), "max": None},
 ]
 
 
-def _compute_tiers(net_equity: Decimal) -> tuple[list[dict], Optional[float]]:
+def _load_tiers(db: Session) -> list[dict]:
+    tiers = db.query(TierConfig).order_by(TierConfig.sort_order).all()
+    if not tiers:
+        # seed defaults
+        for t in DEFAULT_TIERS:
+            db.add(TierConfig(
+                name=t["name"],
+                min_amount=t["min"],
+                max_amount=t["max"],
+                sort_order=DEFAULT_TIERS.index(t),
+            ))
+        db.commit()
+        tiers = db.query(TierConfig).order_by(TierConfig.sort_order).all()
+    return [
+        {"name": t.name, "min": t.min_amount, "max": t.max_amount}
+        for t in tiers
+    ]
+
+
+def _compute_tiers(net_equity: Decimal, db: Session) -> tuple[list[dict], Optional[float]]:
+    tier_defs = _load_tiers(db)
     result = []
     progress = None
-    for tier in TIERS:
+    for tier in tier_defs:
         t_min = tier["min"]
         t_max = tier["max"]
         current = t_min <= net_equity and (t_max is None or net_equity < t_max)
@@ -219,7 +240,7 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
         curve_points.append(EquityCurvePointOut(date=str(today), equity=net_equity))
 
     # Tiers
-    tiers_out, progress = _compute_tiers(net_equity)
+    tiers_out, progress = _compute_tiers(net_equity, db)
 
     current_balance = ensure_decimal(account.current_balance)
 

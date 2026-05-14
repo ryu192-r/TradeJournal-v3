@@ -299,6 +299,18 @@ export interface CapitalDashboardPayload {
   progress_to_next_tier: number | null
 }
 
+export interface TierConfigItem {
+  id?: number
+  name: string
+  min_amount: string
+  max_amount: string | null
+  sort_order: number
+}
+
+export interface TierConfigListResponse {
+  items: TierConfigItem[]
+}
+
 export interface FullDashboardPayload {
   kpi: AnalyticsKpi
   setup_performance: SetupPerformanceItem[]
