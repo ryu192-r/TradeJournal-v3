@@ -1,17 +1,17 @@
 """Pytest configuration: test DB override, fixtures for client and auth tokens."""
 
 import os
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-# Disable rate limiting for all tests
+# Override DB to SQLite for all tests — prevents dependency on Docker Postgres
 os.environ["RATE_LIMIT_OFF"] = "true"
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("SECRET_KEY", "test-secret")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret")
 
+import pytest
 from app.db.database import Base, get_db
+from app.db.database import engine as real_engine
 from app.main import app as _real_app
-from app.core.security import get_password_hash
-from app.models.user import User
 
 
 def __get_db_test():
@@ -32,25 +32,13 @@ def app():
 
 @pytest.fixture(scope="function") 
 def client(app):
-    """HTTPX sync client with fresh empty SQLite DB per test."""
-    from app.db.database import engine as real_engine, Base
+    """HTTPX sync client with fresh empty DB per test."""
     Base.metadata.drop_all(bind=real_engine)
     Base.metadata.create_all(bind=real_engine)
 
-    import httpx
-    from httpx import WSGITransport
-    transport = WSGITransport(app=app)
-    with httpx.Client(transport=transport, base_url="http://test") as c:
-        yield c
-
-    Base.metadata.drop_all(bind=real_engine)
-    Base.metadata.create_all(bind=real_engine)
-
-    import httpx
-    from httpx import ASGITransport
-    transport = ASGITransport(app=app)
-    with httpx.Client(transport=transport, base_url="http://test") as c:
-        yield c
+    from starlette.testclient import TestClient
+    c = TestClient(app)
+    yield c
 
     Base.metadata.drop_all(bind=real_engine)
 
