@@ -34,7 +34,7 @@ export function SettingsPage() {
   useEffect(() => {
     const init = async () => {
       const [providersData, configData] = await Promise.all([
-        getAiProviders().catch(() => ({})),
+        getAiProviders().catch(() => ({}) as Record<string, AIProviderInfo>),
         getAiConfig().catch(() => null),
       ])
       setProviders(providersData)
