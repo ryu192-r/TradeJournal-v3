@@ -95,10 +95,7 @@ export function Sidebar() {
       {/* Mobile hamburger */}
       <button
         onClick={toggleSidebar}
-        className={cn(
-          'fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer',
-          sidebarOpen && 'opacity-0 pointer-events-none'
-        )}
+        className="fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
       >
         <Menu className="w-5 h-5" />
       </button>
