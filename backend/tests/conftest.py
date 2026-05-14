@@ -32,15 +32,25 @@ def app():
 
 @pytest.fixture(scope="function") 
 def client(app):
-    """TestClient with fresh empty SQLite DB per test."""
+    """HTTPX sync client with fresh empty SQLite DB per test."""
     from app.db.database import engine as real_engine, Base
     Base.metadata.drop_all(bind=real_engine)
     Base.metadata.create_all(bind=real_engine)
 
-    from starlette.testclient import TestClient
-    c = TestClient(app)
-    c.raise_server_exceptions = True
-    yield c
+    import httpx
+    from httpx import WSGITransport
+    transport = WSGITransport(app=app)
+    with httpx.Client(transport=transport, base_url="http://test") as c:
+        yield c
+
+    Base.metadata.drop_all(bind=real_engine)
+    Base.metadata.create_all(bind=real_engine)
+
+    import httpx
+    from httpx import ASGITransport
+    transport = ASGITransport(app=app)
+    with httpx.Client(transport=transport, base_url="http://test") as c:
+        yield c
 
     Base.metadata.drop_all(bind=real_engine)
 
