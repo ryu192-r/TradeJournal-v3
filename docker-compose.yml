@@ -30,8 +30,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       RATE_LIMIT_OFF: "true"
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,6 +41,13 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tjv3_api.rule=Host(`${DUCK_DOMAIN}`) && PathPrefix(`/api/v1`)"
+      - "traefik.http.routers.tjv3_api.tls=true"
+      - "traefik.http.routers.tjv3_api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tjv3_api.priority=100"
+      - "traefik.http.services.tjv3_api.loadbalancer.server.port=8000"
 
   frontend:
     build:
@@ -49,12 +56,18 @@ services:
       args:
         VITE_API_URL: /api/v1
     container_name: tjv3_frontend
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tjv3_frontend.rule=Host(`${DUCK_DOMAIN}`)"
+      - "traefik.http.routers.tjv3_frontend.tls=true"
+      - "traefik.http.routers.tjv3_frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tjv3_frontend.loadbalancer.server.port=3000"
 
   bot:
     build:
