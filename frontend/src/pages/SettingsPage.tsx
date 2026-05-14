@@ -1,7 +1,8 @@
 // Settings page — account info, preferences, connection status
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/authStore'
-import { User, Database, Palette, LogOut, Cpu, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useAppStore } from '@/store/appStore'
+import { User, Database, Palette, LogOut, Sun, Moon, Cpu, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection } from '@/lib/endpoints'
 import type { AIProviderInfo } from '@/types/ai'
 
@@ -12,6 +13,7 @@ const testBtnStyle = 'inline-flex items-center justify-center gap-2 px-4 py-2 ro
 
 export function SettingsPage() {
   const { user, logout } = useAuthStore()
+  const { theme, toggleTheme } = useAppStore()
 
   // AI Settings state
   const [providers, setProviders] = useState<Record<string, AIProviderInfo>>({})
@@ -212,7 +214,21 @@ export function SettingsPage() {
         </div>
         <div className="flex items-center justify-between py-2">
           <span className="text-text-muted text-sm">Theme</span>
-          <span className="text-text-heading text-sm">Dark (default)</span>
+          <button
+            onClick={toggleTheme}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-[150ms] ease-out cursor-pointer border"
+            style={{
+              backgroundColor: theme === 'dark' ? 'var(--accent-muted)' : 'var(--profit-faint)',
+              color: theme === 'dark' ? 'var(--accent)' : 'var(--profit)',
+              borderColor: theme === 'dark' ? 'var(--accent)' : 'var(--profit)',
+            }}
+          >
+            {theme === 'dark' ? (
+              <><Sun className="w-4 h-4" /> Light Mode</>
+            ) : (
+              <><Moon className="w-4 h-4" /> Dark Mode</>
+            )}
+          </button>
         </div>
       </div>
 

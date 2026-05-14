@@ -12,32 +12,42 @@ interface Position {
 }
 
 interface AppState {
-  // Open positions
   positions: Position[]
   setPositions: (positions: Position[]) => void
 
-  // Account balance
   accountBalance: number | null
   setAccountBalance: (balance: number) => void
 
-  // UI preferences
   sidebarOpen: boolean
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
 
-  // Active view
   activeView: 'dashboard' | 'trades' | 'journal' | 'playbook' | 'review' | 'ideas' | 'settings'
   setActiveView: (view: AppState['activeView']) => void
 
-  // Trade form mode
   tradeFormMode: 'list' | 'create' | 'edit'
   selectedTradeId: number | null
   openCreateTrade: () => void
   openEditTrade: (id: number) => void
   closeTradeForm: () => void
+
+  theme: 'dark' | 'light'
+  toggleTheme: () => void
+  setTheme: (theme: 'dark' | 'light') => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+const getInitialTheme = (): 'dark' | 'light' => {
+  const stored = localStorage.getItem('tjv3-theme')
+  if (stored === 'light' || stored === 'dark') return stored
+  return window.matchMedia?.('(prefers-color-scheme:light)').matches ? 'light' : 'dark'
+}
+
+const applyTheme = (theme: 'dark' | 'light') => {
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem('tjv3-theme', theme)
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   positions: [],
   setPositions: (positions) => set({ positions }),
 
@@ -56,4 +66,18 @@ export const useAppStore = create<AppState>((set) => ({
   openCreateTrade: () => set({ activeView: 'trades', tradeFormMode: 'create', selectedTradeId: null }),
   openEditTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'edit', selectedTradeId: id }),
   closeTradeForm: () => set({ tradeFormMode: 'list', selectedTradeId: null }),
+
+  theme: getInitialTheme(),
+  toggleTheme: () => {
+    const next = get().theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    set({ theme: next })
+  },
+  setTheme: (theme) => {
+    applyTheme(theme)
+    set({ theme })
+  },
 }))
+
+// Apply initial theme immediately
+applyTheme(getInitialTheme())
