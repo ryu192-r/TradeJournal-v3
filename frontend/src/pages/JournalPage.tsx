@@ -6,6 +6,8 @@ import {
   useJournalQuery,
   useCreateJournalMutation,
   useUpdateJournalMutation,
+  useWeeklyJournalStatsQuery,
+  useWeeklyJournalsQuery,
 } from '@/hooks/useJournalMutation'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
 import type { DailyJournal, ApiTrade } from '@/types'
@@ -110,22 +112,30 @@ function CompareView({ journal }: { journal: DailyJournal | null | undefined }) 
 // Weekly view
 // ---------------------------------------------------------------------------
 
-function WeeklyView({ selectedDate, onSelectDate }: { selectedDate: string; onSelectDate: (d: string) => void }) {
+function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selectedDate: string; onSelectDate: (d: string) => void; onSwitchToJournal: () => void }) {
   const d = new Date(selectedDate)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d.setDate(diff))
+  const monday = new Date(new Date(d).setDate(diff))
+  const mondayISO = toISODate(monday)
+
   const weekDays = Array.from({ length: 5 }, (_, i) => {
     const cd = new Date(monday)
     cd.setDate(monday.getDate() + i)
     return cd
   })
 
+  const { data: stats, isLoading } = useWeeklyJournalStatsQuery(mondayISO)
+  const { data: weekJournals } = useWeeklyJournalsQuery(mondayISO)
+
   return (
     <div className="space-y-5">
-      <h3 className="text-[.8125rem] font-medium text-text-heading">
-        Week of {formatDate(monday)}
-      </h3>
+      <div className="flex items-center gap-3">
+        <h3 className="text-[.8125rem] font-medium text-text-heading">
+          Week of {formatDate(monday)}
+        </h3>
+        {isLoading && <Loader2 className="w-[14px] h-[14px] text-accent animate-spin" />}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {weekDays.map((wd) => {
           const iso = toISODate(wd)
@@ -160,11 +170,80 @@ function WeeklyView({ selectedDate, onSelectDate }: { selectedDate: string; onSe
           )
         })}
       </div>
-      <div className="rounded-xl border-2 border-dashed border-border py-5 px-4">
-        <p className="text-[.75rem] text-text-muted leading-relaxed">
-          Weekly rollup with stats (total P&amp;L, win rate, avg R) will appear here once backend aggregates are ready.
-        </p>
-      </div>
+
+      {/* Stats rollup */}
+      {stats ? (
+        <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border border-b border-border">
+            <div className="px-4 py-3.5">
+              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Trades</div>
+              <div className="font-data text-lg font-semibold text-text-heading">{stats.trade_count}</div>
+            </div>
+            <div className="px-4 py-3.5">
+              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">P&amp;L</div>
+              <div className={cn(
+                'font-data text-lg font-semibold',
+                parseFloat(stats.total_pnl) >= 0 ? 'text-profit' : 'text-loss'
+              )}>
+                {formatCurrency(stats.total_pnl)}
+              </div>
+            </div>
+            <div className="px-4 py-3.5">
+              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Win Rate</div>
+              <div className="font-data text-lg font-semibold text-text-heading">{parseFloat(stats.win_rate).toFixed(1)}%</div>
+            </div>
+            <div className="px-4 py-3.5">
+              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Avg R</div>
+              <div className="font-data text-lg font-semibold text-text-heading">{parseFloat(stats.avg_r).toFixed(2)}R</div>
+            </div>
+          </div>
+
+          {/* Daily journal entries for the week */}
+          <div className="p-4">
+            <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-2">Daily Entries</div>
+            {weekJournals && weekJournals.length > 0 ? (
+              <div className="space-y-2">
+                {weekJournals.map((j) => (
+                  <button
+                    key={j.id}
+                    onClick={() => { onSwitchToJournal(); onSelectDate(j.date); }}
+                    className="w-full text-left rounded-lg border border-border bg-bg-card hover:bg-accent-muted transition-all cursor-pointer p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[.8125rem] font-medium text-text-heading">
+                        {j.date} — {new Date(j.date).toLocaleDateString('en-IN', { weekday: 'long' })}
+                      </span>
+                      {j.mood_rating != null && (
+                        <span className="text-[.6875rem] text-text-muted">
+                          Mood: {'⭐'.repeat(j.mood_rating)}
+                        </span>
+                      )}
+                    </div>
+                    {j.lessons_learned && (
+                      <p className="text-[.75rem] text-text-muted mt-1 line-clamp-2">{j.lessons_learned}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border-2 border-dashed border-border py-4 text-center">
+                <p className="text-[.75rem] text-text-muted">
+                  No journal entries this week.{' '}
+                  <span className="text-accent cursor-pointer" onClick={onSwitchToJournal}>
+                    Write one
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : !isLoading ? (
+        <div className="rounded-xl border-2 border-dashed border-border py-5 px-4">
+          <p className="text-[.75rem] text-text-muted leading-relaxed">
+            No trades this week. Stats will appear when you start trading.
+          </p>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -251,11 +330,11 @@ export function JournalPage() {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="p-4 sm:p-6 sm:px-8 space-y-6 sm:space-y-8">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
         <div>
-          <h1 className="font-display text-2xl font-medium tracking-[-.01rem] leading-tight text-text-heading">
+          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">
             Journal
           </h1>
           <p className="text-[.8125rem] text-text-muted mt-1.5 leading-relaxed">
@@ -392,7 +471,7 @@ export function JournalPage() {
 
       {activeTab === 'compare' && <CompareView journal={journal} />}
       {activeTab === 'weekly' && (
-        <WeeklyView selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+        <WeeklyView selectedDate={selectedDate} onSelectDate={setSelectedDate} onSwitchToJournal={() => setActiveTab('journal')} />
       )}
     </div>
   )

@@ -3,7 +3,6 @@ from .trade import Trade
 from .setup_playbook import SetupPlaybook
 from .daily_journal import DailyJournal
 from .trade_idea import TradeIdea
-from .tag import Tag, TradeTag
 from .stop_history import StopHistory
 from .capital_event import CapitalEvent
 from .milestone import Milestone
@@ -18,8 +17,6 @@ __all__ = [
     'SetupPlaybook',
     'DailyJournal',
     'TradeIdea',
-    'Tag',
-    'TradeTag',
     'StopHistory',
     'CapitalEvent',
     'Milestone',

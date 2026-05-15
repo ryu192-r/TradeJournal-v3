@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.rate_limiter import RateLimiter
 from app.routers.base import api_router
@@ -6,13 +7,26 @@ from app.utils.logging import configure_logging, get_logger
 from app.db.database import Base, engine
 import app.models  # noqa: F401 — registers all models on Base.metadata
 import logging
+from alembic.config import Config
+from alembic import command
+import os
 
 # Configure logging
 configure_logging()
 logger = get_logger(__name__)
 
-# Create all tables on startup
-Base.metadata.create_all(bind=engine)
+# Run alembic migrations on startup
+def run_migrations():
+    alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+    alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    try:
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied successfully")
+    except Exception as e:
+        logger.warning(f"Alembic migration failed, falling back to create_all: {e}")
+        Base.metadata.create_all(bind=engine)
+
+run_migrations()
 
 app = FastAPI(
     title=settings.API_TITLE,
@@ -25,6 +39,10 @@ app.add_middleware(RateLimiter)
 
 # Include routers
 app.include_router(api_router)
+
+# Serve uploaded chart images
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 @app.get("/")
 async def root():

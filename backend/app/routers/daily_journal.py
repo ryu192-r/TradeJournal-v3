@@ -7,19 +7,22 @@ PUT    /api/v1/journal/{date}         — update journal entry
 GET    /api/v1/journal/weekly         — list entries for a given week
 """
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.daily_journal import DailyJournal
+from app.models.trade import Trade
 from app.schemas.daily_journal import (
     DailyJournalCreate,
     DailyJournalResponse,
     DailyJournalUpdate,
+    WeeklyStatsResponse,
 )
 
 logger = structlog.get_logger()
@@ -102,6 +105,53 @@ def list_weekly_journals(
         .all()
     )
     return list(results)
+
+
+@router.get("/weekly-stats", response_model=WeeklyStatsResponse)
+def get_weekly_stats(
+    week_start: str = Query(..., description="Week start date ISO (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """Compute aggregate trading stats for a given week from the trades table."""
+    try:
+        start = date.fromisoformat(week_start)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid date format: {week_start}. Use ISO format (YYYY-MM-DD).",
+        )
+    end = start + timedelta(days=6)
+
+    trades = (
+        db.execute(
+            select(Trade)
+            .where(
+                Trade.status != "deleted",
+                Trade.entry_time >= start,
+                Trade.entry_time < end + timedelta(days=1),
+            )
+            .order_by(Trade.entry_time.asc()),
+        )
+        .scalars()
+        .all()
+    )
+
+    trade_count = len(trades)
+    winning = [t for t in trades if t.pnl is not None and t.pnl > 0]
+    losing = [t for t in trades if t.pnl is not None and t.pnl <= 0]
+    total_pnl = sum((t.pnl or Decimal("0") for t in trades), Decimal("0"))
+    win_rate = Decimal(str(round((len(winning) / trade_count * 100), 1))) if trade_count > 0 else Decimal("0")
+    r_values = [Decimal(str(t.r_multiple)) for t in trades if t.r_multiple is not None]
+    avg_r = sum(r_values, Decimal("0")) / len(r_values) if r_values else Decimal("0")
+
+    return WeeklyStatsResponse(
+        week_start=start,
+        week_end=end,
+        trade_count=trade_count,
+        total_pnl=total_pnl,
+        win_rate=win_rate,
+        avg_r=round(avg_r, 2),
+    )
 
 
 @router.get("/{date_str}", response_model=DailyJournalResponse)

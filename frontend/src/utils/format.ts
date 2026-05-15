@@ -39,6 +39,25 @@ export function formatCurrency(v: string | number, currency = 'INR') {
 }
 
 /**
+ * Format a price with 2 decimals and Indian commas. No k/L/Cr abbreviation.
+ */
+export function formatPrice(v: string | number, currency = 'INR'): string {
+  const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '')) || 0);
+  if (isNaN(n)) return '₹0.00';
+  const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
+  return `${symbol}${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Format quantity as a clean integer (no decimals).
+ */
+export function formatQuantity(v: string | number): string {
+  const n = typeof v === 'number' ? v : Number(v);
+  if (isNaN(n)) return '0';
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+/**
  * Format a percentage value with sign
  */
 export function formatPercent(value: number): string {

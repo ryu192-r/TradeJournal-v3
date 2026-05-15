@@ -37,7 +37,6 @@ def sync_dhan_trades(
 
         for oid, open_leg in opens.items():
             close_leg = closes.get(oid)
-            direction = "LONG" if open_leg.transaction_type == "BUY" else "SHORT"
             existing = trade_svc.get_by_symbol_time(
                 open_leg.trading_symbol,
                 open_leg.order_timestamp,
@@ -46,13 +45,12 @@ def sync_dhan_trades(
             if existing:
                 skipped += 1
                 continue
-            trade_svc.find_or_create_pair(open_leg, close_leg, direction)
+            trade_svc.find_or_create_pair(open_leg, close_leg)
             added += 1
 
         # Unmatched CLOSE legs (single-leg close without open)
         for oid, close_leg in closes.items():
             if oid not in opens:
-                direction = "LONG" if close_leg.transaction_type == "SELL" else "SHORT"
                 existing = trade_svc.get_by_symbol_time(
                     close_leg.trading_symbol,
                     close_leg.order_timestamp,
@@ -61,7 +59,7 @@ def sync_dhan_trades(
                 if existing:
                     skipped += 1
                     continue
-                trade_svc.create_from_dhan_leg(close_leg, direction, is_open=False)
+                trade_svc.create_from_dhan_leg(close_leg, is_open=False)
                 added += 1
 
     return {

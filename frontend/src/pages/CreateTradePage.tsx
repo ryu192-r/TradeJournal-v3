@@ -8,7 +8,7 @@ export function CreateTradePage() {
   const createMutation = useCreateTradeMutation()
 
   return (
-    <div className="p-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <TradeEntryForm
         mode="create"
         submitFn={(payload) => createMutation.mutateAsync(payload)}

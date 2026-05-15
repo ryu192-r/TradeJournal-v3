@@ -9,9 +9,6 @@ export const tradeFormSchema = z.object({
     .min(1, 'Symbol is required')
     .max(20, 'Symbol too long')
     .toUpperCase(),
-  direction: z.enum(['LONG', 'SHORT'], {
-    message: 'Direction is required',
-  }),
   entry_price: z.string().min(1, 'Entry price is required'),
   exit_price: z.string().optional(),
   quantity: z.string().min(1, 'Quantity is required'),
@@ -30,6 +27,8 @@ export const tradeFormSchema = z.object({
 
 export type TradeFormData = z.infer<typeof tradeFormSchema>
 
+export type TradeFormStatus = 'draft' | 'reviewed' | 'analytics'
+
 // Convert ISO datetime string to datetime-local input value (YYYY-MM-DDTHH:MM)
 export function isoToDatetimeLocal(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -46,18 +45,18 @@ export function datetimeLocalToIso(local: string | undefined): string | undefine
 export function formDataToApiPayload(data: TradeFormData): Record<string, unknown> {
   return {
     symbol: data.symbol,
-    direction: data.direction,
-    entry_price: Number(data.entry_price),
-    exit_price: data.exit_price ? Number(data.exit_price) : null,
-    quantity: Number(data.quantity),
+    direction: 'LONG',
+    entry_price: data.entry_price,
+    exit_price: data.exit_price || null,
+    quantity: data.quantity,
     entry_time: datetimeLocalToIso(data.entry_time),
     exit_time: datetimeLocalToIso(data.exit_time),
-    fees: Number(data.fees || 0),
+    fees: data.fees || '0',
     setup: data.setup || null,
     tactic: data.tactic || null,
-    stop_price: data.stop_price ? Number(data.stop_price) : null,
-    target_price: data.target_price ? Number(data.target_price) : null,
-    r_multiple: data.r_multiple ? Number(data.r_multiple) : null,
+    stop_price: data.stop_price || null,
+    target_price: data.target_price || null,
+    r_multiple: data.r_multiple || null,
     notes: data.notes || null,
     tags: data.tags.length > 0 ? data.tags : null,
     status: data.status,

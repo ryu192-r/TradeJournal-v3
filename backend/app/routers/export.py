@@ -67,6 +67,27 @@ async def export_csv(
     )
 
 
+@router.get("/xlsx")
+async def export_xlsx(
+    from_date: str = None,
+    to_date: str = None,
+    trade_status: str = None,
+    db: Session = Depends(get_db)
+):
+    """Export trades as XLSX file."""
+    export_service = ExportService(db)
+    xlsx_bytes = export_service.export_trades_to_xlsx(from_date, to_date, trade_status)
+    if not xlsx_bytes:
+        raise HTTPException(status_code=404, detail="No trades found matching the criteria")
+    return StreamingResponse(
+        iter([xlsx_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=trading_journal_export.xlsx",
+        }
+    )
+
+
 @router.post("/backup")
 async def trigger_telegram_backup(
     chat_id: str = None,

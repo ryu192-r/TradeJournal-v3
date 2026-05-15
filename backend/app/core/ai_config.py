@@ -20,21 +20,36 @@ AI_PROVIDERS: dict[str, dict[str, Any]] = {
         "label": "Ollama (Local)",
         "default_url": "http://localhost:11434",
         "needs_api_key": False,
+        "api_format": "ollama",
         "models": [
-            "qwen2.5:latest",
             "llama3.2:latest",
+            "qwen2.5:latest",
             "mistral:latest",
-            "codellama:latest",
-            "deepseek-r1:latest",
+            "gemma3:latest",
             "phi4:latest",
-            "gemma2:latest",
+            "deepseek-r1:latest",
+            "codellama:latest",
         ],
     },
     "ollama_cloud": {
         "label": "Ollama Cloud",
-        "default_url": "https://your-project.ollama.com",
+        "default_url": "https://ollama.com",
         "needs_api_key": True,
-        "models": ["mistral", "llama3", "phi3", "gemma2"],
+        "api_format": "ollama",
+        "models": [
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
+            "gemma4",
+            "qwen3.5",
+            "glm-5.1",
+            "minimax-m2.7",
+            "kimi-k2.6",
+            "glm-4.7",
+            "nemotron-3-super",
+            "qwen3-coder-next",
+            "gemini-3-flash-preview",
+            "deepseek-v3.2",
+        ],
     },
     "openai": {
         "label": "OpenAI",
@@ -72,6 +87,25 @@ AI_PROVIDERS: dict[str, dict[str, Any]] = {
         "needs_api_key": True,
         "models": [],
     },
+    "opencode_zen": {
+        "label": "OpenCode Zen",
+        "default_url": "https://opencode.ai/zen",
+        "needs_api_key": True,
+        "models": [
+            "deepseek-v4-flash-free",
+            "nemotron-3-super-free",
+            "big-pickle",
+            "minimax-m2.5-free",
+            "ring-2.6-1t-free",
+            "qwen3.6-plus",
+            "qwen3.5-plus",
+            "minimax-m2.7",
+            "glm-5.1",
+            "kimi-k2.6",
+            "gpt-5.4-mini",
+            "gpt-5.4-nano",
+        ],
+    },
 }
 
 
@@ -83,6 +117,21 @@ _DEFAULT_CONFIG = {
     "timeout": 60.0,
     "max_retries": 3,
     "temperature": 0.3,
+    "personality": {
+        "minervini": 50,
+        "manas_arora": 50,
+        "chartitude": 50,
+        "quallamagie": 50,
+        "pradeep_bonde": 50,
+    },
+}
+
+MENTORS = {
+    "minervini": {"name": "Mark Minervini", "description": "SEPA methodology, momentum, risk management"},
+    "manas_arora": {"name": "Manas Arora", "description": "Indian markets, price action, discipline"},
+    "chartitude": {"name": "Chartitude", "description": "Technical analysis, chart patterns, patience"},
+    "quallamagie": {"name": "QuallaMagie", "description": "Quantitative edge, data-driven, systematic"},
+    "pradeep_bonde": {"name": "Pradeep Bonde", "description": "Swing trading, trend following, psychology"},
 }
 
 

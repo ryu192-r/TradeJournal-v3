@@ -64,3 +64,17 @@ def test_journal_weekly_endpoint(client, auth_user_token):
     data = resp.json()
     items = data if isinstance(data, list) else data.get("items", data.get("data", []))
     assert len(items) >= 2
+
+
+def test_journal_weekly_stats_no_trades(client, auth_user_token):
+    """Weekly stats should return zeros when no trades exist for the week."""
+    resp = client.get(
+        "/api/v1/journal/weekly-stats?week_start=2026-05-11",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["trade_count"] == 0
+    assert body["total_pnl"] == "0"
+    assert body["win_rate"] == "0"
+    assert body["avg_r"] == "0.00"

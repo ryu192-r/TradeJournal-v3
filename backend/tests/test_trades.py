@@ -69,11 +69,11 @@ def test_create_trade_computes_pnl(client, auth_user_token):
     assert pnl > 0  # LONG, entry 2500, exit 2550, qty 10 → +500
 
 
-def test_create_trade_long_short(client, auth_user_token):
+def test_create_trade_long_only(client, auth_user_token):
     r1 = _create(client, auth_user_token, direction="LONG")
     assert r1.status_code in (200, 201)
     r2 = _create(client, auth_user_token, direction="SHORT")
-    assert r2.status_code in (200, 201)
+    assert r2.status_code == 422  # SHORT not supported
 
 
 def test_create_trade_missing_symbol_422(client, auth_user_token):

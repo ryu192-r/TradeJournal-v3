@@ -1,14 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
 
 from app.utils.decimal_utils import ensure_decimal
 
 
 class TradeBase(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=20, description="Instrument symbol")
-    direction: str = Field(..., description="Direction: 'LONG' or 'SHORT'")
+    direction: str = Field(default="LONG", description="Always LONG for Indian equities")
     entry_price: Decimal = Field(..., description="Entry price per unit")
     exit_price: Optional[Decimal] = Field(None, description="Exit price per unit")
     quantity: Decimal = Field(..., description="Quantity of shares/contracts")
@@ -28,8 +28,8 @@ class TradeBase(BaseModel):
     @field_validator("direction")
     @classmethod
     def validate_direction(cls, v):
-        if v not in ("LONG", "SHORT"):
-            raise ValueError("Direction must be 'LONG' or 'SHORT'")
+        if v != "LONG":
+            raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
     @field_validator("status")
@@ -70,7 +70,6 @@ class TradeUpdate(BaseModel):
     chart_images: Optional[List[str]] = None
     review_notes: Optional[str] = None
     review_tags: Optional[List[str]] = None
-    review_status: Optional[str] = None
     exit_notes: Optional[str] = None
     exit_reason: Optional[str] = None
 
@@ -79,8 +78,8 @@ class TradeUpdate(BaseModel):
     def validate_direction(cls, v):
         if v is None:
             return v
-        if v not in ("LONG", "SHORT"):
-            raise ValueError("Direction must be 'LONG' or 'SHORT'")
+        if v != "LONG":
+            raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
     @field_validator("status")
@@ -104,7 +103,6 @@ class TradeResponse(TradeBase):
     chart_images: Optional[List[str]] = None
     review_notes: Optional[str] = None
     review_tags: Optional[List[str]] = None
-    review_status: Optional[str] = None
     exit_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -112,9 +110,8 @@ class TradeResponse(TradeBase):
     model_config = ConfigDict(from_attributes=True)
 
     # Do NOT serialize Decimal to float — keep as string in JSON
-    @field_validator("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", mode="plain")
-    @classmethod
-    def serialize_decimal(cls, v):
+    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
+    def serialize_decimal(self, v):
         if v is None:
             return None
         return str(v) if isinstance(v, Decimal) else v
@@ -123,3 +120,16 @@ class TradeResponse(TradeBase):
 class TradeListResponse(BaseModel):
     total: int
     items: List[TradeResponse]
+
+
+class PyramidTradeRequest(BaseModel):
+    entry_price: Decimal = Field(..., description="Entry price of the pyramid lot")
+    quantity: Decimal = Field(..., description="Quantity to add")
+    entry_time: Optional[datetime] = Field(None, description="Entry time for this lot")
+    fees: Optional[Decimal] = Field(Decimal('0'), description="Fees for this lot")
+    stop_price: Optional[Decimal] = Field(None, description="Updated stop loss for the position")
+
+    @field_validator("entry_price", "quantity", "fees", "stop_price")
+    @classmethod
+    def ensure_decimal(cls, v):
+        return ensure_decimal(v)

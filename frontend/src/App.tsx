@@ -8,12 +8,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TradesPage } from '@/pages/TradesPage'
 import { CreateTradePage } from '@/pages/CreateTradePage'
 import { EditTradePage } from '@/pages/EditTradePage'
+import { DashboardPage } from '@/pages/DashboardPage'
 import { JournalPage } from '@/pages/JournalPage'
 import { SetupPlaybookPage } from '@/components/playbook/SetupPlaybookPage'
 import { TradeIdeasPage } from '@/components/ideas/TradeIdeasPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
 import { AnalyticsDashboardPage } from '@/pages/AnalyticsDashboardPage'
 import { CapitalPage } from '@/pages/CapitalPage'
+import { AICoachPage } from '@/components/coach/AICoachPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useEffect } from 'react'
@@ -26,10 +29,6 @@ const queryClient = new QueryClient({
     },
   },
 })
-
-function DashboardView() {
-  return <AnalyticsDashboardPage />
-}
 
 function App() {
   const { sidebarOpen, activeView, tradeFormMode, selectedTradeId } = useAppStore()
@@ -52,6 +51,7 @@ function App() {
               sidebarOpen && 'lg:ml-56'
             )}
           >
+            <OfflineIndicator />
             <TopBar>
               <div className="inline-flex items-center gap-[.375rem] rounded-md px-2 py-[.1875rem] text-[.5rem] font-semibold font-data uppercase tracking-wider bg-text-muted text-text-muted md:gap-[.4375rem] md:px-2.5 md:py-1 md:text-[.625rem]">
                 <div className="w-[4px] h-[4px] rounded-full bg-accent animate-pulse md:w-[6px] md:h-[6px]" />
@@ -59,7 +59,8 @@ function App() {
               </div>
             </TopBar>
             <main className="flex-1 overflow-auto scrollbar-thin">
-              {activeView === 'dashboard' && <ErrorBoundary name="Dashboard"><DashboardView /></ErrorBoundary>}
+              {activeView === 'dashboard' && <ErrorBoundary name="Dashboard"><DashboardPage /></ErrorBoundary>}
+              {activeView === 'analytics' && <ErrorBoundary name="Analytics"><AnalyticsDashboardPage /></ErrorBoundary>}
               {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
               {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
               {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
@@ -69,6 +70,7 @@ function App() {
               {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}
               {activeView === 'review' && <ErrorBoundary name="Review"><TradeReviewStream /></ErrorBoundary>}
               {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
+              {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
             </main>
           </div>
           <ToastContainer />

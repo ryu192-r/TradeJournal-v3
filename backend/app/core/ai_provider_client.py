@@ -21,6 +21,7 @@ logger = structlog.get_logger(__name__)
 FORMAT_OPENAI = "openai"
 FORMAT_ANTHROPIC = "anthropic"
 FORMAT_GOOGLE = "google"
+FORMAT_OLLAMA = "ollama"
 
 
 class AIProviderClient:
@@ -81,6 +82,7 @@ class AIProviderClient:
             FORMAT_OPENAI: self._openai_chat,
             FORMAT_ANTHROPIC: self._anthropic_chat,
             FORMAT_GOOGLE: self._google_chat,
+            FORMAT_OLLAMA: self._ollama_chat,
         }
         handler = dispatch.get(self.api_format, self._openai_chat)
         return await handler(messages, temp, max_tokens)
@@ -145,6 +147,63 @@ class AIProviderClient:
                     ) from last_err
 
         raise RuntimeError("OpenAI chat call exhausted retries")
+
+    # ─── Ollama (/api/chat) ─────────────────────────────────────
+
+    async def _ollama_chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        url = f"{self.base_url}/api/chat"
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+            },
+        }
+
+        last_err: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(self.timeout, connect=10.0),
+                ) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    content = data.get("message", {}).get("content", "")
+                    if not content:
+                        raise ValueError("Empty response from Ollama")
+                    logger.info(
+                        "ollama_chat_response",
+                        model=self.model,
+                        attempt=attempt,
+                    )
+                    return content
+            except Exception as exc:
+                last_err = exc
+                logger.warning(
+                    "ai_chat_error",
+                    api_format="ollama",
+                    attempt=attempt,
+                    error=str(exc),
+                )
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2**attempt)
+                else:
+                    raise RuntimeError(
+                        f"Ollama API call failed after {self.max_retries} attempts: {last_err}"
+                    ) from last_err
+
+        raise RuntimeError("Ollama chat call exhausted retries")
 
     # ─── Anthropic (/v1/messages) ─────────────────────────────────
 

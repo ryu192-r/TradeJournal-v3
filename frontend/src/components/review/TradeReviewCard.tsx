@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { ChartGallery } from './ChartGallery'
 import { TagSelector } from './TagSelector'
 import type { ApiTrade, ApiTradeUpdatePayload } from '@/types'
-import { formatCurrency, formatDate, formatRMultiple } from '@/utils/format'
-import { ArrowRight, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
+import { formatCurrency, formatPrice, formatDate, formatRMultiple } from '@/utils/format'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
 
 interface TradeReviewCardProps {
   trade: ApiTrade
@@ -17,18 +17,6 @@ function pnlColor(pnl: string | number | null | undefined): string {
   if (pnl === null || pnl === undefined) return 'text-text-muted'
   const n = typeof pnl === 'string' ? Number(pnl) : pnl
   return n >= 0 ? 'text-profit' : 'text-loss'
-}
-
-function directionIcon(direction: string) {
-  return direction === 'LONG' ? (
-    <TrendingUp className="w-4 h-4" />
-  ) : (
-    <TrendingDown className="w-4 h-4" />
-  )
-}
-
-function directionBadgeVariant(direction: string): 'profit' | 'loss' {
-  return direction === 'LONG' ? 'profit' : 'loss'
 }
 
 function badgeStyles(variant: 'profit' | 'loss' | 'accent', size?: 'sm'): string {
@@ -71,24 +59,18 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
   const rMultiple = trade.r_multiple ?? undefined
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-6 max-w-2xl mx-auto">
+    <div className="bg-card rounded-2xl border border-border p-4 sm:p-6 max-w-3xl mx-auto">
       {/* Trade Summary Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="font-display text-lg font-semibold text-text-heading">{trade.symbol}</div>
-          <span className={badgeStyles(directionBadgeVariant(trade.direction))}>
-            <span className="flex items-center gap-1">
-              {directionIcon(trade.direction)}
-              {trade.direction}
-            </span>
-          </span>
-          {trade.setup && (
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3 flex-wrap min-w-0">
+          <div className="font-display text-lg font-semibold text-text-heading truncate">{trade.symbol}</div>
+           {trade.setup && (
             <span className={badgeStyles('accent', 'sm')}>
               {trade.setup}
             </span>
           )}
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           {pnl !== undefined && (
             <div className={`font-data font-bold text-lg ${pnlColor(pnl)}`}>
               {Number(pnl) >= 0 ? '+' : ''}
@@ -96,22 +78,22 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
             </div>
           )}
           {rMultiple !== undefined && (
-            <div className="text-xs text-text-muted">{formatRMultiple(Number(rMultiple))}</div>
+            <div className="text-xs text-text-muted text-right">{formatRMultiple(Number(rMultiple))}</div>
           )}
         </div>
       </div>
 
       {/* Trade Details Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 p-4 rounded-xl bg-bg-elevated/30 border border-border">
+      <div className="grid grid-cols-2 gap-3 mb-6 p-3 sm:p-4 rounded-xl bg-bg-elevated/30 border border-border">
         <div>
           <div className="text-[11px] text-text-muted uppercase tracking-wide">Entry</div>
-          <div className="font-data text-sm font-medium text-text-heading mt-1">{formatCurrency(Number(trade.entry_price))}</div>
+          <div className="font-data text-sm font-medium text-text-heading mt-1">{formatPrice(Number(trade.entry_price))}</div>
           <div className="text-[11px] text-text-muted mt-1">{formatDate(trade.entry_time)}</div>
         </div>
         <div>
           <div className="text-[11px] text-text-muted uppercase tracking-wide">Exit</div>
           <div className="font-data text-sm font-medium text-text-heading mt-1">
-            {trade.exit_price ? formatCurrency(Number(trade.exit_price)) : '—'}
+            {trade.exit_price ? formatPrice(Number(trade.exit_price)) : '—'}
           </div>
           <div className="text-[11px] text-text-muted mt-1">
             {trade.exit_time ? formatDate(trade.exit_time) : 'Open'}
@@ -164,11 +146,11 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-border">
         <button
           onClick={handleReview}
           disabled={isSubmitting}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 min-w-[140px]"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 sm:min-w-[140px]"
         >
           <CheckCircle2 className="w-4 h-4" />
           {isSubmitting ? 'Saving...' : 'Review Done'}
@@ -178,7 +160,7 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
           <button
             onClick={onNext}
             disabled={isLast}
-            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50"
           >
             {isLast ? 'All caught up' : (
               <>

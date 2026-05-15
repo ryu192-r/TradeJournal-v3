@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 import { User, Database, Palette, LogOut, Sun, Moon, Cpu, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
-import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection } from '@/lib/endpoints'
+import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection, getAiMentors } from '@/lib/endpoints'
 import type { AIProviderInfo } from '@/types/ai'
 
 const inputStyle = 'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all'
@@ -32,14 +32,18 @@ export function SettingsPage() {
   const [testResult, setTestResult] = useState<{ status: string; message: string } | null>(null)
   const [saved, setSaved] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [mentors, setMentors] = useState<{ key: string; name: string; description: string }[]>([])
+  const [personality, setPersonality] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const init = async () => {
-      const [providersData, configData] = await Promise.all([
+      const [providersData, configData, mentorsData] = await Promise.all([
         getAiProviders().catch(() => ({}) as Record<string, AIProviderInfo>),
         getAiConfig().catch(() => null),
+        getAiMentors().catch(() => []),
       ])
       setProviders(providersData)
+      setMentors(mentorsData)
 
       const providerKeys = Object.keys(providersData)
       const defaultProvider = providerKeys.length > 0 ? providerKeys[0] : ''
@@ -52,6 +56,14 @@ export function SettingsPage() {
         setAiTimeout(configData.timeout ?? 60)
         setAiMaxRetries(configData.max_retries ?? 3)
         setAiTemperature(configData.temperature ?? 0.3)
+        setPersonality(configData.personality ?? {})
+        if (configData.personality && mentorsData.length > 0) {
+          const merged: Record<string, number> = {}
+          for (const m of mentorsData) {
+            merged[m.key] = configData.personality[m.key] ?? 50
+          }
+          setPersonality(merged)
+        }
       } else {
         setAiProvider(defaultProvider)
         const prov = providersData[defaultProvider]
@@ -110,6 +122,7 @@ export function SettingsPage() {
         timeout: aiTimeout,
         max_retries: aiMaxRetries,
         temperature: aiTemperature,
+        personality,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -118,12 +131,12 @@ export function SettingsPage() {
     } finally {
       setSaving(false)
     }
-  }, [aiProvider, aiBaseUrl, aiApiKey, aiModel, aiTimeout, aiMaxRetries, aiTemperature, isCustomProvider, currentProvider, needsApiKey])
+  }, [aiProvider, aiBaseUrl, aiApiKey, aiModel, aiTimeout, aiMaxRetries, aiTemperature, isCustomProvider, currentProvider, needsApiKey, personality])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div>
-        <h1 className="font-display text-2xl text-text-heading">Settings</h1>
+        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Settings</h1>
         <p className="text-sm text-text-muted mt-1">Your profile, connection, and display preferences</p>
       </div>
 
@@ -467,6 +480,51 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* AI Coach Personality Section */}
+      {loaded && mentors.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-accent-faint flex items-center justify-center">
+              <Cpu className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <h2 className="font-medium text-text-heading">Coach Personality</h2>
+              <p className="text-sm text-text-muted">Blend mentor influences to match your style</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {mentors.map((m) => (
+              <div key={m.key}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div>
+                    <label className="text-xs font-medium text-text-heading">{m.name}</label>
+                    <p className="text-[10px] text-text-muted">{m.description}</p>
+                  </div>
+                  <span className="text-xs font-data text-text-heading w-8 text-right">{personality[m.key] ?? 50}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={personality[m.key] ?? 50}
+                  onChange={(e) => setPersonality({ ...personality, [m.key]: Number(e.target.value) })}
+                  className="w-full accent-accent"
+                />
+                <div className="flex justify-between text-[10px] text-text-faint mt-0.5">
+                  <span>Minimal</span>
+                  <span>Strong</span>
+                </div>
+              </div>
+            ))}
+            <p className="text-[11px] text-text-muted leading-relaxed pt-2 border-t border-border">
+              These weights determine how much each mentor&apos;s perspective influences the AI coach&apos;s feedback.
+              Adjust to match the coaching style that resonates with you.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

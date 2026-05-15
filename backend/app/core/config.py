@@ -38,6 +38,10 @@ class Settings:
     # Logging
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO")
     
+    # Uploads
+    UPLOAD_DIR: str = config("UPLOAD_DIR", default="uploads/charts")
+    MAX_UPLOAD_SIZE_MB: int = config("MAX_UPLOAD_SIZE_MB", default=10, cast=int)
+    
     class Config:
         case_sensitive = True
 

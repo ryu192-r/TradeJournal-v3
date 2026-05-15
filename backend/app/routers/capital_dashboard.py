@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
 from decimal import Decimal
+from collections import defaultdict
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_serializer
 
@@ -32,6 +33,7 @@ class EquityCurvePointOut(BaseModel):
 
 
 class CapitalEventOut(BaseModel):
+    id: int
     date: str
     type: str
     amount: Decimal
@@ -57,13 +59,18 @@ class TierOut(BaseModel):
 
 
 class CapitalDashboardResponse(BaseModel):
+    account_id: int
+    account_name: str
     net_equity: str
     total_deposits: str
     total_withdrawals: str
     total_realized_pnl: str
     unrealized_pnl: str
+    deployed_capital: str
+    available_capital: str
     current_balance: str
     initial_balance: str
+    breakeven_threshold: str = "500"
     total_trades: int
     win_rate: Optional[float] = None
     best_trade: str
@@ -175,17 +182,30 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
             total_withdrawals += abs(amt)
 
         capital_events_out.append(CapitalEventOut(
+            id=evt.id,
             date=str(evt.timestamp.date()),
             type=evt.event_type,
             amount=amt,
             description=evt.description,
         ))
 
-    # Realized PnL from trades
+    # Realized PnL from non-deleted trades
     trades = (
         db.query(Trade)
-        .filter(Trade.pnl.isnot(None))
+        .filter(Trade.pnl.isnot(None), Trade.status != "deleted")
         .all()
+    )
+
+    # Open trades — compute deployed capital
+    open_trades = (
+        db.query(Trade)
+        .filter(Trade.pnl.is_(None), Trade.status != "deleted")
+        .all()
+    )
+
+    deployed_capital = sum(
+        (ensure_decimal(t.entry_price) * ensure_decimal(t.quantity) - ensure_decimal(t.fees))
+        for t in open_trades
     )
 
     total_realized_pnl = Decimal("0")
@@ -221,19 +241,26 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
     capital_net = total_deposits - total_withdrawals
     net_equity = initial_balance + capital_net + total_realized_pnl
 
-    # Equity curve from capital events
-    running = initial_balance
-    curve_points: list[EquityCurvePointOut] = []
-    day_buckets: dict[date, Decimal] = {}
+    # Equity curve: start with initial balance, add capital events + daily trade PnL
+    daily_balance: dict[date, Decimal] = defaultdict(Decimal)
 
+    # Track daily PnL from trades
+    for t in trades:
+        day = t.exit_time.date() if t.exit_time else t.entry_time.date()
+        daily_balance[day] += ensure_decimal(t.pnl)
+
+    # Track capital events
     events_asc = sorted(events_q, key=lambda e: e.timestamp)
     for evt in events_asc:
         day = evt.timestamp.date()
-        running += ensure_decimal(evt.amount)
-        day_buckets[day] = running
+        daily_balance[day] += ensure_decimal(evt.amount)
 
-    for day_val in sorted(day_buckets.keys()):
-        curve_points.append(EquityCurvePointOut(date=str(day_val), equity=day_buckets[day_val]))
+    # Build running curve
+    curve_points: list[EquityCurvePointOut] = []
+    running = initial_balance
+    for day_val in sorted(daily_balance.keys()):
+        running += daily_balance[day_val]
+        curve_points.append(EquityCurvePointOut(date=str(day_val), equity=running))
 
     if not curve_points:
         today = date.today()
@@ -245,13 +272,18 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
     current_balance = ensure_decimal(account.current_balance)
 
     return CapitalDashboardResponse(
+        account_id=account.id,
+        account_name=account.name,
         net_equity=str(net_equity),
         total_deposits=str(total_deposits),
         total_withdrawals=str(total_withdrawals),
         total_realized_pnl=str(total_realized_pnl),
         unrealized_pnl="0",
+        deployed_capital=str(deployed_capital),
+        available_capital=str(net_equity - deployed_capital),
         current_balance=str(current_balance),
         initial_balance=str(initial_balance),
+        breakeven_threshold=str(account.breakeven_threshold or "500"),
         total_trades=total_trades,
         win_rate=win_rate,
         best_trade=str(best_trade),

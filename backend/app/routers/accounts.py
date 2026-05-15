@@ -5,7 +5,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, field_serializer
 
 from app.schemas.account import (
     AccountCreate,
@@ -41,9 +41,8 @@ class RebalanceResponse(BaseModel):
     def ensure_decimal(cls, v):
         return ensure_decimal(v)
 
-    @field_validator("new_balance", mode="plain")
-    @classmethod
-    def serialize_decimal(cls, v):
+    @field_serializer("new_balance")
+    def serialize_decimal(self, v):
         if v is None:
             return None
         return str(v) if isinstance(v, Decimal) else v

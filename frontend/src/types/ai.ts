@@ -6,6 +6,7 @@ export interface AiConfigResponse {
   timeout: number
   max_retries: number
   temperature: number
+  personality: Record<string, number> | null
 }
 
 export interface AIProviderInfo {
@@ -24,6 +25,7 @@ export interface AiConfigSaveRequest {
   timeout: number
   max_retries: number
   temperature: number
+  personality?: Record<string, number>
 }
 
 export interface TestResponse {
@@ -31,4 +33,10 @@ export interface TestResponse {
   model?: string
   response?: string
   error?: string
+}
+
+export interface MentorInfo {
+  key: string
+  name: string
+  description: string
 }

@@ -19,8 +19,6 @@ from app.models import (  # noqa: E402, F401
     SetupPlaybook,
     DailyJournal,
     TradeIdea,
-    Tag,
-    TradeTag,
     StopHistory,
     CapitalEvent,
     Milestone,

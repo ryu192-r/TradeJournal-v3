@@ -1,17 +1,29 @@
 import { TradeReviewCard } from './TradeReviewCard'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { useReviewTradeMutation } from '@/hooks/useReviewTradeMutation'
+import { useUpdateTradeMutation } from '@/hooks/useTradeMutation'
 import { useToastStore } from '@/store/toastStore'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Layers, X, Loader2 } from 'lucide-react'
 import { useState, useCallback, useEffect } from 'react'
 
+type ReviewFilter = 'draft' | 'all'
+
 export function TradeReviewStream() {
-  const { data, isLoading, error } = useTradesQuery({ status: 'draft' })
+  const [filter, setFilter] = useState<ReviewFilter>('draft')
+  const { data, isLoading, error } = useTradesQuery({
+    status: filter === 'draft' ? 'draft' : undefined,
+  })
   const reviewMutation = useReviewTradeMutation()
+  const updateMutation = useUpdateTradeMutation()
   const addToast = useToastStore((s) => s.addToast)
 
-  const trades = data?.items || []
+  const trades = data?.items?.filter(t => filter === 'all' || t.status === 'draft') || []
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkNotes, setBulkNotes] = useState('')
+  const [bulkTags, setBulkTags] = useState<string[]>([])
+  const [isBulkApplying, setIsBulkApplying] = useState(false)
 
   useEffect(() => {
     if (trades.length > 0 && currentIndex >= trades.length) {
@@ -23,11 +35,7 @@ export function TradeReviewStream() {
     async (id: number, payload: import('@/types').ApiTradeUpdatePayload) => {
       try {
         await reviewMutation.mutateAsync({ id, payload })
-        addToast({
-          variant: 'success',
-          title: 'Review saved',
-          message: 'Trade reviewed and moved to analytics.',
-        })
+        addToast({ variant: 'success', title: 'Review saved', message: 'Trade reviewed and moved to analytics.' })
         setTimeout(() => {
           setCurrentIndex((idx) => {
             const next = idx + 1
@@ -36,51 +44,72 @@ export function TradeReviewStream() {
         }, 400)
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to save review.'
-        addToast({
-          variant: 'error',
-          title: 'Save failed',
-          message: msg,
-        })
+        addToast({ variant: 'error', title: 'Save failed', message: msg })
         throw err
       }
     },
     [reviewMutation, addToast, trades.length]
   )
 
+  const handlePrev = () => {
+    setCurrentIndex((idx) => (idx > 0 ? idx - 1 : 0))
+  }
+
   const handleNext = () => {
     setCurrentIndex((idx) => (idx < trades.length - 1 ? idx + 1 : idx))
   }
 
-  const renderProgress = () => (
-    <div className="flex items-center justify-center gap-2 mb-4">
-      {trades.map((_, idx) => (
-        <button
-          key={idx}
-          onClick={() => setCurrentIndex(idx)}
-          className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-            idx === currentIndex
-              ? 'bg-accent w-6'
-              : idx < currentIndex
-                ? 'bg-accent/40 w-4'
-                : 'bg-border w-4'
-          }`}
-        />
-      ))}
-    </div>
-  )
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleBulkApply = async () => {
+    if (isBulkApplying || selectedIds.size === 0) return
+    setIsBulkApplying(true)
+    let success = 0
+    let fail = 0
+    for (const id of selectedIds) {
+      try {
+        await updateMutation.mutateAsync({
+          id,
+          payload: {
+            notes: bulkNotes.trim() || null,
+            tags: bulkTags.length > 0 ? bulkTags : null,
+          },
+        })
+        success++
+      } catch {
+        fail++
+      }
+    }
+    setIsBulkApplying(false)
+    setSelectedIds(new Set())
+    setBulkNotes('')
+    setBulkTags([])
+    addToast({
+      variant: success > 0 ? 'success' : 'error',
+      title: 'Bulk update complete',
+      message: `${success} updated${fail > 0 ? `, ${fail} failed` : ''}.`,
+    })
+  }
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-[2rem_2.5rem_3.5rem_3rem] max-w-[calc(100vw-14rem)]">
-        <div className="animate-pulse text-text-muted text-sm">Loading unreviewed trades...</div>
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-[2rem_2.5rem]">
+        <div className="animate-pulse text-text-muted text-sm">Loading trades...</div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center p-[2rem_2.5rem_3.5rem_3rem] max-w-[calc(100vw-14rem)]">
-        <div className="bg-card rounded-2xl border border-border p-8 text-center space-y-3 max-w-md">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-[2rem_2.5rem]">
+        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 text-center space-y-3 max-w-md w-full">
           <div className="text-loss font-medium">Failed to load trades</div>
           <div className="text-sm text-text-muted">{error instanceof Error ? error.message : 'Unknown error'}</div>
           <button
@@ -96,7 +125,7 @@ export function TradeReviewStream() {
 
   if (trades.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-[2rem_2.5rem_3.5rem_3rem] max-w-[calc(100vw-14rem)]">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-[2rem_2.5rem]">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-accent-muted flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8 text-accent" />
@@ -111,36 +140,156 @@ export function TradeReviewStream() {
   }
 
   const currentTrade = trades[currentIndex]
+  const isFirst = currentIndex <= 0
   const isLast = currentIndex >= trades.length - 1
 
   return (
-    <div className="flex-1 p-[2rem_2.5rem_3.5rem_3rem] max-w-[calc(100vw-14rem)] space-y-5">
+    <div className="flex-1 px-[var(--page-px)] py-[var(--page-py)] space-y-5 max-w-3xl mx-auto w-full">
+      {/* Filter + Bulk toggle */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl text-text-heading">Review</h1>
-          <div className="text-sm text-text-muted font-data mt-0.5">
-            {currentIndex + 1} of {trades.length} unreviewed
-          </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setFilter('draft'); setCurrentIndex(0) }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              filter === 'draft'
+                ? 'bg-accent-muted text-accent border border-accent/20'
+                : 'text-text-muted hover:text-text border border-transparent'
+            }`}
+          >
+            Unreviewed
+          </button>
+          <button
+            onClick={() => { setFilter('all'); setCurrentIndex(0) }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              filter === 'all'
+                ? 'bg-accent-muted text-accent border border-accent/20'
+                : 'text-text-muted hover:text-text border border-transparent'
+            }`}
+          >
+            All Trades
+          </button>
         </div>
         <button
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text transition-all duration-[150ms] ease-out hover:text-text-heading hover:bg-accent-faint cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          onClick={handleNext}
-          disabled={isLast}
+          onClick={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()) }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            bulkMode
+              ? 'bg-accent text-white'
+              : 'text-text-muted hover:text-text border border-border'
+          }`}
         >
-          Skip
-          <ArrowRight className="w-4 h-4" />
+          <Layers className="w-3.5 h-3.5" />
+          Bulk
         </button>
       </div>
 
-      {renderProgress()}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {!isFirst && !bulkMode && (
+            <button
+              onClick={handlePrev}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-heading hover:bg-accent-faint transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div>
+            <h1 className="font-display text-2xl text-text-heading">Review</h1>
+            <div className="text-sm text-text-muted font-data mt-0.5">
+              {currentIndex + 1} of {trades.length}{filter === 'draft' ? ' unreviewed' : ''}
+              {bulkMode && ` (${selectedIds.size} selected)`}
+            </div>
+          </div>
+        </div>
+        {!bulkMode && (
+          <button
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text transition-all duration-[150ms] ease-out hover:text-text-heading hover:bg-accent-faint cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={handleNext}
+            disabled={isLast}
+          >
+            Skip
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-      <TradeReviewCard
-        key={currentTrade.id}
-        trade={currentTrade}
-        onReview={handleReview}
-        onNext={handleNext}
-        isLast={isLast}
-      />
+      {/* Progress dots */}
+      <div className="flex items-center justify-center gap-2 mb-1">
+        {trades.map((t, idx) => {
+          const isReviewed = t.status !== 'draft'
+          return (
+            <button
+              key={t.id}
+              onClick={() => {
+                if (bulkMode) {
+                  toggleSelect(t.id)
+                } else {
+                  setCurrentIndex(idx)
+                }
+              }}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                idx === currentIndex
+                  ? 'bg-accent w-6'
+                  : isReviewed
+                    ? 'bg-accent/40 w-4'
+                    : selectedIds.has(t.id)
+                      ? 'bg-accent w-4'
+                      : 'bg-border w-4'
+              }`}
+              title={`${t.symbol} — ${t.status}`}
+            />
+          )
+        })}
+      </div>
+
+      {/* Bulk mode panel */}
+      {bulkMode && (
+        <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+          <h3 className="text-sm font-medium text-text-heading">
+            Apply to {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected trades'}
+          </h3>
+          <textarea
+            value={bulkNotes}
+            onChange={(e) => setBulkNotes(e.target.value)}
+            placeholder="Notes to apply to all selected trades..."
+            rows={2}
+            className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+          />
+          <input
+            value={bulkTags.join(', ')}
+            onChange={(e) => setBulkTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+            placeholder="Tags (comma-separated): fomo, early-entry"
+            className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleBulkApply}
+              disabled={isBulkApplying || selectedIds.size === 0}
+              className="flex-1 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              {isBulkApplying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Apply to {selectedIds.size > 0 ? `${selectedIds.size} trades` : 'selected'}
+            </button>
+            <button
+              onClick={() => { setSelectedIds(new Set()); setBulkNotes(''); setBulkTags([]) }}
+              className="px-3 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Trade card */}
+      {!bulkMode && (
+        <TradeReviewCard
+          key={currentTrade.id}
+          trade={currentTrade}
+          onReview={handleReview}
+          onNext={handleNext}
+          isLast={isLast}
+        />
+      )}
 
       <div className="text-center text-xs text-text-muted font-data">
         {trades.length - currentIndex - 1 > 0

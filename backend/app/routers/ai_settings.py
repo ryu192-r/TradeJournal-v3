@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
-from app.core.ai_config import AI_PROVIDERS, get_ai_config, save_ai_config
+from app.core.ai_config import AI_PROVIDERS, MENTORS, get_ai_config, save_ai_config
 from app.core.ai_provider_client import AIProviderClient
 from app.utils.logging import get_logger
 
@@ -27,6 +27,7 @@ class AIConfigUpdate(BaseModel):
     timeout: float = Field(default=60.0, ge=1.0, le=300.0)
     max_retries: int = Field(default=3, ge=1, le=10)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    personality: Optional[dict[str, int]] = Field(None, description="Mentor personality weights (0-100)")
 
 
 class AIConfigResponse(BaseModel):
@@ -37,6 +38,13 @@ class AIConfigResponse(BaseModel):
     max_retries: int
     temperature: float
     has_api_key: bool
+    personality: Optional[dict[str, int]] = None
+
+
+class MentorInfo(BaseModel):
+    key: str
+    name: str
+    description: str
 
 
 class ProviderInfo(BaseModel):
@@ -77,7 +85,19 @@ def get_config():
         max_retries=cfg["max_retries"],
         temperature=cfg["temperature"],
         has_api_key=bool(cfg.get("api_key")),
+        personality=cfg.get("personality"),
     )
+
+
+@router.get("/mentors", summary="List available mentor personalities")
+def get_mentors():
+    """Return the list of available mentor personalities for the AI coach."""
+    return {
+        "mentors": [
+            MentorInfo(key=k, name=v["name"], description=v["description"])
+            for k, v in MENTORS.items()
+        ]
+    }
 
 
 @router.get(
@@ -120,6 +140,7 @@ async def update_config(body: AIConfigUpdate):
         max_retries=merged["max_retries"],
         temperature=merged["temperature"],
         has_api_key=bool(merged.get("api_key")),
+        personality=merged.get("personality"),
     )
 
 

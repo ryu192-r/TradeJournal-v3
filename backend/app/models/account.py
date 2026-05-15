@@ -14,6 +14,7 @@ class Account(Base):
     initial_balance = Column(Numeric(precision=18, scale=8), server_default=text('0'))
     current_balance = Column(Numeric(precision=18, scale=8), server_default=text('0'))
     currency = Column(String(10), default='INR')
+    breakeven_threshold = Column(Numeric(precision=18, scale=8), server_default=text('500'))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -21,6 +21,7 @@ class DailyJournalCreate(BaseModel):
     avg_r_multiple: Decimal | None = None
     win_rate: Decimal | None = Field(None, ge=0, le=100)
     mood_rating: int | None = Field(None, ge=1, le=5)
+    discipline_rating: int | None = Field(None, ge=1, le=5)
     mood_notes: str | None = None
     rules_followed: str | None = None
     rules_violated: str | None = None
@@ -35,10 +36,22 @@ class DailyJournalUpdate(BaseModel):
     avg_r_multiple: Decimal | None = None
     win_rate: Decimal | None = None
     mood_rating: int | None = None
+    discipline_rating: int | None = None
     mood_notes: str | None = None
     rules_followed: str | None = None
     rules_violated: str | None = None
     lessons_learned: str | None = None
+
+
+class WeeklyStatsResponse(BaseModel):
+    week_start: date
+    week_end: date
+    trade_count: int
+    total_pnl: Decimal
+    win_rate: Decimal
+    avg_r: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DailyJournalResponse(BaseModel):
@@ -56,6 +69,7 @@ class DailyJournalResponse(BaseModel):
     avg_r_multiple: Decimal | None = None
     win_rate: Decimal | None = None
     mood_rating: int | None = None
+    discipline_rating: int | None = None
     mood_notes: str | None = None
     rules_followed: str | None = None
     rules_violated: str | None = None

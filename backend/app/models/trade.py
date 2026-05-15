@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, B
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
+from app.utils.decimal_utils import TagsList
 from decimal import Decimal
 
 
@@ -12,7 +13,7 @@ class Trade(Base):
     
     # Core trade fields
     symbol = Column(String(20), nullable=False, index=True)
-    direction = Column(String(10), nullable=False)  # LONG or SHORT
+    direction = Column(String(10), nullable=False, default='LONG')  # Always LONG for Indian equities
     entry_price = Column(Numeric(precision=18, scale=8), nullable=False)
     exit_price = Column(Numeric(precision=18, scale=8))
     quantity = Column(Numeric(precision=18, scale=8), nullable=False)
@@ -23,7 +24,7 @@ class Trade(Base):
     
     # Management
     notes = Column(Text)
-    tags = Column(String(200))
+    tags = Column(TagsList)
     setup = Column(String(100))
     tactic = Column(String(100))
     stop_price = Column(Numeric(precision=18, scale=8))
@@ -33,7 +34,7 @@ class Trade(Base):
     # Status lifecycle
     status = Column(String(20), default='draft')  # draft, reviewed, analytics, closed_sl_hit, closed_target_hit, closed_manual, deleted
     review_notes = Column(Text)
-    review_tags = Column(String(200))
+    review_tags = Column(TagsList)
     chart_images = Column(JSON, default=list)  # JSON array of image paths
 
     # Exit tracking
@@ -50,11 +51,9 @@ class Trade(Base):
     source_idea = relationship("TradeIdea", back_populates="traded_trade", uselist=False)
 
     def compute_pnl(self):
-        """Auto-compute PnL based on prices and direction."""
+        """Auto-compute PnL. All trades are LONG (Indian equities — shorting not applicable)."""
         if self.exit_price and self.entry_price and self.quantity:
             raw_pnl = (self.exit_price - self.entry_price) * self.quantity
-            if self.direction == 'SHORT':
-                raw_pnl = -raw_pnl
             self.pnl = raw_pnl - (self.fees or Decimal('0'))
         return self.pnl
 

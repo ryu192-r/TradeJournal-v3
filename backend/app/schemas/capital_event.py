@@ -23,7 +23,7 @@ class CapitalEventCreate(BaseSchema):
     @field_validator("event_type")
     @classmethod
     def validate_event_type(cls, v):
-        valid = {"deposit", "withdrawal", "profit", "fee", "adjustment"}
+        valid = {"deposit", "withdrawal", "profit", "fee", "adjustment", "trade_deletion", "pyramid"}
         if v not in valid:
             raise ValueError(f"event_type must be one of: {', '.join(sorted(valid))}")
         return v
@@ -47,7 +47,7 @@ class CapitalEventUpdate(BaseSchema):
     def validate_event_type(cls, v):
         if v is None:
             return v
-        valid = {"deposit", "withdrawal", "profit", "fee", "adjustment"}
+        valid = {"deposit", "withdrawal", "profit", "fee", "adjustment", "trade_deletion", "pyramid"}
         if v not in valid:
             raise ValueError(f"event_type must be one of: {', '.join(sorted(valid))}")
         return v
@@ -78,5 +78,7 @@ class CapitalSummaryResponse(BaseSchema):
     total_profit: str = "0"
     total_fees: str = "0"
     total_adjustments: str = "0"
+    total_trade_deletions: str = "0"
+    total_pyramids: str = "0"
     net_change: str = "0"
     event_count: int = 0

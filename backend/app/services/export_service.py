@@ -111,6 +111,72 @@ class ExportService:
         
         return output.getvalue()
 
+    def export_trades_to_xlsx(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> bytes:
+        """Export trades to XLSX bytes."""
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        query = self.db.query(Trade)
+        if status:
+            query = query.filter(Trade.status == status)
+        if from_date:
+            query = query.filter(Trade.entry_time >= datetime.strptime(from_date, "%Y-%m-%d"))
+        if to_date:
+            query = query.filter(Trade.entry_time <= datetime.strptime(to_date, "%Y-%m-%d"))
+        query = query.filter(Trade.status != "deleted")
+        trades = query.order_by(Trade.entry_time.asc()).all()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Trades"
+
+        headers = [
+            "Symbol", "Entry Price", "Quantity", "Entry Time", "Exit Price",
+            "Exit Time", "Fees", "PnL", "Setup", "Tactic", "Stop Price",
+            "Target Price", "R-Multiple", "Status", "Notes",
+        ]
+
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="C97A3F", end_color="C97A3F", fill_type="solid")
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+
+        for r, trade in enumerate(trades, 2):
+            ws.cell(row=r, column=1, value=trade.symbol)
+            ws.cell(row=r, column=2, value=float(trade.entry_price) if trade.entry_price else 0)
+            ws.cell(row=r, column=3, value=float(trade.quantity) if trade.quantity else 0)
+            ws.cell(row=r, column=4, value=trade.entry_time.strftime("%Y-%m-%d %H:%M") if trade.entry_time else "")
+            ws.cell(row=r, column=5, value=float(trade.exit_price) if trade.exit_price else "")
+            ws.cell(row=r, column=6, value=trade.exit_time.strftime("%Y-%m-%d %H:%M") if trade.exit_time else "")
+            ws.cell(row=r, column=7, value=float(trade.fees) if trade.fees else 0)
+            ws.cell(row=r, column=8, value=float(trade.pnl) if trade.pnl else "")
+            ws.cell(row=r, column=9, value=trade.setup or "")
+            ws.cell(row=r, column=10, value=trade.tactic or "")
+            ws.cell(row=r, column=11, value=float(trade.stop_price) if trade.stop_price else "")
+            ws.cell(row=r, column=12, value=float(trade.target_price) if trade.target_price else "")
+            ws.cell(row=r, column=13, value=float(trade.r_multiple) if trade.r_multiple else "")
+            ws.cell(row=r, column=14, value=trade.status or "")
+            ws.cell(row=r, column=15, value=trade.notes or "")
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = min(max_len + 3, 30)
+
+        output = io.BytesIO()
+        wb.save(output)
+        return output.getvalue()
+
     async def send_telegram_backup(
         self,
         csv_content: str,

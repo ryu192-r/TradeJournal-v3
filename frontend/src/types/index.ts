@@ -1,11 +1,10 @@
 // Shared TypeScript types for the trading journal
 
-export type TradeDirection = 'LONG' | 'SHORT'
+export type TradeDirection = 'LONG'
 
 export type TradeStatus = 'OPEN' | 'CLOSED' | 'MISSED'
 
-export type BackendTradeStatus = 'draft' | 'reviewed' | 'analytics'
-
+export type BackendTradeStatus = 'draft' | 'reviewed' | 'analytics' | 'closed_sl_hit' | 'closed_target_hit' | 'closed_manual' | 'deleted'
 export type SetupType =
   | 'EP'
   | 'Momentum Burst'
@@ -70,6 +69,7 @@ export interface ApiTrade {
   chart_images?: string[] | null
   review_notes?: string | null
   review_tags?: string[] | null
+  exit_reason?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -82,39 +82,21 @@ export interface ApiTradeListResponse {
 export interface ApiTradeUpdatePayload {
   symbol?: string
   direction?: string
-  entry_price?: number
-  exit_price?: number | null
-  quantity?: number
+  entry_price?: string
+  exit_price?: string | null
+  quantity?: string
   entry_time?: string
   exit_time?: string | null
-  fees?: number
+  fees?: string
   notes?: string | null
   tags?: string[] | null
   setup?: string | null
   tactic?: string | null
-  stop_price?: number | null
-  target_price?: number | null
-  r_multiple?: number | null
+  stop_price?: string | null
+  target_price?: string | null
+  r_multiple?: string | null
   status?: BackendTradeStatus
-}
-
-export interface JournalEntry {
-  id: number
-  date: string
-  type: 'PRE_MARKET' | 'POST_MARKET' | 'WEEKLY'
-  content: string
-  linkedTrades?: number[]
-}
-
-
-export interface TradeIdea {
-  id: number
-  symbol: string
-  setup: SetupType
-  triggerPrice: number
-  reasonMissed?: string
-  revisitDate?: string
-  createdAt: string
+  exit_reason?: string | null
 }
 
 export interface DashboardKpi {
@@ -152,6 +134,7 @@ export interface DailyJournal {
   avg_r_multiple: string | null
   win_rate: string | null
   mood_rating: number | null
+  discipline_rating: number | null
   mood_notes: string | null
   rules_followed: string | null
   rules_violated: string | null
@@ -160,12 +143,22 @@ export interface DailyJournal {
   updated_at?: string
 }
 
+export interface WeeklyJournalStats {
+  week_start: string
+  week_end: string
+  trade_count: number
+  total_pnl: string
+  win_rate: string
+  avg_r: string
+}
+
 export interface DailyJournalPayload {
   date: string
   pre_trade_notes?: string | null
   post_trade_notes?: string | null
   trade_count?: number | null
   mood_rating?: number | null
+  discipline_rating?: number | null
   mood_notes?: string | null
   rules_followed?: string | null
   rules_violated?: string | null
@@ -279,13 +272,18 @@ export interface HoldingPeriodEntry {
 }
 
 export interface CapitalDashboardPayload {
+  account_id: number
+  account_name: string
   net_equity: string
   total_deposits: string
   total_withdrawals: string
   total_realized_pnl: string
   unrealized_pnl: string
+  deployed_capital: string
+  available_capital: string
   current_balance: string
   initial_balance: string
+  breakeven_threshold: string
   total_trades: number
   win_rate: number | null
   best_trade: string
@@ -294,10 +292,33 @@ export interface CapitalDashboardPayload {
   average_loss: string
   profit_factor: number | null
   equity_curve: { date: string; equity: string }[]
-  events: { date: string; type: string; amount: string; description: string | null }[]
+  events: { id: number; date: string; type: string; amount: string; description: string | null }[]
   tiers: { name: string; min: string; max: string | null; current: boolean; progress_pct: number | null }[]
   progress_to_next_tier: number | null
 }
+
+export interface AccountInfo {
+  id: number
+  name: string
+  broker: string | null
+  account_number: string | null
+  initial_balance: string
+  current_balance: string
+  breakeven_threshold: string | null
+  currency: string
+}
+
+export interface CapitalEvent {
+  id: number
+  event_type: string
+  amount: string
+  timestamp: string
+  description: string | null
+  account_id: number
+  trade_id: number | null
+}
+
+export type CapitalEventType = 'deposit' | 'withdrawal' | 'profit' | 'fee' | 'adjustment' | 'trade_deletion' | 'pyramid'
 
 export interface TierConfigItem {
   id?: number
@@ -309,6 +330,39 @@ export interface TierConfigItem {
 
 export interface TierConfigListResponse {
   items: TierConfigItem[]
+}
+
+export interface BrokerInfo {
+  id: string
+  name: string
+}
+
+export interface BrokerImportResult {
+  status: 'success' | 'error'
+  added: number
+  merged?: number
+  skipped: number
+  total: number
+  errors: string[]
+  preview: (Record<string, string> & { _skipped?: boolean })[]
+}
+
+export interface StopHistoryEntry {
+  id: number
+  trade_id: number
+  stop_type: 'initial' | 'manual' | 'breakeven' | 'trailing' | 'target'
+  price: string
+  timestamp: string
+}
+
+export interface StopHistoryListResponse {
+  items: StopHistoryEntry[]
+}
+
+export interface StopHistoryCreatePayload {
+  stop_type: string
+  price: string
+  timestamp: string
 }
 
 export interface FullDashboardPayload {

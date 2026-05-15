@@ -6,19 +6,15 @@ import { GlassTextarea } from '@/components/ui/GlassTextarea'
 import {
   tradeFormSchema,
   type TradeFormData,
+  type TradeFormStatus,
   isoToDatetimeLocal,
   formDataToApiPayload,
 } from '@/schemas/tradeForm'
 import { useToastStore } from '@/store/toastStore'
-import type { ApiTrade, BackendTradeStatus } from '@/types'
+import type { ApiTrade } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Save } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
-
-const DIRECTION_OPTIONS = [
-  { value: 'LONG', label: 'LONG' },
-  { value: 'SHORT', label: 'SHORT' },
-]
 
 const SETUP_OPTIONS = [
   { value: '', label: '— Select Setup —' },
@@ -58,10 +54,9 @@ interface TradeEntryFormProps {
 function apiTradeToFormData(trade: ApiTrade): TradeFormData {
   return {
     symbol: trade.symbol,
-    direction: trade.direction as 'LONG' | 'SHORT',
     entry_price: String(trade.entry_price),
     exit_price: trade.exit_price != null ? String(trade.exit_price) : undefined,
-    quantity: String(trade.quantity),
+    quantity: String(Number(trade.quantity)),
     entry_time: isoToDatetimeLocal(trade.entry_time),
     exit_time: isoToDatetimeLocal(trade.exit_time),
     fees: String(trade.fees ?? 0),
@@ -72,7 +67,7 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     r_multiple: trade.r_multiple != null ? String(trade.r_multiple) : undefined,
     notes: trade.notes || undefined,
     tags: trade.tags || [],
-    status: (trade.status as BackendTradeStatus) ?? 'draft',
+    status: (trade.status as TradeFormStatus) || 'draft',
   }
 }
 
@@ -89,7 +84,6 @@ export function TradeEntryForm({
     ? apiTradeToFormData(initialData)
     : {
         symbol: '',
-        direction: 'LONG',
         entry_price: '',
         exit_price: undefined,
         quantity: '',
@@ -112,13 +106,10 @@ export function TradeEntryForm({
     control,
     formState: { errors, isSubmitting },
     reset,
-    watch,
   } = useForm<TradeFormData>({
     resolver: zodResolver(tradeFormSchema) as never,
     defaultValues,
   })
-
-  const direction = watch('direction')
 
   const onSubmit = async (data: TradeFormData) => {
     if (!submitFn) {
@@ -134,10 +125,10 @@ export function TradeEntryForm({
       await submitFn(payload)
       addToast({
         title: mode === 'create' ? 'Trade created' : 'Trade updated',
-        message:
-          mode === 'create'
-            ? `${data.symbol} ${data.direction} trade saved.`
-            : `${data.symbol} trade updated successfully.`,
+          message:
+            mode === 'create'
+              ? `${data.symbol} trade saved.`
+              : `${data.symbol} trade updated successfully.`,
         variant: 'success',
       })
       if (mode === 'create') {
@@ -177,18 +168,6 @@ export function TradeEntryForm({
               placeholder="e.g. RELIANCE"
               {...register('symbol')}
               error={errors.symbol?.message}
-            />
-            <Controller
-              name="direction"
-              control={control}
-              render={({ field }) => (
-                <GlassSelect
-                  label="Direction"
-                  options={DIRECTION_OPTIONS}
-                  {...field}
-                  error={errors.direction?.message}
-                />
-              )}
             />
             <GlassInput
               label="Entry Price (₹)"
@@ -345,16 +324,6 @@ export function TradeEntryForm({
             error={errors.notes?.message}
           />
         </div>
-
-        {/* Direction summary hint */}
-        {direction && (
-          <div className="rounded-lg border border-border bg-bg-elevated/40 px-4 py-3 text-sm text-text">
-            <span className="font-medium text-text-heading">Direction summary: </span>
-            {direction === 'LONG'
-              ? 'Profit when price goes UP. Stop loss should be BELOW entry.'
-              : 'Profit when price goes DOWN. Stop loss should be ABOVE entry.'}
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-2">

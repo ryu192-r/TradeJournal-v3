@@ -26,6 +26,7 @@ class AccountUpdate(BaseSchema):
     account_number: Optional[str] = Field(None, max_length=50)
     initial_balance: Optional[Decimal] = Field(None)
     currency: Optional[str] = Field(None, max_length=10)
+    breakeven_threshold: Optional[Decimal] = Field(None, description="Trades within ± this amount are classified as breakeven")
 
     @field_validator("initial_balance", mode="before")
     @classmethod
@@ -40,12 +41,15 @@ class AccountResponse(BaseSchema):
     account_number: Optional[str] = None
     initial_balance: Decimal
     current_balance: Decimal
+    breakeven_threshold: Optional[Decimal] = None
     currency: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    @field_serializer("initial_balance", "current_balance")
+    @field_serializer("initial_balance", "current_balance", "breakeven_threshold")
     def serialize_balance(self, v: Decimal) -> str:
+        if v is None:
+            return None
         return str(v)
 
 

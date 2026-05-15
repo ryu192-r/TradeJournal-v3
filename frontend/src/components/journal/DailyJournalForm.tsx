@@ -25,6 +25,7 @@ const schema = z.object({
   postTradeNotes: z.string().max(5000).optional(),
   tradeCount: z.number().min(0).optional(),
   moodRating: z.number().min(1).max(5).nullable().optional(),
+  disciplineRating: z.number().min(1).max(5).nullable().optional(),
   moodNotes: z.string().max(1000).optional(),
   rulesFollowed: z.string().max(500).optional(),
   rulesViolated: z.string().max(500).optional(),
@@ -58,10 +59,12 @@ function MoodRating({
   value,
   onChange,
   error,
+  label = 'Mood rating',
 }: {
   value: number | null
   onChange: (val: number | null) => void
   error?: string
+  label?: string
 }) {
   const [hover, setHover] = useState<number | null>(null)
   const display = hover ?? value ?? 0
@@ -69,7 +72,7 @@ function MoodRating({
   return (
     <div className="w-full">
       <label className="block text-xs font-medium text-text-muted mb-1.5">
-        Mood rating
+        {label}
       </label>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
@@ -200,6 +203,7 @@ export function DailyJournalForm({
           postTradeNotes: journal.post_trade_notes ?? '',
           tradeCount: journal.trade_count ?? undefined,
           moodRating: journal.mood_rating,
+          disciplineRating: journal.discipline_rating,
           moodNotes: journal.mood_notes ?? '',
           rulesFollowed: journal.rules_followed ?? '',
           rulesViolated: journal.rules_violated ?? '',
@@ -210,6 +214,7 @@ export function DailyJournalForm({
           postTradeNotes: '',
           tradeCount: summaryStats?.tradeCount ?? undefined,
           moodRating: null,
+          disciplineRating: null,
           moodNotes: '',
           rulesFollowed: '',
           rulesViolated: '',
@@ -223,6 +228,7 @@ export function DailyJournalForm({
       pre_trade_notes: data.preTradeNotes?.trim() || null,
       post_trade_notes: data.postTradeNotes?.trim() || null,
       mood_rating: data.moodRating ?? null,
+      discipline_rating: data.disciplineRating ?? null,
       mood_notes: data.moodNotes?.trim() || null,
       rules_followed: data.rulesFollowed != null ? String(data.rulesFollowed) : null,
       rules_violated: data.rulesViolated != null ? String(data.rulesViolated) : null,
@@ -292,7 +298,7 @@ export function DailyJournalForm({
               <MoodRating
                 value={field.value ?? null}
                 onChange={(val) => field.onChange(val)}
-                error={errors.moodRating?.message}
+                label="Discipline"
               />
             )}
           />
@@ -377,6 +383,20 @@ export function DailyJournalForm({
             )}
           />
         </div>
+
+        <div className="rounded-xl bg-bg-elevated/30 border border-border p-3 space-y-2">
+          <Controller
+            name="disciplineRating"
+            control={control}
+            render={({ field }) => (
+              <MoodRating
+                value={field.value ?? null}
+                onChange={(val) => field.onChange(val)}
+              />
+            )}
+          />
+          <p className="text-[10px] text-text-muted mt-1">Discipline — how well did you follow your rules?</p>
+        </div>
       </div>
 
       <div className="w-full">
@@ -438,8 +458,8 @@ export function DailyJournalForm({
         <div className="rounded-xl bg-bg-elevated/30 border border-dashed border-border p-3">
           <p className="text-xs text-text-muted leading-relaxed">
             These stats are computed automatically from trades tagged with today&apos;s date.
-            They update when you add, edit, or remove trades. The journal entry itself
-            stores only your subjective notes and self-assessment.
+            Trades with P&amp;L within ± the breakeven threshold (configurable in Capital page)
+            are classified as breakeven — not wins or losses.
           </p>
         </div>
 

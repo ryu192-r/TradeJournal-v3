@@ -14,11 +14,60 @@ from app.schemas.capital_event import (
 )
 from app.models.capital_event import CapitalEvent
 from app.models.account import Account
+from app.models.trade import Trade
 from app.db.database import get_db
 from app.utils.logging import get_logger
+from app.utils.decimal_utils import ensure_decimal
 
 router = APIRouter(prefix="/capital-events", tags=["capital-events"])
 logger = get_logger(__name__)
+
+
+def _reconcile_account(account_id: int, db: Session) -> Decimal:
+    """Reconcile account balance. Returns delta applied (0 if no change)."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        return Decimal("0")
+
+    initial = ensure_decimal(account.initial_balance)
+    current = ensure_decimal(account.current_balance)
+
+    # Capital events
+    events = db.query(CapitalEvent).filter(CapitalEvent.account_id == account_id).all()
+    deposits = sum(ensure_decimal(e.amount) for e in events if e.event_type == "deposit")
+    withdrawals = sum(abs(ensure_decimal(e.amount)) for e in events if e.event_type == "withdrawal")
+
+    # Realized PnL (non-deleted, closed trades)
+    realized_pnl = Decimal("0")
+    closed_trades = db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all()
+    for t in closed_trades:
+        realized_pnl += ensure_decimal(t.pnl)
+
+    # Deployed capital (non-deleted, open trades)
+    deployed = Decimal("0")
+    open_trades = db.query(Trade).filter(Trade.pnl.is_(None), Trade.status != "deleted").all()
+    for t in open_trades:
+        deployed += ensure_decimal(t.entry_price) * ensure_decimal(t.quantity) - ensure_decimal(t.fees)
+
+    # Target = initial + deposits - withdrawals + realized_pnl - deployed
+    target = initial + deposits - withdrawals + realized_pnl - deployed
+    delta = target - current
+
+    if delta != 0:
+        db_event = CapitalEvent(
+            account_id=account_id,
+            event_type="adjustment",
+            amount=delta,
+            timestamp=datetime.utcnow(),
+            description="Balance reconciliation",
+        )
+        db.add(db_event)
+        account.current_balance = target
+        account.updated_at = datetime.utcnow()
+        db.commit()
+        logger.info("account_reconciled", account_id=account_id, delta=str(delta))
+
+    return delta
 
 
 @router.post("/", response_model=CapitalEventResponse, status_code=status.HTTP_201_CREATED)
@@ -137,6 +186,10 @@ def get_capital_summary(
             summary.total_fees = total_str
         elif event_type == "adjustment":
             summary.total_adjustments = total_str
+        elif event_type == "trade_deletion":
+            summary.total_trade_deletions = total_str
+        elif event_type == "pyramid":
+            summary.total_pyramids = total_str
 
     # Net change from same query group (compute as sum of all breakdown totals)
     net = Decimal("0")
@@ -167,7 +220,7 @@ def update_capital_event(
     event_update: CapitalEventUpdate,
     db: Session = Depends(get_db),
 ):
-    """Update an existing capital event."""
+    """Update an existing capital event, recalculating account balance if amount changes."""
     db_event = db.query(CapitalEvent).filter(CapitalEvent.id == event_id).first()
     if not db_event:
         raise HTTPException(
@@ -175,10 +228,18 @@ def update_capital_event(
             detail="Capital event not found"
         )
 
+    old_amount = db_event.amount
     update_data = event_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if value is not None:
             setattr(db_event, field, value)
+
+    if "amount" in update_data:
+        delta = db_event.amount - old_amount
+        account = db.query(Account).filter(Account.id == db_event.account_id).first()
+        if account:
+            account.current_balance = (account.current_balance or Decimal("0")) + delta
+            account.updated_at = datetime.utcnow()
 
     db.commit()
     db.refresh(db_event)
@@ -209,3 +270,16 @@ def delete_capital_event(event_id: int, db: Session = Depends(get_db)):
 
     logger.info("capital_event_deleted", event_id=event_id)
     return None
+
+
+@router.post("/accounts/{account_id}/reconcile")
+def reconcile_account(account_id: int, db: Session = Depends(get_db)):
+    """Manually trigger balance reconciliation."""
+    delta = _reconcile_account(account_id, db)
+    account = db.query(Account).filter(Account.id == account_id).first()
+    return {
+        "account_id": account_id,
+        "delta": str(delta),
+        "new_balance": str(account.current_balance) if account else None,
+        "event_created": delta != 0,
+    }

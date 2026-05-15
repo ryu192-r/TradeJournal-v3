@@ -1,53 +1,15 @@
 // Analytics Dashboard Page — 8 live widgets wired to /analytics/dashboard
 import { useDashboardQuery } from '@/hooks/useDashboardQuery'
 import { GlassBadge } from '@/components/ui/GlassBadge'
+import { formatCurrency, formatPercent, formatRMultiple, parseDecimal, formatDate } from '@/utils/format'
+import { Wallet, Flame, Target, BarChart3, Calendar, Clock, AlertTriangle } from 'lucide-react'
 import {
-  formatCurrency,
-  formatPercent,
-  formatRMultiple,
-  parseDecimal,
-  formatDate,
-} from '@/utils/format'
-import {
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  Activity,
-  BarChart3,
-  Calendar,
-  Clock,
-  Flame,
-  Target,
-  AlertTriangle,
-} from 'lucide-react'
-import { motion } from 'framer-motion'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  Line,
-  ScatterChart,
-  Scatter,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Cell,
-  ReferenceLine,
+  AreaChart, Area, BarChart, Bar, ScatterChart, Scatter, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Legend,
 } from 'recharts'
 import type {
-  AnalyticsKpi,
-  DailyPnlEntry,
-  MonthlyPnlEntry,
-  AnalyticsRDist,
-  SetupPerformanceItem,
-  DayOfWeekEntry,
-  TimeOfDayEntry,
-  AnalyticsStreaks,
-  HoldingPeriodEntry,
+  DailyPnlEntry, MonthlyPnlEntry, AnalyticsRDist, SetupPerformanceItem,
+  DayOfWeekEntry, TimeOfDayEntry, AnalyticsStreaks, HoldingPeriodEntry,
 } from '@/types'
 
 // ───────────────────────── helpers ─────────────────────────
@@ -89,78 +51,10 @@ function GlassTooltip({ active, payload, label }: any) {
   )
 }
 
-// ───────────────────────── KPI Cards ─────────────────────────
-
-function KpiCards({ kpi }: { kpi: AnalyticsKpi }) {
-  const cards = [
-    {
-      label: 'Net P\u0026L',
-      value: kpi.net_pnl != null ? formatCurrency(pnlNum(kpi.net_pnl)) : 'N/A',
-      sub: `${kpi.trade_count} trades`,
-      icon: TrendingUp,
-      color: pnlNum(kpi.net_pnl) >= 0 ? 'profit' : 'loss',
-      bg: pnlNum(kpi.net_pnl) >= 0 ? 'bg-profit-muted' : 'bg-loss-muted',
-    },
-    {
-      label: 'Win Rate',
-      value: kpi.win_rate != null ? formatPercent(kpi.win_rate) : 'N/A',
-      sub: kpi.profit_factor != null ? `PF ${kpi.profit_factor.toFixed(2)}` : '',
-      icon: Target,
-      color: 'accent',
-      bg: 'bg-accent-muted',
-    },
-    {
-      label: 'Avg R-Multiple',
-      value: kpi.avg_r_multiple != null ? formatRMultiple(kpi.avg_r_multiple) : 'N/A',
-      sub: kpi.expectancy != null ? `Expectancy ${kpi.expectancy.toFixed(2)}` : '',
-      icon: Activity,
-      color: 'accent',
-      bg: 'bg-accent-muted',
-    },
-    {
-      label: 'Max Drawdown',
-      value: kpi.max_drawdown_pct != null ? formatPercent(kpi.max_drawdown_pct) : 'N/A',
-      sub: '',
-      icon: TrendingDown,
-      color: 'loss',
-      bg: 'bg-loss-muted',
-    },
-  ]
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((card, i) => {
-        const Icon = card.icon
-        return (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, delay: i * 0.05 }}
-          >
-            <div className={CARD_STATIC}>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-9 h-9 rounded-lg ${card.bg} flex items-center justify-center`}
-                >
-                  <Icon className={`w-5 h-5 text-${card.color}`} />
-                </div>
-                <span className="text-xs uppercase tracking-wider text-text-muted kpi-label">{card.label}</span>
-              </div>
-              <div className={`text-2xl font-bold text-${card.color} font-data`}>{card.value}</div>
-              {card.sub && (
-                <div className="text-xs text-text-muted font-data">{card.sub}</div>
-              )}
-            </div>
-          </motion.div>
-        )
-      })}
-    </div>
-  )
-}
 
 // ───────────────────────── Equity Curve ─────────────────────────
 
+// @ts-ignore - kept for reference
 function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
   const chartData = data.map((d) => ({
     date: d.date.slice(0, 10),
@@ -222,8 +116,124 @@ function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
   )
 }
 
+// ───────────────────────── Trading Calendar Heatmap ─────────────────────────
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
+  if (!data || data.length === 0) return null
+
+  const pnlByDate = new Map<string, number>()
+  let maxAbs = 1
+  for (const d of data) {
+    const v = pnlNum(d.net_pnl)
+    pnlByDate.set(d.date, v)
+    maxAbs = Math.max(maxAbs, Math.abs(v))
+  }
+
+  const months: { label: string; weeks: { cells: { date: string; day: number; value: number }[] }[] }[] = []
+  const allDates = data.map((d) => d.date).sort()
+  if (allDates.length === 0) return null
+
+  const first = new Date(allDates[0])
+  const last = new Date(allDates[allDates.length - 1])
+  const cursor = new Date(first)
+  cursor.setDate(1)
+
+  while (cursor <= last) {
+    const monthStart = new Date(cursor)
+    const monthLabel = monthStart.toLocaleString('default', { month: 'short', year: '2-digit' })
+    const cells: { date: string; day: number; value: number }[] = []
+    const wstart = new Date(monthStart)
+    wstart.setDate(wstart.getDate() - wstart.getDay())
+    const wend = new Date(monthStart)
+    wend.setMonth(wend.getMonth() + 1)
+    wend.setDate(0)
+    wend.setDate(wend.getDate() + (6 - wend.getDay()))
+
+    const walk = new Date(wstart)
+    while (walk <= wend) {
+      const dateStr = walk.toISOString().slice(0, 10)
+      const value = pnlByDate.get(dateStr) ?? 0
+      cells.push({ date: dateStr, day: walk.getDay(), value })
+      walk.setDate(walk.getDate() + 1)
+    }
+
+    const weeks: { cells: typeof cells }[] = []
+    for (let i = 0; i < cells.length; i += 7) {
+      weeks.push({ cells: cells.slice(i, i + 7) })
+    }
+
+    months.push({ label: monthLabel, weeks })
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+
+  return (
+    <div className={`${CARD_STATIC}`}>
+      <div className="flex items-center gap-2 mb-4">
+        <Calendar className="w-[15px] h-[15px] text-accent" />
+        <h3 className="font-display text-sm text-text-heading">Trading Heatmap</h3>
+      </div>
+      <div className="overflow-x-auto scrollbar-thin">
+        <div className="flex gap-6 min-w-fit">
+          {months.map((m) => (
+            <div key={m.label}>
+              <div className="text-[.625rem] text-text-muted font-data mb-1.5 text-center">{m.label}</div>
+              <div className="flex gap-0.5">
+                <div className="flex flex-col gap-0.5 mr-0.5">
+                  {DAYS.map((d) => (
+                    <div key={d} className="w-[14px] h-[14px] text-[.5rem] text-text-faint flex items-center justify-center">
+                      {d[0]}
+                    </div>
+                  ))}
+                </div>
+                {m.weeks.map((w, wi) => (
+                  <div key={wi} className="flex flex-col gap-0.5">
+                    {w.cells.map((c) => {
+                      const intensity = Math.abs(c.value) / maxAbs
+                      const isProfit = c.value >= 0
+                      const hasTrade = pnlByDate.has(c.date)
+                      let bg = 'bg-bg-low'
+                      if (hasTrade && c.value !== 0) {
+                        const alpha = Math.min(0.15 + intensity * 0.6, 0.75).toFixed(2)
+                        bg = isProfit
+                          ? `bg-[color:rgba(74,222,128,${alpha})]`
+                          : `bg-[color:rgba(248,113,113,${alpha})]`
+                      }
+                      return (
+                        <div
+                          key={c.date}
+                          className={`w-[14px] h-[14px] rounded-[2px] ${bg}`}
+                          title={`${c.date}: ${c.value >= 0 ? '+' : ''}${formatCurrency(c.value)}`}
+                        />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3 justify-end">
+        <span className="text-[.5625rem] text-text-faint">Less</span>
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.15)]" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.4)]" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.7)]" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-bg-low" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.15)]" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.4)]" />
+        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.7)]" />
+        <span className="text-[.5625rem] text-text-faint">More</span>
+      </div>
+    </div>
+  )
+}
+
+
 // ───────────────────────── Monthly P\u0026L Bars ─────────────────────────
 
+// @ts-ignore - kept for reference
 function MonthlyPnlChart({ data }: { data: MonthlyPnlEntry[] }) {
   const chartData = data.map((d) => ({
     month: d.month,
@@ -564,6 +574,7 @@ function DrawdownChart({ data }: { data: DailyPnlEntry[] }) {
 
 // ───────────────────────── Streaks Mini Card ─────────────────────────
 
+// @ts-ignore - kept for reference
 function StreakMiniCard({ data }: { data: AnalyticsStreaks }) {
   const currentType = data.current_streak.type ?? 'none'
   const currentCount = data.current_streak.count
@@ -672,7 +683,7 @@ export function AnalyticsDashboardPage() {
     return (
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl text-text-heading font-display">Dashboard</h1>
+          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
           <div className="text-xs sm:text-sm text-text-muted font-data">{formatDate(new Date())}</div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -710,34 +721,25 @@ export function AnalyticsDashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl text-text-heading font-display">Dashboard</h1>
+        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Analytics</h1>
         <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
       </div>
 
-      <KpiCards kpi={data.kpi} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <EquityCurveChart data={data.daily_pnl} />
-        </div>
-        <StreakMiniCard data={data.streaks} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <MonthlyPnlChart data={data.monthly_pnl} />
-        <RDistributionChart data={data.r_distribution} />
-      </div>
+      <TradingHeatmap data={data.daily_pnl} />
 
       <SetupPerformanceChart data={data.setup_performance} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RDistributionChart data={data.r_distribution} />
+        <DrawdownChart data={data.daily_pnl} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <DayOfWeekChart data={data.day_of_week} />
         <TimeOfDayChart data={data.time_of_day} />
       </div>
-
-      <DrawdownChart data={data.daily_pnl} />
 
       <HoldingPeriodChart data={data.holding_period} />
     </div>

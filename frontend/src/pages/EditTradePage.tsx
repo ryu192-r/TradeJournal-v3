@@ -35,7 +35,7 @@ export function EditTradePage({ tradeId }: EditTradePageProps) {
 
   if (error || !trade) {
     return (
-      <div className="p-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
         <GlassCard className="py-12 text-center" hover={false}>
           <div className="text-lg font-medium text-loss mb-2">Trade not found</div>
           <p className="text-text-muted">

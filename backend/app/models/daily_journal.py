@@ -24,6 +24,7 @@ class DailyJournal(Base):
 
     # Trader self-assessment
     mood_rating = Column(Integer, nullable=True)  # 1-5
+    discipline_rating = Column(Integer, nullable=True)  # 1-5
     mood_notes = Column(Text, nullable=True)
     rules_followed = Column(String(500), nullable=True)
     rules_violated = Column(String(500), nullable=True)

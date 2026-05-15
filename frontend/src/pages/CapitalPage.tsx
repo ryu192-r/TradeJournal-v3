@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCapitalDashboard, getTierConfig, saveTierConfig } from '@/lib/endpoints'
-import type { CapitalDashboardPayload } from '@/types'
+import {
+  getCapitalDashboard,
+  getTierConfig,
+  saveTierConfig,
+  updateAccount,
+  createCapitalEvent,
+  deleteCapitalEvent,
+  reconcileAccount,
+} from '@/lib/endpoints'
+import type { CapitalDashboardPayload, CapitalEventType } from '@/types'
+import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, parseDecimal } from '@/utils/format'
-import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, AlertTriangle, Settings, Plus, Trash2, Save } from 'lucide-react'
+import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, AlertTriangle, Settings, Plus, Trash2, Save, Edit3, X, Loader2, RefreshCw } from 'lucide-react'
 import {
   AreaChart,
   Area,
@@ -49,7 +58,7 @@ function GlassTooltip({ active, payload, label }: any) {
   )
 }
 
-function NetEquityCard({ data }: { data: CapitalDashboardPayload }) {
+function NetEquityCard({ data, onEdit }: { data: CapitalDashboardPayload; onEdit: () => void }) {
   const netEquity = pnlNum(data.net_equity)
   const initialBalance = pnlNum(data.initial_balance)
   const isProfit = netEquity >= initialBalance
@@ -63,8 +72,17 @@ function NetEquityCard({ data }: { data: CapitalDashboardPayload }) {
           <div className={`text-4xl sm:text-5xl font-bold font-data ${isProfit ? 'text-profit' : 'text-loss'}`}>
             {formatCurrency(data.net_equity)}
           </div>
-          <div className="text-xs text-text-muted mt-2 font-data">
-            Initial balance: {formatCurrency(data.initial_balance)}
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-text-muted font-data">
+              Starting capital: {formatCurrency(data.initial_balance)}
+            </span>
+            <button
+              onClick={onEdit}
+              className="inline-flex items-center justify-center w-5 h-5 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer"
+              title="Edit starting capital"
+            >
+              <Edit3 className="w-3 h-3 text-text-muted" />
+            </button>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -111,15 +129,11 @@ function PnlStatsCard({ data }: { data: CapitalDashboardPayload }) {
 }
 
 function AccountActivityCard({ data }: { data: CapitalDashboardPayload }) {
-  const deposits = pnlNum(data.total_deposits)
-  const withdrawals = pnlNum(data.total_withdrawals)
-  const netActivity = deposits - withdrawals
-
   const rows = [
     { label: 'Total Deposits', value: formatCurrency(data.total_deposits), color: 'text-profit' },
     { label: 'Total Withdrawals', value: formatCurrency(data.total_withdrawals), color: 'text-loss' },
-    { label: 'Net Change', value: formatCurrency(String(netActivity)), color: netActivity >= 0 ? 'text-profit' : 'text-loss' },
-    { label: 'Current Balance', value: formatCurrency(data.current_balance), color: 'text-text-heading' },
+    { label: 'Deployed Capital', value: formatCurrency(data.deployed_capital), color: 'text-text-heading' },
+    { label: 'Available Capital', value: formatCurrency(data.available_capital), color: 'text-text-heading' },
     { label: 'Total Trades', value: String(data.total_trades), color: 'text-text-heading' },
     { label: 'Win Rate', value: data.win_rate != null ? `${data.win_rate.toFixed(1)}%` : '-', color: 'text-text-heading' },
   ]
@@ -199,52 +213,221 @@ function EquityCurveSection({ data }: { data: CapitalDashboardPayload }) {
   )
 }
 
-function CapitalEventsTable({ data }: { data: CapitalDashboardPayload }) {
+function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
+  const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
+  const [showModal, setShowModal] = useState(false)
+  const [modalType, setModalType] = useState<'deposit' | 'withdrawal'>('deposit')
+  const [amount, setAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [dateStr, setDateStr] = useState(new Date().toISOString().split('T')[0])
+
+  const createMutation = useMutation({
+    mutationFn: (payload: { event_type: CapitalEventType; amount: string; timestamp: string; description?: string; account_id: number }) => createCapitalEvent(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      setShowModal(false)
+      setAmount('')
+      setDescription('')
+      addToast({ title: 'Capital event added', message: `${modalType} saved successfully.`, variant: 'success' })
+    },
+    onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCapitalEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      addToast({ title: 'Deleted', message: 'Capital event removed.', variant: 'success' })
+    },
+    onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
+  })
+
+  const reconcileMutation = useMutation({
+    mutationFn: () => reconcileAccount(data.account_id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      if (res.event_created) {
+        addToast({ title: 'Reconciled', message: `Balance adjusted by ${formatCurrency(res.delta)}.`, variant: 'info' })
+      } else {
+        addToast({ title: 'Reconciled', message: 'Balance already in sync.', variant: 'success' })
+      }
+    },
+    onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
+  })
+
+  const openModal = (type: 'deposit' | 'withdrawal') => {
+    setModalType(type)
+    setShowModal(true)
+  }
+
+  const handleSubmit = () => {
+    const amountNum = parseFloat(amount)
+    if (isNaN(amountNum) || amountNum <= 0) return
+    const finalAmount = modalType === 'withdrawal' ? -amountNum : amountNum
+    createMutation.mutate({
+      event_type: modalType,
+      amount: String(finalAmount),
+      timestamp: new Date(dateStr).toISOString(),
+      description: description || undefined,
+      account_id: data.account_id,
+    })
+  }
+
   const events = data.events
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
-      <div className="flex items-center gap-2">
-        <Calendar className="w-4 h-4 text-accent" />
-        <h3 className="text-sm font-medium text-text-heading font-display">Capital Events</h3>
-      </div>
-      {events.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-text-muted border-b border-border">
-                <th className="text-left py-2 px-2 font-display">Date</th>
-                <th className="text-left py-2 px-2 font-display">Type</th>
-                <th className="text-right py-2 px-2 font-display">Amount</th>
-                <th className="text-left py-2 px-2 font-display">Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((evt, i) => {
-                const amt = pnlNum(evt.amount)
-                const isDeposit = evt.type === 'deposit'
-                const isWithdrawal = evt.type === 'withdrawal'
-                const badgeVariant = isDeposit ? 'profit' : isWithdrawal ? 'loss' : 'muted'
-                return (
-                  <tr key={i} className="border-b border-border/50 hover:bg-bg-elevated/30 transition-colors">
-                    <td className="py-2 px-2 text-text-heading font-data">{evt.date}</td>
-                    <td className="py-2 px-2">
-                      <GlassBadge variant={badgeVariant}>{evt.type}</GlassBadge>
-                    </td>
-                    <td className={`py-2 px-2 text-right font-data ${amt >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatCurrency(evt.amount)}
-                    </td>
-                    <td className="py-2 px-2 text-text-muted">{evt.description ?? '-'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+    <>
+      <div className={`${CARD_STATIC} space-y-3`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-accent" />
+            <h3 className="text-sm font-medium text-text-heading font-display">Capital Events</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => reconcileMutation.mutate()}
+              disabled={reconcileMutation.isPending}
+              className="inline-flex items-center gap-1 rounded-lg bg-accent/10 border border-accent/20 px-2.5 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${reconcileMutation.isPending ? 'animate-spin' : ''}`} />Reconcile
+            </button>
+            <button
+              onClick={() => openModal('deposit')}
+              className="inline-flex items-center gap-1 rounded-lg bg-profit/10 border border-profit/20 px-2.5 py-1.5 text-xs font-medium text-profit hover:bg-profit/20 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />Deposit
+            </button>
+            <button
+              onClick={() => openModal('withdrawal')}
+              className="inline-flex items-center gap-1 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-1.5 text-xs font-medium text-loss hover:bg-loss/20 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />Withdraw
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="py-8 text-center text-text-muted text-sm">No capital events</div>
+        {events.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-text-muted border-b border-border">
+                  <th className="text-left py-2 px-2 font-display">Date</th>
+                  <th className="text-left py-2 px-2 font-display">Type</th>
+                  <th className="text-right py-2 px-2 font-display">Amount</th>
+                  <th className="text-left py-2 px-2 font-display">Description</th>
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((evt, i) => {
+                  const amt = pnlNum(evt.amount)
+                  const isDeposit = evt.type === 'deposit'
+                  const isWithdrawal = evt.type === 'withdrawal'
+                  const badgeVariant = isDeposit ? 'profit' : isWithdrawal ? 'loss' : 'muted'
+                  return (
+                    <tr key={i} className="border-b border-border/50 hover:bg-bg-elevated/30 transition-colors">
+                      <td className="py-2 px-2 text-text-heading font-data">{evt.date}</td>
+                      <td className="py-2 px-2">
+                        <GlassBadge variant={badgeVariant}>{evt.type}</GlassBadge>
+                      </td>
+                      <td className={`py-2 px-2 text-right font-data ${amt >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {formatCurrency(evt.amount)}
+                      </td>
+                      <td className="py-2 px-2 text-text-muted">{evt.description ?? '-'}</td>
+                      <td className="py-2 px-2">
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete this ${evt.type} of ${formatCurrency(evt.amount)}?`)) {
+                              deleteMutation.mutate(evt.id)
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-loss/10 transition-colors cursor-pointer"
+                          title="Delete event"
+                        >
+                          <Trash2 className="w-3 h-3 text-loss/60" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-8 text-center text-text-muted text-sm">No capital events</div>
+        )}
+      </div>
+
+      {/* Add/Withdraw Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-bg-card rounded-2xl border border-border shadow-xl animate-card-in">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="text-sm font-medium text-text-heading font-display flex items-center gap-2">
+                {modalType === 'deposit' ? (
+                  <><ArrowUpRight className="w-4 h-4 text-profit" /> Add Deposit</>
+                ) : (
+                  <><ArrowUpRight className="w-4 h-4 text-loss rotate-90" /> Add Withdrawal</>
+                )}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer">
+                <X className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Date</label>
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all [color-scheme:dark]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Amount (₹)</label>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="e.g. 50000"
+                  min="1"
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Description (optional)</label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Monthly SIP, Bonus, ATM withdrawal..."
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={handleSubmit}
+                  disabled={createMutation.isPending || !amount}
+                  className={`flex-1 rounded-lg px-4 py-2 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 ${
+                    modalType === 'deposit'
+                      ? 'bg-profit text-white hover:bg-profit/90'
+                      : 'bg-loss text-white hover:bg-loss/90'
+                  }`}
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                  ) : modalType === 'deposit' ? 'Add Deposit' : 'Add Withdrawal'}
+                </button>
+                <button onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -433,6 +616,8 @@ function TierEditor() {
 }
 
 export function CapitalPage() {
+  const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
   const { data, isLoading, error } = useQuery<CapitalDashboardPayload>({
     queryKey: ['capital-dashboard'],
     queryFn: getCapitalDashboard,
@@ -440,9 +625,36 @@ export function CapitalPage() {
     refetchOnWindowFocus: false,
   })
 
+  const [showEditAccount, setShowEditAccount] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editInitialBalance, setEditInitialBalance] = useState('')
+  const [editBreakevenThreshold, setEditBreakevenThreshold] = useState('')
+
+  useEffect(() => {
+    if (data) {
+      setEditName(data.account_name)
+      setEditInitialBalance(data.initial_balance)
+      setEditBreakevenThreshold(data.breakeven_threshold || '')
+    }
+  }, [data])
+
+  const accountMutation = useMutation({
+    mutationFn: (payload: { name?: string; initial_balance?: string; breakeven_threshold?: string }) => updateAccount(data!.account_id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      setShowEditAccount(false)
+      addToast({ title: 'Account updated', message: 'Starting capital saved.', variant: 'success' })
+    },
+    onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
+  })
+
+  const handleSaveAccount = () => {
+    accountMutation.mutate({ name: editName, initial_balance: editInitialBalance, breakeven_threshold: editBreakevenThreshold })
+  }
+
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
         <div className="space-y-1">
           <div className="h-8 w-24 bg-bg-elevated rounded animate-pulse" />
           <div className="h-4 w-48 bg-bg-elevated rounded animate-pulse" />
@@ -482,13 +694,13 @@ export function CapitalPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div className="space-y-1">
-        <h1 className="text-xl sm:text-3xl text-text-heading font-display">Capital</h1>
+        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Capital</h1>
         <p className="text-sm text-text-muted font-data">Account growth & equity tracking</p>
       </div>
 
-      <NetEquityCard data={data} />
+      <NetEquityCard data={data} onEdit={() => setShowEditAccount(true)} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PnlStatsCard data={data} />
@@ -496,9 +708,75 @@ export function CapitalPage() {
       </div>
 
       <EquityCurveSection data={data} />
-      <CapitalEventsTable data={data} />
+      <CapitalEventsManager data={data} />
       <CapitalTiersSection data={data} />
       <TierEditor />
+
+      {/* Edit Starting Capital Modal */}
+      {showEditAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-bg-card rounded-2xl border border-border shadow-xl animate-card-in">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="text-sm font-medium text-text-heading font-display flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-accent" /> Edit Account
+              </h2>
+              <button onClick={() => setShowEditAccount(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer">
+                <X className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Account Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Starting Capital (₹)</label>
+                <input
+                  type="number"
+                  value={editInitialBalance}
+                  onChange={(e) => setEditInitialBalance(e.target.value)}
+                  min="0"
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAccount() }}
+                />
+                <p className="text-[.6875rem] text-text-muted mt-1">
+                  Changing this recalculates Net Equity. Deployed P&amp;L from trades is preserved.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1.5 font-medium">Breakeven Threshold (±₹)</label>
+                <input
+                  type="number"
+                  value={editBreakevenThreshold}
+                  onChange={(e) => setEditBreakevenThreshold(e.target.value)}
+                  min="0"
+                  step="10"
+                  className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAccount() }}
+                />
+                <p className="text-[.6875rem] text-text-muted mt-1">
+                  Trades with P&amp;L within ± this amount are classified as breakeven (not win/loss).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={handleSaveAccount}
+                  disabled={accountMutation.isPending || !editName}
+                  className="flex-1 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {accountMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Save Changes'}
+                </button>
+                <button onClick={() => setShowEditAccount(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getJournal, getWeeklyJournals, createJournal, updateJournal } from '@/lib/endpoints'
+import { getJournal, getWeeklyJournals, getWeeklyJournalStats, createJournal, updateJournal } from '@/lib/endpoints'
 import type { DailyJournal, DailyJournalPayload } from '@/types'
+import type { WeeklyJournalStats } from '@/types'
 
 const JOURNAL_KEY = ['journal'] as const
 
@@ -25,6 +26,15 @@ export function useWeeklyJournalsQuery(weekStart: string) {
   return useQuery<DailyJournal[]>({
     queryKey: [...JOURNAL_KEY, 'weekly', weekStart],
     queryFn: () => getWeeklyJournals(weekStart),
+    staleTime: 2 * 60 * 1000,
+    enabled: weekStart.length > 0,
+  })
+}
+
+export function useWeeklyJournalStatsQuery(weekStart: string) {
+  return useQuery<WeeklyJournalStats>({
+    queryKey: [...JOURNAL_KEY, 'weekly-stats', weekStart],
+    queryFn: () => getWeeklyJournalStats(weekStart),
     staleTime: 2 * 60 * 1000,
     enabled: weekStart.length > 0,
   })

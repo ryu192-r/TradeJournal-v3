@@ -9,18 +9,21 @@ import {
   Lightbulb,
   Menu,
   Settings,
+  Sparkles,
   TrendingUp,
 } from 'lucide-react'
 import { type ReactNode } from 'react'
 
 const navItems = [
   { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
   { id: 'trades' as const, label: 'Trades', icon: Briefcase },
   { id: 'journal' as const, label: 'Journal', icon: BookOpen },
   { id: 'playbook' as const, label: 'Playbook', icon: ClipboardList },
-  { id: 'review' as const, label: 'Review', icon: BarChart3 },
+  { id: 'review' as const, label: 'Review', icon: TrendingUp },
   { id: 'ideas' as const, label: 'Ideas', icon: Lightbulb },
   { id: 'capital' as const, label: 'Capital', icon: TrendingUp },
+  { id: 'coach' as const, label: 'AI Coach', icon: Sparkles },
   { id: 'settings' as const, label: 'Settings', icon: Settings },
 ]
 
