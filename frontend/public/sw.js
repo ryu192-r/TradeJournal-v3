@@ -1,4 +1,4 @@
-const CACHE = 'tj-v3-v2'
+const CACHE = 'tj-v3-v3'
 const STATIC_URLS = ['/', '/index.html', '/manifest.json']
 const API_CACHE = 'tj-v3-api-v1'
 
@@ -19,12 +19,14 @@ self.addEventListener('activate', (e) => {
           .filter((k) => k !== CACHE && k !== API_CACHE)
           .map((k) => caches.delete(k))
       )
+    ).then(() =>
+      caches.open(CACHE).then((c) => c.addAll(STATIC_URLS))
     )
   )
   self.clients.claim()
 })
 
-// Fetch: stale-while-revalidate for API, cache-first for static
+// Fetch: stale-while-revalidate for API, network-first for HTML, cache-first for assets
 self.addEventListener('fetch', (e) => {
   const req = e.request
   const url = new URL(req.url)
@@ -35,11 +37,40 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Static assets: cache-first
-  e.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
-  )
+  // HTML (index.html): network-first — always get fresh hash references
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    e.respondWith(networkFirst(req))
+    return
+  }
+
+  // Hashed assets: cache-first — immutable, cache aggressively
+  if (url.pathname.startsWith('/assets/')) {
+    e.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        const clone = res.clone()
+        caches.open(CACHE).then((c) => c.put(req, clone))
+        return res
+      }))
+    )
+    return
+  }
+
+  // Everything else: network-first
+  e.respondWith(networkFirst(req))
 })
+
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE)
+  try {
+    const res = await fetch(req)
+    const clone = res.clone()
+    cache.put(req, clone)
+    return res
+  } catch {
+    const cached = await cache.match(req)
+    return cached || new Response('Offline', { status: 503 })
+  }
+}
 
 async function staleWhileRevalidate(req) {
   const cache = await caches.open(API_CACHE)

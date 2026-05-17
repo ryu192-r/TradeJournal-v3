@@ -84,16 +84,15 @@ export function SettingsPage() {
   const providerModels = currentProvider?.models ?? []
 
   useEffect(() => {
-    if (!currentProvider && !isCustomProvider) return
-    if (isCustomProvider) {
-      setAiBaseUrl(aiBaseUrl)
-    } else {
-      setAiBaseUrl(currentProvider.default_url)
-      if (!aiModel || !providerModels.includes(aiModel)) {
-        setAiModel(providerModels.length > 0 ? providerModels[0] : '')
-      }
-    }
-  }, [aiProvider])
+    if (aiProvider === 'custom') return
+    const provider = providers[aiProvider]
+    if (!provider) return
+
+    setAiBaseUrl(provider.default_url)
+    setAiModel((current) => (
+      current && provider.models.includes(current) ? current : provider.models[0] || ''
+    ))
+  }, [aiProvider, providers])
 
   const handleTestConnection = useCallback(async () => {
     setTestingConnection(true)

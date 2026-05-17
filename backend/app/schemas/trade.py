@@ -22,7 +22,6 @@ class TradeBase(BaseModel):
     stop_price: Optional[Decimal] = Field(None, description="Stop loss price")
     target_price: Optional[Decimal] = Field(None, description="Target profit price")
     r_multiple: Optional[Decimal] = Field(None, description="Risk multiple")
-    status: str = Field(default="draft", description="Status: draft, reviewed, analytics, closed_sl_hit, closed_target_hit, closed_manual")
     exit_reason: Optional[str] = Field(None, description="Exit reason: stop_loss, target, manual, trailing, system")
 
     @field_validator("direction")
@@ -30,13 +29,6 @@ class TradeBase(BaseModel):
     def validate_direction(cls, v):
         if v != "LONG":
             raise ValueError("Direction must be 'LONG' — only long positions supported")
-        return v
-
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, v):
-        if v not in ("draft", "reviewed", "analytics", "closed_sl_hit", "closed_target_hit", "closed_manual", "deleted"):
-            raise ValueError("Status must be a valid trade status")
         return v
 
     # Keep as strings to avoid precision loss
@@ -66,7 +58,6 @@ class TradeUpdate(BaseModel):
     stop_price: Optional[Decimal] = None
     target_price: Optional[Decimal] = None
     r_multiple: Optional[Decimal] = None
-    status: Optional[str] = None
     chart_images: Optional[List[str]] = None
     review_notes: Optional[str] = None
     review_tags: Optional[List[str]] = None
@@ -82,28 +73,36 @@ class TradeUpdate(BaseModel):
             raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, v):
-        if v is None:
-            return v
-        if v not in ("draft", "reviewed", "analytics", "closed_sl_hit", "closed_target_hit", "closed_manual", "deleted"):
-            raise ValueError("Status must be a valid trade status")
-        return v
-
     @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
     @classmethod
     def ensure_decimal(cls, v):
         return ensure_decimal(v)
 
 
-class TradeResponse(TradeBase):
+class TradeResponse(BaseModel):
     id: int
+    symbol: str
+    direction: str
+    entry_price: Decimal
+    exit_price: Optional[Decimal] = None
+    quantity: Decimal
+    entry_time: datetime
+    exit_time: Optional[datetime] = None
+    fees: Decimal
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+    setup: Optional[str] = None
+    tactic: Optional[str] = None
+    stop_price: Optional[Decimal] = None
+    target_price: Optional[Decimal] = None
+    r_multiple: Optional[Decimal] = None
+    status: str = Field(default="open", description="open, closed, or deleted")
     pnl: Optional[Decimal] = None
     chart_images: Optional[List[str]] = None
     review_notes: Optional[str] = None
     review_tags: Optional[List[str]] = None
     exit_notes: Optional[str] = None
+    exit_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

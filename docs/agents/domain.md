@@ -2,18 +2,15 @@
 
 ## Layout
 
-This repo uses **single-context** layout:
+This repo uses single-context layout:
 
-- `CONTEXT.md` at repo root — domain glossary and flow definitions
-- `docs/adr/` at repo root — architectural decision records
+- `CONTEXT.md` at repo root
+- `docs/adr/` at repo root
 
 ## Consumer Rules
 
-1. Read `CONTEXT.md` first to learn domain terms before touching code.
-2. Use terms from the glossary in commit messages, issue titles, and PR descriptions.
-3. When a term conflicts between code and `CONTEXT.md`, flag it — don't silently change either.
-4. Create an ADR in `docs/adr/` when a decision is:
-   - Hard to reverse
-   - Surprising without context
-   - The result of a real trade-off
-5. ADR naming: `NNNN-short-title.md` (zero-padded number, kebab-case title).
+1. Read `CONTEXT.md` before touching code.
+2. Use glossary terms in issues, PRs, and commits.
+3. If code and `CONTEXT.md` disagree, flag it.
+4. Create an ADR for hard-to-reverse or surprising architecture decisions.
+5. ADR naming: `NNN-short-title.md` or existing repo style.

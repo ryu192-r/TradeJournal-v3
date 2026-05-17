@@ -187,7 +187,7 @@ def _normalize_zerodha_row(
         "stop_price": "",
         "target_price": "",
         "r_multiple": "",
-        "status": "draft",
+        "status": "open",
         "notes": "",
     }
 
@@ -385,7 +385,7 @@ def _pair_dhan_legs(legs: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 "stop_price": "",
                 "target_price": "",
                 "r_multiple": "",
-                "status": "draft",
+                "status": "open",
                 "notes": "",
             })
 
@@ -405,7 +405,7 @@ def _pair_dhan_legs(legs: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 "stop_price": "",
                 "target_price": "",
                 "r_multiple": "",
-                "status": "draft",
+                "status": "open",
                 "notes": "",
             })
 

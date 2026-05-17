@@ -621,8 +621,7 @@ export function CapitalPage() {
   const { data, isLoading, error } = useQuery<CapitalDashboardPayload>({
     queryKey: ['capital-dashboard'],
     queryFn: getCapitalDashboard,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
   })
 
   const [showEditAccount, setShowEditAccount] = useState(false)

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listIdeas, getIdea, createIdea, updateIdea, deleteIdea, convertIdeaToTrade } from '@/lib/endpoints'
+import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import type {
   TradeIdeaItem, TradeIdeaListResponse, TradeIdeaCreatePayload,
   TradeIdeaUpdatePayload, ConvertToTradePayload, ConvertToTradeResponse, TradeIdeaStatus,
@@ -55,7 +56,7 @@ export function useConvertToTradeMutation() {
     mutationFn: ({ id, payload }) => convertIdeaToTrade(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ideas'] })
-      queryClient.invalidateQueries({ queryKey: ['trades'] })
+      invalidateTradeDomain(queryClient)
     },
   })
 }

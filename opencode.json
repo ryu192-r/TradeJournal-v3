@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "Tapetide": {
+      "type": "remote",
+      "url": "https://mcp.tapetide.com/mcp",
+      "oauth": {
+        "clientId": "tpt_rt_03dd59bc51d497a53dd01aae46bc74722232bd1f8edbc96005e9817d"
+      }
+    }
+  }
+}

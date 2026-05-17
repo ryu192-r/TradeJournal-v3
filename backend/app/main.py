@@ -5,6 +5,8 @@ from app.core.rate_limiter import RateLimiter
 from app.routers.base import api_router
 from app.utils.logging import configure_logging, get_logger
 from app.db.database import Base, engine
+from app.models.trade import Trade
+from app.db.database import SessionLocal
 import app.models  # noqa: F401 — registers all models on Base.metadata
 import logging
 from alembic.config import Config
@@ -27,6 +29,23 @@ def run_migrations():
         Base.metadata.create_all(bind=engine)
 
 run_migrations()
+
+# Backfill trade status for existing trades with old status values
+def _backfill_trade_statuses():
+    try:
+        db = SessionLocal()
+        old_statuses = ["draft", "reviewed", "analytics"]
+        affected = db.query(Trade).filter(Trade.status.in_(old_statuses)).all()
+        for t in affected:
+            t.status = "closed" if t.exit_price is not None else "open"
+        db.commit()
+        if affected:
+            logger.info(f"Backfilled {len(affected)} trade(s) with old status values")
+        db.close()
+    except Exception as e:
+        logger.warning(f"Trade status backfill skipped: {e}")
+
+_backfill_trade_statuses()
 
 app = FastAPI(
     title=settings.API_TITLE,

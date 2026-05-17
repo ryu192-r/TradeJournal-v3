@@ -33,7 +33,9 @@ cd frontend && npm run build           # production build
 
 ## Key architecture
 - **Auth gate**: `App.tsx` checks `isAuthenticated` — all pages require login
-- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `journal`, `playbook`, `review`, `ideas`, `capital`, `settings`
+- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `journal`, `playbook`, `review`, `ideas`, `capital`, `settings`, `coach`
+- **View code-splitting**: `App.tsx` lazy-loads all major views with `React.lazy`/`Suspense`; keep heavy pages (analytics/recharts, coach, trades) out of the initial bundle.
+- **Data refresh**: React Query refetches on mount/window focus/reconnect. Trade-domain mutations call `invalidateTradeDomain()` (`trades`, `trade`, `capital-dashboard`, `capital-events`, `analytics`, journal weekly stats, `setups`). Capital-event mutations call `invalidateCapitalDomain()`.
 - **Routes**: Register in `backend/app/routers/base.py`, prefix `/api/v1`. **Order matters**: `broker_import` router must come before `trades` router or `/{trade_id}` shadows `/brokers`
 - **Models**: Define in `backend/app/models/`, import in `__init__.py` so `Base.metadata.create_all` picks them up
 - **Schemas**: Pydantic v2 in `backend/app/schemas/`
@@ -44,6 +46,9 @@ cd frontend && npm run build           # production build
 - **Fluid layout**: Page containers use `clamp()` CSS variables (`--page-px`, `--page-py`, `--page-gap`, `--heading-size`, `--cell-px`, `--cell-py`, `--text-sm`, `--text-xs`) defined in `index.css`. Use `text-[length:var(--x)]` not `text-[var(--x)]` (Tailwind treats `var()` as color by default).
 - **Dynamic tiers**: `tier_configs` table, editable via TierEditor on Capital page
 - **Direction**: All trades are LONG (Indian equities — no shorting). DB column defaults to `"LONG"`, removed from UI. PnL = `(exit - entry) * qty - fees`
+- **Status auto-computed**: Derived from `exit_price` everywhere — no exit = open, has exit = closed. `_auto_set_status()` in `trades.py`. Old `draft`/`reviewed`/`analytics` values backfilled via `_backfill_trade_statuses()` on startup. Frontend `getStatus()`/`getStatusLabel()` use `exit_price` as source of truth. List filter uses `exit_price IS NULL/NOT NULL`.
+- **Status badge colors**: Open → neutral grey (`bg-border text-text-muted`), Closed+profit → green (`bg-profit-muted text-profit`), Closed+loss → red (`bg-loss-muted text-loss`).
+- **Status display in detail modal**: Uses `trade.exit_price ? 'Closed' : 'Open'`.
 - **Pyramid**: Open positions (no exit) have a pyramid button → `POST /trades/{id}/pyramid`. Adds more shares: weighted-average entry, sum qty, earliest entry, optional stop_price. Only allowed on open trades.
 - **Merge by date**: Trades for same `(symbol, date)` are automatically merged on create/import: weighted-average entry/exit prices, summed quantity/fees/PnL, earliest entry time. Different dates = separate trades. Backfill existing duplicates via `POST /trades/merge-duplicates`.
 - **Rate limiter**: `RateLimiter` middleware in `main.py`. Disabled in Docker via `RATE_LIMIT_OFF=true` env var. Tests also set this.
@@ -52,6 +57,11 @@ cd frontend && npm run build           # production build
 - **Exit reason**: Auto-detected when trade is closed: `stop_loss` (exit ≈ stop_price), `target` (exit ≈ target_price), `manual`. User can override. Triggered in `_auto_detect_exit_reason()` in `trades.py`.
 - **Breakeven threshold**: Configurable ±₹ amount on Account model (`breakeven_threshold`). Default ₹500. Editable in Capital page → Edit Account modal.
 - **Stop history**: `GET|POST /trades/{id}/stop-history`. Records every stop adjustment. Timeline component in trade detail modal.
+- **Stop history updates stop_price**: `POST /trades/{id}/stop-history` also sets `trade.stop_price = payload.price`, so the trade's current SL stays in sync.
+- **SL inline edit**: Click the SL cell in the trades table to open a compact inline form — enter price + type (Manual/Trailing/Breakeven) → creates stop history entry + updates displayed SL.
+- **Trades table columns**: Symbol, Entry, Exit, **SL** (inline-editable), **Max Risk** (`(entry - stop) * qty`), Qty, Setup, Status, **P&L %** (`pnl / (entry × qty) × 100`), **Cap %** (`pnl / net_equity × 100`), P&L, Actions.
+- **Setup from playbook**: Trade form's setup dropdown fetches active setups via `useSetupsQuery('active')` instead of hardcoded values. Setup stored as playbook name string on trade.
+- **Playbook stats sync**: `_update_setup_stats(db, setup_name)` in `trades.py` recomputes `trade_count`, `win_rate`, `avg_r` on a playbook entry after every trade create/update/delete. Called from create, update (both old + new setup), delete, and pyramid endpoints.
 - **Chart images**: `POST|DELETE /trades/{id}/images`. Multipart upload, disk storage (`UPLOAD_DIR` env var), served via `/uploads/`. Gallery with nav + delete in trade detail modal.
 - **Discipline rating**: 1-5 field in daily journal post-market step (separate from mood). Stored in `DailyJournal.discipline_rating`.
 - **Review stream**: `TradeReviewStream` supports back navigation, re-review filter (Unreviewed/All Trades), bulk mode (batch notes/tags on selected trades).
@@ -135,6 +145,6 @@ cd frontend && npm run build           # production build
   - Delete capital events (trash icon per row)
   - Reconcile button → toast showing delta or "in sync"
   - `reconcileAccount()` endpoint in `frontend/src/lib/endpoints.ts`
-- **Trade mutations** (`frontend/src/hooks/useTradeMutation.ts`): invalidate both `['trades']` and `['capital-dashboard']` on create/update
+- **Trade mutations**: Use `invalidateTradeDomain()` in `frontend/src/lib/queryInvalidation.ts`, not ad-hoc invalidation. This refreshes trades, detail queries, capital dashboard/events, analytics, journal weekly stats, and setup playbook stats after create/update/delete/import/pyramid/stop-history/review/idea-convert paths.
 - **Dashboard** (`backend/app/routers/capital_dashboard.py`): filters `Trade.status != "deleted"` for PnL and deployed capital
 - **Equity curve**: includes trade PnL (not just capital events)

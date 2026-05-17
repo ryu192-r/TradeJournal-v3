@@ -32,7 +32,7 @@ class Trade(Base):
     r_multiple = Column(Numeric(precision=10, scale=4))
     
     # Status lifecycle
-    status = Column(String(20), default='draft')  # draft, reviewed, analytics, closed_sl_hit, closed_target_hit, closed_manual, deleted
+    status = Column(String(20), default='open')  # open, closed, deleted
     review_notes = Column(Text)
     review_tags = Column(TagsList)
     chart_images = Column(JSON, default=list)  # JSON array of image paths

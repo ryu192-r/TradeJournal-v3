@@ -6,13 +6,15 @@ import {
 import {
   TrendingUp, Wallet, Activity, Target, Calendar, Flame, AlertTriangle,
 } from 'lucide-react'
-import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import type {
   AnalyticsKpi, DailyPnlEntry, MonthlyPnlEntry, AnalyticsStreaks,
 } from '@/types'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 function pnlNum(v: string | null): number { return parseDecimal(v, 0) }
 
@@ -48,13 +50,13 @@ function KpiCards({ kpi }: { kpi: AnalyticsKpi }) {
       {cards.map((card) => {
         const Icon = card.icon
         return (
-          <motion.div key={card.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-4`}>
+          <div key={card.label} className={`${CARD} p-4`}>
             <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center mb-2`}>
               <Icon className={`w-4 h-4 text-${card.color}`} />
             </div>
             <div className={`text-lg font-bold font-data ${card.color === 'profit' ? 'text-profit' : card.color === 'loss' ? 'text-loss' : card.color === 'text-accent' ? 'text-accent' : 'text-text-heading'}`}>{card.value}</div>
             <div className="text-[11px] text-text-muted font-data mt-0.5">{card.sub}</div>
-          </motion.div>
+          </div>
         )
       })}
     </div>
@@ -154,6 +156,12 @@ function MonthlyPnl({ data }: { data: MonthlyPnlEntry[] }) {
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardQuery()
+  const queryClient = useQueryClient()
+
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    await queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+  }, [queryClient])
 
   if (isLoading) {
     return (
@@ -192,6 +200,7 @@ export function DashboardPage() {
   }
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
@@ -206,5 +215,6 @@ export function DashboardPage() {
       </div>
       <MonthlyPnl data={data.monthly_pnl} />
     </div>
+    </PullToRefresh>
   )
 }

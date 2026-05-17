@@ -1,32 +1,19 @@
 import { GlassButton } from '@/components/ui/GlassButton'
 import { GlassInput } from '@/components/ui/GlassInput'
 import { GlassSelect } from '@/components/ui/GlassSelect'
-import { GlassTagInput } from '@/components/ui/GlassTagInput'
 import { GlassTextarea } from '@/components/ui/GlassTextarea'
 import {
   tradeFormSchema,
   type TradeFormData,
-  type TradeFormStatus,
   isoToDatetimeLocal,
   formDataToApiPayload,
 } from '@/schemas/tradeForm'
 import { useToastStore } from '@/store/toastStore'
 import type { ApiTrade } from '@/types'
+import { useSetupsQuery } from '@/hooks/useSetupPlaybookQuery'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Save } from 'lucide-react'
+import { Save, Loader2 } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
-
-const SETUP_OPTIONS = [
-  { value: '', label: '— Select Setup —' },
-  { value: 'EP', label: 'EP' },
-  { value: 'Momentum Burst', label: 'Momentum Burst' },
-  { value: 'Pullback', label: 'Pullback' },
-  { value: 'Reversal', label: 'Reversal' },
-  { value: 'IPO', label: 'IPO' },
-  { value: 'Gap Up', label: 'Gap Up' },
-  { value: 'Parabolic Long', label: 'Parabolic Long' },
-  { value: 'Custom', label: 'Custom' },
-]
 
 const TACTIC_OPTIONS = [
   { value: '', label: '— Select Tactic —' },
@@ -35,12 +22,6 @@ const TACTIC_OPTIONS = [
   { value: '10-DMA Touch', label: '10-DMA Touch' },
   { value: 'Intraday Reversal', label: 'Intraday Reversal' },
   { value: 'Custom', label: 'Custom' },
-]
-
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'reviewed', label: 'Reviewed' },
-  { value: 'analytics', label: 'Analytics' },
 ]
 
 interface TradeEntryFormProps {
@@ -66,8 +47,6 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     target_price: trade.target_price != null ? String(trade.target_price) : undefined,
     r_multiple: trade.r_multiple != null ? String(trade.r_multiple) : undefined,
     notes: trade.notes || undefined,
-    tags: trade.tags || [],
-    status: (trade.status as TradeFormStatus) || 'draft',
   }
 }
 
@@ -79,6 +58,13 @@ export function TradeEntryForm({
   submitFn,
 }: TradeEntryFormProps) {
   const addToast = useToastStore((s) => s.addToast)
+  const { data: setupsData, isLoading: setupsLoading } = useSetupsQuery('active')
+
+  const setupOptions = [
+    { value: '', label: '— Select Setup —' },
+    ...(setupsData?.items?.map((s) => ({ value: s.name, label: s.name })) ?? []),
+    { value: 'Custom', label: 'Custom' },
+  ]
 
   const defaultValues: TradeFormData = initialData
     ? apiTradeToFormData(initialData)
@@ -96,8 +82,6 @@ export function TradeEntryForm({
         target_price: undefined,
         r_multiple: undefined,
         notes: undefined,
-        tags: [],
-        status: 'draft',
       }
 
   const {
@@ -229,7 +213,7 @@ export function TradeEntryForm({
               error={errors.exit_price?.message}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <GlassInput
               label="R-Multiple"
               type="number"
@@ -246,18 +230,6 @@ export function TradeEntryForm({
               {...register('fees')}
               error={errors.fees?.message}
             />
-            <Controller
-              name="status"
-              control={control}
-              render={({ field }) => (
-                <GlassSelect
-                  label="Status"
-                  options={STATUS_OPTIONS}
-                  {...field}
-                  error={errors.status?.message}
-                />
-              )}
-            />
           </div>
         </div>
 
@@ -269,14 +241,20 @@ export function TradeEntryForm({
               name="setup"
               control={control}
               render={({ field }) => (
-                <GlassSelect
-                  label="Setup Type"
-                  options={SETUP_OPTIONS}
-                  placeholder="Select setup..."
-                  {...field}
-                  value={field.value || ''}
-                  error={errors.setup?.message}
-                />
+                setupsLoading ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated/50 text-xs text-text-muted">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading setups...
+                  </div>
+                ) : (
+                  <GlassSelect
+                    label="Setup Type"
+                    options={setupOptions}
+                    placeholder="Select setup..."
+                    {...field}
+                    value={field.value || ''}
+                    error={errors.setup?.message}
+                  />
+                )
               )}
             />
             <Controller
@@ -294,23 +272,6 @@ export function TradeEntryForm({
               )}
             />
           </div>
-        </div>
-
-        {/* Tags */}
-        <div className="space-y-4">
-          <h3 className="font-display text-sm text-accent">Tags</h3>
-          <Controller
-            name="tags"
-            control={control}
-            render={({ field }) => (
-              <GlassTagInput
-                value={field.value}
-                onChange={field.onChange}
-                placeholder="Add tags..."
-                error={errors.tags?.message}
-              />
-            )}
-          />
         </div>
 
         {/* Notes */}

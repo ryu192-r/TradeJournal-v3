@@ -17,6 +17,7 @@ from app.services.trade_service import TradeService
 from app.db.database import get_db
 from app.routers.capital_events import _reconcile_account
 from app.models.capital_event import CapitalEvent
+from app.models.setup_playbook import SetupPlaybook
 from app.core.config import settings
 
 def _auto_reconcile(db: Session):
@@ -28,16 +29,10 @@ router = APIRouter(prefix="/trades", tags=["trades"])
 
 # ─────────────────────── helpers ───────────────────────
 
-VALID_TRANSITIONS = {
-    "draft":     ["reviewed", "deleted"],
-    "reviewed":  ["analytics", "deleted", "draft"],
-    "analytics": ["deleted", "draft", "reviewed"],
-    "deleted":   ["draft"],
-}
 
-
-def _validate_status_transition(current: str, new: str) -> bool:
-    return new in VALID_TRANSITIONS.get(current, [])
+def _auto_set_status(trade: Trade):
+    """Auto-set status based on exit_price."""
+    trade.status = "closed" if trade.exit_price is not None else "open"
 
 
 def _compute_pnl(trade: Trade) -> Optional[Decimal]:
@@ -55,6 +50,26 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
     """Auto-detect exit reason based on price proximity."""
     if trade.exit_price is None:
         return "system"
+
+
+def _update_setup_stats(db: Session, setup_name: str | None):
+    """Recompute trade_count, win_rate, avg_r for a setup playbook."""
+    if not setup_name:
+        return
+    playbook = db.query(SetupPlaybook).filter(SetupPlaybook.name == setup_name).first()
+    if not playbook:
+        return
+    trades = db.query(Trade).filter(
+        Trade.setup == setup_name,
+        Trade.status != "deleted",
+    ).all()
+    closed = [t for t in trades if t.pnl is not None]
+    wins = [t for t in closed if t.pnl > 0]
+    playbook.trade_count = len(trades)
+    playbook.win_rate = f"{round(len(wins) / len(closed) * 100, 1)}%" if closed else None
+    r_values = [t.r_multiple for t in closed if t.r_multiple is not None]
+    playbook.avg_r = f"{round(sum(float(r) for r in r_values) / len(r_values), 2)}" if r_values else None
+    db.commit()
     exit_price = Decimal(str(trade.exit_price))
     if trade.stop_price:
         stop = Decimal(str(trade.stop_price))
@@ -75,8 +90,12 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     svc = TradeService(db)
     trade_data = trade.model_dump()
     db_trade, action = svc.merge_or_create(trade_data)
+    _auto_set_status(db_trade)
+    db.commit()
+    db.refresh(db_trade)
     action_log = "merged" if action == "merged" else "created"
     _auto_reconcile(db)
+    _update_setup_stats(db, db_trade.setup)
     return db_trade
 
 
@@ -92,8 +111,10 @@ def list_trades(
 ):
     """List trades with optional filters."""
     query = db.query(Trade).filter(Trade.status != "deleted")
-    if status:
-        query = query.filter(Trade.status == status)
+    if status == "closed":
+        query = query.filter(Trade.exit_price.isnot(None))
+    elif status == "open":
+        query = query.filter(Trade.exit_price.is_(None))
     if symbol:
         query = query.filter(Trade.symbol == symbol)
     if from_date:
@@ -116,21 +137,14 @@ def read_trade(trade_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{trade_id}", response_model=TradeResponse)
 def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends(get_db)):
-    """Update an existing trade. Status transitions are validated."""
+    """Update an existing trade. Status is auto-computed from exit_price."""
     db_trade = db.query(Trade).filter(Trade.id == trade_id).first()
     if not db_trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
 
     update_data = trade_update.model_dump(exclude_unset=True)
 
-    if "status" in update_data:
-        new_status = update_data["status"]
-        if not _validate_status_transition(db_trade.status, new_status):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status transition from {db_trade.status} to {new_status}. "
-                       f"Valid transitions: {VALID_TRANSITIONS.get(db_trade.status, [])}",
-            )
+    old_setup = db_trade.setup
 
     for field, value in update_data.items():
         setattr(db_trade, field, value)
@@ -138,13 +152,18 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
     if any(k in update_data for k in ("entry_price", "exit_price", "quantity", "fees")):
         _update_pnl(db_trade)
 
-    # Auto-detect exit_reason if exit price was set but reason wasn't explicitly provided
-    if "exit_price" in update_data and "exit_reason" not in update_data:
-        db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
+    if "exit_price" in update_data:
+        _auto_set_status(db_trade)
+        # Auto-detect exit_reason if exit price was set but reason wasn't explicitly provided
+        if "exit_reason" not in update_data:
+            db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
 
     db.commit()
     db.refresh(db_trade)
     _auto_reconcile(db)
+    _update_setup_stats(db, db_trade.setup)
+    if "setup" in update_data and old_setup != db_trade.setup:
+        _update_setup_stats(db, old_setup)
     return db_trade
 
 
@@ -167,6 +186,7 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     _auto_reconcile(db)
+    _update_setup_stats(db, trade.setup)
     return trade
 
 
@@ -190,7 +210,7 @@ def list_stop_history(trade_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{trade_id}/stop-history", response_model=StopHistoryResponse, status_code=status.HTTP_201_CREATED)
 def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session = Depends(get_db)):
-    """Record a new stop loss adjustment."""
+    """Record a new stop loss adjustment and update the trade's current stop_price."""
     trade = db.query(Trade).filter(Trade.id == trade_id).first()
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
@@ -201,6 +221,7 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
         timestamp=payload.timestamp,
     )
     db.add(entry)
+    trade.stop_price = payload.price
     db.commit()
     db.refresh(entry)
     return entry
@@ -269,11 +290,6 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
     trade = db.query(Trade).filter(Trade.id == trade_id).first()
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
-    if not _validate_status_transition(trade.status, "deleted"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete from status {trade.status}. Valid transitions: {VALID_TRANSITIONS.get(trade.status, [])}",
-        )
     trade.status = "deleted"
 
     # Create trade_deletion event if trade was closed (had realized PnL)
@@ -289,4 +305,5 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
 
     db.commit()
     _auto_reconcile(db)
+    _update_setup_stats(db, trade.setup)
     return None

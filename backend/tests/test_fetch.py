@@ -14,7 +14,6 @@ def _insert_trade(client, token, **kw):
         "quantity": 10,
         "entry_time": "2025-01-13T09:30:00",
         "exit_time": "2025-01-13T10:00:00",
-        "status": "draft",
         **kw,
     }
     return client.post(

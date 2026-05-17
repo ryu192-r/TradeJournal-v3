@@ -22,11 +22,11 @@ function pnlColor(pnl: string | number | null | undefined): string {
 function badgeStyles(variant: 'profit' | 'loss' | 'accent', size?: 'sm'): string {
   const base = 'inline-flex items-center rounded-full font-medium'
   const sizing = size === 'sm' ? 'text-[10px] px-2 py-0.5' : 'text-xs px-2.5 py-1'
-  
-  let color = ''
-  if (variant === 'profit') color = 'bg-profit-faint text-profit'
-  else if (variant === 'loss') color = 'bg-loss-faint text-loss'
-  else color = 'bg-accent-faint text-accent'
+  const color = variant === 'profit'
+    ? 'bg-profit-faint text-profit'
+    : variant === 'loss'
+      ? 'bg-loss-faint text-loss'
+      : 'bg-accent-faint text-accent'
   
   return `${base} ${sizing} ${color}`
 }
@@ -44,7 +44,6 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
     const payload: ApiTradeUpdatePayload = {
       tags: tags.length > 0 ? tags : null,
       notes: notes.trim() || null,
-      status: 'reviewed',
     }
     try {
       await onReview(trade.id, payload)

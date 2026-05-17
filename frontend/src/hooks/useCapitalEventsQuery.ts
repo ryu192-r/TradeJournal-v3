@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listCapitalEvents, createCapitalEvent, updateCapitalEvent, deleteCapitalEvent } from '@/lib/endpoints'
+import { invalidateCapitalDomain } from '@/lib/queryInvalidation'
 import type { CapitalEvent, CapitalEventType } from '@/types'
 
 export function useCapitalEventsQuery(accountId: number | null, eventType?: string, startDate?: string, endDate?: string) {
@@ -21,10 +22,7 @@ export function useCreateCapitalEventMutation() {
     account_id: number
   }>({
     mutationFn: (payload) => createCapitalEvent(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['capital-events'] })
-      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
-    },
+    onSuccess: () => invalidateCapitalDomain(queryClient),
   })
 }
 
@@ -35,10 +33,7 @@ export function useUpdateCapitalEventMutation() {
     payload: { event_type?: CapitalEventType; amount?: string; timestamp?: string; description?: string }
   }>({
     mutationFn: ({ eventId, payload }) => updateCapitalEvent(eventId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['capital-events'] })
-      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
-    },
+    onSuccess: () => invalidateCapitalDomain(queryClient),
   })
 }
 
@@ -46,9 +41,6 @@ export function useDeleteCapitalEventMutation() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: (eventId) => deleteCapitalEvent(eventId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['capital-events'] })
-      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
-    },
+    onSuccess: () => invalidateCapitalDomain(queryClient),
   })
 }

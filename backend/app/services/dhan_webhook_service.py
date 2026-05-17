@@ -132,7 +132,7 @@ class DhanWebhookService:
         Within same status, picks earliest entry_time.
         """
         # Query open trades with priority statuses
-        open_statuses = ("analytics", "reviewed", "draft")
+        open_statuses = ("open",)
         trade = (
             self.db.query(Trade)
             .filter(

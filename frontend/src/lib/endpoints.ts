@@ -55,6 +55,10 @@ export function updateTrade(id: number, payload: Record<string, unknown>) {
   return apiClient.put<ApiTrade>(`/trades/${id}`, payload).then(r => r.data)
 }
 
+export function deleteTrade(id: number) {
+  return apiClient.delete(`/trades/${id}`)
+}
+
 export function pyramidTrade(id: number, payload: { entry_price: number; quantity: number; entry_time?: string; fees?: number; stop_price?: number }) {
   return apiClient.post<ApiTrade>(`/trades/${id}/pyramid`, payload).then(r => r.data)
 }

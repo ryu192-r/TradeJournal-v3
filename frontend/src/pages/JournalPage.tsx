@@ -1,4 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { useSwipeTabs } from '@/hooks/useSwipeTabs'
 import { formatDate, formatCurrency } from '@/utils/format'
 import { cn } from '@/lib/utils'
 import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
@@ -256,6 +259,7 @@ export function JournalPage() {
   const [selectedDate, setSelectedDate] = useState<string>(toISODate(new Date()))
   const [activeTab, setActiveTab] = useState<TabId>('journal')
   const addToast = useToastStore((s) => s.addToast)
+  const queryClient = useQueryClient()
 
   const {
     data: journal,
@@ -265,14 +269,14 @@ export function JournalPage() {
   } = useJournalQuery(selectedDate)
 
   const { data: tradesData } = useTradesQuery()
-  const trades = tradesData?.items ?? []
 
   const createMutation = useCreateJournalMutation()
   const updateMutation = useUpdateJournalMutation()
 
   const summaryStats = useMemo(() => {
+    const trades = tradesData?.items ?? []
     return computeDailyStats(trades, selectedDate)
-  }, [trades, selectedDate])
+  }, [tradesData?.items, selectedDate])
 
   const handleSave = useCallback(
     (payload: import('@/types').DailyJournalPayload) => {
@@ -325,12 +329,24 @@ export function JournalPage() {
     [selectedDate]
   )
 
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['journal'] })
+    await queryClient.invalidateQueries({ queryKey: ['trades'] })
+  }, [queryClient])
+
+  const swipeTabs = useSwipeTabs({
+    tabs: ['journal', 'compare', 'weekly'],
+    activeTab,
+    onTabChange: (tab) => setActiveTab(tab as TabId),
+  })
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
   return (
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]" {...swipeTabs.handlers}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
         <div>
@@ -474,5 +490,6 @@ export function JournalPage() {
         <WeeklyView selectedDate={selectedDate} onSelectDate={setSelectedDate} onSwitchToJournal={() => setActiveTab('journal')} />
       )}
     </div>
+    </PullToRefresh>
   )
 }

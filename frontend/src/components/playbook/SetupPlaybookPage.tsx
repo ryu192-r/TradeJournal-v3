@@ -71,7 +71,7 @@ export function SetupPlaybookPage() {
     try {
       await archiveMutation.mutateAsync(confirmArchive)
       addToast({ title: 'Archived', message: 'Setup archived successfully.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to archive setup.', variant: 'error' })
     } finally {
       setConfirmArchive(null)
@@ -99,7 +99,7 @@ export function SetupPlaybookPage() {
     try {
       await seedMutation.mutateAsync()
       addToast({ title: 'Seeded', message: 'Default setups loaded.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to seed defaults.', variant: 'error' })
     }
   }

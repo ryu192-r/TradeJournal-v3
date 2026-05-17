@@ -4,7 +4,7 @@ export type TradeDirection = 'LONG'
 
 export type TradeStatus = 'OPEN' | 'CLOSED' | 'MISSED'
 
-export type BackendTradeStatus = 'draft' | 'reviewed' | 'analytics' | 'closed_sl_hit' | 'closed_target_hit' | 'closed_manual' | 'deleted'
+export type BackendTradeStatus = 'open' | 'closed' | 'deleted'
 export type SetupType =
   | 'EP'
   | 'Momentum Burst'

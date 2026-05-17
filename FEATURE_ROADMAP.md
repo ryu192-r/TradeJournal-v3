@@ -4,11 +4,16 @@
 
 ### Core Trading
 - [x] Trade CRUD (all LONG — Indian equities)
+- [x] Open/Closed derived from `exit_price`
 - [x] Auto-merge by `(symbol, date)` on create/import
 - [x] Pyramid: add shares to open positions
 - [x] Soft delete (status = `"deleted"`)
 - [x] Trade detail modal (click symbol)
 - [x] Status column (Open/Closed)
+- [x] Inline SL edit with trailing/manual/breakeven stop history
+- [x] Max Risk, P&L %, and Cap % table columns
+- [x] Setup dropdown fetched from Playbook active setups
+- [x] Playbook stats sync after trade mutations
 - [x] Date range filter
 - [x] Bulk select + bulk delete
 - [x] Keyboard shortcuts (N, J/K)
@@ -64,6 +69,8 @@
 ### UI/UX
 - [x] Light/dark theme (CSS variables)
 - [x] Fluid responsive layout (`clamp()` variables)
+- [x] View-level code splitting with `React.lazy`/`Suspense`
+- [x] Auto-refresh on mutation, mount, focus, and reconnect via React Query
 - [x] Horizontal scroll table for mobile
 - [x] Stacked pagination on mobile
 - [x] Review section mobile fixes

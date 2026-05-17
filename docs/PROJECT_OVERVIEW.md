@@ -36,6 +36,8 @@ Trading Journal v3 is a self-hosted personal trading platform. It evolved from a
 - **Broker Integration** — Dhan API sync + real-time webhook handling
 - **Telegram Bot** — free-form trade parsing ("Bought RELIANCE 50 @ 2650"), daily summaries, stop reminders
 - **Zero data loss** — daily CSV backups to Telegram, soft deletes
+- **Fresh UI by default** — trade/capital mutations invalidate all dependent React Query domains; views refetch on mount, focus, and reconnect
+- **Fast initial load** — major views are code-split, with analytics/recharts and other heavy sections loaded on demand
 
 ### Design Philosophy
 - Journal should "just work" — zero tolerance for lag/broken states
@@ -50,7 +52,7 @@ Trading Journal v3 is a self-hosted personal trading platform. It evolved from a
 ```
 ┌─────────────────────────────────────────────────┐
 │                   Frontend (React 19)            │
-│  Glass morphism UI, Multi-step forms,            │
+│  Glass morphism UI, lazy-loaded views,           │
 │  Review stream, Analytics dashboard (8 charts)   │
 │  Port: 3000  (serve -s dist)                     │
 ├─────────────────────────────────────────────────┤
@@ -189,10 +191,11 @@ User Input (Telegram) → Bot Parser → FastAPI → PostgreSQL
 │   ├── vite.config.ts / tsconfig.json / tailwind.config.js
 │   └── src/  (46 files)
 │       ├── main.tsx                 # Entry point with PWA service worker
-│       ├── App.tsx                  # Zustand-driven view switching, ErrorBoundary per page
+│       ├── App.tsx                  # Zustand view switching, lazy-loaded views, ErrorBoundary per page
 │       ├── index.css                # Tailwind + glass utilities
 │       ├── lib/
 │       │   ├── api.ts               # Axios client + interceptors
+│       │   ├── queryInvalidation.ts # Trade/capital domain refresh helpers
 │       │   └── utils.ts             # cn() helper
 │       ├── types/
 │       │   ├── index.ts             # 291 lines — all API response types
@@ -337,9 +340,9 @@ User Input (Telegram) → Bot Parser → FastAPI → PostgreSQL
 
 ## What's Working
 
-### Backend (verified via TestClient — 23/23 endpoints)
+### Backend
 - All CRUD endpoints for trades, journal, setups, ideas, accounts, capital events
-- Status machine enforcement (draft → reviewed → analytics → closed_* / deleted)
+- Trade state derived from `exit_price`: no exit = open, has exit = closed; soft delete uses `deleted`
 - PnL auto-computation on trade create/update
 - 10 analytics endpoints with pandas/numpy
 - 9 AI Coach endpoints (returns cached/empty when Ollama unavailable)
@@ -350,7 +353,8 @@ User Input (Telegram) → Bot Parser → FastAPI → PostgreSQL
 
 ### Frontend
 - Glass morphism design system (dark-only)
-- Zustand-driven SPA navigation (7 views)
+- Zustand-driven SPA navigation with lazy-loaded views
+- React Query domain invalidation for trade/capital mutations; views refetch on mount/focus/reconnect
 - Trade entry form (react-hook-form + Zod)
 - Daily journal 3-step wizard
 - Analytics dashboard (8 charts via Recharts)
@@ -542,7 +546,9 @@ See `.env.example` for all configurable variables. Key ones:
 
 ### Status Lifecycle
 ```
-draft → reviewed → analytics → closed_sl_hit / closed_target_hit / closed_manual / deleted
+exit_price IS NULL → open
+exit_price IS NOT NULL → closed
+DELETE /trades/{id} → deleted
 ```
 
 ---

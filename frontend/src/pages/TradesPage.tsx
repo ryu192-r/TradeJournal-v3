@@ -1,27 +1,31 @@
 import { GlassButton } from '@/components/ui/GlassButton'
 import { BrokerImportModal } from '@/components/trades/BrokerImportModal'
-import { StopHistoryTimeline } from '@/components/trades/StopHistoryTimeline'
-import { ChartImageGallery } from '@/components/trades/ChartImageGallery'
+import { TradeDetailSwipeContent } from '@/components/trades/TradeDetailSwipeContent'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { SwipeModal } from '@/components/ui/SwipeModal'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
-import { useUpdateTradeMutation } from '@/hooks/useTradeMutation'
 import { useToastStore } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '@/utils/format'
 import type { BackendTradeStatus, ApiTrade } from '@/types'
-import { pyramidTrade, exportTradesXlsx } from '@/lib/endpoints'
+import { pyramidTrade, exportTradesXlsx, deleteTrade, getCapitalDashboard } from '@/lib/endpoints'
 import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square } from 'lucide-react'
+import { useRowGestures } from '@/hooks/useRowGestures'
+import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
+import { invalidateTradeDomain, setTradeCache } from '@/lib/queryInvalidation'
 import { useState, useCallback, useEffect } from 'react'
 
-const statusBadge: Record<string, string> = {
-  open: 'bg-accent-muted text-accent',
-  closed: 'bg-profit-muted text-profit',
+function statusBadgeClass(trade: ApiTrade): string {
+  if (trade.status === 'deleted') return 'bg-text-faint text-text-muted'
+  if (!trade.exit_price) return 'bg-border text-text-muted'
+  return Number(trade.pnl) >= 0 ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'
 }
 
 export function TradesPage() {
   const addToast = useToastStore((s) => s.addToast)
-  const { openCreateTrade } = useAppStore()
+  const { openCreateTrade, openEditTrade } = useAppStore()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [symbolFilter, setSymbolFilter] = useState('')
@@ -56,17 +60,17 @@ export function TradesPage() {
     if (!pyramidEntryPrice || !pyramidQty) return
     setPyramidSubmitting(true)
     try {
-      await pyramidTrade(tradeId, {
+      const trade = await pyramidTrade(tradeId, {
         entry_price: Number(pyramidEntryPrice),
         quantity: Number(pyramidQty),
         fees: Number(pyramidFees) || 0,
         stop_price: pyramidStopPrice ? Number(pyramidStopPrice) : undefined,
       })
       addToast({ title: 'Pyramided', message: 'Shares added to position.', variant: 'success' })
-      queryClient.invalidateQueries({ queryKey: ['trades'] })
-      queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      setTradeCache(queryClient, trade)
+      invalidateTradeDomain(queryClient)
       closePyramid()
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to pyramid trade.', variant: 'error' })
     } finally {
       setPyramidSubmitting(false)
@@ -80,8 +84,14 @@ export function TradesPage() {
     skip,
     limit: 100,
   })
-  const updateMutation = useUpdateTradeMutation()
   const totalPages = data ? Math.ceil(data.total / 100) : 0
+
+  const { data: capitalData } = useQuery({
+    queryKey: ['capital-dashboard'],
+    queryFn: getCapitalDashboard,
+    staleTime: 2 * 60 * 1000,
+  })
+  const netEquity = capitalData?.net_equity ?? null
 
   const toggleSelect = useCallback((id: number) => {
     setSelectedIds((prev) => {
@@ -97,19 +107,19 @@ export function TradesPage() {
     let success = 0
     for (const id of selectedIds) {
       try {
-        await updateMutation.mutateAsync({ id, payload: { status: 'deleted' } })
+        await deleteTrade(id)
         success++
       } catch { /* skip failed */ }
     }
     addToast({ title: 'Deleted', message: `${success} trades deleted.`, variant: 'info' })
     setSelectedIds(new Set())
-    queryClient.invalidateQueries({ queryKey: ['trades'] })
-  }, [selectedIds, updateMutation, addToast, queryClient])
+    invalidateTradeDomain(queryClient)
+  }, [selectedIds, addToast, queryClient])
 
   const allSelected = data?.items?.length === selectedIds.size
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['trades'] })
+    await invalidateTradeDomain(queryClient)
   }, [queryClient])
 
   // Keyboard shortcuts
@@ -160,10 +170,9 @@ export function TradesPage() {
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
           className="w-full sm:w-36 rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer"
         >
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="reviewed">Reviewed</option>
-          <option value="analytics">Analytics</option>
+          <option value="">All positions</option>
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
         </select>
         {hasFilters && (
           <button onClick={clearFilters} className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer">
@@ -235,89 +244,34 @@ export function TradesPage() {
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Symbol</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Entry</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Exit</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">SL</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Max Risk</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Qty</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Setup</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Status</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">P&amp;L</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">P&amp;L%</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Cap%</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {data?.items && data.items.length > 0 ? (
-                  data.items.map((trade) => {
-                    const isProfit = trade.pnl != null && Number(trade.pnl) >= 0
-                    const pnlFormatted = trade.pnl != null ? formatCurrency(Number(trade.pnl)) : '—'
-                    const pnlText = isProfit ? `+${pnlFormatted}` : pnlFormatted
-                    return (
-                      <tr key={trade.id} className={`transition-colors hover:bg-bg-card-h ${selectedIds.has(trade.id) ? 'bg-accent-faint/20' : ''}`}>
-                        <td className="px-3 py-3">
-                          <button
-                            onClick={() => toggleSelect(trade.id)}
-                            className={`transition-colors cursor-pointer ${selectedIds.has(trade.id) ? 'text-accent' : 'text-text-muted hover:text-text-heading'}`}
-                          >
-                            {selectedIds.has(trade.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                          </button>
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-                          <button
-                            onClick={() => setDetailTrade(trade)}
-                            className="font-medium text-text-heading hover:text-accent transition-colors cursor-pointer"
-                          >
-                            {trade.symbol}
-                          </button>
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-                          <div className="text-text-heading text-xs">{formatPrice(Number(trade.entry_price))}</div>
-                          <div className="text-[10px] text-text-muted mt-0.5">{formatDate(trade.entry_time)}</div>
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-                          {trade.exit_price ? (
-                            <>
-                              <div className="text-text-heading text-xs">{formatPrice(Number(trade.exit_price))}</div>
-                              <div className="text-[10px] text-text-muted mt-0.5">{trade.exit_time ? formatDate(trade.exit_time) : '—'}</div>
-                            </>
-                          ) : (
-                            <span className="text-text-muted text-xs">Open</span>
-                          )}
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-heading text-xs">{formatQuantity(trade.quantity)}</td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-muted text-xs">{trade.setup || '—'}</td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${statusBadge[getStatus(trade)] || 'bg-text-faint text-text-muted'}`}>
-                            {getStatusLabel(trade)}
-                          </span>
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-                          <span className={`font-data text-xs font-medium ${trade.pnl == null ? 'text-text-muted' : isProfit ? 'text-profit' : 'text-loss'}`}>
-                            {pnlText}
-                          </span>
-                        </td>
-                        <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-right">
-                          <div className="flex items-center justify-end gap-0.5">
-                            {!trade.exit_price && (
-                              <button
-                                onClick={() => { setPyramidingTradeId(trade.id); setPyramidEntryPrice(''); setPyramidQty('') }}
-                                className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
-                                title="Pyramid"
-                              >
-                                <Layers className="w-4 h-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setDetailTrade(trade)}
-                              className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
-                              title="View"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
+                  data.items.map((trade) => (
+                      <TradeRow
+                        key={trade.id}
+                        trade={trade}
+                        selectedIds={selectedIds}
+                        toggleSelect={toggleSelect}
+                        openEditTrade={openEditTrade}
+                        setDetailTrade={setDetailTrade}
+                        setPyramidingTradeId={setPyramidingTradeId}
+                        netEquity={netEquity}
+                      />
+                  ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-5 py-16 text-center text-text-muted">No trades found. Click "New Trade" to add your first trade.</td>
+                    <td colSpan={13} className="px-5 py-16 text-center text-text-muted">No trades found. Click "New Trade" to add your first trade.</td>
                   </tr>
                 )}
               </tbody>
@@ -345,143 +299,253 @@ export function TradesPage() {
         )}
       </div>
 
-      {/* Pyramid modal */}
-      {pyramidingTradeId !== null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-bg-card rounded-2xl border border-border p-6 w-full max-w-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg text-text-heading">Pyramid Position</h3>
-              <button onClick={closePyramid} className="p-1.5 rounded-lg text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-colors cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-sm text-text-muted mb-4">Add more shares to this open position. Entry price will be averaged.</p>
-            <div className="space-y-3 mb-5">
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Entry Price (₹)</label>
-                <input type="number" step="0.01" value={pyramidEntryPrice} onChange={(e) => setPyramidEntryPrice(e.target.value)}
-                  className="w-full rounded-lg border border-border-strong bg-bg-card/60 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Quantity</label>
-                <input type="number" step="1" value={pyramidQty} onChange={(e) => setPyramidQty(e.target.value)}
-                  className="w-full rounded-lg border border-border-strong bg-bg-card/60 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Fees (optional)</label>
-                <input type="number" step="0.01" value={pyramidFees} onChange={(e) => setPyramidFees(e.target.value)}
-                  className="w-full rounded-lg border border-border-strong bg-bg-card/60 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Stop Price (optional)</label>
-                <input type="number" step="0.01" value={pyramidStopPrice} onChange={(e) => setPyramidStopPrice(e.target.value)}
-                  className="w-full rounded-lg border border-border-strong bg-bg-card/60 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3">
-              <button onClick={closePyramid} className="px-3 py-1.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer">Cancel</button>
-              <button onClick={() => handlePyramid(pyramidingTradeId)} disabled={pyramidSubmitting || !pyramidEntryPrice || !pyramidQty}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
-                {pyramidSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Layers className="w-4 h-4" /> Pyramid</>}
-              </button>
-            </div>
+      {/* Pyramid bottom sheet */}
+      <BottomSheet open={pyramidingTradeId !== null} onClose={closePyramid} title="Pyramid Position">
+        <p className="text-sm text-text-muted mb-4">Add more shares to this open position. Entry price will be averaged.</p>
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Entry Price (₹)</label>
+            <input type="number" step="0.01" value={pyramidEntryPrice} onChange={(e) => setPyramidEntryPrice(e.target.value)}
+              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Quantity</label>
+            <input type="number" step="1" value={pyramidQty} onChange={(e) => setPyramidQty(e.target.value)}
+              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Fees (optional)</label>
+            <input type="number" step="0.01" value={pyramidFees} onChange={(e) => setPyramidFees(e.target.value)}
+              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Stop Price (optional)</label>
+            <input type="number" step="0.01" value={pyramidStopPrice} onChange={(e) => setPyramidStopPrice(e.target.value)}
+              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
         </div>
-      )}
+        <div className="flex items-center gap-3">
+          <button onClick={closePyramid} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+          <button onClick={() => handlePyramid(pyramidingTradeId!)} disabled={pyramidSubmitting || !pyramidEntryPrice || !pyramidQty}
+            className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+            {pyramidSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Layers className="w-4 h-4" /> Pyramid</>}
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* Trade detail modal */}
       {detailTrade && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-bg-card rounded-2xl border border-border p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display text-lg text-text-heading">{detailTrade.symbol}</h2>
-              <button onClick={() => setDetailTrade(null)} className="p-1.5 rounded-lg text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-colors cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-                  <div className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Entry</div>
-                  <div className="font-data text-sm font-medium text-text-heading">{formatPrice(Number(detailTrade.entry_price))}</div>
-                  <div className="text-[11px] text-text-muted mt-1">{formatDate(detailTrade.entry_time)}</div>
-                </div>
-                <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-                  <div className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Exit</div>
-                  <div className="font-data text-sm font-medium text-text-heading">{detailTrade.exit_price ? formatPrice(Number(detailTrade.exit_price)) : '—'}</div>
-                  <div className="text-[11px] text-text-muted mt-1">{detailTrade.exit_time ? formatDate(detailTrade.exit_time) : 'Open'}</div>
-                </div>
-                <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-                  <div className="text-[11px] text-text-muted uppercase tracking-wide mb-1">Qty</div>
-                  <div className="font-data text-sm font-medium text-text-heading">{formatQuantity(detailTrade.quantity)}</div>
-                </div>
-                <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-                  <div className="text-[11px] text-text-muted uppercase tracking-wide mb-1">P&amp;L</div>
-                  <div className={`font-data text-sm font-medium ${detailTrade.pnl == null ? 'text-text-muted' : Number(detailTrade.pnl) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {detailTrade.pnl != null ? `${Number(detailTrade.pnl) >= 0 ? '+' : ''}${formatCurrency(Number(detailTrade.pnl))}` : '—'}
-                  </div>
-                </div>
-              </div>
-
-              <ChartImageGallery tradeId={detailTrade.id} images={detailTrade.chart_images ?? []} />
-
-              <div className="border-t border-border pt-4 space-y-2">
-                {detailTrade.stop_price && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Stop Loss</span><span className="text-text-heading font-medium">{formatPrice(Number(detailTrade.stop_price))}</span></div>
-                )}
-                {detailTrade.target_price && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Target</span><span className="text-text-heading font-medium">{formatPrice(Number(detailTrade.target_price))}</span></div>
-                )}
-                {detailTrade.r_multiple && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">R-Multiple</span><span className="text-text-heading font-medium">{Number(detailTrade.r_multiple).toFixed(2)}</span></div>
-                )}
-                {detailTrade.fees && Number(detailTrade.fees) > 0 && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Fees</span><span className="text-text-heading font-medium">{formatCurrency(Number(detailTrade.fees))}</span></div>
-                )}
-                {detailTrade.setup && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Setup</span><span className="text-text-heading font-medium">{detailTrade.setup}</span></div>
-                )}
-                {detailTrade.tactic && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Tactic</span><span className="text-text-heading font-medium">{detailTrade.tactic}</span></div>
-                )}
-                <div className="flex justify-between text-sm"><span className="text-text-muted">Status</span><span className="text-text-heading font-medium capitalize">{detailTrade.status}</span></div>
-                {detailTrade.exit_reason && (
-                  <div className="flex justify-between text-sm"><span className="text-text-muted">Exit Reason</span><span className="text-text-heading font-medium capitalize">{detailTrade.exit_reason.replace('_', ' ')}</span></div>
-                )}
-              </div>
-
-              {detailTrade.notes && (
-                <div className="border-t border-border pt-4">
-                  <div className="text-xs text-text-muted uppercase tracking-wide mb-2">Notes</div>
-                  <p className="text-sm text-text-heading whitespace-pre-wrap">{detailTrade.notes}</p>
-                </div>
-              )}
-              {detailTrade.tags && detailTrade.tags.length > 0 && (
-                <div className="border-t border-border pt-4">
-                  <div className="text-xs text-text-muted uppercase tracking-wide mb-2">Tags</div>
-                  <div className="flex flex-wrap gap-1.5">{detailTrade.tags.map((tag) => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-accent-faint text-accent">{tag}</span>
-                  ))}</div>
-                </div>
-              )}
-              <StopHistoryTimeline tradeId={detailTrade.id} />
-            </div>
-          </div>
-        </div>
+        <SwipeModal open={true} onClose={() => setDetailTrade(null)}>
+          <TradeDetailSwipeContent
+            trade={detailTrade}
+            trades={data?.items ?? []}
+            onSelect={setDetailTrade}
+            onClose={() => setDetailTrade(null)}
+          />
+        </SwipeModal>
       )}
 
-      <BrokerImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => queryClient.invalidateQueries({ queryKey: ['trades'] })} />
+      <BrokerImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => invalidateTradeDomain(queryClient)} />
     </div>
     </PullToRefresh>
   )
 }
 
-function getStatus(trade: ApiTrade): string {
-  if (trade.status === 'deleted') return 'deleted'
-  return trade.exit_price ? 'closed' : 'open'
-}
-
 function getStatusLabel(trade: ApiTrade): string {
   if (trade.status === 'deleted') return 'Deleted'
   return trade.exit_price ? 'Closed' : 'Open'
+}
+// ── TradeRow component ──
+
+interface TradeRowProps {
+  trade: ApiTrade
+  selectedIds: Set<number>
+  toggleSelect: (id: number) => void
+  openEditTrade: (id: number) => void
+  setDetailTrade: (t: ApiTrade) => void
+  setPyramidingTradeId: (id: number | null) => void
+  netEquity: string | null
+}
+
+const STOP_TYPE_OPTIONS = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'trailing', label: 'Trailing' },
+  { value: 'breakeven', label: 'Breakeven' },
+]
+
+function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTrade, setPyramidingTradeId, netEquity }: TradeRowProps) {
+  const isProfit = trade.pnl != null && Number(trade.pnl) >= 0
+  const pnlFormatted = trade.pnl != null ? formatCurrency(Number(trade.pnl)) : '—'
+  const pnlText = isProfit ? `+${pnlFormatted}` : pnlFormatted
+  const entryCost = Number(trade.entry_price) * Number(trade.quantity)
+  const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
+  const pnlPct = entryCost > 0 ? ((pnlNum / entryCost) * 100) : null
+  const capPct = netEquity && Number(netEquity) > 0 ? ((pnlNum / Number(netEquity)) * 100) : null
+  const [slEditing, setSlEditing] = useState(false)
+  const [slPrice, setSlPrice] = useState(trade.stop_price ?? '')
+  const [slType, setSlType] = useState('trailing')
+  const createStopHistory = useCreateStopHistoryMutation()
+
+  const slRef = useCallback((el: HTMLInputElement | null) => {
+    if (el) el.focus()
+  }, [])
+
+  const handleSlSave = useCallback(async () => {
+    if (!slPrice) return
+    try {
+      await createStopHistory.mutateAsync({
+        tradeId: trade.id,
+        payload: {
+          stop_type: slType,
+          price: slPrice,
+          timestamp: new Date().toISOString(),
+        },
+      })
+      setSlEditing(false)
+    } catch {
+      /* toast handled by hook */
+    }
+  }, [slPrice, slType, trade.id, createStopHistory])
+
+  const swipeGw = useRowGestures({
+    disabled: false,
+    onDoubleTap: () => openEditTrade(trade.id),
+    onLongPress: () => {
+      navigator.clipboard?.writeText(trade.pnl ?? '').then(() => {
+        const addToast = useToastStore.getState().addToast
+        addToast({ title: 'Copied', message: 'P&L copied to clipboard.', variant: 'info' })
+      })
+    },
+  })
+
+  return (
+    <tr className={`transition-colors hover:bg-bg-card-h ${selectedIds.has(trade.id) ? 'bg-accent-faint/20' : ''}`} {...swipeGw.handlers}>
+      <td className="px-3 py-3">
+        <button
+          onClick={() => toggleSelect(trade.id)}
+          className={`transition-colors cursor-pointer ${selectedIds.has(trade.id) ? 'text-accent' : 'text-text-muted hover:text-text-heading'}`}
+        >
+          {selectedIds.has(trade.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+        </button>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <button
+          onClick={() => setDetailTrade(trade)}
+          className="font-medium text-text-heading hover:text-accent transition-colors cursor-pointer"
+        >
+          {trade.symbol}
+        </button>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <div className="text-text-heading text-xs">{formatPrice(Number(trade.entry_price))}</div>
+        <div className="text-[10px] text-text-muted mt-0.5">{formatDate(trade.entry_time)}</div>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        {trade.exit_price ? (
+          <>
+            <div className="text-text-heading text-xs">{formatPrice(Number(trade.exit_price))}</div>
+            <div className="text-[10px] text-text-muted mt-0.5">{trade.exit_time ? formatDate(trade.exit_time) : '—'}</div>
+          </>
+        ) : (
+          <span className="text-text-muted text-xs">Open</span>
+        )}
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        {slEditing ? (
+          <div className="flex items-center gap-1 min-w-[140px]">
+            <input
+              ref={slRef}
+              type="number"
+              step="0.01"
+              value={slPrice}
+              onChange={(e) => setSlPrice(e.target.value)}
+              className="w-20 px-1.5 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading"
+              placeholder="Price"
+            />
+            <select
+              value={slType}
+              onChange={(e) => setSlType(e.target.value)}
+              className="w-16 px-1 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading"
+            >
+              {STOP_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSlSave}
+              disabled={!slPrice || createStopHistory.isPending}
+              className="px-1.5 py-1 rounded text-[10px] font-medium bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {createStopHistory.isPending ? '…' : 'Set'}
+            </button>
+            <button
+              onClick={() => setSlEditing(false)}
+              className="px-1 py-1 rounded text-[10px] text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setSlPrice(trade.stop_price ?? ''); setSlEditing(true) }}
+            className={`font-data text-xs transition-colors cursor-pointer ${trade.stop_price ? 'text-text-heading hover:text-accent' : 'text-text-faint hover:text-text-muted'}`}
+            title="Click to set trailing stop"
+          >
+            {trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—'}
+          </button>
+        )}
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        {trade.stop_price ? (
+          <span className="font-data text-xs text-loss">
+            {formatCurrency(Number((Number(trade.entry_price) - Number(trade.stop_price)) * Number(trade.quantity)))}
+          </span>
+        ) : (
+          <span className="text-text-faint text-xs">—</span>
+        )}
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-heading text-xs">{formatQuantity(trade.quantity)}</td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-muted text-xs">{trade.setup || '—'}</td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${statusBadgeClass(trade)}`}>
+          {getStatusLabel(trade)}
+        </span>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <span className={`font-data text-xs font-medium ${trade.pnl == null ? 'text-text-muted' : isProfit ? 'text-profit' : 'text-loss'}`}>
+          {pnlText}
+        </span>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <span className={`font-data text-xs ${trade.pnl == null ? 'text-text-muted' : isProfit ? 'text-profit' : 'text-loss'}`}>
+          {pnlPct != null ? `${isProfit ? '+' : ''}${pnlPct.toFixed(2)}%` : '—'}
+        </span>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <span className={`font-data text-xs ${capPct == null ? 'text-text-faint' : pnlNum >= 0 ? 'text-profit' : 'text-loss'}`}>
+          {capPct != null ? `${pnlNum >= 0 ? '+' : ''}${capPct.toFixed(2)}%` : '—'}
+        </span>
+      </td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-right">
+        <div className="flex items-center justify-end gap-0.5">
+          {!trade.exit_price && (
+            <button
+              onClick={() => { setPyramidingTradeId(trade.id) }}
+              className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
+              title="Pyramid"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => openEditTrade(trade.id)}
+            className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
+            title="Edit"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
 }

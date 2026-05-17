@@ -44,6 +44,7 @@ Indian retail equity traders who:
 - Zustand `appStore.activeView` controls pages (not URL router)
 - Sub-views via `tradeFormMode` (`list|create|edit`)
 - Active views: `dashboard`, `analytics`, `trades`, `journal`, `playbook`, `review`, `ideas`, `capital`, `settings`, `ai-coach`
+- Major views are code-split with `React.lazy`/`Suspense`; analytics/recharts, trades, capital, coach, and other heavy pages load on demand instead of in the initial bundle
 
 ### Route Registration
 - Register in `backend/app/routers/base.py`, prefix `/api/v1`
@@ -53,6 +54,9 @@ Indian retail equity traders who:
 - Backend returns monetary values as **strings** (Decimal serialization)
 - Frontend formats via `formatCurrency()` (PnL), `formatPrice()` (prices), `formatQuantity()` (quantities)
 - All in `frontend/src/utils/format.ts`
+- React Query refetches on mount/window focus/reconnect
+- Trade-impacting mutations use `invalidateTradeDomain()` to refresh trades, trade detail, capital dashboard/events, analytics, journal weekly stats, and setup playbook stats
+- Capital-event mutations use `invalidateCapitalDomain()` to refresh capital, trade, and analytics data
 
 ### Theme
 - CSS variables via `data-theme="dark"|"light"` on root
@@ -71,11 +75,14 @@ Indian retail equity traders who:
 - Auto-merge by `(symbol, date)`: weighted-average prices, summed qty/fees/PnL
 - Pyramid: add shares to open positions (weighted-average entry, optional stop update)
 - Soft delete (status = `"deleted"`)
+- Open/Closed is derived from `exit_price` (no exit = open, has exit = closed)
 - Date range filter, bulk select/delete
 - Keyboard shortcuts: N (new), J/K (navigate)
 - Excel export
 - Exit reason auto-detection (stop_price→stop_loss, target→target, else manual) with user override
 - Stop history (audit trail of stop adjustments, timeline in trade detail modal)
+- Trades table includes inline SL editing, Max Risk, P&L %, and Cap % columns
+- Setup dropdown is fetched from Playbook active setups and playbook stats sync after trade mutations
 - Chart image upload/delete/gallery (multipart, disk storage, served via `/uploads/`)
 
 ### Broker Import

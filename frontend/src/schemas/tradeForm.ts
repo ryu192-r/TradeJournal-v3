@@ -21,13 +21,9 @@ export const tradeFormSchema = z.object({
   target_price: z.string().optional(),
   r_multiple: z.string().optional(),
   notes: z.string().optional(),
-  tags: z.array(z.string()).default([]),
-  status: z.enum(['draft', 'reviewed', 'analytics']).default('draft'),
 })
 
 export type TradeFormData = z.infer<typeof tradeFormSchema>
-
-export type TradeFormStatus = 'draft' | 'reviewed' | 'analytics'
 
 // Convert ISO datetime string to datetime-local input value (YYYY-MM-DDTHH:MM)
 export function isoToDatetimeLocal(iso: string | null | undefined): string {
@@ -58,7 +54,5 @@ export function formDataToApiPayload(data: TradeFormData): Record<string, unknow
     target_price: data.target_price || null,
     r_multiple: data.r_multiple || null,
     notes: data.notes || null,
-    tags: data.tags.length > 0 ? data.tags : null,
-    status: data.status,
   }
 }

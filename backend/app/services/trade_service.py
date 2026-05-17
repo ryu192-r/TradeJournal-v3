@@ -210,9 +210,7 @@ class TradeService:
             "entry_time": entry_time,
             "exit_time": exit_time,
             "fees": Decimal("0"),
-            "status": "draft",
-            "setup": None,
-            "tactic": None,
+            "status": "open",
         }
         trade, _ = self.merge_or_create(trade_data)
         return trade
@@ -231,7 +229,7 @@ class TradeService:
             "entry_time": entry_time,
             "exit_time": exit_time,
             "fees": Decimal("0"),
-            "status": "draft",
+            "status": "open",
         }
         trade, _ = self.merge_or_create(trade_data)
         return trade

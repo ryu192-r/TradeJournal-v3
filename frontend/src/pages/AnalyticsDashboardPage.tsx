@@ -11,6 +11,9 @@ import type {
   DailyPnlEntry, MonthlyPnlEntry, AnalyticsRDist, SetupPerformanceItem,
   DayOfWeekEntry, TimeOfDayEntry, AnalyticsStreaks, HoldingPeriodEntry,
 } from '@/types'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 // ───────────────────────── helpers ─────────────────────────
 
@@ -55,6 +58,7 @@ function GlassTooltip({ active, payload, label }: any) {
 // ───────────────────────── Equity Curve ─────────────────────────
 
 // @ts-ignore - kept for reference
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
   const chartData = data.map((d) => ({
     date: d.date.slice(0, 10),
@@ -234,6 +238,7 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
 // ───────────────────────── Monthly P\u0026L Bars ─────────────────────────
 
 // @ts-ignore - kept for reference
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MonthlyPnlChart({ data }: { data: MonthlyPnlEntry[] }) {
   const chartData = data.map((d) => ({
     month: d.month,
@@ -575,6 +580,7 @@ function DrawdownChart({ data }: { data: DailyPnlEntry[] }) {
 // ───────────────────────── Streaks Mini Card ─────────────────────────
 
 // @ts-ignore - kept for reference
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StreakMiniCard({ data }: { data: AnalyticsStreaks }) {
   const currentType = data.current_streak.type ?? 'none'
   const currentCount = data.current_streak.count
@@ -678,6 +684,11 @@ function HoldingPeriodChart({ data }: { data: HoldingPeriodEntry[] }) {
 
 export function AnalyticsDashboardPage() {
   const { data, isLoading, error } = useDashboardQuery()
+  const queryClient = useQueryClient()
+
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['analytics'] })
+  }, [queryClient])
 
   if (isLoading) {
     return (
@@ -721,6 +732,7 @@ export function AnalyticsDashboardPage() {
   }
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Analytics</h1>
@@ -743,5 +755,6 @@ export function AnalyticsDashboardPage() {
 
       <HoldingPeriodChart data={data.holding_period} />
     </div>
+    </PullToRefresh>
   )
 }

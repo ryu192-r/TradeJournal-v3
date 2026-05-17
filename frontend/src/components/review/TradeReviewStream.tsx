@@ -6,18 +6,16 @@ import { useToastStore } from '@/store/toastStore'
 import { ArrowLeft, ArrowRight, CheckCircle2, Layers, X, Loader2 } from 'lucide-react'
 import { useState, useCallback, useEffect } from 'react'
 
-type ReviewFilter = 'draft' | 'all'
+type ReviewFilter = 'unreviewed' | 'all'
 
 export function TradeReviewStream() {
-  const [filter, setFilter] = useState<ReviewFilter>('draft')
-  const { data, isLoading, error } = useTradesQuery({
-    status: filter === 'draft' ? 'draft' : undefined,
-  })
+  const [filter, setFilter] = useState<ReviewFilter>('unreviewed')
+  const { data, isLoading, error } = useTradesQuery()
   const reviewMutation = useReviewTradeMutation()
   const updateMutation = useUpdateTradeMutation()
   const addToast = useToastStore((s) => s.addToast)
 
-  const trades = data?.items?.filter(t => filter === 'all' || t.status === 'draft') || []
+  const trades = data?.items?.filter(t => filter === 'all' || !t.review_notes) || []
   const [currentIndex, setCurrentIndex] = useState(0)
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -35,7 +33,7 @@ export function TradeReviewStream() {
     async (id: number, payload: import('@/types').ApiTradeUpdatePayload) => {
       try {
         await reviewMutation.mutateAsync({ id, payload })
-        addToast({ variant: 'success', title: 'Review saved', message: 'Trade reviewed and moved to analytics.' })
+        addToast({ variant: 'success', title: 'Review saved', message: 'Trade review saved.' })
         setTimeout(() => {
           setCurrentIndex((idx) => {
             const next = idx + 1
@@ -149,9 +147,9 @@ export function TradeReviewStream() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setFilter('draft'); setCurrentIndex(0) }}
+            onClick={() => { setFilter('unreviewed'); setCurrentIndex(0) }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-              filter === 'draft'
+              filter === 'unreviewed'
                 ? 'bg-accent-muted text-accent border border-accent/20'
                 : 'text-text-muted hover:text-text border border-transparent'
             }`}
@@ -196,7 +194,7 @@ export function TradeReviewStream() {
           <div>
             <h1 className="font-display text-2xl text-text-heading">Review</h1>
             <div className="text-sm text-text-muted font-data mt-0.5">
-              {currentIndex + 1} of {trades.length}{filter === 'draft' ? ' unreviewed' : ''}
+              {currentIndex + 1} of {trades.length}{filter === 'unreviewed' ? ' unreviewed' : ''}
               {bulkMode && ` (${selectedIds.size} selected)`}
             </div>
           </div>
@@ -216,7 +214,7 @@ export function TradeReviewStream() {
       {/* Progress dots */}
       <div className="flex items-center justify-center gap-2 mb-1">
         {trades.map((t, idx) => {
-          const isReviewed = t.status !== 'draft'
+          const isReviewed = t.review_notes != null
           return (
             <button
               key={t.id}
@@ -236,7 +234,7 @@ export function TradeReviewStream() {
                       ? 'bg-accent w-4'
                       : 'bg-border w-4'
               }`}
-              title={`${t.symbol} — ${t.status}`}
+              title={`${t.symbol}`}
             />
           )
         })}

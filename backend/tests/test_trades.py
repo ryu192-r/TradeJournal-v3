@@ -8,7 +8,7 @@ TRADE = {
     "quantity": 10,
     "entry_time": "2025-01-13T09:30:00",
     "exit_time": "2025-01-13T10:00:00",
-    "status": "draft",
+    "status": "open",
 }
 
 # ── helpers ──
@@ -130,11 +130,12 @@ def test_list_trades_paginated(client, auth_user_token):
 
 
 def test_list_trades_filter_by_status(client, auth_user_token):
-    _create(client, auth_user_token, status="draft", symbol="X")
-    _create(client, auth_user_token, status="reviewed", symbol="Z")
-    resp = _list(client, auth_user_token, status="draft")
+    _create(client, auth_user_token, exit_price=None, symbol="X")  # → open
+    _create(client, auth_user_token, exit_price=2000, symbol="Z")  # → closed
+    resp = _list(client, auth_user_token, status="open")
     items = resp.json()["items"]
-    assert all(t["status"] == "draft" for t in items)
+    assert all(t["status"] == "open" for t in items)
+    assert any(t["symbol"] == "X" for t in items)
 
 
 def test_get_trade_by_id(client, auth_user_token):

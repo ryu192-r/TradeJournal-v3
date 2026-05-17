@@ -1,34 +1,47 @@
 import { Sidebar, TopBar } from '@/components/layout/Sidebar'
-import { TradeReviewStream } from '@/components/review/TradeReviewStream'
 import { ToastContainer } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { TradesPage } from '@/pages/TradesPage'
-import { CreateTradePage } from '@/pages/CreateTradePage'
-import { EditTradePage } from '@/pages/EditTradePage'
-import { DashboardPage } from '@/pages/DashboardPage'
-import { JournalPage } from '@/pages/JournalPage'
-import { SetupPlaybookPage } from '@/components/playbook/SetupPlaybookPage'
-import { TradeIdeasPage } from '@/components/ideas/TradeIdeasPage'
-import { SettingsPage } from '@/pages/SettingsPage'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
-import { AnalyticsDashboardPage } from '@/pages/AnalyticsDashboardPage'
-import { CapitalPage } from '@/pages/CapitalPage'
-import { AICoachPage } from '@/components/coach/AICoachPage'
-import { LoginPage } from '@/pages/LoginPage'
+import { InstallPrompt } from '@/components/ui/InstallPrompt'
+import { EdgeSwipe } from '@/components/ui/EdgeSwipe'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+
+const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const AnalyticsDashboardPage = lazy(() => import('@/pages/AnalyticsDashboardPage').then((m) => ({ default: m.AnalyticsDashboardPage })))
+const TradesPage = lazy(() => import('@/pages/TradesPage').then((m) => ({ default: m.TradesPage })))
+const CreateTradePage = lazy(() => import('@/pages/CreateTradePage').then((m) => ({ default: m.CreateTradePage })))
+const EditTradePage = lazy(() => import('@/pages/EditTradePage').then((m) => ({ default: m.EditTradePage })))
+const JournalPage = lazy(() => import('@/pages/JournalPage').then((m) => ({ default: m.JournalPage })))
+const SetupPlaybookPage = lazy(() => import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })))
+const TradeIdeasPage = lazy(() => import('@/components/ideas/TradeIdeasPage').then((m) => ({ default: m.TradeIdeasPage })))
+const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
+const TradeReviewStream = lazy(() => import('@/components/review/TradeReviewStream').then((m) => ({ default: m.TradeReviewStream })))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const AICoachPage = lazy(() => import('@/components/coach/AICoachPage').then((m) => ({ default: m.AICoachPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
+      staleTime: 60 * 1000,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: 'always',
+      refetchOnReconnect: true,
     },
   },
 })
+
+function ViewFallback() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center text-sm text-text-muted">
+      Loading...
+    </div>
+  )
+}
 
 function App() {
   const { sidebarOpen, activeView, tradeFormMode, selectedTradeId } = useAppStore()
@@ -41,7 +54,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {!isAuthenticated ? (
-        <LoginPage />
+        <Suspense fallback={<ViewFallback />}>
+          <LoginPage />
+        </Suspense>
       ) : (
         <div className="min-h-screen bg-bg flex">
           <Sidebar />
@@ -51,6 +66,7 @@ function App() {
               sidebarOpen && 'lg:ml-56'
             )}
           >
+            <EdgeSwipe>
             <OfflineIndicator />
             <TopBar>
               <div className="inline-flex items-center gap-[.375rem] rounded-md px-2 py-[.1875rem] text-[.5rem] font-semibold font-data uppercase tracking-wider bg-text-muted text-text-muted md:gap-[.4375rem] md:px-2.5 md:py-1 md:text-[.625rem]">
@@ -59,21 +75,25 @@ function App() {
               </div>
             </TopBar>
             <main className="flex-1 overflow-auto scrollbar-thin">
-              {activeView === 'dashboard' && <ErrorBoundary name="Dashboard"><DashboardPage /></ErrorBoundary>}
-              {activeView === 'analytics' && <ErrorBoundary name="Analytics"><AnalyticsDashboardPage /></ErrorBoundary>}
-              {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
-              {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
-              {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
-              {activeView === 'journal' && <ErrorBoundary name="Journal"><JournalPage /></ErrorBoundary>}
-              {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
-              {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
-              {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}
-              {activeView === 'review' && <ErrorBoundary name="Review"><TradeReviewStream /></ErrorBoundary>}
-              {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
-              {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
+              <Suspense fallback={<ViewFallback />}>
+                {activeView === 'dashboard' && <ErrorBoundary name="Dashboard"><DashboardPage /></ErrorBoundary>}
+                {activeView === 'analytics' && <ErrorBoundary name="Analytics"><AnalyticsDashboardPage /></ErrorBoundary>}
+                {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
+                {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
+                {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
+                {activeView === 'journal' && <ErrorBoundary name="Journal"><JournalPage /></ErrorBoundary>}
+                {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
+                {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
+                {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}
+                {activeView === 'review' && <ErrorBoundary name="Review"><TradeReviewStream /></ErrorBoundary>}
+                {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
+                {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
+              </Suspense>
             </main>
+            </EdgeSwipe>
           </div>
           <ToastContainer />
+          <InstallPrompt />
         </div>
       )}
     </QueryClientProvider>

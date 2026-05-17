@@ -5,21 +5,13 @@
 Issues are tracked in GitHub Issues for this repo:
 https://github.com/ryu192-r/TradeJournal-v3/issues
 
-### CLI
+## CLI
 
-Use the `gh` CLI for all issue operations:
+Use the `gh` CLI for all issue operations.
 
-```bash
-gh issue create --title "..." --body "..." --label "needs-triage"
-gh issue list --state open
-gh issue view <number>
-gh issue edit <number> --add-label "ready-for-agent"
-gh issue close <number>
-```
-
-### Workflow
+## Workflow
 
 1. New issues start with `needs-triage` label.
 2. After evaluation, move to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`.
-3. `ready-for-agent` issues are self-contained — any agent can pick them up with no human context.
+3. `ready-for-agent` issues are self-contained and AFK-ready.
 4. `ready-for-human` issues need human judgment or implementation.

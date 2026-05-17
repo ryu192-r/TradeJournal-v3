@@ -62,7 +62,7 @@ export function TradeIdeasPage() {
     try {
       await updateMutation.mutateAsync({ id: confirmArchive, payload: { status: 'archived' } })
       addToast({ title: 'Archived', message: 'Idea archived.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to archive idea.', variant: 'error' })
     } finally {
       setConfirmArchive(null)
@@ -74,7 +74,7 @@ export function TradeIdeasPage() {
     try {
       await deleteMutation.mutateAsync(confirmDelete)
       addToast({ title: 'Deleted', message: 'Idea permanently removed.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to delete idea.', variant: 'error' })
     } finally {
       setConfirmDelete(null)
@@ -85,7 +85,7 @@ export function TradeIdeasPage() {
     try {
       await updateMutation.mutateAsync({ id, payload: { status: 'active' } })
       addToast({ title: 'Activated', message: 'Idea is now active.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to activate idea.', variant: 'error' })
     }
   }
@@ -94,7 +94,7 @@ export function TradeIdeasPage() {
     try {
       await updateMutation.mutateAsync({ id, payload: { status: 'draft' } })
       addToast({ title: 'Restored', message: 'Idea restored to draft.', variant: 'info' })
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to restore idea.', variant: 'error' })
     }
   }
@@ -109,7 +109,7 @@ export function TradeIdeasPage() {
       await convertMutation.mutateAsync({ id: convertId, payload })
       addToast({ title: 'Converted', message: 'Idea converted to trade successfully.', variant: 'info' })
       setConvertId(null)
-    } catch (err: unknown) {
+    } catch {
       addToast({ title: 'Error', message: 'Failed to convert idea to trade.', variant: 'error' })
     }
   }
