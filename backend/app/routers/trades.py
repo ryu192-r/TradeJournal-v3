@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 from datetime import datetime
 from typing import List, Optional
 from decimal import Decimal
@@ -20,10 +19,12 @@ from app.models.capital_event import CapitalEvent
 from app.models.setup_playbook import SetupPlaybook
 from app.core.config import settings
 
+
 def _auto_reconcile(db: Session):
     account = db.query(Account).first()
     if account:
         _reconcile_account(account.id, db)
+
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -51,9 +52,23 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
     if trade.exit_price is None:
         return "system"
 
+    exit_price = Decimal(str(trade.exit_price))
+    if trade.stop_price:
+        stop = Decimal(str(trade.stop_price))
+        if abs(exit_price - stop) <= max(Decimal("0.01") * stop, Decimal("1")):
+            return "stop_loss"
+    if trade.target_price:
+        target = Decimal(str(trade.target_price))
+        if abs(exit_price - target) <= max(Decimal("0.01") * target, Decimal("1")):
+            return "target"
+    return "manual"
+
 
 def _update_setup_stats(db: Session, setup_name: str | None):
-    """Recompute trade_count, win_rate, avg_r for a setup playbook."""
+    """Recompute trade_count, win_rate, avg_r for a setup playbook.
+
+    This helper intentionally does not commit; callers own transaction boundaries.
+    """
     if not setup_name:
         return
     playbook = db.query(SetupPlaybook).filter(SetupPlaybook.name == setup_name).first()
@@ -69,17 +84,6 @@ def _update_setup_stats(db: Session, setup_name: str | None):
     playbook.win_rate = f"{round(len(wins) / len(closed) * 100, 1)}%" if closed else None
     r_values = [t.r_multiple for t in closed if t.r_multiple is not None]
     playbook.avg_r = f"{round(sum(float(r) for r in r_values) / len(r_values), 2)}" if r_values else None
-    db.commit()
-    exit_price = Decimal(str(trade.exit_price))
-    if trade.stop_price:
-        stop = Decimal(str(trade.stop_price))
-        if abs(exit_price - stop) <= max(Decimal("0.01") * stop, Decimal("1")):
-            return "stop_loss"
-    if trade.target_price:
-        target = Decimal(str(trade.target_price))
-        if abs(exit_price - target) <= max(Decimal("0.01") * target, Decimal("1")):
-            return "target"
-    return "manual"
 
 
 # ─────────────────────── endpoints ───────────────────────
@@ -93,9 +97,10 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     _auto_set_status(db_trade)
     db.commit()
     db.refresh(db_trade)
-    action_log = "merged" if action == "merged" else "created"
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
+    db.commit()
+    db.refresh(db_trade)
     return db_trade
 
 
@@ -143,7 +148,6 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
 
     update_data = trade_update.model_dump(exclude_unset=True)
-
     old_setup = db_trade.setup
 
     for field, value in update_data.items():
@@ -154,16 +158,15 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
 
     if "exit_price" in update_data:
         _auto_set_status(db_trade)
-        # Auto-detect exit_reason if exit price was set but reason wasn't explicitly provided
         if "exit_reason" not in update_data:
             db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
 
-    db.commit()
-    db.refresh(db_trade)
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
     if "setup" in update_data and old_setup != db_trade.setup:
         _update_setup_stats(db, old_setup)
+    db.commit()
+    db.refresh(db_trade)
     return db_trade
 
 
@@ -187,6 +190,8 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     _auto_reconcile(db)
     _update_setup_stats(db, trade.setup)
+    db.commit()
+    db.refresh(trade)
     return trade
 
 
@@ -274,7 +279,6 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     images.remove(url)
     trade.chart_images = images
 
-    # Try to delete the file from disk
     rel_path = url.lstrip("/uploads/")
     filepath = os.path.join(settings.UPLOAD_DIR, rel_path)
     if os.path.exists(filepath):
@@ -292,7 +296,6 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
     trade.status = "deleted"
 
-    # Create trade_deletion event if trade was closed (had realized PnL)
     if trade.pnl is not None:
         deletion_event = CapitalEvent(
             event_type="trade_deletion",
@@ -303,7 +306,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         )
         db.add(deletion_event)
 
-    db.commit()
     _auto_reconcile(db)
     _update_setup_stats(db, trade.setup)
+    db.commit()
     return None
