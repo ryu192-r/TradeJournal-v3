@@ -1,11 +1,14 @@
 // Dashboard — key metrics at a glance
 import { useDashboardQuery } from '@/hooks/useDashboardQuery'
 import { useRiskDashboardQuery } from '@/hooks/useRiskDashboardQuery'
+import { useLiveQuotesQuery } from '@/hooks/useMarketContextQuery'
+import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
 import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
 import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
 import { MarketContext } from '@/components/market/MarketContext'
+import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
 import {
   formatCurrency, formatPercent, parseDecimal, formatDate,
 } from '@/utils/format'
@@ -20,7 +23,7 @@ import type {
 } from '@/types'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 function pnlNum(v: string | null): number { return parseDecimal(v, 0) }
 
@@ -213,12 +216,23 @@ function RiskCommandCenterNoAccount() {
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardQuery()
   const { data: riskData, isLoading: isRiskLoading, error: riskError } = useRiskDashboardQuery()
+  const { data: liveQuotes } = useLiveQuotesQuery(60_000)
+  const { data: tradesData } = useTradesQuery({ limit: 500 })
   const queryClient = useQueryClient()
+
+  const quoteMap = useMemo(() => {
+    const map = new Map<string, import('@/types').LiveQuote>()
+    if (liveQuotes?.quotes) {
+      for (const q of liveQuotes.quotes) map.set(q.symbol, q)
+    }
+    return map
+  }, [liveQuotes])
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['analytics'] })
     await queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
     await queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
+    await queryClient.invalidateQueries({ queryKey: ['market', 'live-quotes'] })
   }, [queryClient])
 
   if (isLoading) {
@@ -265,6 +279,7 @@ export function DashboardPage() {
         <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
       </div>
       <KpiCards kpi={data.kpi} />
+      <LiveDashboard trades={tradesData?.items ?? []} quoteMap={quoteMap} />
       {isRiskLoading ? (
         <RiskCommandCenterSkeleton />
       ) : riskData ? (

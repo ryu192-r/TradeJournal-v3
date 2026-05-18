@@ -922,6 +922,8 @@ export interface MarketRegimeCurrent {
   decline_count: number | null
   sector_strength: Record<string, { change_pct: number | null; last_price: number | null }> | null
   is_earnings_season: string | null
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
 }
 
 export interface MarketRegimeSummary {

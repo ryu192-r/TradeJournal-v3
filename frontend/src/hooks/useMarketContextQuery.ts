@@ -53,11 +53,12 @@ export function useMySymbolsQuery() {
   })
 }
 
-export function useLiveQuotesQuery() {
+export function useLiveQuotesQuery(refreshInterval?: number) {
   return useQuery({
     queryKey: ['market', 'live-quotes'],
     queryFn: () => getLiveQuotes(),
     staleTime: 30 * 1000,
+    refetchInterval: refreshInterval ?? false,
   })
 }
 

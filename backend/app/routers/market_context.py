@@ -539,6 +539,8 @@ def regime_summary(
             "decline_count": latest.decline_count,
             "sector_strength": latest.sector_strength,
             "is_earnings_season": latest.is_earnings_season,
+            "fii_flow_cr": str(latest.fii_flow_cr) if latest.fii_flow_cr else None,
+            "dii_flow_cr": str(latest.dii_flow_cr) if latest.dii_flow_cr else None,
         },
         "regime_distribution": dict(regime_counts),
         "trend_distribution": dict(trend_counts),
