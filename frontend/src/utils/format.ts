@@ -66,6 +66,14 @@ export function formatPercent(value: number): string {
 }
 
 /**
+ * Format a neutral percentage value without forcing a gain/loss sign.
+ */
+export function formatMetricPercent(value: number | null | undefined, digits = 2): string {
+  if (value == null || Number.isNaN(value)) return '-'
+  return `${value.toFixed(digits)}%`
+}
+
+/**
  * Format R-multiple (trading metric)
  */
 export function formatRMultiple(value: number): string {

@@ -1,10 +1,6 @@
 import { Layers, PieChart } from 'lucide-react'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, formatMetricPercent } from '@/utils/format'
 import type { RiskBucket } from '@/types/riskDashboard'
-
-function formatExposure(value: number | null): string {
-  return value == null ? '-' : `${value.toFixed(2)}%`
-}
 
 function exposureWidth(value: number | null): string {
   if (value == null) return '0%'
@@ -59,7 +55,7 @@ export function RiskExposureTable({ title, buckets, variant }: RiskExposureTable
                   <td className="py-3 px-3 text-right font-data text-text-heading">{bucket.position_count}</td>
                   <td className="py-3 px-3 text-right font-data text-text-heading">{formatCurrency(bucket.deployed_capital)}</td>
                   <td className="py-3 px-3 text-right font-data text-loss">{formatCurrency(bucket.open_risk)}</td>
-                  <td className="py-3 pl-3 text-right font-data text-text-heading">{formatExposure(bucket.exposure_pct)}</td>
+                  <td className="py-3 pl-3 text-right font-data text-text-heading">{formatMetricPercent(bucket.exposure_pct)}</td>
                 </tr>
               ))}
             </tbody>

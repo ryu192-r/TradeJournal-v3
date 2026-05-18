@@ -1,10 +1,6 @@
 import { Gauge, ShieldAlert } from 'lucide-react'
-import { formatCurrency, parseDecimal } from '@/utils/format'
+import { formatCurrency, formatMetricPercent, parseDecimal } from '@/utils/format'
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
-
-function formatRiskPct(value: number | null): string {
-  return value == null ? '-' : `${value.toFixed(2)}%`
-}
 
 function heatTone(value: number | null) {
   if (value == null) return { label: 'Unknown', color: 'var(--text-muted)', className: 'text-text-muted' }
@@ -35,7 +31,7 @@ export function PortfolioHeatGauge({ data }: { data: RiskDashboardPayload }) {
 
       <div className="mt-4 flex flex-col items-center">
         <div className="relative h-36 w-36 sm:h-40 sm:w-40">
-          <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120" role="img" aria-label={`Portfolio heat ${formatRiskPct(heat)}`}>
+          <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120" role="img" aria-label={`Portfolio heat ${formatMetricPercent(heat)}`}>
             <circle
               cx="60"
               cy="60"
@@ -58,7 +54,7 @@ export function PortfolioHeatGauge({ data }: { data: RiskDashboardPayload }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className={`font-data text-3xl font-semibold ${tone.className}`}>
-              {formatRiskPct(heat)}
+              {formatMetricPercent(heat)}
             </div>
             <div className="mt-1 text-[length:var(--text-xs)] text-text-muted font-data">
               of equity

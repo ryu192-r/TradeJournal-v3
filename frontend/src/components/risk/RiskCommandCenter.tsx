@@ -5,18 +5,15 @@ import {
   BriefcaseBusiness,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Wallet,
 } from 'lucide-react'
-import { formatCurrency, formatPrice, formatQuantity, parseDecimal } from '@/utils/format'
+import { formatCurrency, formatMetricPercent, formatPrice, formatQuantity, parseDecimal } from '@/utils/format'
 import type { RiskDashboardPayload, RiskTrade } from '@/types/riskDashboard'
 import { PortfolioHeatGauge } from '@/components/risk/PortfolioHeatGauge'
 import { RiskExposureTable } from '@/components/risk/RiskExposureTable'
 import { RiskMetricCard } from '@/components/risk/RiskMetricCard'
 import { RiskWarningsPanel } from '@/components/risk/RiskWarningsPanel'
-
-function formatPct(value: number | null): string {
-  return value == null ? '-' : `${value.toFixed(2)}%`
-}
 
 function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | null }) {
   return (
@@ -36,7 +33,7 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
               <div className="mt-1 truncate text-xs text-text-muted">{trade.setup ?? 'Uncategorised'}</div>
             </div>
             <div className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-text-muted font-data">
-              {formatPct(trade.risk_pct)}
+              {formatMetricPercent(trade.risk_pct)}
             </div>
           </div>
 
@@ -115,7 +112,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <RiskMetricCard
             label="Deployed"
             value={formatCurrency(data.deployed_capital)}
-            detail={formatPct(data.deployed_capital_pct)}
+            detail={formatMetricPercent(data.deployed_capital_pct)}
             icon={ArrowDownToLine}
             tone={data.deployed_capital_pct != null && data.deployed_capital_pct > 80 ? 'warning' : deployedCapital > 0 ? 'accent' : 'neutral'}
           />
@@ -129,7 +126,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <RiskMetricCard
             label="Open Risk"
             value={formatCurrency(data.open_risk)}
-            detail={formatPct(data.portfolio_heat_pct)}
+            detail={formatMetricPercent(data.portfolio_heat_pct)}
             icon={ShieldAlert}
             tone={openRisk > 0 ? heatTone : 'neutral'}
           />
@@ -142,6 +139,20 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           />
         </div>
       </div>
+
+      {!hasOpenPositions ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-bg-elevated p-4 animate-card-in sm:flex-row sm:items-center">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-profit/20 bg-profit-muted">
+            <ShieldCheck className="h-4 w-4 text-profit" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-display text-sm text-text-heading">No open trades</div>
+            <div className="mt-1 text-sm text-text-muted">
+              Portfolio heat is idle. New positions will appear here with stop coverage, setup exposure, and concentration warnings.
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2 grid grid-cols-1 gap-4 lg:grid-cols-2">

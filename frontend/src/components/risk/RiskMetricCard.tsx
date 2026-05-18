@@ -54,11 +54,11 @@ export function RiskMetricCard({
   const classes = toneClasses[tone]
 
   return (
-    <div className={cn('bg-card rounded-2xl border border-border p-4 animate-card-in min-w-0')}>
+    <div className="bg-card rounded-2xl border border-border p-4 animate-card-in min-h-[112px] min-w-0">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[length:var(--text-xs)] text-text-muted font-data">{label}</div>
-          <div className={cn('mt-2 break-words text-lg font-semibold leading-tight font-data sm:text-xl 2xl:text-2xl', classes.value)}>
+          <div className={cn('mt-2 break-words text-lg font-semibold leading-tight font-data tabular-nums sm:text-xl 2xl:text-2xl', classes.value)}>
             {value}
           </div>
         </div>
@@ -67,7 +67,7 @@ export function RiskMetricCard({
         </div>
       </div>
       {detail ? (
-        <div className="mt-2 min-h-4 truncate text-[length:var(--text-xs)] text-text-muted font-data">
+        <div className="mt-2 min-h-4 truncate text-[length:var(--text-xs)] text-text-muted font-data tabular-nums">
           {detail}
         </div>
       ) : null}
