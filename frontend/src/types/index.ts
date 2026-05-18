@@ -706,3 +706,157 @@ export interface BehavioralScoreResponse {
   model_used: string
   generated_at: string
 }
+
+// ---------------------------------------------------------------------------
+// Playbook Intelligence types
+// ---------------------------------------------------------------------------
+
+export interface PlaybookOverviewSetup {
+  setup_id: number
+  setup_name: string
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  expectancy: number | null
+  profit_factor: number | null
+  total_pnl: number | null
+  avg_r: number | null
+}
+
+export interface PlaybookOverviewResponse {
+  setups: PlaybookOverviewSetup[]
+  best_by_expectancy: PlaybookOverviewSetup | null
+  best_by_win_rate: PlaybookOverviewSetup | null
+  best_by_pnl: PlaybookOverviewSetup | null
+}
+
+export interface SetupPerformance {
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  total_pnl: number | null
+  avg_pnl: number | null
+  profit_factor: number | null
+  expectancy: number | null
+  avg_r: number | null
+  max_r: number | null
+  min_r: number | null
+  r_std: number | null
+}
+
+export interface HoldTimePerformance {
+  count: number
+  avg_pnl: number | null
+  win_rate: number | null
+}
+
+export interface SetupHoldTime {
+  avg_hours: number | null
+  median_hours: number | null
+  min_hours: number | null
+  max_hours: number | null
+  sample_size: number
+  hold_performance: Record<string, HoldTimePerformance>
+  best_hold_bucket: string | null
+}
+
+export interface TimeOfDayEntry {
+  hour: number
+  label: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface DayOfWeekEntry {
+  day_of_week: number
+  day_name: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface SetupMarketConditions {
+  time_of_day: TimeOfDayEntry[]
+  day_of_week: DayOfWeekEntry[]
+  best_time: TimeOfDayEntry | null
+  best_day: DayOfWeekEntry | null
+  worst_time: TimeOfDayEntry | null
+  worst_day: DayOfWeekEntry | null
+}
+
+export interface ExitReasonOnLoss {
+  reason: string
+  count: number
+}
+
+export interface FailureInsight {
+  type: 'warning' | 'pattern'
+  message: string
+}
+
+export interface SetupFailurePatterns {
+  loss_count: number
+  avg_loss: number | null
+  max_loss: number | null
+  max_consecutive_losses: number
+  current_loss_streak: number
+  exit_reasons_on_losses: ExitReasonOnLoss[]
+  missing_stop_rate: number | null
+  insights: FailureInsight[]
+}
+
+export interface EmotionPnlEntry {
+  emotion: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface GradePnlEntry2 {
+  grade: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface SetupBehaviorCrossover {
+  emotion_breakdown: EmotionPnlEntry[]
+  grade_breakdown: GradePnlEntry2[]
+}
+
+export interface TacticPerformance {
+  tactic: string
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  avg_pnl: number | null
+  total_pnl: number | null
+}
+
+export interface RecentTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  exit_price: string | null
+  pnl: string | null
+  r_multiple: string | null
+  exit_reason: string | null
+  tactic: string | null
+  entry_time: string | null
+}
+
+export interface SetupIntelligenceResponse {
+  setup_name: string
+  description: string | null
+  ideal_conditions: string[]
+  risk_profile: Record<string, unknown>
+  rules: string[]
+  performance: SetupPerformance
+  hold_time: SetupHoldTime
+  market_conditions: SetupMarketConditions
+  failure_patterns: SetupFailurePatterns
+  behavior_crossover: SetupBehaviorCrossover
+  tactic_breakdown: TacticPerformance[]
+  recent_trades: RecentTrade[]
+}

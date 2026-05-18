@@ -13,6 +13,7 @@ import type {
 } from '@/types'
 import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
 import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
+import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
@@ -759,6 +760,7 @@ export function AnalyticsDashboardPage() {
 
       <LifecycleInsights />
       <BehavioralIntelligence />
+      <PlaybookIntelligence />
     </div>
     </PullToRefresh>
   )

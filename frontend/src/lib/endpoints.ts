@@ -454,3 +454,21 @@ export function getBehavioralScore(lookbackDays?: number) {
     params: lookbackDays ? { lookback_days: lookbackDays } : undefined,
   }).then(r => r.data)
 }
+
+// ───────────────────────── Playbook Intelligence ─────────────────────────
+
+export function getPlaybookOverview(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').PlaybookOverviewResponse>('/playbook/intelligence/overview' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getSetupIntelligence(setupName: string, fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').SetupIntelligenceResponse>(`/playbook/intelligence/${encodeURIComponent(setupName)}` + (qs ? `?${qs}` : '')).then(r => r.data)
+}
