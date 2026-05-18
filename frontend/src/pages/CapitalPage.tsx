@@ -503,7 +503,7 @@ function TierEditor() {
   const { data, isLoading } = useQuery({
     queryKey: ['tier-config'],
     queryFn: getTierConfig,
-    staleTime: Infinity,
+    staleTime: 30 * 1000,
   })
   const [tiers, setTiers] = useState<
     { name: string; min_amount: string; max_amount: string | null; sort_order: number }[]
@@ -624,7 +624,7 @@ export function CapitalPage() {
   const { data, isLoading, error } = useQuery<CapitalDashboardPayload>({
     queryKey: ['capital-dashboard'],
     queryFn: getCapitalDashboard,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 1000,
   })
 
   const [showEditAccount, setShowEditAccount] = useState(false)

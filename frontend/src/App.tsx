@@ -27,10 +27,14 @@ const AICoachPage = lazy(() => import('@/components/coach/AICoachPage').then((m)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000,
-      refetchOnMount: 'always',
-      refetchOnWindowFocus: 'always',
+      staleTime: 5 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+    },
+    mutations: {
+      networkMode: 'online',
     },
   },
 })

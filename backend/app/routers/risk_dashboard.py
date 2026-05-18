@@ -98,7 +98,7 @@ def _trade_open_risk(trade: Trade) -> Decimal:
     entry = ensure_decimal(trade.entry_price)
     stop = ensure_decimal(trade.stop_price)
     qty = ensure_decimal(trade.quantity)
-    return max(entry - stop, Decimal("0")) * qty
+    return (entry - stop) * qty
 
 
 def _risk_trade_out(trade: Trade, net_equity: Decimal) -> RiskTradeOut:

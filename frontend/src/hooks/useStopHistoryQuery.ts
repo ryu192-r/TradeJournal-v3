@@ -8,7 +8,7 @@ export function useStopHistoryQuery(tradeId: number | null) {
     queryKey: ['stop-history', tradeId],
     queryFn: () => listStopHistory(tradeId!),
     enabled: tradeId != null,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 1000,
   })
 }
 
@@ -16,9 +16,9 @@ export function useCreateStopHistoryMutation() {
   const queryClient = useQueryClient()
   return useMutation<StopHistoryEntry, Error, { tradeId: number; payload: StopHistoryCreatePayload }>({
     mutationFn: ({ tradeId, payload }) => createStopHistory(tradeId, payload),
-    onSuccess: (_, { tradeId }) => {
+    onSuccess: async (_, { tradeId }) => {
       queryClient.invalidateQueries({ queryKey: ['stop-history', tradeId] })
-      invalidateTradeDomain(queryClient)
+      await invalidateTradeDomain(queryClient)
     },
   })
 }

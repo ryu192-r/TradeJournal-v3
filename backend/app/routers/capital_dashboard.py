@@ -154,12 +154,12 @@ def _compute_tiers(net_equity: Decimal, db: Session) -> tuple[list[dict], Option
 def get_capital_dashboard(db: Session = Depends(get_db)):
     accounts = db.query(Account).order_by(Account.id).limit(1).all()
     if not accounts:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No accounts found. Create an account first."
-        )
-
-    account = accounts[0]
+        account = Account(name="Default", initial_balance=0, current_balance=0)
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+    else:
+        account = accounts[0]
     initial_balance = ensure_decimal(account.initial_balance)
 
     # Capital events

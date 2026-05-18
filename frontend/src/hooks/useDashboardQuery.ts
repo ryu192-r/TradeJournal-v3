@@ -6,6 +6,6 @@ export function useDashboardQuery(fromDate?: string, toDate?: string) {
   return useQuery<FullDashboardPayload>({
     queryKey: ['analytics', 'dashboard', { fromDate, toDate }],
     queryFn: () => getDashboard(fromDate, toDate),
-    staleTime: 60 * 1000,
+    staleTime: 10 * 1000,
   })
 }

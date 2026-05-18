@@ -54,7 +54,7 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Risk</div>
-              <div className="mt-1 truncate font-data text-sm text-loss">{formatCurrency(trade.open_risk)}</div>
+              <div className={`mt-1 truncate font-data text-sm ${Number(trade.open_risk) < 0 ? 'text-profit' : 'text-loss'}`}>{Number(trade.open_risk) < 0 ? '-' : ''}{formatCurrency(Math.abs(Number(trade.open_risk)))}</div>
             </div>
           </div>
         </div>
@@ -128,7 +128,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
             value={formatCurrency(data.open_risk)}
             detail={formatMetricPercent(data.portfolio_heat_pct)}
             icon={ShieldAlert}
-            tone={openRisk > 0 ? heatTone : 'neutral'}
+            tone={openRisk < 0 ? 'profit' : openRisk > 0 ? heatTone : 'neutral'}
           />
           <RiskMetricCard
             label="Warnings"

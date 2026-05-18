@@ -66,7 +66,7 @@ export function PortfolioHeatGauge({ data }: { data: RiskDashboardPayload }) {
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
         <div>
           <div className="text-[length:var(--text-xs)] text-text-muted">Open Risk</div>
-          <div className={`mt-1 truncate font-data text-sm font-medium ${openRisk > 0 ? 'text-loss' : 'text-text-heading'}`}>
+          <div className={`mt-1 truncate font-data text-sm font-medium ${openRisk < 0 ? 'text-profit' : openRisk > 0 ? 'text-loss' : 'text-text-heading'}`}>
             {formatCurrency(data.open_risk)}
           </div>
         </div>

@@ -8,7 +8,7 @@ export function useCapitalEventsQuery(accountId: number | null, eventType?: stri
     queryKey: ['capital-events', accountId, eventType, startDate, endDate],
     queryFn: () => listCapitalEvents(accountId!, eventType, startDate, endDate),
     enabled: accountId != null,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 1000,
   })
 }
 
@@ -22,7 +22,7 @@ export function useCreateCapitalEventMutation() {
     account_id: number
   }>({
     mutationFn: (payload) => createCapitalEvent(payload),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: async () => { await invalidateCapitalDomain(queryClient) },
   })
 }
 
@@ -33,7 +33,7 @@ export function useUpdateCapitalEventMutation() {
     payload: { event_type?: CapitalEventType; amount?: string; timestamp?: string; description?: string }
   }>({
     mutationFn: ({ eventId, payload }) => updateCapitalEvent(eventId, payload),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: async () => { await invalidateCapitalDomain(queryClient) },
   })
 }
 
@@ -41,6 +41,6 @@ export function useDeleteCapitalEventMutation() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: (eventId) => deleteCapitalEvent(eventId),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: async () => { await invalidateCapitalDomain(queryClient) },
   })
 }

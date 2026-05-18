@@ -5,8 +5,8 @@ export function setTradeCache(queryClient: QueryClient, trade: ApiTrade) {
   queryClient.setQueryData(['trade', trade.id], trade)
 }
 
-export function invalidateTradeDomain(queryClient: QueryClient) {
-  return Promise.all([
+export async function invalidateTradeDomain(queryClient: QueryClient) {
+  await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
     queryClient.invalidateQueries({ queryKey: ['trade'] }),
     queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] }),
@@ -15,11 +15,15 @@ export function invalidateTradeDomain(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ['analytics'] }),
     queryClient.invalidateQueries({ queryKey: ['journal', 'weekly-stats'] }),
     queryClient.invalidateQueries({ queryKey: ['setups'] }),
+    queryClient.invalidateQueries({ queryKey: ['timeline'] }),
+    queryClient.invalidateQueries({ queryKey: ['partial-exits'] }),
+    queryClient.invalidateQueries({ queryKey: ['emotion-logs'] }),
+    queryClient.invalidateQueries({ queryKey: ['execution-grade'] }),
   ])
 }
 
-export function invalidateCapitalDomain(queryClient: QueryClient) {
-  return Promise.all([
+export async function invalidateCapitalDomain(queryClient: QueryClient) {
+  await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['capital-events'] }),
     queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] }),
     queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] }),

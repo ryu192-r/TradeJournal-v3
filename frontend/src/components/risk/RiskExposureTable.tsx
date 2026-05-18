@@ -54,7 +54,7 @@ export function RiskExposureTable({ title, buckets, variant }: RiskExposureTable
                   </td>
                   <td className="py-3 px-3 text-right font-data text-text-heading">{bucket.position_count}</td>
                   <td className="py-3 px-3 text-right font-data text-text-heading">{formatCurrency(bucket.deployed_capital)}</td>
-                  <td className="py-3 px-3 text-right font-data text-loss">{formatCurrency(bucket.open_risk)}</td>
+                  <td className={`py-3 px-3 text-right font-data ${Number(bucket.open_risk) < 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(bucket.open_risk)}</td>
                   <td className="py-3 pl-3 text-right font-data text-text-heading">{formatMetricPercent(bucket.exposure_pct)}</td>
                 </tr>
               ))}

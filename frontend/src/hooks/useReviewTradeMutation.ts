@@ -7,9 +7,9 @@ export function useReviewTradeMutation() {
   const queryClient = useQueryClient()
   return useMutation<ApiTrade, Error, { id: number; payload: ApiTradeUpdatePayload }>({
     mutationFn: ({ id, payload }) => updateTrade(id, payload as Record<string, unknown>),
-    onSuccess: (trade) => {
+    onSuccess: async (trade) => {
       setTradeCache(queryClient, trade)
-      invalidateTradeDomain(queryClient)
+      await invalidateTradeDomain(queryClient)
     },
   })
 }

@@ -6,7 +6,7 @@ export function useSetupsQuery(is_active?: string) {
   return useQuery<SetupPlaybookListResponse>({
     queryKey: ['setups', { is_active }],
     queryFn: () => listSetups(is_active),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -15,7 +15,7 @@ export function useSetupQuery(id: number | null) {
     queryKey: ['setup', id],
     queryFn: () => getSetup(id!),
     enabled: id != null && id > 0,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   })
 }
 
