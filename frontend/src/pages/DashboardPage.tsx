@@ -5,6 +5,7 @@ import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
 import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
 import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
+import { MarketContext } from '@/components/market/MarketContext'
 import {
   formatCurrency, formatPercent, parseDecimal, formatDate,
 } from '@/utils/format'
@@ -283,6 +284,7 @@ export function DashboardPage() {
       <LifecycleInsights />
       <BehavioralIntelligence />
       <PlaybookIntelligence />
+      <MarketContext />
     </div>
     </PullToRefresh>
   )

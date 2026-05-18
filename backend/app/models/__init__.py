@@ -14,6 +14,8 @@ from .trade_timeline import TradeTimeline
 from .partial_exit import PartialExit
 from .emotion_log import EmotionLog
 from .execution_grade import ExecutionGrade
+from .market_snapshot import MarketSnapshot
+from .live_quote import LiveQuote
 
 __all__ = [
     'Base',
@@ -32,4 +34,6 @@ __all__ = [
     'PartialExit',
     'EmotionLog',
     'ExecutionGrade',
+    'MarketSnapshot',
+    'LiveQuote',
 ]

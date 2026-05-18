@@ -860,3 +860,98 @@ export interface SetupIntelligenceResponse {
   tactic_breakdown: TacticPerformance[]
   recent_trades: RecentTrade[]
 }
+
+// ---------------------------------------------------------------------------
+// Market Context types
+// ---------------------------------------------------------------------------
+
+export interface MarketSnapshotEntry {
+  date: string
+  nifty_close: string | null
+  nifty_change_pct: string | null
+  nifty_trend: string | null
+  nifty_regime: string | null
+  india_vix: string | null
+  atr_pct: string | null
+  advance_count: number | null
+  decline_count: number | null
+  advance_decline_ratio: string | null
+  sector_strength: Record<string, { change_pct: number | null; last_price: number | null }>
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
+  is_earnings_season: string | null
+  macro_events: string[] | null
+}
+
+export interface MarketSnapshotsResponse {
+  snapshots: MarketSnapshotEntry[]
+  total: number
+}
+
+export interface MarketCorrelationBucket {
+  trade_count: number
+  win_rate: number | null
+  avg_pnl: number | null
+  total_pnl: number | null
+  expectancy: number | null
+}
+
+export interface MarketCorrelationInsight {
+  type: 'insight' | 'warning'
+  message: string
+}
+
+export interface MarketPerformanceCorrelation {
+  by_trend: Record<string, MarketCorrelationBucket>
+  by_regime: Record<string, MarketCorrelationBucket>
+  by_vix_bucket: Record<string, MarketCorrelationBucket>
+  by_breadth: Record<string, MarketCorrelationBucket>
+  by_earnings_season: Record<string, MarketCorrelationBucket>
+  insights: MarketCorrelationInsight[]
+  total_matched_trades: number
+}
+
+export interface MarketRegimeCurrent {
+  date: string
+  nifty_close: string | null
+  nifty_change_pct: string | null
+  nifty_trend: string | null
+  nifty_regime: string | null
+  india_vix: string | null
+  advance_count: number | null
+  decline_count: number | null
+  sector_strength: Record<string, { change_pct: number | null; last_price: number | null }> | null
+  is_earnings_season: string | null
+}
+
+export interface MarketRegimeSummary {
+  current: MarketRegimeCurrent | null
+  regime_distribution: Record<string, number>
+  trend_distribution: Record<string, number>
+  avg_vix: number | null
+  total_days: number
+}
+
+export interface LiveQuote {
+  symbol: string
+  company_name: string | null
+  ltp: string | null
+  change: string | null
+  change_pct: string | null
+  volume: string | null
+  high_52w: string | null
+  low_52w: string | null
+  pe: string | null
+  market_cap_cr: string | null
+  sector: string | null
+  updated_at: string | null
+}
+
+export interface LiveQuotesResponse {
+  quotes: LiveQuote[]
+  total: number
+}
+
+export interface MySymbolsResponse {
+  symbols: string[]
+}

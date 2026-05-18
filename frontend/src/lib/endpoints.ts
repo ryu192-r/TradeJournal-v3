@@ -472,3 +472,53 @@ export function getSetupIntelligence(setupName: string, fromDate?: string, toDat
   const qs = params.toString()
   return apiClient.get<import('@/types').SetupIntelligenceResponse>(`/playbook/intelligence/${encodeURIComponent(setupName)}` + (qs ? `?${qs}` : '')).then(r => r.data)
 }
+
+// ───────────────────────── Market Context ─────────────────────────
+
+export function getMarketSnapshots(days?: number) {
+  return apiClient.get<import('@/types').MarketSnapshotsResponse>('/market/snapshots', {
+    params: days ? { days } : undefined,
+  }).then(r => r.data)
+}
+
+export function getMarketSnapshot(date: string) {
+  return apiClient.get<import('@/types').MarketSnapshotEntry>(`/market/snapshot/${date}`).then(r => r.data)
+}
+
+export function saveMarketSnapshot(payload: Record<string, unknown>) {
+  return apiClient.post<{ id: number; date: string; message: string }>('/market/snapshot', payload).then(r => r.data)
+}
+
+export function fetchMarketData(payload: Record<string, unknown>) {
+  return apiClient.post<{ id: number; date: string; message: string }>('/market/fetch', payload).then(r => r.data)
+}
+
+export function seedMarketSnapshots(snapshots: Record<string, unknown>[]) {
+  return apiClient.post<{ added: number; skipped: number; errors: string[]; total: number }>('/market/seed', { snapshots }).then(r => r.data)
+}
+
+export function getMarketPerformanceCorrelation(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').MarketPerformanceCorrelation>('/market/performance-correlation' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getMarketRegimeSummary(days?: number) {
+  return apiClient.get<import('@/types').MarketRegimeSummary>('/market/regime-summary', {
+    params: days ? { days } : undefined,
+  }).then(r => r.data)
+}
+
+export function getMySymbols() {
+  return apiClient.get<import('@/types').MySymbolsResponse>('/market/my-symbols').then(r => r.data)
+}
+
+export function upsertLiveQuotes(quotes: Record<string, unknown>[]) {
+  return apiClient.post<{ upserted: number; errors: string[]; total: number }>('/market/live-quotes', { quotes }).then(r => r.data)
+}
+
+export function getLiveQuotes() {
+  return apiClient.get<import('@/types').LiveQuotesResponse>('/market/live-quotes').then(r => r.data)
+}
