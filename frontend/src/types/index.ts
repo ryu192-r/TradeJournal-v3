@@ -376,3 +376,133 @@ export interface FullDashboardPayload {
   time_of_day: TimeOfDayEntry[]
   holding_period: HoldingPeriodEntry[]
 }
+
+// ---------------------------------------------------------------------------
+// Trade Timeline types
+// ---------------------------------------------------------------------------
+
+export type TimelineEventType = 'trade_opened' | 'stop_updated' | 'target_updated' | 'pyramided' | 'partial_exit' | 'note_added' | 'conviction_changed' | 'emotion_logged' | 'trade_closed' | 'review_added'
+
+export interface TimelineEvent {
+  id: number
+  trade_id: number
+  event_type: TimelineEventType
+  timestamp: string
+  old_value: string | null
+  new_value: string | null
+  note: string | null
+  emotion: string | null
+  confidence: number | null
+}
+
+export interface TimelineEventCreatePayload {
+  event_type: TimelineEventType
+  old_value?: string | null
+  new_value?: string | null
+  note?: string | null
+  emotion?: string | null
+  confidence?: number | null
+  timestamp?: string | null
+}
+
+export interface TimelineListResponse {
+  items: TimelineEvent[]
+}
+
+// ---------------------------------------------------------------------------
+// Partial Exit types
+// ---------------------------------------------------------------------------
+
+export interface PartialExit {
+  id: number
+  trade_id: number
+  qty: string
+  exit_price: string
+  exit_time: string
+  realized_pnl: string | null
+  r_captured: string | null
+  exit_reason: string | null
+  note: string | null
+}
+
+export interface PartialExitCreatePayload {
+  qty: string
+  exit_price: string
+  exit_time: string
+  realized_pnl?: string | null
+  r_captured?: string | null
+  exit_reason?: string | null
+  note?: string | null
+}
+
+export interface PartialExitListResponse {
+  items: PartialExit[]
+}
+
+// ---------------------------------------------------------------------------
+// Emotion Log types
+// ---------------------------------------------------------------------------
+
+export type EmotionType = 'calm' | 'fearful' | 'euphoric' | 'revenge' | 'fomo' | 'hesitant' | 'disciplined'
+
+export interface EmotionLog {
+  id: number
+  trade_id: number
+  emotion: EmotionType
+  confidence: number | null
+  stress: number | null
+  conviction: number | null
+  patience: number | null
+  focus: number | null
+  note: string | null
+  timestamp: string
+}
+
+export interface EmotionLogCreatePayload {
+  emotion: EmotionType
+  confidence?: number | null
+  stress?: number | null
+  conviction?: number | null
+  patience?: number | null
+  focus?: number | null
+  note?: string | null
+  timestamp?: string | null
+}
+
+export interface EmotionLogListResponse {
+  items: EmotionLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Execution Grade types
+// ---------------------------------------------------------------------------
+
+export type GradeLetter = 'A' | 'B' | 'C' | 'D' | 'F'
+
+export interface ExecutionGrade {
+  id: number
+  trade_id: number
+  entry_quality: GradeLetter | null
+  sizing_quality: GradeLetter | null
+  stop_quality: GradeLetter | null
+  patience: GradeLetter | null
+  rule_adherence: GradeLetter | null
+  exit_quality: GradeLetter | null
+  overall_grade: GradeLetter | null
+  notes: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ExecutionGradeCreatePayload {
+  entry_quality?: GradeLetter | null
+  sizing_quality?: GradeLetter | null
+  stop_quality?: GradeLetter | null
+  patience?: GradeLetter | null
+  rule_adherence?: GradeLetter | null
+  exit_quality?: GradeLetter | null
+  overall_grade?: GradeLetter | null
+  notes?: string | null
+}
+
+export interface ExecutionGradeUpdatePayload extends ExecutionGradeCreatePayload {}

@@ -327,3 +327,55 @@ export function getCoachReview(id: number) {
 export function deleteCoachReview(id: number) {
   return apiClient.delete(`/coach/reviews/${id}`).then(() => {})
 }
+
+// ───────────────────────── Trade Timeline ─────────────────────────
+
+export function listTimeline(tradeId: number) {
+  return apiClient.get<import('@/types').TimelineListResponse>(`/trades/${tradeId}/timeline`).then(r => r.data)
+}
+
+export function createTimelineEvent(tradeId: number, payload: import('@/types').TimelineEventCreatePayload) {
+  return apiClient.post<import('@/types').TimelineEvent>(`/trades/${tradeId}/timeline`, payload).then(r => r.data)
+}
+
+// ───────────────────────── Partial Exits ─────────────────────────
+
+export function listPartialExits(tradeId: number) {
+  return apiClient.get<import('@/types').PartialExitListResponse>(`/trades/${tradeId}/partial-exits`).then(r => r.data)
+}
+
+export function createPartialExit(tradeId: number, payload: import('@/types').PartialExitCreatePayload) {
+  return apiClient.post<import('@/types').PartialExit>(`/trades/${tradeId}/partial-exits`, payload).then(r => r.data)
+}
+
+export function deletePartialExit(tradeId: number, exitId: number) {
+  return apiClient.delete(`/trades/${tradeId}/partial-exits/${exitId}`).then(() => {})
+}
+
+// ───────────────────────── Emotion Logs ─────────────────────────
+
+export function listEmotionLogs(tradeId: number) {
+  return apiClient.get<import('@/types').EmotionLogListResponse>(`/trades/${tradeId}/emotions`).then(r => r.data)
+}
+
+export function createEmotionLog(tradeId: number, payload: import('@/types').EmotionLogCreatePayload) {
+  return apiClient.post<import('@/types').EmotionLog>(`/trades/${tradeId}/emotions`, payload).then(r => r.data)
+}
+
+// ───────────────────────── Execution Grades ─────────────────────────
+
+export function getExecutionGrade(tradeId: number) {
+  return apiClient.get<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`).then(r => r.data)
+}
+
+export function createExecutionGrade(tradeId: number, payload: import('@/types').ExecutionGradeCreatePayload) {
+  return apiClient.post<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`, payload).then(r => r.data)
+}
+
+export function updateExecutionGrade(tradeId: number, payload: import('@/types').ExecutionGradeUpdatePayload) {
+  return apiClient.put<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`, payload).then(r => r.data)
+}
+
+export function deleteExecutionGrade(tradeId: number) {
+  return apiClient.delete(`/trades/${tradeId}/execution-grade`).then(() => {})
+}

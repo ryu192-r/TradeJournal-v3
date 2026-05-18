@@ -1,11 +1,15 @@
 from fastapi import APIRouter
-from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard
+from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(broker_import.router, prefix="/trades", tags=["broker-import"])
 api_router.include_router(trades.router, tags=["trades"])
+api_router.include_router(trade_timeline.router, tags=["trade-timeline"])
+api_router.include_router(partial_exit.router, tags=["partial-exits"])
+api_router.include_router(emotion_log.router, tags=["emotion-logs"])
+api_router.include_router(execution_grade.router, tags=["execution-grades"])
 api_router.include_router(dhan.router, tags=["dhan-sync"])
 api_router.include_router(dhan_webhook.router, tags=["dhan-webhook"])
 api_router.include_router(capital_events.router, tags=["capital-events"])

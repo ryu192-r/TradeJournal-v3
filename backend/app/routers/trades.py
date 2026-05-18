@@ -11,6 +11,7 @@ from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeList
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
+from app.models.trade_timeline import TradeTimeline
 from app.models.account import Account
 from app.services.trade_service import TradeService
 from app.db.database import get_db
@@ -97,6 +98,13 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     _auto_set_status(db_trade)
     db.commit()
     db.refresh(db_trade)
+    timeline = TradeTimeline(
+        trade_id=db_trade.id,
+        event_type="trade_opened",
+        new_value=f"{db_trade.symbol} @ {db_trade.entry_price}",
+        note=f"qty={db_trade.quantity}",
+    )
+    db.add(timeline)
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
     db.commit()
@@ -160,6 +168,32 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         _auto_set_status(db_trade)
         if "exit_reason" not in update_data:
             db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
+        if db_trade.exit_price is not None:
+            timeline = TradeTimeline(
+                trade_id=db_trade.id,
+                event_type="trade_closed",
+                new_value=f"PnL={db_trade.pnl}",
+                note=f"exit_reason={db_trade.exit_reason}",
+            )
+            db.add(timeline)
+    if "stop_price" in update_data:
+        old_stop = str(db_trade.stop_price) if db_trade.stop_price else None
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="stop_updated",
+            old_value=old_stop,
+            new_value=str(update_data["stop_price"]),
+        )
+        db.add(timeline)
+    if "target_price" in update_data:
+        old_target = str(db_trade.target_price) if db_trade.target_price else None
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="target_updated",
+            old_value=old_target,
+            new_value=str(update_data["target_price"]),
+        )
+        db.add(timeline)
 
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
@@ -188,6 +222,12 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
                                    payload.entry_time, payload.fees, payload.stop_price)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    timeline = TradeTimeline(
+        trade_id=trade_id,
+        event_type="pyramided",
+        new_value=f"+{payload.quantity} @ {payload.entry_price}",
+    )
+    db.add(timeline)
     _auto_reconcile(db)
     _update_setup_stats(db, trade.setup)
     db.commit()
@@ -226,7 +266,16 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
         timestamp=payload.timestamp,
     )
     db.add(entry)
+    old_stop = str(trade.stop_price) if trade.stop_price else None
     trade.stop_price = payload.price
+    timeline = TradeTimeline(
+        trade_id=trade_id,
+        event_type="stop_updated",
+        old_value=old_stop,
+        new_value=str(payload.price),
+        note=f"type={payload.stop_type}",
+    )
+    db.add(timeline)
     db.commit()
     db.refresh(entry)
     return entry
@@ -295,6 +344,12 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
     trade.status = "deleted"
+    timeline = TradeTimeline(
+        trade_id=trade.id,
+        event_type="trade_closed",
+        note="Trade deleted",
+    )
+    db.add(timeline)
 
     if trade.pnl is not None:
         deletion_event = CapitalEvent(

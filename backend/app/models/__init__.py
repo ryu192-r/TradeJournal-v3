@@ -10,6 +10,10 @@ from .account import Account
 from .coach_review import CoachReview
 from .user import User
 from .tier_config import TierConfig
+from .trade_timeline import TradeTimeline
+from .partial_exit import PartialExit
+from .emotion_log import EmotionLog
+from .execution_grade import ExecutionGrade
 
 __all__ = [
     'Base',
@@ -23,5 +27,9 @@ __all__ = [
     'Account',
     'CoachReview',
     'User',
-    'TierConfig'
+    'TierConfig',
+    'TradeTimeline',
+    'PartialExit',
+    'EmotionLog',
+    'ExecutionGrade',
 ]
