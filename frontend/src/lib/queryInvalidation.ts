@@ -21,6 +21,7 @@ export async function invalidateTradeDomain(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ['execution-grade'] }),
     queryClient.invalidateQueries({ queryKey: ['lifecycle'] }),
     queryClient.invalidateQueries({ queryKey: ['coach-reviews'] }),
+    queryClient.invalidateQueries({ queryKey: ['behavioral-intelligence'] }),
   ])
 }
 

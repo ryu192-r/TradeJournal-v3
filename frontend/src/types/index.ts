@@ -583,3 +583,126 @@ export interface RevengeTradesResponse {
   avg_pnl_flagged: number | null
   avg_pnl_unflagged: number | null
 }
+
+// ---------------------------------------------------------------------------
+// Overtrading Detection types
+// ---------------------------------------------------------------------------
+
+export interface OvertradingDay {
+  date: string
+  trade_count: number
+  threshold: number
+  total_pnl: number | null
+  avg_pnl: number | null
+  win_rate: number | null
+  emotions: string[]
+  trade_ids: number[]
+}
+
+export interface OvertradingWeek {
+  week: string
+  trade_count: number
+  threshold: number
+  total_pnl: number | null
+  avg_pnl: number | null
+  win_rate: number | null
+  top_emotions: string[]
+}
+
+export interface OvertradingResponse {
+  overtrading_days: OvertradingDay[]
+  overtrading_weeks: OvertradingWeek[]
+  total_overtrading_trades: number
+  avg_pnl_overtrading: number | null
+  avg_pnl_normal: number | null
+  summary: {
+    total_days: number
+    overtrading_days: number
+    total_weeks: number
+    overtrading_weeks: number
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Early Exit Analysis types
+// ---------------------------------------------------------------------------
+
+export interface ExitReasonBreakdown {
+  reason: string
+  count: number
+  total_pnl: number
+  avg_pnl: number
+  win_rate: number | null
+}
+
+export interface EarlyExit {
+  trade_id: number
+  symbol: string
+  entry_price: string
+  exit_price: string
+  target_price: string | null
+  stop_price: string | null
+  pnl: string
+  exit_reason: string
+  capture_ratio: number
+  actual_r: number
+  max_r: number
+  exit_quality_grade: string | null
+  entry_time: string | null
+}
+
+export interface EarlyExitResponse {
+  total_closed: number
+  exit_reason_breakdown: ExitReasonBreakdown[]
+  capture_stats: {
+    avg_capture_ratio: number | null
+    median_capture_ratio: number | null
+    target_reach_rate: number | null
+    stop_hit_rate: number | null
+    manual_exit_rate: number | null
+  } | null
+  early_exits: EarlyExit[]
+  early_exit_rate: number | null
+  avg_pnl_early_exit: number | null
+  avg_pnl_full_exit: number | null
+  dimension_scores: { exit_quality_avg: number | null; graded_count: number } | null
+}
+
+// ---------------------------------------------------------------------------
+// Composite Discipline Score types
+// ---------------------------------------------------------------------------
+
+export interface DisciplineInsight {
+  type: 'warning' | 'insight'
+  area: string
+  message: string
+}
+
+export interface DisciplineScoreResponse {
+  overall_score: number | null
+  components: Record<string, number>
+  grade: string | null
+  insights: DisciplineInsight[]
+}
+
+// ---------------------------------------------------------------------------
+// AI Behavioral Score types
+// ---------------------------------------------------------------------------
+
+export interface AIAssessment {
+  behavioral_summary: string
+  strengths: string[]
+  weaknesses: string[]
+  recommendations: string[]
+  risk_level: 'low' | 'medium' | 'high' | 'unknown'
+  composite_score: number | null
+}
+
+export interface BehavioralScoreResponse {
+  programmatic: DisciplineScoreResponse
+  ai_assessment: AIAssessment
+  lookback_days: number
+  trades_analyzed: number
+  model_used: string
+  generated_at: string
+}

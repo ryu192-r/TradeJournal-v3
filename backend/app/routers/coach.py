@@ -596,3 +596,118 @@ def delete_review(
     db.delete(review)
     db.commit()
     logger.info("review_deleted", review_id=review_id)
+
+
+@router.post(
+    "/behavioral-score",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "No trades found in period"},
+        500: {"description": "AI scoring failed"},
+    },
+)
+async def behavioral_score(
+    lookback_days: int = 30,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Generate an AI-powered behavioral score with personalized recommendations.
+
+    Combines programmatic discipline metrics with AI-generated insights.
+    """
+    from app.routers.lifecycle_analytics import composite_discipline_score, _parse_date_range, _base_trade_query
+
+    start, end = _parse_date_range(None, None)
+    if not start:
+        now = _now()
+        start = now - timedelta(days=lookback_days)
+
+    programmatic = composite_discipline_score(
+        from_date=start.isoformat(),
+        to_date=end.isoformat() if end else None,
+        db=db,
+    )
+
+    trades = _get_trades_for_period(db, start, end or _now())
+    if not trades:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No trades found in the last {lookback_days} days",
+        )
+
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
+    summary_stats = compute_summary_stats(trades)
+
+    prompt_parts = [
+        "You are a trading behavioral analyst. Based on the data below, provide a concise behavioral assessment.",
+        "",
+        f"DISCIPLINE METRICS (programmatic):",
+        f"- Overall score: {programmatic.get('overall_score', 'N/A')}/100",
+        f"- Grade: {programmatic.get('grade', 'N/A')}",
+    ]
+    components = programmatic.get("components", {})
+    for comp, score in components.items():
+        prompt_parts.append(f"- {comp}: {score}/100")
+    prompt_parts.append("")
+    prompt_parts.append(f"TRADE SUMMARY: {len(trades)} trades, PnL: {summary_stats.get('total_pnl', 'N/A')}, Win rate: {summary_stats.get('win_rate', 'N/A')}%")
+    prompt_parts.append("")
+    prompt_parts.append("RECENT TRADES:")
+    for td in trade_data[:10]:
+        pnl_str = f"PnL: {td.get('pnl', 'N/A')}"
+        emotion_str = f"emotion: {td.get('emotions', 'none')}" if td.get('emotions') else ""
+        grade_str = f"grade: {td.get('overall_grade', 'N/A')}" if td.get('overall_grade') else ""
+        prompt_parts.append(f"  {td.get('symbol', '?')} | {pnl_str} | {emotion_str} | {grade_str}")
+    prompt_parts.append("")
+    prompt_parts.append("Return JSON with this exact structure:")
+    prompt_parts.append('{')
+    prompt_parts.append('  "behavioral_summary": "2-3 sentence summary of the trader\'s behavioral patterns",')
+    prompt_parts.append('  "strengths": ["list of 2-3 behavioral strengths"],')
+    prompt_parts.append('  "weaknesses": ["list of 2-3 behavioral weaknesses"],')
+    prompt_parts.append('  "recommendations": ["3-5 specific actionable recommendations"],')
+    prompt_parts.append('  "risk_level": "low|medium|high",')
+    prompt_parts.append('  "composite_score": <number 0-100 based on overall assessment>')
+    prompt_parts.append('}')
+
+    prompt = "\n".join(prompt_parts)
+
+    system_msg = (
+        "You are a trading behavioral analyst. Always respond with valid JSON only, "
+        "no markdown, no explanation outside the JSON structure."
+    )
+
+    try:
+        messages = [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": prompt},
+        ]
+        result = await ai_coach._chat(messages, max_tokens=1500)
+        import json
+        try:
+            parsed = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            parsed = {
+                "behavioral_summary": str(result)[:500] if result else "Unable to generate assessment",
+                "strengths": [],
+                "weaknesses": [],
+                "recommendations": [],
+                "risk_level": "unknown",
+                "composite_score": None,
+            }
+    except Exception as e:
+        logger.error("behavioral_score_failed", error=str(e))
+        parsed = {
+            "behavioral_summary": f"AI assessment unavailable: {str(e)}",
+            "strengths": [],
+            "weaknesses": [],
+            "recommendations": [],
+            "risk_level": "unknown",
+            "composite_score": None,
+        }
+
+    return {
+        "programmatic": programmatic,
+        "ai_assessment": parsed,
+        "lookback_days": lookback_days,
+        "trades_analyzed": len(trades),
+        "model_used": "ollama",
+        "generated_at": _now().isoformat(),
+    }

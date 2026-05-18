@@ -422,3 +422,35 @@ export function getRevengeTrades(fromDate?: string, toDate?: string, hoursWindow
   const qs = params.toString()
   return apiClient.get<import('@/types').RevengeTradesResponse>('/lifecycle/revenge-trades' + (qs ? `?${qs}` : '')).then(r => r.data)
 }
+
+export function getOvertradingDetection(fromDate?: string, toDate?: string, dailyThreshold?: number, weeklyThreshold?: number) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  if (dailyThreshold) params.append('daily_threshold', String(dailyThreshold))
+  if (weeklyThreshold) params.append('weekly_threshold', String(weeklyThreshold))
+  const qs = params.toString()
+  return apiClient.get<import('@/types').OvertradingResponse>('/lifecycle/overtrading' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getEarlyExitAnalysis(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').EarlyExitResponse>('/lifecycle/early-exits' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getDisciplineScore(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').DisciplineScoreResponse>('/lifecycle/discipline-score' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getBehavioralScore(lookbackDays?: number) {
+  return apiClient.post<import('@/types').BehavioralScoreResponse>('/coach/behavioral-score', null, {
+    params: lookbackDays ? { lookback_days: lookbackDays } : undefined,
+  }).then(r => r.data)
+}

@@ -12,6 +12,7 @@ import type {
   DayOfWeekEntry, TimeOfDayEntry, AnalyticsStreaks, HoldingPeriodEntry,
 } from '@/types'
 import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
+import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
@@ -757,6 +758,7 @@ export function AnalyticsDashboardPage() {
       <HoldingPeriodChart data={data.holding_period} />
 
       <LifecycleInsights />
+      <BehavioralIntelligence />
     </div>
     </PullToRefresh>
   )
