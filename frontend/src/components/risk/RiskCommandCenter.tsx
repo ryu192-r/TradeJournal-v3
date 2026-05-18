@@ -7,7 +7,7 @@ import {
   ShieldAlert,
   Wallet,
 } from 'lucide-react'
-import { formatCurrency, formatPrice, formatQuantity } from '@/utils/format'
+import { formatCurrency, formatPrice, formatQuantity, parseDecimal } from '@/utils/format'
 import type { RiskDashboardPayload, RiskTrade } from '@/types/riskDashboard'
 import { PortfolioHeatGauge } from '@/components/risk/PortfolioHeatGauge'
 import { RiskExposureTable } from '@/components/risk/RiskExposureTable'
@@ -35,7 +35,7 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
               <div className="truncate font-data text-lg font-semibold text-text-heading">{trade.symbol}</div>
               <div className="mt-1 truncate text-xs text-text-muted">{trade.setup ?? 'Uncategorised'}</div>
             </div>
-            <div className="rounded-md border border-border px-2 py-1 text-xs text-text-muted font-data">
+            <div className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-text-muted font-data">
               {formatPct(trade.risk_pct)}
             </div>
           </div>
@@ -67,6 +67,12 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
 }
 
 export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
+  const warnings = data.warnings ?? []
+  const setupBuckets = data.risk_by_setup ?? []
+  const symbolBuckets = data.risk_by_symbol ?? []
+  const deployedCapital = parseDecimal(data.deployed_capital, 0)
+  const openRisk = parseDecimal(data.open_risk, 0)
+  const hasOpenPositions = data.open_positions > 0
   const hasMissingStops = data.positions_without_stop > 0
   const heatTone = data.portfolio_heat_pct != null && data.portfolio_heat_pct > 6
     ? 'loss'
@@ -85,7 +91,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <h2 className="mt-1 font-display text-xl text-text-heading sm:text-2xl">Risk Command Center</h2>
         </div>
         <div className="truncate text-[length:var(--text-xs)] text-text-muted font-data">
-          {data.account_name}
+          {data.account_name || 'Primary account'}
         </div>
       </div>
 
@@ -102,16 +108,16 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <RiskMetricCard
             label="Open Positions"
             value={String(data.open_positions)}
-            detail={hasMissingStops ? `${data.positions_without_stop} without SL` : 'all stopped'}
+            detail={!hasOpenPositions ? 'no open trades' : hasMissingStops ? `${data.positions_without_stop} without SL` : 'all stopped'}
             icon={BriefcaseBusiness}
-            tone={hasMissingStops ? 'loss' : 'accent'}
+            tone={hasMissingStops ? 'loss' : hasOpenPositions ? 'accent' : 'neutral'}
           />
           <RiskMetricCard
             label="Deployed"
             value={formatCurrency(data.deployed_capital)}
             detail={formatPct(data.deployed_capital_pct)}
             icon={ArrowDownToLine}
-            tone={data.deployed_capital_pct != null && data.deployed_capital_pct > 80 ? 'warning' : 'accent'}
+            tone={data.deployed_capital_pct != null && data.deployed_capital_pct > 80 ? 'warning' : deployedCapital > 0 ? 'accent' : 'neutral'}
           />
           <RiskMetricCard
             label="Available"
@@ -125,14 +131,14 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
             value={formatCurrency(data.open_risk)}
             detail={formatPct(data.portfolio_heat_pct)}
             icon={ShieldAlert}
-            tone={heatTone}
+            tone={openRisk > 0 ? heatTone : 'neutral'}
           />
           <RiskMetricCard
             label="Warnings"
-            value={String(data.warnings.length)}
-            detail={data.warnings.length > 0 ? 'active alerts' : 'clear'}
+            value={String(warnings.length)}
+            detail={warnings.length > 0 ? 'active alerts' : 'clear'}
             icon={Activity}
-            tone={data.warnings.some((warning) => warning.severity === 'high') ? 'loss' : data.warnings.length > 0 ? 'warning' : 'profit'}
+            tone={warnings.some((warning) => warning.severity === 'high') ? 'loss' : warnings.length > 0 ? 'warning' : 'profit'}
           />
         </div>
       </div>
@@ -142,12 +148,12 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <RiskPositionCard title="Largest Position" trade={data.largest_position} />
           <RiskPositionCard title="Largest Risk" trade={data.largest_risk_position} />
         </div>
-        <RiskWarningsPanel warnings={data.warnings} />
+        <RiskWarningsPanel warnings={warnings} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <RiskExposureTable title="Setup Exposure" variant="setup" buckets={data.risk_by_setup} />
-        <RiskExposureTable title="Symbol Exposure" variant="symbol" buckets={data.risk_by_symbol} />
+        <RiskExposureTable title="Setup Exposure" variant="setup" buckets={setupBuckets} />
+        <RiskExposureTable title="Symbol Exposure" variant="symbol" buckets={symbolBuckets} />
       </div>
     </section>
   )

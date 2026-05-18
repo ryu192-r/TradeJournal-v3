@@ -192,6 +192,20 @@ function RiskCommandCenterError({ error }: { error: unknown }) {
   )
 }
 
+function RiskCommandCenterNoAccount() {
+  return (
+    <div className={`${CARD} flex items-start gap-3`}>
+      <Wallet className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+      <div>
+        <h2 className="font-display text-sm text-text-heading">Risk layer waiting for account</h2>
+        <p className="mt-1 text-sm text-text-muted">
+          Create a capital account to activate portfolio heat, deployment, and open-risk metrics.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardQuery()
   const { data: riskData, isLoading: isRiskLoading, error: riskError } = useRiskDashboardQuery()
@@ -251,6 +265,8 @@ export function DashboardPage() {
         <RiskCommandCenterSkeleton />
       ) : riskData ? (
         <RiskCommandCenter data={riskData} />
+      ) : riskData === null ? (
+        <RiskCommandCenterNoAccount />
       ) : (
         <RiskCommandCenterError error={riskError} />
       )}
