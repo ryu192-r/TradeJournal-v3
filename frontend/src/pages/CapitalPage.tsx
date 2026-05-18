@@ -226,6 +226,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: (payload: { event_type: CapitalEventType; amount: string; timestamp: string; description?: string; account_id: number }) => createCapitalEvent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       setShowModal(false)
       setAmount('')
       setDescription('')
@@ -238,6 +239,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: deleteCapitalEvent,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       addToast({ title: 'Deleted', message: 'Capital event removed.', variant: 'success' })
     },
     onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
@@ -247,6 +249,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: () => reconcileAccount(data.account_id),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       if (res.event_created) {
         addToast({ title: 'Reconciled', message: `Balance adjusted by ${formatCurrency(res.delta)}.`, variant: 'info' })
       } else {
@@ -641,6 +644,7 @@ export function CapitalPage() {
     mutationFn: (payload: { name?: string; initial_balance?: string; breakeven_threshold?: string }) => updateAccount(data!.account_id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       setShowEditAccount(false)
       addToast({ title: 'Account updated', message: 'Starting capital saved.', variant: 'success' })
     },

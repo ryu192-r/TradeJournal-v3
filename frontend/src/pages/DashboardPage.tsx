@@ -1,5 +1,7 @@
 // Dashboard — key metrics at a glance
 import { useDashboardQuery } from '@/hooks/useDashboardQuery'
+import { useRiskDashboardQuery } from '@/hooks/useRiskDashboardQuery'
+import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import {
   formatCurrency, formatPercent, parseDecimal, formatDate,
 } from '@/utils/format'
@@ -154,13 +156,51 @@ function MonthlyPnl({ data }: { data: MonthlyPnlEntry[] }) {
   )
 }
 
+function RiskCommandCenterSkeleton() {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="h-4 w-32 rounded bg-bg-elevated animate-pulse" />
+          <div className="mt-2 h-7 w-52 rounded bg-bg-elevated animate-pulse" />
+        </div>
+        <div className="hidden h-4 w-28 rounded bg-bg-elevated animate-pulse sm:block" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className={`${CARD} h-72 animate-pulse`} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className={`${CARD} h-28 animate-pulse`} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function RiskCommandCenterError({ error }: { error: unknown }) {
+  return (
+    <div className={`${CARD} flex items-start gap-3`}>
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-loss" />
+      <div>
+        <h2 className="font-display text-sm text-text-heading">Risk layer unavailable</h2>
+        <p className="mt-1 text-sm text-text-muted">
+          {(error as Error)?.message || 'Unable to load current risk metrics.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardQuery()
+  const { data: riskData, isLoading: isRiskLoading, error: riskError } = useRiskDashboardQuery()
   const queryClient = useQueryClient()
 
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['analytics'] })
     await queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+    await queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
   }, [queryClient])
 
   if (isLoading) {
@@ -207,6 +247,13 @@ export function DashboardPage() {
         <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
       </div>
       <KpiCards kpi={data.kpi} />
+      {isRiskLoading ? (
+        <RiskCommandCenterSkeleton />
+      ) : riskData ? (
+        <RiskCommandCenter data={riskData} />
+      ) : (
+        <RiskCommandCenterError error={riskError} />
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <EquityCurve data={data.daily_pnl} />

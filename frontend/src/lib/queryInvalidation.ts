@@ -10,6 +10,7 @@ export function invalidateTradeDomain(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
     queryClient.invalidateQueries({ queryKey: ['trade'] }),
     queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] }),
     queryClient.invalidateQueries({ queryKey: ['capital-events'] }),
     queryClient.invalidateQueries({ queryKey: ['analytics'] }),
     queryClient.invalidateQueries({ queryKey: ['journal', 'weekly-stats'] }),
@@ -21,6 +22,7 @@ export function invalidateCapitalDomain(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ['capital-events'] }),
     queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] }),
     queryClient.invalidateQueries({ queryKey: ['analytics'] }),
     queryClient.invalidateQueries({ queryKey: ['trades'] }),
   ])
