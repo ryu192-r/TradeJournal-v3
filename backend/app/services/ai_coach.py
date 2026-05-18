@@ -310,9 +310,13 @@ class AICoachService:
 # ──────────────────────── Trade data helpers ────────────────────────
 
 
-def trade_to_dict(t: object) -> dict:
-    """Convert a Trade ORM row to a plain dict for the AI coach."""
-    return {
+def trade_to_dict(t: object, lifecycle: dict | None = None) -> dict:
+    """Convert a Trade ORM row to a plain dict for the AI coach.
+
+    If lifecycle dict is provided, includes emotion logs, execution grades,
+    and timeline events for richer AI context.
+    """
+    base = {
         "id": t.id,
         "symbol": t.symbol,
         "direction": t.direction,
@@ -328,6 +332,26 @@ def trade_to_dict(t: object) -> dict:
         "entry_time": t.entry_time.isoformat() if t.entry_time else None,
         "exit_time": t.exit_time.isoformat() if t.exit_time else None,
     }
+    if lifecycle:
+        if lifecycle.get("emotions"):
+            base["emotions"] = [
+                {"emotion": e.emotion, "confidence": e.confidence, "stress": e.stress,
+                 "conviction": e.conviction, "patience": e.patience, "focus": e.focus}
+                for e in lifecycle["emotions"]
+            ]
+        if lifecycle.get("grade"):
+            g = lifecycle["grade"]
+            base["execution_grade"] = {
+                "overall": g.overall_grade, "entry": g.entry_quality,
+                "sizing": g.sizing_quality, "stop": g.stop_quality,
+                "patience": g.patience, "rules": g.rule_adherence, "exit": g.exit_quality,
+            }
+        if lifecycle.get("timeline"):
+            base["key_events"] = [
+                {"type": e.event_type, "value": e.new_value, "note": e.note}
+                for e in lifecycle["timeline"][:10]
+            ]
+    return base
 
 
 def compute_summary_stats(trades: list) -> dict:

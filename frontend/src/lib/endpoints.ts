@@ -338,6 +338,10 @@ export function createTimelineEvent(tradeId: number, payload: import('@/types').
   return apiClient.post<import('@/types').TimelineEvent>(`/trades/${tradeId}/timeline`, payload).then(r => r.data)
 }
 
+export function deleteTimelineEvent(tradeId: number, eventId: number) {
+  return apiClient.delete(`/trades/${tradeId}/timeline/${eventId}`).then(() => {})
+}
+
 // ───────────────────────── Partial Exits ─────────────────────────
 
 export function listPartialExits(tradeId: number) {
@@ -362,6 +366,10 @@ export function createEmotionLog(tradeId: number, payload: import('@/types').Emo
   return apiClient.post<import('@/types').EmotionLog>(`/trades/${tradeId}/emotions`, payload).then(r => r.data)
 }
 
+export function deleteEmotionLog(tradeId: number, logId: number) {
+  return apiClient.delete(`/trades/${tradeId}/emotions/${logId}`).then(() => {})
+}
+
 // ───────────────────────── Execution Grades ─────────────────────────
 
 export function getExecutionGrade(tradeId: number) {
@@ -378,4 +386,39 @@ export function updateExecutionGrade(tradeId: number, payload: import('@/types')
 
 export function deleteExecutionGrade(tradeId: number) {
   return apiClient.delete(`/trades/${tradeId}/execution-grade`).then(() => {})
+}
+
+// ───────────────────────── Lifecycle Analytics ─────────────────────────
+
+export function getEmotionSummary(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').EmotionSummaryResponse>('/lifecycle/emotion-summary' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getGradeSummary(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').GradeSummaryResponse>('/lifecycle/grade-summary' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getBehavioralAnalytics(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').BehavioralAnalyticsResponse>('/lifecycle/behavioral' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getRevengeTrades(fromDate?: string, toDate?: string, hoursWindow?: number) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  if (hoursWindow) params.append('hours_window', String(hoursWindow))
+  const qs = params.toString()
+  return apiClient.get<import('@/types').RevengeTradesResponse>('/lifecycle/revenge-trades' + (qs ? `?${qs}` : '')).then(r => r.data)
 }

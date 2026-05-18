@@ -43,3 +43,13 @@ def create_timeline_event(trade_id: int, payload: TimelineEventCreate, db: Sessi
     db.commit()
     db.refresh(entry)
     return entry
+
+
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_timeline_event(trade_id: int, event_id: int, db: Session = Depends(get_db)):
+    event = db.query(TradeTimeline).filter(TradeTimeline.id == event_id, TradeTimeline.trade_id == trade_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Timeline event not found")
+    db.delete(event)
+    db.commit()
+    return None

@@ -506,3 +506,80 @@ export interface ExecutionGradeCreatePayload {
 }
 
 export interface ExecutionGradeUpdatePayload extends ExecutionGradeCreatePayload {}
+
+// ---------------------------------------------------------------------------
+// Lifecycle Analytics types
+// ---------------------------------------------------------------------------
+
+export interface EmotionSummaryEntry {
+  emotion: string
+  count: number
+  avg_confidence: number | null
+  avg_stress: number | null
+  avg_conviction: number | null
+  avg_patience: number | null
+  avg_focus: number | null
+  trade_count: number
+  total_pnl: string
+  win_rate: number | null
+}
+
+export interface EmotionSummaryResponse {
+  emotions: EmotionSummaryEntry[]
+  total_logs: number
+  most_frequent: string | null
+  worst_performing: string | null
+}
+
+export interface GradePnlEntry {
+  grade: string
+  count: number
+  avg_pnl: string
+  total_pnl: string
+  win_rate: number | null
+}
+
+export interface GradeSummaryResponse {
+  grade_distribution: Record<string, number>
+  dimension_averages: Record<string, number | null>
+  grade_pnl: GradePnlEntry[]
+  avg_overall: number | null
+}
+
+export interface EmotionGradeMatrixEntry {
+  emotion: string
+  count: number
+  avg_pnl: number
+  total_pnl: number
+  win_rate: number
+  avg_grade_numeric: number | null
+}
+
+export interface BehavioralInsight {
+  type: 'warning' | 'insight'
+  message: string
+  emotion: string
+}
+
+export interface BehavioralAnalyticsResponse {
+  emotion_grade_matrix: EmotionGradeMatrixEntry[]
+  discipline_score: number | null
+  insights: BehavioralInsight[]
+}
+
+export interface RevengeTrade {
+  trade_id: number
+  symbol: string
+  entry_time: string | null
+  pnl: string | null
+  emotion: string | null
+  flagged_reason: 'emotion' | 'window' | 'both'
+  hours_after_loss: number | null
+}
+
+export interface RevengeTradesResponse {
+  revenge_trades: RevengeTrade[]
+  total_flagged: number
+  avg_pnl_flagged: number | null
+  avg_pnl_unflagged: number | null
+}

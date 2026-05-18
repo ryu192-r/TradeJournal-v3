@@ -26,6 +26,9 @@ from app.schemas.coach import (
 from app.services.ai_coach import ai_coach, review_cache, review_cache_key, trade_to_dict, compute_summary_stats, compute_setup_performance
 from app.db.database import get_db
 from app.models.coach_review import CoachReview
+from app.models.emotion_log import EmotionLog
+from app.models.execution_grade import ExecutionGrade
+from app.models.trade_timeline import TradeTimeline
 from app.models.trade import Trade
 from app.utils.logging import get_logger
 
@@ -50,6 +53,29 @@ def _get_trades_for_period(db: Session, start: datetime, end: datetime) -> List[
         .order_by(Trade.entry_time.asc())
     )
     return list(db.scalars(stmt).all())
+
+
+def _load_lifecycle_for_trades(db: Session, trade_ids: list[int]) -> dict[int, dict]:
+    """Bulk-load emotion logs, execution grades, and timeline events for trades."""
+    emotions = db.query(EmotionLog).filter(EmotionLog.trade_id.in_(trade_ids)).all()
+    grades = db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(trade_ids)).all()
+    timelines = db.query(TradeTimeline).filter(TradeTimeline.trade_id.in_(trade_ids)).order_by(TradeTimeline.timestamp.desc()).all()
+
+    result: dict[int, dict] = {tid: {"emotions": [], "grade": None, "timeline": []} for tid in trade_ids}
+    for e in emotions:
+        result[e.trade_id]["emotions"].append(e)
+    for g in grades:
+        result[g.trade_id]["grade"] = g
+    for t in timelines:
+        result[t.trade_id]["timeline"].append(t)
+    return result
+
+
+def _enrich_trades_with_lifecycle(trades: list[Trade], db: Session) -> list[dict]:
+    """Convert trades to dicts including lifecycle data for AI context."""
+    trade_ids = [t.id for t in trades]
+    lifecycle_map = _load_lifecycle_for_trades(db, trade_ids)
+    return [trade_to_dict(t, lifecycle=lifecycle_map.get(t.id)) for t in trades]
 
 
 # ──────────────────────── endpoints ────────────────────────
@@ -111,7 +137,7 @@ async def generate_daily_review(
                 detail=f"None of the requested trade IDs found: {request.trade_ids}",
             )
 
-    trade_data = [trade_to_dict(t) for t in trades]
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
     summary_stats = compute_summary_stats(trades)
 
     try:
@@ -183,7 +209,7 @@ async def generate_weekly_review(
             detail=f"No trades found in the week of {period_start.date()}",
         )
 
-    trade_data = [trade_to_dict(t) for t in trades]
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
     summary_stats = compute_summary_stats(trades)
     setup_performance = compute_setup_performance(trades)
 
@@ -272,7 +298,7 @@ async def generate_trade_insight(
             detail=f"No valid trades found for IDs: {request.trade_ids}",
         )
 
-    trade_data = [trade_to_dict(t) for t in trades]
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
 
     try:
         insight = await ai_coach.generate_trade_insight(
@@ -329,11 +355,11 @@ async def ask_coach(
     if request.trade_ids:
         stmt = select(Trade).where(Trade.id.in_(request.trade_ids), Trade.status != "deleted")
         trades = list(db.scalars(stmt).all())
-        trade_data = [trade_to_dict(t) for t in trades]
+        trade_data = _enrich_trades_with_lifecycle(trades, db)
         summary_stats = compute_summary_stats(trades)
     elif request.period_start and request.period_end:
         trades = _get_trades_for_period(db, request.period_start, request.period_end)
-        trade_data = [trade_to_dict(t) for t in trades]
+        trade_data = _enrich_trades_with_lifecycle(trades, db)
         summary_stats = compute_summary_stats(trades)
 
     try:
@@ -398,7 +424,7 @@ async def detect_patterns(
             detail=f"No trades found in the last {request.lookback_days} days",
         )
 
-    trade_data = [trade_to_dict(t) for t in trades]
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
     summary_stats = compute_summary_stats(trades)
 
     try:
@@ -464,7 +490,7 @@ async def check_rule_reminders(
             detail=f"No trades found in the last {request.lookback_days} days",
         )
 
-    trade_data = [trade_to_dict(t) for t in trades]
+    trade_data = _enrich_trades_with_lifecycle(trades, db)
 
     try:
         reminder = await ai_coach.check_rule_reminders(

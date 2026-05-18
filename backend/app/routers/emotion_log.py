@@ -57,3 +57,13 @@ def create_emotion_log(trade_id: int, payload: EmotionLogCreate, db: Session = D
     db.commit()
     db.refresh(entry)
     return entry
+
+
+@router.delete("/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_emotion_log(trade_id: int, log_id: int, db: Session = Depends(get_db)):
+    log = db.query(EmotionLog).filter(EmotionLog.id == log_id, EmotionLog.trade_id == trade_id).first()
+    if not log:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Emotion log not found")
+    db.delete(log)
+    db.commit()
+    return None

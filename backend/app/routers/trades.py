@@ -176,6 +176,14 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
                 note=f"exit_reason={db_trade.exit_reason}",
             )
             db.add(timeline)
+    if "notes" in update_data and update_data["notes"]:
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="note_added",
+            new_value=update_data["notes"][:200] if update_data["notes"] else None,
+            note="Notes updated",
+        )
+        db.add(timeline)
     if "stop_price" in update_data:
         old_stop = str(db_trade.stop_price) if db_trade.stop_price else None
         timeline = TradeTimeline(

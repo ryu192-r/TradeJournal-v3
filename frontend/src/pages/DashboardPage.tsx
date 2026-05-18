@@ -2,6 +2,7 @@
 import { useDashboardQuery } from '@/hooks/useDashboardQuery'
 import { useRiskDashboardQuery } from '@/hooks/useRiskDashboardQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
+import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
 import {
   formatCurrency, formatPercent, parseDecimal, formatDate,
 } from '@/utils/format'
@@ -277,6 +278,7 @@ export function DashboardPage() {
         <StreakCard data={data.streaks} />
       </div>
       <MonthlyPnl data={data.monthly_pnl} />
+      <LifecycleInsights />
     </div>
     </PullToRefresh>
   )

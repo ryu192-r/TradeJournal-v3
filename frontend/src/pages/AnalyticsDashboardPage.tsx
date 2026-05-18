@@ -11,6 +11,7 @@ import type {
   DailyPnlEntry, MonthlyPnlEntry, AnalyticsRDist, SetupPerformanceItem,
   DayOfWeekEntry, TimeOfDayEntry, AnalyticsStreaks, HoldingPeriodEntry,
 } from '@/types'
+import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
@@ -754,6 +755,8 @@ export function AnalyticsDashboardPage() {
       </div>
 
       <HoldingPeriodChart data={data.holding_period} />
+
+      <LifecycleInsights />
     </div>
     </PullToRefresh>
   )
