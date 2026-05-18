@@ -5,6 +5,7 @@ import type { DailyJournal, DailyJournalPayload } from '@/types'
 import type { WeeklyJournalStats } from '@/types'
 import type { FullDashboardPayload, CapitalDashboardPayload } from '@/types'
 import type { CapitalEvent, CapitalEventType, AccountInfo, BrokerInfo, BrokerImportResult } from '@/types'
+import type { RiskDashboardPayload } from '@/types/riskDashboard'
 import type {
   SetupPlaybookItem, SetupPlaybookListResponse,
   SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload,
@@ -198,6 +199,10 @@ export function getAiMentors() {
 
 export function getCapitalDashboard() {
   return apiClient.get<CapitalDashboardPayload>('/accounts/capital-dashboard').then(r => r.data)
+}
+
+export function getRiskDashboard() {
+  return apiClient.get<RiskDashboardPayload>('/risk-dashboard/').then(r => r.data)
 }
 
 export function getAccountInfo(accountId: number) {
