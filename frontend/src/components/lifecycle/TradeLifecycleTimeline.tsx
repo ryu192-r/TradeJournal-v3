@@ -40,9 +40,7 @@ const EVENT_CONFIG: Record<string, { icon: React.ReactNode; label: string; color
 }
 
 function formatDetail(event: TimelineEvent): string {
-  if (event.new_value && event.old_value) {
-    return `${event.old_value} → ${event.new_value}`
-  }
+  if (event.new_value && event.old_value) return `${event.old_value} → ${event.new_value}`
   if (event.new_value) return event.new_value
   if (event.note) return event.note
   return ''
@@ -147,15 +145,15 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
   if (items.length === 0) {
     return (
       <div className="border-t border-border pt-4 mt-4">
-        <div className="text-[10px] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
-        <p className="text-xs text-text-muted text-center py-4">No lifecycle events recorded yet.</p>
+        <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
+        <p className="text-sm text-text-muted text-center py-4">No lifecycle events recorded yet.</p>
       </div>
     )
   }
 
   return (
     <div className="border-t border-border pt-4 mt-4">
-      <div className="text-[10px] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
+      <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
       <div className="relative pl-4">
         <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" />
         <div className="space-y-2">
@@ -165,15 +163,15 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
                 <span className="sr-only">{item.label}</span>
               </div>
               <div className="flex-1 min-w-0 pb-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-text-heading">{item.label}</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-sm font-medium text-text-heading">{item.label}</span>
                   {item.badge && (
-                    <span className={`text-[10px] px-1.5 py-px rounded-full bg-bg-elevated ${item.badgeClass || 'text-text-muted'}`}>{item.badge}</span>
+                    <span className={`text-[length:var(--text-xs)] px-1.5 py-px rounded-full bg-bg-elevated ${item.badgeClass || 'text-text-muted'}`}>{item.badge}</span>
                   )}
-                  <span className="text-[10px] text-text-muted ml-auto font-data">{formatDate(item.timestamp)}</span>
+                  <span className="text-[length:var(--text-xs)] text-text-muted ml-auto font-data shrink-0">{formatDate(item.timestamp)}</span>
                 </div>
                 {item.detail && (
-                  <p className="text-[11px] text-text-muted mt-0.5 truncate">{item.detail}</p>
+                  <p className="text-sm text-text-muted mt-0.5 truncate">{item.detail}</p>
                 )}
               </div>
             </div>

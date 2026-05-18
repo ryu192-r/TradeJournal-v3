@@ -21,8 +21,8 @@ function SliderField({ label, value, onChange }: { label: string; value: number 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-text-muted">{label}</span>
-        <span className="text-[11px] font-data text-text-heading">{value ?? '—'}</span>
+        <span className="text-sm text-text-muted">{label}</span>
+        <span className="text-sm font-data text-text-heading">{value ?? '—'}</span>
       </div>
       <input
         type="range"
@@ -33,9 +33,6 @@ function SliderField({ label, value, onChange }: { label: string; value: number 
         onDoubleClick={() => onChange(null)}
         className="w-full h-1.5 rounded-full appearance-none bg-border accent-accent cursor-pointer"
       />
-      <div className="flex justify-between text-[9px] text-text-muted/50 px-0.5">
-        <span>1</span><span>5</span><span>10</span>
-      </div>
     </div>
   )
 }
@@ -74,7 +71,7 @@ export function EmotionLogger({ tradeId, onClose }: EmotionLoggerProps) {
           <button
             key={e.value}
             onClick={() => setEmotion(e.value)}
-            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${emotion === e.value ? 'border-accent bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
+            className={`text-sm px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${emotion === e.value ? 'border-accent bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
           >
             <span className="mr-1">{e.emoji}</span>{e.label}
           </button>
@@ -93,21 +90,21 @@ export function EmotionLogger({ tradeId, onClose }: EmotionLoggerProps) {
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Optional note..."
-        className="w-full text-xs border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none"
+        className="w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none"
         rows={2}
       />
 
       <div className="flex gap-2 justify-end">
         <button
           onClick={onClose}
-          className="text-xs px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+          className="text-sm px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={!emotion || createMutation.isPending}
-          className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+          className="text-sm px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
         >
           {createMutation.isPending ? 'Saving...' : 'Log Emotion'}
         </button>

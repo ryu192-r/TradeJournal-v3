@@ -81,14 +81,14 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
   return (
     <div className="space-y-3">
       {CATEGORIES.map(({ key, label }) => (
-        <div key={key} className="flex items-center justify-between gap-2">
-          <span className="text-xs text-text-muted w-14 shrink-0">{label}</span>
-          <div className="flex gap-1 sm:gap-1.5">
+        <div key={key} className="flex items-center justify-between gap-3">
+          <span className="text-sm text-text-muted w-14 shrink-0">{label}</span>
+          <div className="flex gap-1.5">
             {GRADES.map((g) => (
               <button
                 key={g}
                 onClick={() => handleGrade(key, g)}
-                className={`w-6 h-6 sm:w-7 sm:h-7 text-[10px] sm:text-[11px] font-semibold rounded border transition-all cursor-pointer ${fields[key] === g ? GRADE_COLORS[g] : 'border-border text-text-muted hover:border-text-muted'}`}
+                className={`w-7 h-7 text-xs font-semibold rounded border transition-all cursor-pointer ${fields[key] === g ? GRADE_COLORS[g] : 'border-border text-text-muted hover:border-text-muted'}`}
               >
                 {g}
               </button>
@@ -97,14 +97,14 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
         </div>
       ))}
 
-      <div className="border-t border-border pt-3 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-text-heading">Overall</span>
-        <div className="flex gap-1 sm:gap-1.5">
+      <div className="border-t border-border pt-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-text-heading">Overall</span>
+        <div className="flex gap-1.5">
           {GRADES.map((g) => (
             <button
               key={g}
               onClick={() => handleGrade('overall_grade', g)}
-              className={`w-7 h-7 sm:w-8 sm:h-8 text-xs font-bold rounded border transition-all cursor-pointer ${fields.overall_grade === g ? GRADE_COLORS[g] : 'border-border text-text-muted hover:border-text-muted'}`}
+              className={`w-8 h-8 text-sm font-bold rounded border transition-all cursor-pointer ${fields.overall_grade === g ? GRADE_COLORS[g] : 'border-border text-text-muted hover:border-text-muted'}`}
             >
               {g}
             </button>
@@ -116,14 +116,14 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
         value={fields.notes}
         onChange={(e) => setFields((prev) => ({ ...prev, notes: e.target.value }))}
         placeholder="Process notes — what did you do well? What would you change?"
-        className="w-full text-xs border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none"
+        className="w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none"
         rows={2}
       />
 
       <button
         onClick={handleSubmit}
         disabled={isPending}
-        className="w-full text-xs font-medium py-2 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+        className="w-full text-sm font-medium py-2 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
       >
         {isPending ? 'Saving...' : isExisting ? 'Update Grade' : 'Save Grade'}
       </button>
