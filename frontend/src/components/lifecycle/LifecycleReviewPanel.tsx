@@ -74,7 +74,7 @@ export function LifecycleReviewPanel({ trade }: LifecycleReviewPanelProps) {
         </div>
       )}
 
-      {activePanel === 'partial_exit' && (
+      {!trade.exit_price && activePanel === 'partial_exit' && (
         <div className="border border-accent/20 rounded-xl p-[var(--page-px)] bg-bg-elevated/30 mb-3">
           <PartialExitForm
             tradeId={trade.id}

@@ -437,6 +437,7 @@ export interface PartialExitCreatePayload {
 
 export interface PartialExitListResponse {
   items: PartialExit[]
+  remaining_qty: string
 }
 
 // ---------------------------------------------------------------------------

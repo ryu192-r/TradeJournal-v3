@@ -40,3 +40,4 @@ class PartialExitResponse(BaseSchema):
 
 class PartialExitListResponse(BaseSchema):
     items: List[PartialExitResponse]
+    remaining_qty: str = "0"
