@@ -1,4 +1,4 @@
-// Setup Playbook page: 2-col grid, expandable cards, mini bar charts, dark discipline palette
+// Setup Playbook page: tabbed view — Setups (CRUD) + Intelligence (deep analytics)
 import { useState } from 'react'
 import { GlassButton } from '@/components/ui/GlassButton'
 import { SetupCard } from './SetupCard'
@@ -12,12 +12,16 @@ import {
   useSeedSetupsMutation,
 } from '@/hooks/useSetupPlaybookQuery'
 import { useToastStore } from '@/store/toastStore'
-import { Loader2, Plus, RefreshCw, Filter } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Filter, BookOpen, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload } from '@/types/setupPlaybook'
+import { PlaybookIntelligenceFull } from './PlaybookIntelligenceFull'
+
+type TabKey = 'setups' | 'intelligence'
 
 export function SetupPlaybookPage() {
   const addToast = useToastStore((s) => s.addToast)
+  const [activeTab, setActiveTab] = useState<TabKey>('setups')
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -139,6 +143,42 @@ export function SetupPlaybookPage() {
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 mb-6">
+        <button
+          onClick={() => setActiveTab('setups')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
+            activeTab === 'setups'
+              ? 'bg-accent-muted text-accent border border-accent/20'
+              : 'text-text-muted hover:text-text hover:bg-bg-elevated/50 border border-transparent'
+          )}
+        >
+          <BookOpen className="w-4 h-4" />
+          Setups
+        </button>
+        <button
+          onClick={() => setActiveTab('intelligence')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
+            activeTab === 'intelligence'
+              ? 'bg-accent-muted text-accent border border-accent/20'
+              : 'text-text-muted hover:text-text hover:bg-bg-elevated/50 border border-transparent'
+          )}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Intelligence
+        </button>
+      </div>
+
+      {/* Intelligence tab */}
+      {activeTab === 'intelligence' && (
+        <PlaybookIntelligenceFull />
+      )}
+
+      {/* Setups tab */}
+      {activeTab === 'setups' && (
+      <>
       {/* Filter bar */}
       <div className="flex items-center gap-1.5 sm:gap-2 mb-6 overflow-x-auto pb-1">
         <Filter className="w-4 h-4 text-text-muted" />
@@ -202,6 +242,8 @@ export function SetupPlaybookPage() {
             </div>
           )}
         </>
+      )}
+      </>
       )}
 
       <SetupFormModal
