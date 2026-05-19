@@ -296,11 +296,15 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
             pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
             daily_balance[day] += pe_pnl
 
-    # Capital events
+    # Capital events (only deposits and withdrawals for equity curve — adjustments are reconciliation artifacts)
     events_asc = sorted(events_q, key=lambda e: e.timestamp)
     for evt in events_asc:
-        day = evt.timestamp.date()
-        daily_balance[day] += ensure_decimal(evt.amount)
+        if evt.event_type in ("deposit", "withdrawal"):
+            day = evt.timestamp.date()
+            amt = ensure_decimal(evt.amount)
+            if evt.event_type == "withdrawal":
+                amt = -abs(amt)
+            daily_balance[day] += amt
 
     # Build running curve
     curve_points: list[EquityCurvePointOut] = []

@@ -83,7 +83,16 @@ def _remaining_qty(trade: Trade, pe_map: dict[int, list]) -> Decimal:
 def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list]) -> Decimal:
     initial_balance = ensure_decimal(account.initial_balance)
     events = db.query(CapitalEvent).filter(CapitalEvent.account_id == account.id).all()
-    capital_delta = sum((ensure_decimal(evt.amount) for evt in events), Decimal("0"))
+    total_deposits = Decimal("0")
+    total_withdrawals = Decimal("0")
+    for evt in events:
+        amt = ensure_decimal(evt.amount)
+        if evt.event_type == "deposit":
+            total_deposits += amt
+        elif evt.event_type == "withdrawal":
+            total_withdrawals += abs(amt)
+    capital_net = total_deposits - total_withdrawals
+
     realized_pnl = Decimal("0")
     for t in db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all():
         realized_pnl += ensure_decimal(t.pnl)
@@ -91,7 +100,7 @@ def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list]) 
         for pe in pe_map.get(t.id, []):
             if pe.realized_pnl:
                 realized_pnl += ensure_decimal(pe.realized_pnl)
-    return initial_balance + capital_delta + realized_pnl
+    return initial_balance + capital_net + realized_pnl
 
 
 def _trade_deployed_capital(trade: Trade, pe_map: dict[int, list]) -> Decimal:
