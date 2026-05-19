@@ -528,3 +528,46 @@ export function upsertLiveQuotes(quotes: Record<string, unknown>[]) {
 export function getLiveQuotes() {
   return apiClient.get<import('@/types').LiveQuotesResponse>('/market/live-quotes').then(r => r.data)
 }
+
+// ────────────────────────── Performance OS ──────────────────────────
+
+export function getDailyDashboard(date?: string) {
+  const path = date ? `/perf-os/workflow/${date}` : '/perf-os/workflow/today'
+  return apiClient.get<import('@/types/performanceOs').DailyDashboard>(path).then(r => r.data)
+}
+
+export function updateDailyWorkflow(date: string, payload: import('@/types/performanceOs').DailyWorkflowUpdate) {
+  return apiClient.put<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}`, payload).then(r => r.data)
+}
+
+export function advanceWorkflowPhase(date: string) {
+  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/advance`).then(r => r.data)
+}
+
+export function resetWorkflow(date: string) {
+  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/reset`).then(r => r.data)
+}
+
+export function getCurrentWeeklyReview() {
+  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>('/perf-os/weekly/current').then(r => r.data)
+}
+
+export function getWeeklyReview(weekStart: string) {
+  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>(`/perf-os/weekly/${weekStart}`).then(r => r.data)
+}
+
+export function updateWeeklyReview(weekStart: string, payload: import('@/types/performanceOs').WeeklyReviewUpdate) {
+  return apiClient.put<import('@/types/performanceOs').WeeklyReview>(`/perf-os/weekly/${weekStart}`, payload).then(r => r.data)
+}
+
+export function getCurrentMonthlyReview() {
+  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>('/perf-os/monthly/current').then(r => r.data)
+}
+
+export function getMonthlyReview(month: string) {
+  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>(`/perf-os/monthly/${month}`).then(r => r.data)
+}
+
+export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
+  return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
+}
