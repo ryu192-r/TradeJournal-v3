@@ -1,9 +1,11 @@
-import { useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRef, useCallback, useState, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, Target, Loader2 } from 'lucide-react'
 import { ChartImageGallery } from '@/components/trades/ChartImageGallery'
 import { LifecycleReviewPanel } from '@/components/lifecycle/LifecycleReviewPanel'
+import { useTradeReviewMutation } from '@/hooks/useTradeReviewMutation'
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '@/utils/format'
 import type { ApiTrade } from '@/types'
+import type { TradeReviewResponse } from '@/types/coach'
 
 interface TradeDetailSwipeContentProps {
   trade: ApiTrade
@@ -17,6 +19,16 @@ export function TradeDetailSwipeContent({ trade, trades, onSelect }: TradeDetail
   const idx = trades.findIndex((t) => t.id === trade.id)
   const hasPrev = idx > 0
   const hasNext = idx < trades.length - 1
+  const [inlineReview, setInlineReview] = useState<TradeReviewResponse | null>(null)
+  const reviewMut = useTradeReviewMutation()
+
+  useEffect(() => { setInlineReview(null) }, [trade.id])
+
+  const handleTradeReview = () => {
+    reviewMut.mutate(trade.id, {
+      onSuccess: (data) => setInlineReview(data),
+    })
+  }
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX
@@ -63,6 +75,16 @@ export function TradeDetailSwipeContent({ trade, trades, onSelect }: TradeDetail
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {trade.exit_price && (
+            <button
+              onClick={handleTradeReview}
+              disabled={reviewMut.isPending}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[length:var(--text-xs)] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {reviewMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Target className="w-3 h-3" />}
+              AI Review
+            </button>
+          )}
           <span className="text-[length:var(--text-xs)] text-text-muted font-data">{idx + 1}/{trades.length}</span>
         </div>
       </div>
@@ -122,6 +144,29 @@ export function TradeDetailSwipeContent({ trade, trades, onSelect }: TradeDetail
               <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-accent-faint text-accent">{tag}</span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Inline AI Review result */}
+      {inlineReview && (
+        <div className="border-t border-border pt-3 mt-3 space-y-3 animate-card-in">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-accent" />
+            <span className="text-xs font-medium text-text-heading">AI Trade Review</span>
+            <span className={`text-xs font-bold ml-auto ${inlineReview.discipline_score >= 70 ? 'text-profit' : inlineReview.discipline_score >= 40 ? 'text-amber-400' : 'text-loss'}`}>
+              {inlineReview.discipline_score}/100
+            </span>
+          </div>
+          <p className="text-xs text-text">{inlineReview.summary}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {inlineReview.strengths.slice(0, 2).map((s, i) => (
+              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-profit-muted/20 text-profit">{s}</span>
+            ))}
+            {inlineReview.weaknesses.slice(0, 2).map((w, i) => (
+              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-loss-muted/20 text-loss">{w}</span>
+            ))}
+          </div>
+          <p className="text-[10px] text-text-muted">Full review available in AI Coach → Trade Review tab</p>
         </div>
       )}
 

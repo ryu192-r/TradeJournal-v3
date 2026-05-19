@@ -14,7 +14,7 @@ class CoachReview(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # Review metadata
-    review_type = Column(String(50), nullable=False)  # daily, weekly, insight, answer
+    review_type = Column(String(50), nullable=False)  # daily, weekly, insight, answer, trade_review
     
     # AI-generated content
     content = Column(Text, nullable=False)

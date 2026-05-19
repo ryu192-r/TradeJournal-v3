@@ -455,6 +455,12 @@ export function getBehavioralScore(lookbackDays?: number) {
   }).then(r => r.data)
 }
 
+// ───────────────────────── Trade Review Engine ─────────────────────────
+
+export function generateTradeReview(tradeId: number) {
+  return apiClient.post<import('@/types/coach').TradeReviewResponse>('/coach/trade-review', { trade_id: tradeId }).then(r => r.data)
+}
+
 // ───────────────────────── Playbook Intelligence ─────────────────────────
 
 export function getPlaybookOverview(fromDate?: string, toDate?: string) {

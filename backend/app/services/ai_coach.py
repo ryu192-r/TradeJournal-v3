@@ -43,6 +43,7 @@ WEEKLY_REVIEW_SYSTEM = _read_prompt("weekly_review.txt")
 TRADE_INSIGHT_SYSTEM = _read_prompt("trade_insight.txt")
 ASK_COACH_SYSTEM = _read_prompt("ask_coach.txt")
 RULE_REMINDER_SYSTEM = _read_prompt("rule_reminder.txt")
+TRADE_REVIEW_SYSTEM = _read_prompt("trade_review.txt")
 
 
 # ──────────────────────── Back-compat aliases ────────────────────────
@@ -272,6 +273,85 @@ class AICoachService:
 
         return patterns
 
+    async def generate_trade_review(self, trade_dict: dict) -> dict:
+        """Generate a structured post-trade review for a single trade.
+
+        Returns a dict matching the TradeReviewResponse schema.
+        """
+        trade_text = _CoachTradeData.format_trade(trade_dict)
+
+        context_parts = [f"TRADE DATA:\n{trade_text}"]
+
+        if trade_dict.get("emotions"):
+            emotion_lines = []
+            for e in trade_dict["emotions"]:
+                emotion_lines.append(
+                    f"  - {e['emotion']}: confidence={e.get('confidence','?')}/10, "
+                    f"stress={e.get('stress','?')}/10, conviction={e.get('conviction','?')}/10, "
+                    f"patience={e.get('patience','?')}/10, focus={e.get('focus','?')}/10"
+                )
+            context_parts.append("EMOTIONS:\n" + "\n".join(emotion_lines))
+
+        if trade_dict.get("execution_grade"):
+            g = trade_dict["execution_grade"]
+            context_parts.append(
+                f"EXECUTION GRADES: overall={g.get('overall','?')}, entry={g.get('entry','?')}, "
+                f"sizing={g.get('sizing','?')}, stop={g.get('stop','?')}, "
+                f"patience={g.get('patience','?')}, rules={g.get('rules','?')}, exit={g.get('exit','?')}"
+            )
+
+        if trade_dict.get("partial_exits"):
+            pe_lines = []
+            for pe in trade_dict["partial_exits"]:
+                pe_lines.append(
+                    f"  - qty={pe['qty']} @ {pe['exit_price']}, "
+                    f"pnl={pe.get('realized_pnl', '?')}, R={pe.get('r_captured', '?')}, "
+                    f"reason={pe.get('exit_reason', '?')}"
+                )
+            context_parts.append("PARTIAL EXITS:\n" + "\n".join(pe_lines))
+
+        if trade_dict.get("key_events"):
+            event_lines = []
+            for evt in trade_dict["key_events"]:
+                event_lines.append(f"  - {evt['type']}: {evt.get('value', '')} {evt.get('note', '')}")
+            context_parts.append("TIMELINE:\n" + "\n".join(event_lines))
+
+        if trade_dict.get("playbook"):
+            pb = trade_dict["playbook"]
+            pb_lines = [f"Setup: {pb['name']}"]
+            if pb.get("description"):
+                pb_lines.append(f"Description: {pb['description']}")
+            if pb.get("rules"):
+                pb_lines.append("Rules:")
+                for i, rule in enumerate(pb["rules"], 1):
+                    pb_lines.append(f"  {i}. {rule}")
+            if pb.get("ideal_conditions"):
+                pb_lines.append("Ideal conditions: " + ", ".join(pb["ideal_conditions"]))
+            context_parts.append("PLAYBOOK:\n" + "\n".join(pb_lines))
+
+        user_prompt = "\n\n".join(context_parts)
+
+        logger.info("generating_trade_review", trade_id=trade_dict.get("id"))
+
+        messages = [
+            {"role": "system", "content": TRADE_REVIEW_SYSTEM},
+            {"role": "user", "content": user_prompt},
+        ]
+        raw = await self._chat(messages, max_tokens=2500)
+
+        parsed = _parse_json_response(raw)
+
+        required_keys = ["overall_verdict", "summary", "scores", "strengths", "weaknesses", "discipline_score"]
+        for key in required_keys:
+            if key not in parsed:
+                parsed[key] = _default_review_value(key)
+
+        if "scores" in parsed and isinstance(parsed["scores"], dict):
+            for skey in ["entry_timing", "exit_timing", "risk_management", "plan_adherence", "psychology", "overall"]:
+                parsed["scores"].setdefault(skey, 5)
+
+        return parsed
+
     async def check_rule_reminders(
         self,
         trades: List[dict],
@@ -310,11 +390,13 @@ class AICoachService:
 # ──────────────────────── Trade data helpers ────────────────────────
 
 
-def trade_to_dict(t: object, lifecycle: dict | None = None) -> dict:
+def trade_to_dict(t: object, lifecycle: dict | None = None, partial_exits: list | None = None, playbook: dict | None = None) -> dict:
     """Convert a Trade ORM row to a plain dict for the AI coach.
 
     If lifecycle dict is provided, includes emotion logs, execution grades,
     and timeline events for richer AI context.
+    If partial_exits is provided, includes partial exit data.
+    If playbook is provided, includes setup rules and conditions.
     """
     base = {
         "id": t.id,
@@ -323,12 +405,15 @@ def trade_to_dict(t: object, lifecycle: dict | None = None) -> dict:
         "entry_price": str(t.entry_price),
         "exit_price": str(t.exit_price) if t.exit_price else None,
         "quantity": str(t.quantity),
+        "fees": str(t.fees) if getattr(t, "fees", None) else "0",
         "pnl": str(t.pnl) if t.pnl else None,
         "setup": t.setup,
         "tactic": t.tactic,
         "notes": t.notes,
         "stop_price": str(t.stop_price) if t.stop_price else None,
+        "target_price": str(t.target_price) if getattr(t, "target_price", None) else None,
         "r_multiple": str(t.r_multiple) if t.r_multiple else None,
+        "exit_reason": getattr(t, "exit_reason", None),
         "entry_time": t.entry_time.isoformat() if t.entry_time else None,
         "exit_time": t.exit_time.isoformat() if t.exit_time else None,
     }
@@ -351,6 +436,27 @@ def trade_to_dict(t: object, lifecycle: dict | None = None) -> dict:
                 {"type": e.event_type, "value": e.new_value, "note": e.note}
                 for e in lifecycle["timeline"][:10]
             ]
+    if partial_exits:
+        base["partial_exits"] = [
+            {
+                "qty": str(pe.qty),
+                "exit_price": str(pe.exit_price),
+                "exit_time": pe.exit_time.isoformat() if pe.exit_time else None,
+                "realized_pnl": str(pe.realized_pnl) if pe.realized_pnl else None,
+                "r_captured": str(pe.r_captured) if pe.r_captured else None,
+                "exit_reason": pe.exit_reason,
+                "note": pe.note,
+            }
+            for pe in partial_exits
+        ]
+    if playbook:
+        base["playbook"] = {
+            "name": playbook.get("name", ""),
+            "description": playbook.get("description", ""),
+            "rules": playbook.get("rules", []),
+            "ideal_conditions": playbook.get("ideal_conditions", []),
+            "risk_profile": playbook.get("risk_profile", {}),
+        }
     return base
 
 
@@ -425,6 +531,43 @@ class _CoachTradeData:
             f"--- Trade {i+1} ---\n{_CoachTradeData.format_trade(t)}"
             for i, t in enumerate(trades)
         )
+
+
+def _parse_json_response(raw: str) -> dict:
+    """Parse JSON from an LLM response, handling markdown fences and preamble."""
+    text = raw.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):]
+    elif text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        for line in text.split("\n"):
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+    return {"raw_response": raw[:2000]}
+
+
+def _default_review_value(key: str):
+    defaults = {
+        "overall_verdict": "poor_execution",
+        "summary": "Review generation failed.",
+        "strengths": [],
+        "weaknesses": [],
+        "rule_violations": [],
+        "missed_opportunity": None,
+        "coaching_notes": "Review generation failed. Try again.",
+        "discipline_score": 0,
+    }
+    return defaults.get(key, None)
 
 
 # ──────────────────────── Response Cache (TTL-based) ────────────────────────

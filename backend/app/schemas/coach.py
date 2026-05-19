@@ -1,7 +1,7 @@
 """Pydantic schemas for the AI Coach service."""
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -133,8 +133,8 @@ class CoachReviewResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     insight: str = Field(..., description="The AI-generated analysis")
-    review_type: Literal["daily", "weekly", "insight", "answer"] = Field(
-        ..., description="Type of review: daily, weekly, insight, or answer"
+    review_type: Literal["daily", "weekly", "insight", "answer", "trade_review"] = Field(
+        ..., description="Type of review"
     )
     trades_analyzed: int = Field(..., description="Number of trades analyzed")
     model_used: str = Field(..., description="Model that generated the response")
@@ -147,7 +147,7 @@ class CoachReviewListItem(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     id: int
-    review_type: Literal["daily", "weekly", "insight", "answer"]
+    review_type: Literal["daily", "weekly", "insight", "answer", "trade_review"]
     content_preview: str
     period_start: Optional[datetime] = None
     period_end: Optional[datetime] = None
@@ -161,3 +161,46 @@ class CoachReviewListResponse(BaseModel):
 
     total: int
     items: List[CoachReviewListItem]
+
+
+# ──────────────── Trade Review Engine ────────────────
+
+
+class TradeReviewRequest(BaseModel):
+    """Request for a single-trade AI review."""
+
+    trade_id: int = Field(..., description="ID of the trade to review")
+
+
+class MissedOpportunity(BaseModel):
+    better_exit_price: Optional[float] = Field(None, description="Estimated better exit price if held to target")
+    potential_r: Optional[float] = Field(None, description="Estimated R if held to target")
+    note: str = Field(..., description="What was left on the table")
+
+
+class TradeReviewScores(BaseModel):
+    entry_timing: int = Field(..., ge=0, le=10)
+    exit_timing: int = Field(..., ge=0, le=10)
+    risk_management: int = Field(..., ge=0, le=10)
+    plan_adherence: int = Field(..., ge=0, le=10)
+    psychology: int = Field(..., ge=0, le=10)
+    overall: int = Field(..., ge=0, le=10)
+
+
+class TradeReviewResponse(BaseModel):
+    """Structured AI trade review response."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    trade_id: int = Field(..., description="ID of the reviewed trade")
+    overall_verdict: str = Field(..., description="One of: excellent_execution, good_execution, flawed_but_profitable, poor_execution, disaster")
+    summary: str = Field(..., description="2-3 sentence honest assessment")
+    scores: TradeReviewScores = Field(..., description="Dimensional scores 0-10")
+    strengths: List[str] = Field(default_factory=list, description="Things done well")
+    weaknesses: List[str] = Field(default_factory=list, description="Things done poorly")
+    rule_violations: List[str] = Field(default_factory=list, description="Playbook rules violated")
+    missed_opportunity: Optional[MissedOpportunity] = Field(None, description="What was left on the table")
+    coaching_notes: str = Field(..., description="3-5 actionable improvement points")
+    discipline_score: int = Field(..., ge=0, le=100, description="Overall discipline score 0-100")
+    model_used: str = Field(..., description="AI model that generated the review")
+    generated_at: str = Field(..., description="ISO timestamp of generation")

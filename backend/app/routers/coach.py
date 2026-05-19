@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
@@ -16,6 +17,10 @@ from app.schemas.coach import (
     CoachReviewRequest,
     CoachReviewResponse,
     TradeInsightRequest,
+    TradeReviewRequest,
+    TradeReviewResponse,
+    TradeReviewScores,
+    MissedOpportunity,
     WeeklyReviewRequest,
     PatternDetectionRequest,
     PatternDetectionResponse,
@@ -24,11 +29,14 @@ from app.schemas.coach import (
     RuleReminderResponse,
 )
 from app.services.ai_coach import ai_coach, review_cache, review_cache_key, trade_to_dict, compute_summary_stats, compute_setup_performance
+from app.core.ai_config import get_ai_config
 from app.db.database import get_db
 from app.models.coach_review import CoachReview
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.trade_timeline import TradeTimeline
+from app.models.partial_exit import PartialExit
+from app.models.setup_playbook import SetupPlaybook
 from app.models.trade import Trade
 from app.utils.logging import get_logger
 
@@ -711,3 +719,122 @@ async def behavioral_score(
         "model_used": "ollama",
         "generated_at": _now().isoformat(),
     }
+
+
+# ──────────────────────── Trade Review Engine ────────────────────────
+
+
+def _load_playbook_for_trade(db: Session, trade: Trade) -> dict | None:
+    """Load playbook data for a trade's setup, if it exists."""
+    if not trade.setup:
+        return None
+    playbook = db.query(SetupPlaybook).filter(SetupPlaybook.name == trade.setup).first()
+    if not playbook:
+        return None
+    return {
+        "name": playbook.name,
+        "description": playbook.description or "",
+        "rules": playbook.rules or [],
+        "ideal_conditions": playbook.ideal_conditions or [],
+        "risk_profile": playbook.risk_profile or {},
+    }
+
+
+@router.post(
+    "/trade-review",
+    response_model=TradeReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Trade not found"},
+        500: {"description": "AI generation failed"},
+    },
+)
+async def generate_trade_review(
+    request: TradeReviewRequest,
+    db: Session = Depends(get_db),
+) -> TradeReviewResponse:
+    """Generate a structured post-trade review with coaching, discipline analysis,
+    execution critique, missed opportunity assessment, and setup-quality scoring.
+
+    This is not a generic summary — it's a private trading coach that cross-references
+    your playbook rules, emotions, execution grades, partial exits, and timeline events
+    to produce an honest, actionable review.
+    """
+    trade = db.query(Trade).filter(Trade.id == request.trade_id, Trade.status != "deleted").first()
+    if not trade:
+        raise HTTPException(status_code=404, detail=f"Trade {request.trade_id} not found")
+
+    lifecycle_map = _load_lifecycle_for_trades(db, [trade.id])
+    lifecycle = lifecycle_map.get(trade.id)
+
+    partial_exits = db.query(PartialExit).filter(PartialExit.trade_id == trade.id).order_by(PartialExit.exit_time.asc()).all()
+    playbook = _load_playbook_for_trade(db, trade)
+
+    trade_dict = trade_to_dict(trade, lifecycle=lifecycle, partial_exits=partial_exits, playbook=playbook)
+
+    cfg = get_ai_config()
+    model_used = cfg.get("model", "unknown")
+
+    try:
+        result = await ai_coach.generate_trade_review(trade_dict)
+    except Exception as e:
+        logger.error("trade_review_failed", trade_id=trade.id, error=str(e))
+        result = {
+            "overall_verdict": "poor_execution",
+            "summary": f"Review generation failed: {str(e)}",
+            "scores": {"entry_timing": 0, "exit_timing": 0, "risk_management": 0, "plan_adherence": 0, "psychology": 0, "overall": 0},
+            "strengths": [],
+            "weaknesses": ["Review generation failed"],
+            "rule_violations": [],
+            "missed_opportunity": None,
+            "coaching_notes": "Review generation failed. Please try again.",
+            "discipline_score": 0,
+        }
+
+    scores_data = result.get("scores", {})
+    scores = TradeReviewScores(
+        entry_timing=scores_data.get("entry_timing", 5),
+        exit_timing=scores_data.get("exit_timing", 5),
+        risk_management=scores_data.get("risk_management", 5),
+        plan_adherence=scores_data.get("plan_adherence", 5),
+        psychology=scores_data.get("psychology", 5),
+        overall=scores_data.get("overall", 5),
+    )
+
+    missed = result.get("missed_opportunity")
+    missed_obj = None
+    if missed and isinstance(missed, dict):
+        missed_obj = MissedOpportunity(
+            better_exit_price=missed.get("better_exit_price"),
+            potential_r=missed.get("potential_r"),
+            note=missed.get("note", ""),
+        )
+
+    review = CoachReview(
+        review_type="trade_review",
+        content=json.dumps(result),
+        period_start=trade.entry_time,
+        period_end=trade.exit_time,
+        trade_ids=[trade.id],
+        summary_stats={"pnl": str(trade.pnl) if trade.pnl else "0", "r_multiple": str(trade.r_multiple) if trade.r_multiple else "N/A"},
+        model_used=model_used,
+        prompt_template="trade_review",
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+
+    return TradeReviewResponse(
+        trade_id=trade.id,
+        overall_verdict=result.get("overall_verdict", "poor_execution"),
+        summary=result.get("summary", ""),
+        scores=scores,
+        strengths=result.get("strengths", []),
+        weaknesses=result.get("weaknesses", []),
+        rule_violations=result.get("rule_violations", []),
+        missed_opportunity=missed_obj,
+        coaching_notes=result.get("coaching_notes", ""),
+        discipline_score=result.get("discipline_score", 0),
+        model_used=model_used,
+        generated_at=_now().isoformat(),
+    )
