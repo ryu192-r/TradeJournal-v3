@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import {
   BarChart3,
+  BookOpen,
   Briefcase,
   ClipboardList,
   Cpu,
@@ -20,6 +21,7 @@ const navItems = [
   { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
   { id: 'trades' as const, label: 'Trades', icon: Briefcase },
   { id: 'perf-os' as const, label: 'Perf OS', icon: Cpu },
+  { id: 'sa-notes' as const, label: 'SA Notes', icon: BookOpen },
   { id: 'playbook' as const, label: 'Playbook', icon: ClipboardList },
   { id: 'review' as const, label: 'Review', icon: TrendingUp },
   { id: 'ideas' as const, label: 'Ideas', icon: Lightbulb },

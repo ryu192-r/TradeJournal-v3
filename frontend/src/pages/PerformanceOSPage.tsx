@@ -1,19 +1,15 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
-  Loader2, BookOpen, Sunrise, Sunset, GitCompare, ArrowRight,
+  Loader2, ArrowRight,
 } from 'lucide-react'
-import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import { useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow } from '@/hooks/usePerformanceOS'
 import { getCurrentWeeklyReview, updateWeeklyReview, getCurrentMonthlyReview, updateMonthlyReview } from '@/lib/endpoints'
-import { useJournalQuery, useCreateJournalMutation, useUpdateJournalMutation, useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJournalMutation'
-import { useTradesQuery } from '@/hooks/useTradesQuery'
+import { useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJournalMutation'
 import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
-import { useToastStore } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
 import type { WorkflowPhase, DailyDashboard, ChecklistItem } from '@/types/performanceOs'
-import type { DailyJournal, ApiTrade } from '@/types'
 
 type ViewTab = 'daily' | 'weekly' | 'monthly'
 
@@ -28,17 +24,6 @@ const PHASE_LABEL: Record<WorkflowPhase, string> = {
 
 function toISODate(d: Date): string {
   return d.toISOString().split('T')[0]
-}
-
-function computeDailyStats(trades: ApiTrade[], date: string) {
-  const dayTrades = trades.filter((t) => t.entry_time && t.entry_time.split('T')[0] === date)
-  const count = dayTrades.length
-  const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl ? parseFloat(t.pnl) : 0), 0)
-  const wins = dayTrades.filter((t) => t.pnl && parseFloat(t.pnl) > 0)
-  const winRate = count > 0 ? Math.round((wins.length / count) * 100) : 0
-  const rValues = dayTrades.map((t) => t.r_multiple ? parseFloat(t.r_multiple) : 0).filter((r) => !isNaN(r) && r !== 0)
-  const avgR = rValues.length > 0 ? parseFloat((rValues.reduce((a, b) => a + b, 0) / rValues.length).toFixed(2)) : 0
-  return { tradeCount: count, totalPnl, winRate, avgR }
 }
 
 function PhaseDots({ phase, progress }: { phase: WorkflowPhase; progress: DailyDashboard['phase_progress'] }) {
@@ -268,93 +253,71 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         disabled={advanceMut.isPending}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-accent/10 text-accent hover:bg-accent/15 transition-all cursor-pointer disabled:opacity-30"
       >
-        {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+        {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
         Move to Review
       </button>
     </div>
   )
 }
 
-function CompareView({ journal }: { journal: DailyJournal | null | undefined }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div>
-        <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-2"><Sunrise className="w-3.5 h-3.5 text-accent" /> Pre-market</div>
-        <div className="text-sm text-text whitespace-pre-wrap min-h-[10rem] leading-relaxed">
-          {journal?.pre_trade_notes || <span className="text-text-faint italic">No pre-market notes.</span>}
-        </div>
-      </div>
-      <div>
-        <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-2"><Sunset className="w-3.5 h-3.5 text-accent" /> Post-market</div>
-        <div className="text-sm text-text whitespace-pre-wrap min-h-[10rem] leading-relaxed">
-          {journal?.post_trade_notes || <span className="text-text-faint italic">No post-market notes.</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateStr: string }) {
   const advanceMut = useAdvancePhase(dateStr)
-  const addToast = useToastStore((s) => s.addToast)
-  const [showCompare, setShowCompare] = useState(false)
-
-  const { data: journal, isLoading: journalLoading } = useJournalQuery(dateStr)
-  const { data: tradesData } = useTradesQuery()
-  const createMutation = useCreateJournalMutation()
-  const updateMutation = useUpdateJournalMutation()
-
-  const summaryStats = useMemo(() => {
-    const trades = tradesData?.items ?? []
-    return computeDailyStats(trades, dateStr)
-  }, [tradesData?.items, dateStr])
-
-  const handleSave = useCallback((payload: import('@/types').DailyJournalPayload) => {
-    if (journal) {
-      updateMutation.mutate(
-        { date: dateStr, payload },
-        {
-          onSuccess: () => addToast({ title: 'Journal updated', message: `Entry for ${formatDate(dateStr)} saved.`, variant: 'success' }),
-          onError: (err: Error) => addToast({ title: 'Save failed', message: err.message, variant: 'error' }),
-        }
-      )
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => addToast({ title: 'Journal created', message: `Entry for ${formatDate(dateStr)} saved.`, variant: 'success' }),
-        onError: (err: Error) => addToast({ title: 'Save failed', message: err.message, variant: 'error' }),
-      })
-    }
-  }, [journal, dateStr, createMutation, updateMutation, addToast])
-
-  const isSaving = createMutation.isPending || updateMutation.isPending
+  const updateMut = useUpdateWorkflow(dateStr)
+  const wf = dashboard.workflow!
   const todayPnl = dashboard.today_trades.filter(t => t.exit_price).reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0)
 
   return (
     <div className="space-y-6 animate-card-in">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 font-data text-[length:var(--text-xs)] text-text-muted">
-          <span>{dashboard.today_trades.length} trades</span>
-          <span>{dashboard.today_trades.filter(t => t.exit_price).length} closed</span>
-          <span className={cn('font-medium', todayPnl >= 0 ? 'text-profit' : 'text-loss')}>
-            {todayPnl >= 0 ? '+' : ''}{formatCurrency(todayPnl)}
-          </span>
-        </div>
-        <button
-          onClick={() => setShowCompare(!showCompare)}
-          className="text-[length:var(--text-xs)] text-text-muted hover:text-accent cursor-pointer flex items-center gap-1"
-        >
-          <GitCompare className="w-3 h-3" />
-          {showCompare ? 'Journal' : 'Compare'}
-        </button>
+      <div className="flex items-center justify-between font-data text-[length:var(--text-xs)] text-text-muted">
+        <span>{dashboard.today_trades.length} trades</span>
+        <span>{dashboard.today_trades.filter(t => t.exit_price).length} closed</span>
+        <span className={cn('font-medium', todayPnl >= 0 ? 'text-profit' : 'text-loss')}>
+          {todayPnl >= 0 ? '+' : ''}{formatCurrency(todayPnl)}
+        </span>
       </div>
 
-      {showCompare ? (
-        <CompareView journal={journal} />
-      ) : journalLoading ? (
-        <div className="py-12 text-center"><Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" /></div>
-      ) : (
-        <DailyJournalForm journal={journal} date={dateStr} onSave={handleSave} isSaving={isSaving} summaryStats={summaryStats} />
-      )}
+      <div>
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Mood</label>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              onClick={() => updateMut.mutate({ mood_rating: n })}
+              className={cn(
+                'w-9 h-9 rounded-lg text-sm font-medium cursor-pointer transition-all',
+                wf.mood_rating === n ? 'bg-accent/15 text-accent' : 'bg-bg-elevated/30 text-text-muted hover:bg-bg-elevated/50',
+              )}
+            >{n}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Discipline</label>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              onClick={() => updateMut.mutate({ discipline_rating: n })}
+              className={cn(
+                'w-9 h-9 rounded-lg text-sm font-medium cursor-pointer transition-all',
+                wf.discipline_rating === n ? 'bg-accent/15 text-accent' : 'bg-bg-elevated/30 text-text-muted hover:bg-bg-elevated/50',
+              )}
+            >{n}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Lessons</label>
+        <textarea
+          value={wf.post_market_notes ?? ''}
+          onChange={(e) => updateMut.mutate({ post_market_notes: e.target.value })}
+          placeholder="What worked? What will you do differently?"
+          rows={4}
+          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
+        />
+      </div>
 
       <button
         onClick={() => advanceMut.mutate()}
@@ -368,8 +331,7 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
   )
 }
 
-function BehaviorPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateStr: string }) {
-  const { data: journal } = useJournalQuery(dateStr)
+function BehaviorPhase({ dashboard }: { dashboard: DailyDashboard }) {
   const ds = dashboard.discipline_score
   const wf = dashboard.workflow!
 
@@ -382,29 +344,19 @@ function BehaviorPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; date
         </div>
       )}
 
-      {journal ? (
+      {wf.mood_rating && (
         <div className="flex items-center gap-6 text-sm">
-          {journal.mood_rating != null && (
-            <div>
-              <span className="text-[length:var(--text-xs)] text-text-muted block">Mood</span>
-              <span className="font-data font-medium text-text-heading">{journal.mood_rating}/5</span>
-            </div>
-          )}
-          {journal.discipline_rating != null && (
+          <div>
+            <span className="text-[length:var(--text-xs)] text-text-muted block">Mood</span>
+            <span className="font-data font-medium text-text-heading">{wf.mood_rating}/5</span>
+          </div>
+          {wf.discipline_rating && (
             <div>
               <span className="text-[length:var(--text-xs)] text-text-muted block">Discipline</span>
-              <span className="font-data font-medium text-text-heading">{journal.discipline_rating}/5</span>
-            </div>
-          )}
-          {journal.rules_followed && (
-            <div className="flex-1 min-w-0">
-              <span className="text-[length:var(--text-xs)] text-text-muted block">Rules Followed</span>
-              <span className="text-text-heading text-sm line-clamp-1">{journal.rules_followed}</span>
+              <span className="font-data font-medium text-text-heading">{wf.discipline_rating}/5</span>
             </div>
           )}
         </div>
-      ) : (
-        <div className="text-sm text-text-faint">Complete the Review phase to see journal data here.</div>
       )}
 
       {wf.behavior_done ? (
@@ -414,7 +366,7 @@ function BehaviorPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; date
         </div>
       ) : (
         <div className="text-[length:var(--text-xs)] text-text-faint text-center py-4">
-          Review your emotional state, patterns, and rule compliance.
+          Review your emotional state and rule compliance.
         </div>
       )}
     </div>

@@ -22,7 +22,7 @@ interface AppState {
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
 
-  activeView: 'dashboard' | 'analytics' | 'coach' | 'trades' | 'playbook' | 'review' | 'ideas' | 'capital' | 'perf-os' | 'settings'
+  activeView: 'dashboard' | 'analytics' | 'coach' | 'trades' | 'playbook' | 'review' | 'ideas' | 'capital' | 'perf-os' | 'sa-notes' | 'settings'
   setActiveView: (view: AppState['activeView']) => void
 
   tradeFormMode: 'list' | 'create' | 'edit'
