@@ -12,6 +12,7 @@ from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, Sto
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
 from app.models.trade_timeline import TradeTimeline
+from app.models.partial_exit import PartialExit
 from app.models.account import Account
 from app.services.trade_service import TradeService
 from app.db.database import get_db
@@ -25,6 +26,32 @@ def _auto_reconcile(db: Session):
     account = db.query(Account).first()
     if account:
         _reconcile_account(account.id, db)
+
+
+def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
+    partials = (
+        db.query(PartialExit)
+        .filter(PartialExit.trade_id == trade.id)
+        .order_by(PartialExit.exit_time.asc())
+        .all()
+    )
+    total_exited_qty = sum(p.qty for p in partials)
+    partial_realized = sum(p.realized_pnl or Decimal("0") for p in partials)
+    remaining_qty = trade.quantity - total_exited_qty
+
+    if trade.exit_price is not None:
+        unrealized = Decimal("0")
+    elif partials and remaining_qty > 0:
+        unrealized = Decimal("0")
+    else:
+        unrealized = None
+
+    d = {
+        "remaining_qty": remaining_qty,
+        "partial_realized_pnl": partial_realized if partials else None,
+        "unrealized_pnl": unrealized,
+    }
+    return d
 
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -136,7 +163,15 @@ def list_trades(
         query = query.filter(Trade.entry_time <= datetime.fromisoformat(to_date + " 23:59:59"))
     total = query.count()
     trades = query.order_by(Trade.entry_time.desc()).offset(skip).limit(limit).all()
-    return {"total": total, "items": trades}
+    items = []
+    for t in trades:
+        resp = TradeResponse.model_validate(t)
+        extra = _enrich_trade_with_partials(t, db)
+        resp.remaining_qty = extra["remaining_qty"]
+        resp.partial_realized_pnl = extra["partial_realized_pnl"]
+        resp.unrealized_pnl = extra["unrealized_pnl"]
+        items.append(resp)
+    return {"total": total, "items": items}
 
 
 @router.get("/{trade_id}", response_model=TradeResponse)
@@ -145,7 +180,12 @@ def read_trade(trade_id: int, db: Session = Depends(get_db)):
     trade = db.query(Trade).filter(Trade.id == trade_id).first()
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
-    return trade
+    resp = TradeResponse.model_validate(trade)
+    extra = _enrich_trade_with_partials(trade, db)
+    resp.remaining_qty = extra["remaining_qty"]
+    resp.partial_realized_pnl = extra["partial_realized_pnl"]
+    resp.unrealized_pnl = extra["unrealized_pnl"]
+    return resp
 
 
 @router.put("/{trade_id}", response_model=TradeResponse)

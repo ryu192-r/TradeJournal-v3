@@ -72,6 +72,9 @@ export interface ApiTrade {
   exit_reason?: string | null
   created_at?: string
   updated_at?: string
+  remaining_qty?: string | null
+  partial_realized_pnl?: string | null
+  unrealized_pnl?: string | null
 }
 
 export interface ApiTradeListResponse {

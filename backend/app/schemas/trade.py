@@ -105,11 +105,13 @@ class TradeResponse(BaseModel):
     exit_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    remaining_qty: Optional[Decimal] = None
+    partial_realized_pnl: Optional[Decimal] = None
+    unrealized_pnl: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-    # Do NOT serialize Decimal to float — keep as string in JSON
-    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
+    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl")
     def serialize_decimal(self, v):
         if v is None:
             return None

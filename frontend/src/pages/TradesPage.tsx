@@ -293,11 +293,11 @@ export function TradesPage() {
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">SL</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Max Risk</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Qty</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Rem.</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Setup</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Status</th>
-                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">P&amp;L</th>
-                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">P&amp;L%</th>
-                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Live P&amp;L</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Realized</th>
+                  <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Unrealized</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest">Cap%</th>
                   <th className="px-[var(--cell-px)] py-[var(--cell-py)] text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-widest text-right">Actions</th>
                 </tr>
@@ -470,18 +470,18 @@ const STOP_TYPE_OPTIONS = [
 ]
 
 function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTrade, setPyramidingTradeId, setPartialExitTradeId, netEquity, quoteMap }: TradeRowProps) {
-  const isProfit = trade.pnl != null && Number(trade.pnl) >= 0
-  const pnlFormatted = trade.pnl != null ? formatCurrency(Number(trade.pnl)) : '—'
-  const pnlText = isProfit ? `+${pnlFormatted}` : pnlFormatted
   const entryCost = Number(trade.entry_price) * Number(trade.quantity)
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
-  const pnlPct = entryCost > 0 ? ((pnlNum / entryCost) * 100) : null
   const capPct = netEquity && Number(netEquity) > 0 ? ((pnlNum / Number(netEquity)) * 100) : null
   const quote = quoteMap.get(trade.symbol)
   const ltp = quote?.ltp ? parseFloat(quote.ltp) : null
   const ltpChg = quote?.change_pct ? parseFloat(quote.change_pct) : null
   const isOpen = !trade.exit_price
-  const livePnl = isOpen && ltp != null ? (ltp - Number(trade.entry_price)) * Number(trade.quantity) - Number(trade.fees) : null
+  const remainingQty = trade.remaining_qty ? Number(trade.remaining_qty) : Number(trade.quantity)
+  const partialRealized = trade.partial_realized_pnl ? Number(trade.partial_realized_pnl) : null
+  const hasPartials = partialRealized != null
+  const realizedPnl = hasPartials ? partialRealized : (trade.exit_price ? pnlNum : null)
+  const livePnl = isOpen && ltp != null ? (ltp - Number(trade.entry_price)) * remainingQty - Number(trade.fees) * (remainingQty / Number(trade.quantity)) : null
   const livePnlPct = isOpen && entryCost > 0 && livePnl != null ? (livePnl / entryCost) * 100 : null
   const [slEditing, setSlEditing] = useState(false)
   const [slPrice, setSlPrice] = useState(trade.stop_price ?? '')
@@ -613,7 +613,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTr
       </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
         {trade.stop_price ? (() => {
-          const risk = (Number(trade.entry_price) - Number(trade.stop_price)) * Number(trade.quantity)
+          const risk = (Number(trade.entry_price) - Number(trade.stop_price)) * remainingQty
           return (
             <span className={`font-data text-xs ${risk < 0 ? 'text-profit' : risk > 0 ? 'text-loss' : 'text-text-muted'}`}>
               {risk < 0 ? '-' : ''}{formatCurrency(Math.abs(risk))}
@@ -624,6 +624,11 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTr
         )}
       </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-heading text-xs">{formatQuantity(trade.quantity)}</td>
+      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
+        <span className={`font-data text-xs ${remainingQty < Number(trade.quantity) ? 'text-accent' : 'text-text-heading'}`}>
+          {formatQuantity(String(remainingQty))}
+        </span>
+      </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-muted text-xs">{trade.setup || '—'}</td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${statusBadgeClass(trade)}`}>
@@ -631,27 +636,30 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTr
         </span>
       </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-        <span className={`font-data text-xs font-medium ${trade.pnl == null ? 'text-text-muted' : isProfit ? 'text-profit' : 'text-loss'}`}>
-          {pnlText}
-        </span>
+        {realizedPnl != null ? (
+          <span className={`font-data text-xs font-medium ${realizedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+            {realizedPnl >= 0 ? '+' : ''}{formatCurrency(realizedPnl)}
+          </span>
+        ) : (
+          <span className="text-text-muted text-xs">—</span>
+        )}
       </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-        <span className={`font-data text-xs ${trade.pnl == null ? 'text-text-muted' : isProfit ? 'text-profit' : 'text-loss'}`}>
-          {pnlPct != null ? `${isProfit ? '+' : ''}${pnlPct.toFixed(2)}%` : '—'}
-        </span>
-      </td>
-      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
-        {livePnl != null ? (
-          <div>
-            <span className={`font-data text-xs font-medium ${livePnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {livePnl >= 0 ? '+' : ''}{formatCurrency(livePnl)}
-            </span>
-            {livePnlPct != null && (
-              <div className={`text-[10px] font-data ${livePnlPct >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {livePnlPct >= 0 ? '+' : ''}{livePnlPct.toFixed(2)}%
-              </div>
-            )}
-          </div>
+        {isOpen ? (
+          livePnl != null ? (
+            <div>
+              <span className={`font-data text-xs font-medium ${livePnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                {livePnl >= 0 ? '+' : ''}{formatCurrency(livePnl)}
+              </span>
+              {livePnlPct != null && (
+                <div className={`text-[10px] font-data ${livePnlPct >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  {livePnlPct >= 0 ? '+' : ''}{livePnlPct.toFixed(2)}%
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="text-text-faint text-xs">—</span>
+          )
         ) : (
           <span className="text-text-faint text-xs">—</span>
         )}
