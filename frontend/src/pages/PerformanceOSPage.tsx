@@ -1,10 +1,8 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2, Circle, ChevronRight, RotateCcw, Calendar,
-  TrendingUp, Activity, Brain, Target, BarChart3,
-  AlertTriangle, Sparkles, BookOpen, Loader2, ChevronLeft,
-  Sunrise, Sunset, GitCompare,
+  CheckCircle2, ChevronRight, ChevronLeft,
+  Loader2, BookOpen, Sunrise, Sunset, GitCompare, ArrowRight,
 } from 'lucide-react'
 import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import { useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow } from '@/hooks/usePerformanceOS'
@@ -14,17 +12,18 @@ import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
 import { useToastStore } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
-import type { WorkflowPhase, DailyDashboard } from '@/types/performanceOs'
+import type { WorkflowPhase, DailyDashboard, ChecklistItem } from '@/types/performanceOs'
 import type { DailyJournal, ApiTrade } from '@/types'
 
 type ViewTab = 'daily' | 'weekly' | 'monthly'
-type ReviewSubTab = 'journal' | 'compare'
 
-const PHASE_META: Record<WorkflowPhase, { label: string; icon: typeof Activity; color: string; desc: string }> = {
-  pre_market: { label: 'Pre-Market', icon: Brain, color: 'text-blue-400', desc: 'Prepare, plan, and set your rules' },
-  execution: { label: 'Execution', icon: Target, color: 'text-amber-400', desc: 'Trade with discipline and focus' },
-  review: { label: 'Review', icon: BookOpen, color: 'text-emerald-400', desc: 'Grade your trades and extract lessons' },
-  behavior: { label: 'Behavior', icon: Activity, color: 'text-purple-400', desc: 'Check emotions, discipline, and patterns' },
+const PHASE_ORDER: WorkflowPhase[] = ['pre_market', 'execution', 'review', 'behavior']
+
+const PHASE_LABEL: Record<WorkflowPhase, string> = {
+  pre_market: 'Pre-Market',
+  execution: 'Execution',
+  review: 'Review',
+  behavior: 'Behavior',
 }
 
 function toISODate(d: Date): string {
@@ -32,10 +31,7 @@ function toISODate(d: Date): string {
 }
 
 function computeDailyStats(trades: ApiTrade[], date: string) {
-  const dayTrades = trades.filter((t) => {
-    if (!t.entry_time) return false
-    return t.entry_time.split('T')[0] === date
-  })
+  const dayTrades = trades.filter((t) => t.entry_time && t.entry_time.split('T')[0] === date)
   const count = dayTrades.length
   const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl ? parseFloat(t.pnl) : 0), 0)
   const wins = dayTrades.filter((t) => t.pnl && parseFloat(t.pnl) > 0)
@@ -45,31 +41,83 @@ function computeDailyStats(trades: ApiTrade[], date: string) {
   return { tradeCount: count, totalPnl, winRate, avgR }
 }
 
-function PhaseStepper({ phase, progress }: { phase: WorkflowPhase; progress: DailyDashboard['phase_progress'] }) {
-  const phases: WorkflowPhase[] = ['pre_market', 'execution', 'review', 'behavior']
+function PhaseDots({ phase, progress }: { phase: WorkflowPhase; progress: DailyDashboard['phase_progress'] }) {
+  const idx = PHASE_ORDER.indexOf(phase)
   return (
-    <div className="flex items-center gap-1">
-      {phases.map((p, i) => {
-        const meta = PHASE_META[p]
-        const Icon = meta.icon
+    <div className="flex items-center gap-2">
+      {PHASE_ORDER.map((p, i) => {
         const done = progress.completed[i]
-        const current = p === phase
-        const future = phases.indexOf(phase) > i
+        const current = i === idx
         return (
-          <div key={p} className="flex items-center gap-1">
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              current ? `bg-accent/15 ${meta.color} ring-1 ring-accent/30` :
-              done ? 'bg-profit-muted/20 text-profit' :
-              future ? 'bg-bg-elevated/30 text-text-faint' :
-              'bg-bg-elevated/30 text-text-muted'
-            }`}>
-              {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : current ? <Icon className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{meta.label}</span>
+          <div key={p} className="flex items-center gap-2">
+            <div className={cn(
+              'flex items-center gap-1.5 text-[length:var(--text-xs)] font-medium transition-all',
+              current ? 'text-accent' : done ? 'text-profit/70' : 'text-text-faint',
+            )}>
+              {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <div className={cn('w-2 h-2 rounded-full', current ? 'bg-accent' : 'bg-text-faint/30')} />}
+              <span className={cn(current && 'font-semibold')}>{PHASE_LABEL[p]}</span>
             </div>
-            {i < phases.length - 1 && <ChevronRight className="w-3.5 h-3.5 text-text-faint" />}
+            {i < PHASE_ORDER.length - 1 && <div className={cn('w-4 h-px', i < idx ? 'bg-profit/30' : 'bg-text-faint/15')} />}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function CommandStrip({ dashboard, selectedDate, onDateChange }: { dashboard: DailyDashboard; selectedDate: string; onDateChange: (d: string) => void }) {
+  const today = toISODate(new Date())
+  const regime = dashboard.market_regime
+  const todayPnl = dashboard.today_trades.filter(t => t.exit_price).reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0)
+  const openCount = dashboard.open_positions.length
+  const phase = dashboard.workflow?.phase ?? 'pre_market'
+
+  const shiftDate = (days: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + days)
+    onDateChange(toISODate(d))
+  }
+
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <div className="flex items-center gap-1">
+        <button onClick={() => shiftDate(-1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
+        <span className="font-data text-text-heading">{formatDate(new Date(selectedDate + 'T00:00:00'))}</span>
+        <button onClick={() => shiftDate(1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
+        {selectedDate === today && <span className="text-accent font-medium ml-0.5">today</span>}
+      </div>
+
+      <div className="w-px h-3 bg-border" />
+
+      <span className={cn('font-medium', phase === 'pre_market' ? 'text-blue-400' : phase === 'execution' ? 'text-amber-400' : phase === 'review' ? 'text-emerald-400' : 'text-purple-400')}>
+        {PHASE_LABEL[phase]}
+      </span>
+
+      {todayPnl !== 0 && (
+        <>
+          <div className="w-px h-3 bg-border" />
+          <span className={cn('font-data font-medium', todayPnl >= 0 ? 'text-profit' : 'text-loss')}>
+            {todayPnl >= 0 ? '+' : ''}{formatCurrency(todayPnl)}
+          </span>
+        </>
+      )}
+
+      {openCount > 0 && (
+        <>
+          <div className="w-px h-3 bg-border" />
+          <span className="text-text-muted">{openCount} open</span>
+        </>
+      )}
+
+      {regime && (
+        <>
+          <div className="w-px h-3 bg-border" />
+          <span className={cn('font-data', regime.nifty_trend === 'bullish' ? 'text-profit/70' : regime.nifty_trend === 'bearish' ? 'text-loss/70' : 'text-text-muted')}>
+            Nifty {regime.nifty_trend ?? '—'}
+          </span>
+          {regime.india_vix && <span className="text-text-faint">VIX {regime.india_vix}</span>}
+        </>
+      )}
     </div>
   )
 }
@@ -78,96 +126,74 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
   const updateMut = useUpdateWorkflow(dateStr)
   const advanceMut = useAdvancePhase(dateStr)
   const wf = dashboard.workflow!
-  const checklist = wf.checklist_items
-  const checkedCount = checklist.filter(c => c.checked).length
-  const allChecked = checklist.every(c => c.checked)
-  const regime = dashboard.market_regime
+  const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>(wf.checklist_items)
+  const initialized = useRef(false)
+  if (!initialized.current) { initialized.current = true }
+  if (initialized.current && localChecklist !== wf.checklist_items && wf.checklist_items.length > 0 && localChecklist.length === 0) {
+    setLocalChecklist(wf.checklist_items)
+  }
+
+  const checkedCount = localChecklist.filter(c => c.checked).length
+  const allChecked = localChecklist.every(c => c.checked)
 
   const toggleItem = (id: string) => {
-    const updated = checklist.map(c => c.id === id ? { ...c, checked: !c.checked } : c)
-    updateMut.mutate({ checklist_items: updated })
+    setLocalChecklist(prev => prev.map(c => c.id === id ? { ...c, checked: !c.checked } : c))
+  }
+
+  const handleAdvance = () => {
+    updateMut.mutate({ checklist_items: localChecklist }, {
+      onSuccess: () => advanceMut.mutate(),
+    })
   }
 
   return (
-    <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Market Regime</h4>
-        {regime ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <div className="text-[10px] text-text-faint uppercase">Nifty</div>
-              <div className="text-sm font-data text-text-heading">{regime.nifty_close ? formatPrice(Number(regime.nifty_close)) : '—'}</div>
-              <div className={`text-xs font-data ${regime.nifty_trend === 'bullish' ? 'text-profit' : regime.nifty_trend === 'bearish' ? 'text-loss' : 'text-text-muted'}`}>
-                {regime.nifty_trend ?? '—'}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] text-text-faint uppercase">Regime</div>
-              <div className="text-sm font-data text-text-heading capitalize">{regime.nifty_regime?.replace('_', ' ') ?? '—'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-text-faint uppercase">VIX</div>
-              <div className="text-sm font-data text-text-heading">{regime.india_vix ?? '—'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-text-faint uppercase">A/D</div>
-              <div className="text-sm font-data text-text-heading">{regime.advance_count ?? 0}/{regime.decline_count ?? 0}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-xs text-text-muted py-3">
-            <AlertTriangle className="w-4 h-4" />
-            <span>No market data for today. Seed from Market Context page.</span>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Pre-Market Checklist</h4>
-          <span className="text-xs font-data text-text-muted">{checkedCount}/{checklist.length}</span>
+    <div className="space-y-6 animate-card-in">
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Checklist</span>
+          <span className="text-[length:var(--text-xs)] font-data text-text-faint">{checkedCount}/{localChecklist.length}</span>
         </div>
-        <div className="space-y-2">
-          {checklist.map(item => (
+        <div className="h-1 bg-bg-elevated rounded-full overflow-hidden mb-3">
+          <div className="h-full bg-profit/60 rounded-full transition-all" style={{ width: `${localChecklist.length ? (checkedCount / localChecklist.length) * 100 : 0}%` }} />
+        </div>
+        <div className="space-y-0.5">
+          {localChecklist.map(item => (
             <button
               key={item.id}
               onClick={() => toggleItem(item.id)}
-              className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                item.checked ? 'border-profit/20 bg-profit-muted/10' : 'border-border hover:border-accent/30'
-              }`}
+              className="w-full flex items-center gap-3 py-2.5 px-1 text-left cursor-pointer group transition-all"
             >
-              {item.checked
-                ? <CheckCircle2 className="w-4 h-4 text-profit mt-0.5 shrink-0" />
-                : <Circle className="w-4 h-4 text-text-muted mt-0.5 shrink-0" />
-              }
-              <span className={`text-sm ${item.checked ? 'text-text-muted line-through' : 'text-text-heading'}`}>{item.label}</span>
+              <div className={cn(
+                'w-4 h-4 rounded-full border transition-all shrink-0 flex items-center justify-center',
+                item.checked ? 'border-profit/40 bg-profit/15' : 'border-text-faint/20 group-hover:border-text-muted/40',
+              )}>
+                {item.checked && <div className="w-1.5 h-1.5 rounded-full bg-profit" />}
+              </div>
+              <span className={cn('text-sm transition-all', item.checked ? 'text-text-muted line-through' : 'text-text-heading')}>{item.label}</span>
             </button>
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between">
-          <div className="h-2 flex-1 bg-bg-elevated rounded-full overflow-hidden mr-3">
-            <div className="h-full bg-profit rounded-full transition-all" style={{ width: `${checklist.length ? (checkedCount / checklist.length) * 100 : 0}%` }} />
-          </div>
-          <button
-            onClick={() => advanceMut.mutate()}
-            disabled={!allChecked || advanceMut.isPending}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-40"
-          >
-            {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-            Start Trading
-          </button>
-        </div>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Pre-Market Notes</h4>
+      <div>
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
         <textarea
           value={wf.pre_market_notes ?? ''}
           onChange={(e) => updateMut.mutate({ pre_market_notes: e.target.value })}
           placeholder="Market context, key levels, setups to watch, risk plan..."
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[120px]"
+          rows={5}
+          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
         />
       </div>
+
+      <button
+        onClick={handleAdvance}
+        disabled={!allChecked || advanceMut.isPending}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-accent/10 text-accent hover:bg-accent/15 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+        Start Trading
+      </button>
     </div>
   )
 }
@@ -180,50 +206,44 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
   const todayTrades = dashboard.today_trades
 
   return (
-    <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Open Positions</h4>
-        {positions.length === 0 ? (
-          <div className="py-6 text-center text-sm text-text-muted">No open positions</div>
-        ) : (
-          <div className="space-y-2">
+    <div className="space-y-6 animate-card-in">
+      {positions.length > 0 && (
+        <div>
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Open Positions</span>
+          <div className="mt-2 divide-y divide-border/50">
             {positions.map(p => (
-              <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-bg-elevated/30">
-                <div className="min-w-0">
+              <div key={p.id} className="flex items-center justify-between py-2.5">
+                <div>
                   <span className="text-sm font-medium text-text-heading">{p.symbol}</span>
-                  <span className="text-xs text-text-muted ml-2">{p.setup}</span>
+                  {p.setup && <span className="text-[length:var(--text-xs)] text-text-muted ml-2">{p.setup}</span>}
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-text-muted">Entry {formatPrice(Number(p.entry_price))} x {p.quantity}</div>
-                  {p.stop_price && <div className="text-xs text-loss">SL {formatPrice(Number(p.stop_price))}</div>}
+                <div className="text-right font-data text-[length:var(--text-xs)] text-text-muted">
+                  {formatPrice(Number(p.entry_price))} x {p.quantity}
+                  {p.stop_price && <span className="text-loss ml-2">SL {formatPrice(Number(p.stop_price))}</span>}
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Today's Trades</h4>
+      <div>
+        <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Today's Trades</span>
         {todayTrades.length === 0 ? (
-          <div className="py-6 text-center text-sm text-text-muted">No trades yet today</div>
+          <div className="mt-3 text-sm text-text-faint py-4 text-center">No trades yet today</div>
         ) : (
-          <div className="space-y-2">
+          <div className="mt-2 divide-y divide-border/50">
             {todayTrades.map(t => {
               const pnl = t.pnl ? Number(t.pnl) : null
               return (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-bg-elevated/30">
-                  <div className="min-w-0">
+                <div key={t.id} className="flex items-center justify-between py-2.5">
+                  <div>
                     <span className="text-sm font-medium text-text-heading">{t.symbol}</span>
-                    <span className="text-xs text-text-muted ml-2">{t.setup}</span>
+                    {t.setup && <span className="text-[length:var(--text-xs)] text-text-muted ml-2">{t.setup}</span>}
                   </div>
                   <div className="text-right">
-                    {pnl !== null && (
-                      <div className={`text-sm font-data ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
-                      </div>
-                    )}
-                    <div className="text-xs text-text-muted">{t.exit_price ? 'Closed' : 'Open'}</div>
+                    {pnl !== null && <div className={cn('text-sm font-data', pnl >= 0 ? 'text-profit' : 'text-loss')}>{pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}</div>}
+                    <div className="text-[length:var(--text-xs)] text-text-faint">{t.exit_price ? 'Closed' : 'Open'}</div>
                   </div>
                 </div>
               )
@@ -232,23 +252,24 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         )}
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Intraday Notes</h4>
+      <div>
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Intraday Notes</label>
         <textarea
           value={wf.intraday_notes ?? ''}
           onChange={(e) => updateMut.mutate({ intraday_notes: e.target.value })}
-          placeholder="Trade observations, emotion check-ins, rule violations..."
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[80px]"
+          placeholder="Observations, emotion check-ins..."
+          rows={3}
+          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
         />
       </div>
 
       <button
         onClick={() => advanceMut.mutate()}
         disabled={advanceMut.isPending}
-        className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-accent/10 text-accent hover:bg-accent/15 transition-all cursor-pointer disabled:opacity-30"
       >
         {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
-        Move to Review Phase
+        Move to Review
       </button>
     </div>
   )
@@ -256,21 +277,17 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
 
 function CompareView({ journal }: { journal: DailyJournal | null | undefined }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="rounded-xl border border-border bg-bg-card p-5">
-        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
-          <Sunrise className="w-[15px] h-[15px] text-accent" /> Pre-market
-        </div>
-        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
-          {journal?.pre_trade_notes || <span className="text-text-muted italic">No pre-market notes yet.</span>}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-2"><Sunrise className="w-3.5 h-3.5 text-accent" /> Pre-market</div>
+        <div className="text-sm text-text whitespace-pre-wrap min-h-[10rem] leading-relaxed">
+          {journal?.pre_trade_notes || <span className="text-text-faint italic">No pre-market notes.</span>}
         </div>
       </div>
-      <div className="rounded-xl border border-border bg-bg-card p-5">
-        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
-          <Sunset className="w-[15px] h-[15px] text-accent" /> Post-market
-        </div>
-        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
-          {journal?.post_trade_notes || <span className="text-text-muted italic">No post-market notes yet.</span>}
+      <div>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-2"><Sunset className="w-3.5 h-3.5 text-accent" /> Post-market</div>
+        <div className="text-sm text-text whitespace-pre-wrap min-h-[10rem] leading-relaxed">
+          {journal?.post_trade_notes || <span className="text-text-faint italic">No post-market notes.</span>}
         </div>
       </div>
     </div>
@@ -280,7 +297,7 @@ function CompareView({ journal }: { journal: DailyJournal | null | undefined }) 
 function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateStr: string }) {
   const advanceMut = useAdvancePhase(dateStr)
   const addToast = useToastStore((s) => s.addToast)
-  const [subTab, setSubTab] = useState<ReviewSubTab>('journal')
+  const [showCompare, setShowCompare] = useState(false)
 
   const { data: journal, isLoading: journalLoading } = useJournalQuery(dateStr)
   const { data: tradesData } = useTradesQuery()
@@ -313,126 +330,91 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
   const todayPnl = dashboard.today_trades.filter(t => t.exit_price).reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0)
 
   return (
-    <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Post-Market Summary</h4>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Trades</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{dashboard.today_trades.length}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Closed</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{dashboard.today_trades.filter(t => t.exit_price).length}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Day P&amp;L</div>
-            <div className={`text-lg font-data font-semibold ${todayPnl >= 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(todayPnl)}</div>
-          </div>
+    <div className="space-y-6 animate-card-in">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 font-data text-[length:var(--text-xs)] text-text-muted">
+          <span>{dashboard.today_trades.length} trades</span>
+          <span>{dashboard.today_trades.filter(t => t.exit_price).length} closed</span>
+          <span className={cn('font-medium', todayPnl >= 0 ? 'text-profit' : 'text-loss')}>
+            {todayPnl >= 0 ? '+' : ''}{formatCurrency(todayPnl)}
+          </span>
         </div>
+        <button
+          onClick={() => setShowCompare(!showCompare)}
+          className="text-[length:var(--text-xs)] text-text-muted hover:text-accent cursor-pointer flex items-center gap-1"
+        >
+          <GitCompare className="w-3 h-3" />
+          {showCompare ? 'Journal' : 'Compare'}
+        </button>
       </div>
 
-      <div className="flex gap-1 p-1 rounded-xl bg-bg-card border border-border overflow-x-auto">
-        {([
-          { id: 'journal' as ReviewSubTab, label: 'Journal Entry', icon: BookOpen },
-          { id: 'compare' as ReviewSubTab, label: 'Compare', icon: GitCompare },
-        ]).map(t => {
-          const Icon = t.icon
-          const active = subTab === t.id
-          return (
-            <button
-              key={t.id}
-              onClick={() => setSubTab(t.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap',
-                active ? 'bg-accent-muted text-accent font-semibold' : 'text-text hover:text-text-heading'
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {subTab === 'journal' && !journalLoading && (
+      {showCompare ? (
+        <CompareView journal={journal} />
+      ) : journalLoading ? (
+        <div className="py-12 text-center"><Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" /></div>
+      ) : (
         <DailyJournalForm journal={journal} date={dateStr} onSave={handleSave} isSaving={isSaving} summaryStats={summaryStats} />
       )}
-      {subTab === 'journal' && journalLoading && (
-        <div className="bg-card rounded-2xl border border-border p-8 text-center">
-          <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
-          <p className="text-sm text-text-muted mt-3">Loading entry...</p>
-        </div>
-      )}
-      {subTab === 'compare' && <CompareView journal={journal} />}
 
       <button
         onClick={() => advanceMut.mutate()}
         disabled={advanceMut.isPending}
-        className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-accent/10 text-accent hover:bg-accent/15 transition-all cursor-pointer disabled:opacity-30"
       >
-        {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-        Move to Behavior Phase
+        {advanceMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+        Move to Behavior
       </button>
     </div>
   )
 }
 
-function BehaviorPhase({ dashboard }: { dashboard: DailyDashboard }) {
-  const { data: journal } = useJournalQuery(new Date().toISOString().slice(0, 10))
+function BehaviorPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateStr: string }) {
+  const { data: journal } = useJournalQuery(dateStr)
   const ds = dashboard.discipline_score
   const wf = dashboard.workflow!
 
   return (
-    <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Execution Discipline</h4>
-        {ds ? (
-          <div className="flex items-center gap-4">
-            <div className="text-3xl font-data font-bold text-accent">{ds.avg_execution_grade.toFixed(1)}</div>
+    <div className="space-y-6 animate-card-in">
+      {ds && (
+        <div className="flex items-baseline gap-3">
+          <span className="text-2xl font-data font-bold text-accent">{ds.avg_execution_grade.toFixed(1)}</span>
+          <span className="text-[length:var(--text-xs)] text-text-muted">avg execution grade — {ds.total_graded} trades (30d)</span>
+        </div>
+      )}
+
+      {journal ? (
+        <div className="flex items-center gap-6 text-sm">
+          {journal.mood_rating != null && (
             <div>
-              <div className="text-sm text-text-heading">Avg Execution Grade</div>
-              <div className="text-xs text-text-muted">Based on {ds.total_graded} graded trades (30d)</div>
+              <span className="text-[length:var(--text-xs)] text-text-muted block">Mood</span>
+              <span className="font-data font-medium text-text-heading">{journal.mood_rating}/5</span>
             </div>
-          </div>
-        ) : (
-          <div className="text-sm text-text-muted py-2">Grade trades to see discipline score</div>
-        )}
-      </div>
-
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Today's Journal</h4>
-        {journal ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-              <div className="text-[10px] text-text-faint uppercase">Mood</div>
-              <div className="text-lg font-data font-semibold text-text-heading">{journal.mood_rating ?? '—'}/5</div>
+          )}
+          {journal.discipline_rating != null && (
+            <div>
+              <span className="text-[length:var(--text-xs)] text-text-muted block">Discipline</span>
+              <span className="font-data font-medium text-text-heading">{journal.discipline_rating}/5</span>
             </div>
-            <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-              <div className="text-[10px] text-text-faint uppercase">Discipline</div>
-              <div className="text-lg font-data font-semibold text-text-heading">{journal.discipline_rating ?? '—'}/5</div>
+          )}
+          {journal.rules_followed && (
+            <div className="flex-1 min-w-0">
+              <span className="text-[length:var(--text-xs)] text-text-muted block">Rules Followed</span>
+              <span className="text-text-heading text-sm line-clamp-1">{journal.rules_followed}</span>
             </div>
-            <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 col-span-2">
-              <div className="text-[10px] text-text-faint uppercase">Rules Followed</div>
-              <div className="text-sm text-text-heading whitespace-pre-wrap mt-1">{journal.rules_followed || '—'}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-sm text-text-muted py-2">Fill in your journal from the Review phase</div>
-        )}
-      </div>
-
-      {wf.behavior_done ? (
-        <div className="bg-profit-muted/10 border border-profit/20 rounded-2xl p-5 text-center">
-          <CheckCircle2 className="w-10 h-10 text-profit mx-auto mb-2" />
-          <div className="text-sm font-medium text-profit">Day Complete</div>
-          <div className="text-xs text-text-muted mt-1">You ran your full trading workflow today.</div>
+          )}
         </div>
       ) : (
-        <div className="bg-accent-muted/10 border border-accent/20 rounded-2xl p-5 text-center">
-          <Sparkles className="w-10 h-10 text-accent mx-auto mb-2" />
-          <div className="text-sm font-medium text-accent">Behavior review done?</div>
-          <div className="text-xs text-text-muted mt-1">Check your emotions, patterns, and rules.</div>
+        <div className="text-sm text-text-faint">Complete the Review phase to see journal data here.</div>
+      )}
+
+      {wf.behavior_done ? (
+        <div className="py-6 text-center">
+          <CheckCircle2 className="w-8 h-8 text-profit/60 mx-auto mb-2" />
+          <div className="text-sm text-profit/80 font-medium">Day complete</div>
+        </div>
+      ) : (
+        <div className="text-[length:var(--text-xs)] text-text-faint text-center py-4">
+          Review your emotional state, patterns, and rule compliance.
         </div>
       )}
     </div>
@@ -449,91 +431,69 @@ const PHASE_COMPONENTS: Record<WorkflowPhase, typeof PreMarketPhase> = {
 export function PerformanceOSPage() {
   const [viewTab, setViewTab] = useState<ViewTab>('daily')
   const [selectedDate, setSelectedDate] = useState<string>(toISODate(new Date()))
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toISODate(new Date())
   const isToday = selectedDate === today
 
   const { data: dashboard, isLoading } = useDailyDashboard(isToday ? undefined : selectedDate)
   const resetMut = useResetWorkflow(today)
   const qc = useQueryClient()
 
-  const shiftDate = (days: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + days)
-    setSelectedDate(toISODate(d))
-  }
-
-  if (isLoading && isToday) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 text-accent animate-spin" /></div>
-  }
-
   const wf = dashboard?.workflow
   const phase = wf?.phase ?? 'pre_market'
   const PhaseComponent = PHASE_COMPONENTS[phase]
 
   return (
-    <div className="space-y-[var(--page-gap)] px-[var(--page-px)] py-[var(--page-py)]">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-xl sm:text-2xl font-semibold text-text-heading">Performance OS</h1>
-          <p className="text-sm text-text-muted mt-0.5">Your daily trading workflow</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => shiftDate(-1)} className="flex items-center justify-center w-8 h-8 rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <div className="relative">
-            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-8 pl-8 pr-2 rounded-lg border border-border bg-bg-card text-xs text-text-heading font-data focus:outline-none focus:border-accent/40 cursor-pointer [color-scheme:dark]"
-            />
-          </div>
-          <button onClick={() => shiftDate(1)} className="flex items-center justify-center w-8 h-8 rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          {isToday && (
-            <button
-              onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-elevated/50 text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-all cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Reset
-            </button>
-          )}
-        </div>
+    <div className="px-[var(--page-px)] py-[var(--page-py)]">
+      {/* Header */}
+      <div className="mb-1">
+        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading tracking-tight">Performance OS</h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Command strip */}
+      {dashboard && <CommandStrip dashboard={dashboard} selectedDate={selectedDate} onDateChange={setSelectedDate} />}
+
+      {/* View range selector */}
+      <div className="flex items-center gap-1 mt-4 mb-5">
         {([
-          { id: 'daily' as ViewTab, label: 'Daily', icon: Calendar },
-          { id: 'weekly' as ViewTab, label: 'Weekly', icon: BarChart3 },
-          { id: 'monthly' as ViewTab, label: 'Monthly', icon: TrendingUp },
+          { id: 'daily' as ViewTab, label: 'Daily' },
+          { id: 'weekly' as ViewTab, label: 'Weekly' },
+          { id: 'monthly' as ViewTab, label: 'Monthly' },
         ]).map(t => (
           <button
             key={t.id}
             onClick={() => setViewTab(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              viewTab === t.id ? 'bg-accent text-white' : 'bg-bg-elevated/50 text-text-muted hover:text-text-heading hover:bg-bg-card-h'
-            }`}
+            className={cn(
+              'px-3 py-1 rounded-lg text-[length:var(--text-xs)] font-medium transition-all cursor-pointer',
+              viewTab === t.id ? 'bg-bg-elevated/80 text-text-heading' : 'text-text-faint hover:text-text-muted',
+            )}
           >
-            <t.icon className="w-3.5 h-3.5" />
             {t.label}
           </button>
         ))}
+        {isToday && viewTab === 'daily' && (
+          <button
+            onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
+            className="ml-auto text-[10px] text-text-faint hover:text-text-muted cursor-pointer"
+          >
+            reset
+          </button>
+        )}
       </div>
 
-      {viewTab === 'daily' && dashboard && (
-        <>
-          <PhaseStepper phase={phase} progress={dashboard.phase_progress} />
-          <PhaseComponent dashboard={dashboard} dateStr={selectedDate} />
-        </>
+      {/* Daily: Phase content */}
+      {viewTab === 'daily' && isLoading && (
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
       )}
-
-      {viewTab === 'daily' && !dashboard && (
-        <div className="bg-card rounded-2xl border border-border p-5 text-center">
-          <div className="text-sm text-text-muted">Loading workflow...</div>
+      {viewTab === 'daily' && dashboard && (
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+          <PhaseDots phase={phase} progress={dashboard.phase_progress} />
+          <div className="mt-5 border-t border-border/50 pt-5">
+            <PhaseComponent dashboard={dashboard} dateStr={selectedDate} />
+          </div>
         </div>
+      )}
+      {viewTab === 'daily' && !dashboard && !isLoading && (
+        <div className="text-sm text-text-faint text-center py-12">No workflow data.</div>
       )}
 
       {viewTab === 'weekly' && <WeeklyReviewSection selectedDate={selectedDate} onSelectDate={setSelectedDate} />}
@@ -558,11 +518,7 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   const monday = new Date(new Date(d).setDate(diff))
   const mondayISO = toISODate(monday)
-  const weekDays = Array.from({ length: 5 }, (_, i) => {
-    const cd = new Date(monday)
-    cd.setDate(monday.getDate() + i)
-    return cd
-  })
+  const weekDays = Array.from({ length: 5 }, (_, i) => { const cd = new Date(monday); cd.setDate(monday.getDate() + i); return cd })
 
   const { data: stats } = useWeeklyJournalStatsQuery(mondayISO)
   const { data: weekJournals } = useWeeklyJournalsQuery(mondayISO)
@@ -573,37 +529,21 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
 
   return (
     <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-text-heading">
-            Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}
-          </h3>
-          <span className={`text-lg font-data font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+        <div className="flex items-baseline justify-between mb-4">
+          <span className="text-sm font-medium text-text-heading">Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}</span>
+          <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Trades</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.total_trades ?? stats?.trade_count ?? 0}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Win Rate</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.win_rate ?? (stats ? `${parseFloat(stats.win_rate).toFixed(1)}%` : '—')}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Best Setup</div>
-            <div className="text-sm font-medium text-text-heading">{review?.top_setup ?? '—'}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">P&amp;L</div>
-            <div className={`text-lg font-data font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
-            </div>
-          </div>
+
+        <div className="flex items-center gap-6 mb-4 text-sm font-data">
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{review?.total_trades ?? stats?.trade_count ?? 0}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{review?.win_rate ?? (stats ? `${parseFloat(stats.win_rate).toFixed(1)}%` : '—')}</span></div>
+          {review?.top_setup && <div><span className="text-[length:var(--text-xs)] text-text-muted block">Best Setup</span><span className="text-text-heading font-medium">{review.top_setup}</span></div>}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {weekDays.map(wd => {
             const iso = toISODate(wd)
             const isToday = iso === toISODate(new Date())
@@ -613,17 +553,12 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
                 key={iso}
                 onClick={() => onSelectDate(iso)}
                 className={cn(
-                  'text-left rounded-xl border p-3 transition-all cursor-pointer',
-                  isSelected ? 'border-accent/30 bg-accent-muted' : 'border-border bg-bg-card hover:border-medium'
+                  'rounded-lg p-2 text-center transition-all cursor-pointer',
+                  isSelected ? 'bg-accent/10 text-accent' : 'hover:bg-bg-elevated/50 text-text-muted',
                 )}
               >
-                <div className="text-[10px] text-text-muted uppercase tracking-wider font-medium mb-1">
-                  {wd.toLocaleDateString('en-IN', { weekday: 'short' })}
-                </div>
-                <div className={cn('text-sm font-semibold', isToday ? 'text-accent' : 'text-text-heading')}>
-                  {formatDate(wd)}
-                </div>
-                <div className="text-[10px] text-text-muted mt-1">{isToday ? 'Today' : 'Tap to open'}</div>
+                <div className="text-[10px] uppercase tracking-wider mb-0.5">{wd.toLocaleDateString('en-IN', { weekday: 'short' })}</div>
+                <div className={cn('text-sm font-semibold', isToday ? 'text-accent' : 'text-text-heading')}>{wd.getDate()}</div>
               </button>
             )
           })}
@@ -631,14 +566,14 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
       </div>
 
       {review?.daily_breakdown && review.daily_breakdown.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Daily Breakdown</h4>
-          <div className="space-y-1.5">
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Daily Breakdown</span>
+          <div className="mt-3 divide-y divide-border/50">
             {review.daily_breakdown.map(d => (
-              <div key={d.date} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-bg-elevated/30">
-                <span className="text-xs text-text-muted">{new Date(d.date + 'T00:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                <span className="text-xs text-text-muted">{d.trades} trades</span>
-                <span className={`text-xs font-data ${Number(d.pnl) >= 0 ? 'text-profit' : 'text-loss'}`}>{Number(d.pnl) >= 0 ? '+' : ''}{formatCurrency(Number(d.pnl))}</span>
+              <div key={d.date} className="flex items-center justify-between py-2">
+                <span className="text-[length:var(--text-xs)] text-text-muted">{new Date(d.date + 'T00:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                <span className="text-[length:var(--text-xs)] text-text-faint">{d.trades}</span>
+                <span className={cn('text-[length:var(--text-xs)] font-data', Number(d.pnl) >= 0 ? 'text-profit/70' : 'text-loss/70')}>{Number(d.pnl) >= 0 ? '+' : ''}{formatCurrency(Number(d.pnl))}</span>
               </div>
             ))}
           </div>
@@ -646,33 +581,32 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
       )}
 
       {weekJournals && weekJournals.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Journal Entries</h4>
-          <div className="space-y-2">
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Journal Entries</span>
+          <div className="mt-3 divide-y divide-border/50">
             {weekJournals.map(j => (
-              <button
-                key={j.id}
-                onClick={() => onSelectDate(j.date)}
-                className="w-full text-left rounded-lg border border-border bg-bg-card hover:bg-accent-muted transition-all cursor-pointer p-3"
-              >
+              <button key={j.id} onClick={() => onSelectDate(j.date)} className="w-full text-left py-2.5 cursor-pointer group">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-text-heading">{j.date} — {new Date(j.date).toLocaleDateString('en-IN', { weekday: 'long' })}</span>
-                  {j.mood_rating != null && <span className="text-[10px] text-text-muted">Mood: {j.mood_rating}/5</span>}
+                  <span className="text-[length:var(--text-xs)] font-medium text-text-heading group-hover:text-accent transition-colors">
+                    {new Date(j.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </span>
+                  {j.mood_rating != null && <span className="text-[10px] text-text-faint">{j.mood_rating}/5</span>}
                 </div>
-                {j.lessons_learned && <p className="text-xs text-text-muted mt-1 line-clamp-2">{j.lessons_learned}</p>}
+                {j.lessons_learned && <p className="text-[length:var(--text-xs)] text-text-faint mt-0.5 line-clamp-1">{j.lessons_learned}</p>}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Key Lessons</h4>
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Key Lessons</label>
         <textarea
           value={review?.key_lessons ?? ''}
           onChange={(e) => updateMut.mutate({ key_lessons: e.target.value })}
           placeholder="What did you learn this week?"
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[80px]"
+          rows={3}
+          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
         />
       </div>
     </div>
@@ -695,42 +629,30 @@ function MonthlyReviewSection() {
   const pnl = review ? Number(review.total_pnl) : 0
   return (
     <div className="space-y-5 animate-card-in">
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-text-heading">{review?.month ?? 'Current Month'}</h3>
-          <span className={`text-lg font-data font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+        <div className="flex items-baseline justify-between mb-4">
+          <span className="text-sm font-medium text-text-heading">{review?.month ?? 'Current Month'}</span>
+          <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Trades</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.total_trades ?? 0}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Win Rate</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.win_rate ?? '—'}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Profit Factor</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.profit_factor ?? '—'}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Avg R</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.avg_r ?? '—'}</div>
-          </div>
+        <div className="flex items-center gap-6 text-sm font-data">
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{review?.total_trades ?? 0}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{review?.win_rate ?? '—'}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">PF</span><span className="text-text-heading font-medium">{review?.profit_factor ?? '—'}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Avg R</span><span className="text-text-heading font-medium">{review?.avg_r ?? '—'}</span></div>
         </div>
       </div>
 
       {review?.setup_performance && review.setup_performance.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Setup Performance</h4>
-          <div className="space-y-1.5">
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Setup Performance</span>
+          <div className="mt-3 divide-y divide-border/50">
             {review.setup_performance.map(s => (
-              <div key={s.setup} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-bg-elevated/30">
+              <div key={s.setup} className="flex items-center justify-between py-2">
                 <span className="text-sm text-text-heading">{s.setup}</span>
-                <span className="text-xs text-text-muted">{s.count} trades</span>
-                <span className={`text-xs font-data ${Number(s.pnl) >= 0 ? 'text-profit' : 'text-loss'}`}>{Number(s.pnl) >= 0 ? '+' : ''}{formatCurrency(Number(s.pnl))}</span>
+                <span className="text-[length:var(--text-xs)] text-text-faint">{s.count}</span>
+                <span className={cn('text-[length:var(--text-xs)] font-data', Number(s.pnl) >= 0 ? 'text-profit/70' : 'text-loss/70')}>{Number(s.pnl) >= 0 ? '+' : ''}{formatCurrency(Number(s.pnl))}</span>
               </div>
             ))}
           </div>
@@ -738,23 +660,24 @@ function MonthlyReviewSection() {
       )}
 
       {review?.top_emotions && review.top_emotions.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Emotional Landscape</h4>
-          <div className="flex flex-wrap gap-2">
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-2 block">Emotional Landscape</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
             {review.top_emotions.map(e => (
-              <span key={e.emotion} className="text-xs px-3 py-1 rounded-full bg-accent-muted/15 text-accent capitalize">{e.emotion} ({e.count})</span>
+              <span key={e.emotion} className="text-[10px] px-2.5 py-0.5 rounded-full bg-accent/8 text-accent/70 capitalize">{e.emotion} {e.count}</span>
             ))}
           </div>
         </div>
       )}
 
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Month Notes</h4>
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+        <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
         <textarea
           value={review?.notes ?? ''}
           onChange={(e) => updateMut.mutate({ notes: e.target.value })}
-          placeholder="Reflections, goals progress, next month targets..."
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[80px]"
+          placeholder="Reflections, goals, next month targets..."
+          rows={3}
+          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
         />
       </div>
     </div>
