@@ -27,11 +27,13 @@ function computeLivePositions(trades: ApiTrade[], quoteMap: Map<string, LiveQuot
       const ltp = quote?.ltp ? parseFloat(quote.ltp) : null
       const changePct = quote?.change_pct ? parseFloat(quote.change_pct) : null
       const entry = parseFloat(t.entry_price)
-      const qty = parseFloat(t.quantity)
+      const fullQty = parseFloat(t.quantity)
+      const remainingQty = t.remaining_qty ? parseFloat(t.remaining_qty) : fullQty
       const fees = parseFloat(t.fees)
-      const investedValue = entry * qty
-      const marketValue = ltp != null ? ltp * qty : investedValue
-      const livePnl = ltp != null ? (ltp - entry) * qty - fees : 0
+      const feeRatio = fullQty > 0 ? remainingQty / fullQty : 1
+      const investedValue = entry * remainingQty
+      const marketValue = ltp != null ? ltp * remainingQty : investedValue
+      const livePnl = ltp != null ? (ltp - entry) * remainingQty - fees * feeRatio : 0
       const livePnlPct = investedValue > 0 ? (livePnl / investedValue) * 100 : 0
       return { trade: t, quote, ltp, changePct, livePnl, livePnlPct, investedValue, marketValue }
     })

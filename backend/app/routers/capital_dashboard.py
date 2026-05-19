@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_serializer
 from app.models.account import Account
 from app.models.capital_event import CapitalEvent
 from app.models.trade import Trade
+from app.models.partial_exit import PartialExit
 from app.models.tier_config import TierConfig
 from app.db.database import get_db
 from app.utils.logging import get_logger
@@ -97,7 +98,6 @@ DEFAULT_TIERS = [
 def _load_tiers(db: Session) -> list[dict]:
     tiers = db.query(TierConfig).order_by(TierConfig.sort_order).all()
     if not tiers:
-        # seed defaults
         for t in DEFAULT_TIERS:
             db.add(TierConfig(
                 name=t["name"],
@@ -147,6 +147,22 @@ def _compute_tiers(net_equity: Decimal, db: Session) -> tuple[list[dict], Option
     return result, progress
 
 
+# ───────────────────────── Helpers ─────────────────────────
+
+
+def _get_partial_exits_by_trade(db: Session) -> dict[int, list[PartialExit]]:
+    all_partials = db.query(PartialExit).order_by(PartialExit.exit_time.asc()).all()
+    by_trade: dict[int, list[PartialExit]] = defaultdict(list)
+    for pe in all_partials:
+        by_trade[pe.trade_id].append(pe)
+    return by_trade
+
+
+def _remaining_qty_for_trade(trade: Trade, partials: list[PartialExit]) -> Decimal:
+    total_exited = sum(pe.qty for pe in partials)
+    return trade.quantity - total_exited
+
+
 # ───────────────────────── Endpoint ─────────────────────────
 
 
@@ -189,67 +205,98 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
             description=evt.description,
         ))
 
-    # Realized PnL from non-deleted trades
-    trades = (
+    # Load all partial exits indexed by trade_id
+    pe_by_trade = _get_partial_exits_by_trade(db)
+
+    # ── Realized PnL: closed trade pnl + partial exit realized_pnl from open trades ──
+    closed_trades = (
         db.query(Trade)
-        .filter(Trade.pnl.isnot(None), Trade.status != "deleted")
+        .filter(Trade.exit_price.isnot(None), Trade.status != "deleted")
         .all()
     )
 
-    # Open trades — compute deployed capital
     open_trades = (
         db.query(Trade)
-        .filter(Trade.pnl.is_(None), Trade.status != "deleted")
+        .filter(Trade.exit_price.is_(None), Trade.status != "deleted")
         .all()
-    )
-
-    deployed_capital = sum(
-        (ensure_decimal(t.entry_price) * ensure_decimal(t.quantity) - ensure_decimal(t.fees))
-        for t in open_trades
     )
 
     total_realized_pnl = Decimal("0")
-    total_trades = len(trades)
+    all_realized_pnls: list[Decimal] = []
+
+    # Closed trades contribute their full pnl
+    for t in closed_trades:
+        pnl = ensure_decimal(t.pnl)
+        total_realized_pnl += pnl
+        all_realized_pnls.append(pnl)
+
+    # Open trades contribute partial exit realized pnl
+    open_partial_realized = Decimal("0")
+    for t in open_trades:
+        partials = pe_by_trade.get(t.id, [])
+        for pe in partials:
+            pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
+            total_realized_pnl += pe_pnl
+            open_partial_realized += pe_pnl
+            all_realized_pnls.append(pe_pnl)
+
+    # ── Deployed capital using remaining_qty ──
+    deployed_capital = Decimal("0")
+    for t in open_trades:
+        partials = pe_by_trade.get(t.id, [])
+        rem = _remaining_qty_for_trade(t, partials)
+        deployed_capital += ensure_decimal(t.entry_price) * rem
+
+    # ── Unrealized PnL: (cannot compute server-side without LTP — return 0) ──
+    #    Frontend computes this client-side using LTP from market data
+    unrealized_pnl = Decimal("0")
+
+    # ── Stats from all realized PnLs (closed trade PnL + partial exit PnL) ──
+    total_trades = len(all_realized_pnls)
     win_count = 0
+    loss_count = 0
     best_trade = Decimal("0")
     worst_trade = Decimal("0")
     total_wins = Decimal("0")
     total_losses = Decimal("0")
-    win_count = 0
-    loss_count = 0
 
-    for t in trades:
-        pnl = ensure_decimal(t.pnl)
-        total_realized_pnl += pnl
-        if pnl > best_trade:
-            best_trade = pnl
-        if pnl < worst_trade:
-            worst_trade = pnl
-        if pnl >= 0:
+    for pnl_val in all_realized_pnls:
+        if pnl_val > best_trade:
+            best_trade = pnl_val
+        if pnl_val < worst_trade:
+            worst_trade = pnl_val
+        if pnl_val >= 0:
             win_count += 1
-            total_wins += pnl
+            total_wins += pnl_val
         else:
             loss_count += 1
-            total_losses += pnl
+            total_losses += pnl_val
 
     win_rate = round((win_count / total_trades * 100), 2) if total_trades > 0 else None
     average_win = round(total_wins / win_count, 2) if win_count > 0 else Decimal("0")
     average_loss = round(total_losses / loss_count, 2) if loss_count > 0 else Decimal("0")
     profit_factor = round(float(total_wins / abs(total_losses)), 2) if total_losses != 0 else None
 
-    # Net equity = initial_balance + sum of capital events + realized PnL
+    # Net equity = initial_balance + capital events net + all realized PnL
     capital_net = total_deposits - total_withdrawals
     net_equity = initial_balance + capital_net + total_realized_pnl
 
-    # Equity curve: start with initial balance, add capital events + daily trade PnL
+    # ── Equity curve ──
     daily_balance: dict[date, Decimal] = defaultdict(Decimal)
 
-    # Track daily PnL from trades
-    for t in trades:
+    # Closed trade PnL by exit date
+    for t in closed_trades:
         day = t.exit_time.date() if t.exit_time else t.entry_time.date()
         daily_balance[day] += ensure_decimal(t.pnl)
 
-    # Track capital events
+    # Partial exit realized PnL by exit date
+    for t in open_trades:
+        for pe in pe_by_trade.get(t.id, []):
+            day = pe.exit_time.date() if pe.exit_time else date.today()
+            pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
+            daily_balance[day] += pe_pnl
+
+    # Capital events
     events_asc = sorted(events_q, key=lambda e: e.timestamp)
     for evt in events_asc:
         day = evt.timestamp.date()
@@ -278,7 +325,7 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
         total_deposits=str(total_deposits),
         total_withdrawals=str(total_withdrawals),
         total_realized_pnl=str(total_realized_pnl),
-        unrealized_pnl="0",
+        unrealized_pnl=str(unrealized_pnl),
         deployed_capital=str(deployed_capital),
         available_capital=str(net_equity - deployed_capital),
         current_balance=str(current_balance),

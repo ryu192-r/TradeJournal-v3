@@ -10,6 +10,7 @@ from app.db.database import get_db
 from app.models.account import Account
 from app.models.capital_event import CapitalEvent
 from app.models.trade import Trade
+from app.models.partial_exit import PartialExit
 from app.utils.decimal_utils import ensure_decimal
 
 
@@ -74,36 +75,43 @@ class RiskDashboardResponse(BaseModel):
         return str(v)
 
 
-def _compute_net_equity(account: Account, db: Session) -> Decimal:
+def _remaining_qty(trade: Trade, pe_map: dict[int, list]) -> Decimal:
+    total_exited = sum(pe.qty for pe in pe_map.get(trade.id, []))
+    return trade.quantity - total_exited
+
+
+def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list]) -> Decimal:
     initial_balance = ensure_decimal(account.initial_balance)
     events = db.query(CapitalEvent).filter(CapitalEvent.account_id == account.id).all()
     capital_delta = sum((ensure_decimal(evt.amount) for evt in events), Decimal("0"))
-    realized_pnl = sum(
-        (
-            ensure_decimal(t.pnl)
-            for t in db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all()
-        ),
-        Decimal("0"),
-    )
+    realized_pnl = Decimal("0")
+    for t in db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all():
+        realized_pnl += ensure_decimal(t.pnl)
+    for t in db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted").all():
+        for pe in pe_map.get(t.id, []):
+            if pe.realized_pnl:
+                realized_pnl += ensure_decimal(pe.realized_pnl)
     return initial_balance + capital_delta + realized_pnl
 
 
-def _trade_deployed_capital(trade: Trade) -> Decimal:
-    return ensure_decimal(trade.entry_price) * ensure_decimal(trade.quantity)
+def _trade_deployed_capital(trade: Trade, pe_map: dict[int, list]) -> Decimal:
+    rem = _remaining_qty(trade, pe_map)
+    return ensure_decimal(trade.entry_price) * rem
 
 
-def _trade_open_risk(trade: Trade) -> Decimal:
+def _trade_open_risk(trade: Trade, pe_map: dict[int, list]) -> Decimal:
     if trade.stop_price is None:
         return Decimal("0")
     entry = ensure_decimal(trade.entry_price)
     stop = ensure_decimal(trade.stop_price)
-    qty = ensure_decimal(trade.quantity)
-    return (entry - stop) * qty
+    rem = _remaining_qty(trade, pe_map)
+    return (entry - stop) * rem
 
 
-def _risk_trade_out(trade: Trade, net_equity: Decimal) -> RiskTradeOut:
-    deployed = _trade_deployed_capital(trade)
-    risk = _trade_open_risk(trade)
+def _risk_trade_out(trade: Trade, net_equity: Decimal, pe_map: dict[int, list]) -> RiskTradeOut:
+    deployed = _trade_deployed_capital(trade, pe_map)
+    risk = _trade_open_risk(trade, pe_map)
+    rem = _remaining_qty(trade, pe_map)
     risk_pct = round(float((risk / net_equity) * 100), 2) if net_equity > 0 else None
     return RiskTradeOut(
         trade_id=trade.id,
@@ -111,16 +119,16 @@ def _risk_trade_out(trade: Trade, net_equity: Decimal) -> RiskTradeOut:
         setup=trade.setup,
         entry_price=ensure_decimal(trade.entry_price),
         stop_price=ensure_decimal(trade.stop_price) if trade.stop_price is not None else None,
-        quantity=ensure_decimal(trade.quantity),
+        quantity=rem,
         deployed_capital=deployed,
         open_risk=risk,
         risk_pct=risk_pct,
     )
 
 
-def _bucket(name: str, trades: list[Trade], net_equity: Decimal) -> RiskBucketOut:
-    deployed = sum((_trade_deployed_capital(t) for t in trades), Decimal("0"))
-    risk = sum((_trade_open_risk(t) for t in trades), Decimal("0"))
+def _bucket(name: str, trades: list[Trade], net_equity: Decimal, pe_map: dict[int, list]) -> RiskBucketOut:
+    deployed = sum((_trade_deployed_capital(t, pe_map) for t in trades), Decimal("0"))
+    risk = sum((_trade_open_risk(t, pe_map) for t in trades), Decimal("0"))
     exposure_pct = round(float((deployed / net_equity) * 100), 2) if net_equity > 0 else None
     return RiskBucketOut(
         name=name,
@@ -147,17 +155,23 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
         .all()
     )
 
-    net_equity = _compute_net_equity(account, db)
-    deployed_capital = sum((_trade_deployed_capital(t) for t in open_trades), Decimal("0"))
+    # Load partial exits for all open trades
+    all_pe = db.query(PartialExit).order_by(PartialExit.exit_time.asc()).all()
+    pe_map: dict[int, list[PartialExit]] = defaultdict(list)
+    for pe in all_pe:
+        pe_map[pe.trade_id].append(pe)
+
+    net_equity = _compute_net_equity(account, db, pe_map)
+    deployed_capital = sum((_trade_deployed_capital(t, pe_map) for t in open_trades), Decimal("0"))
     available_capital = net_equity - deployed_capital
-    open_risk = sum((_trade_open_risk(t) for t in open_trades), Decimal("0"))
+    open_risk = sum((_trade_open_risk(t, pe_map) for t in open_trades), Decimal("0"))
     positions_without_stop = sum(1 for t in open_trades if t.stop_price is None)
 
     portfolio_heat_pct = round(float((open_risk / net_equity) * 100), 2) if net_equity > 0 else None
     deployed_capital_pct = round(float((deployed_capital / net_equity) * 100), 2) if net_equity > 0 else None
 
-    largest_position_trade = max(open_trades, key=_trade_deployed_capital, default=None)
-    largest_risk_trade = max(open_trades, key=_trade_open_risk, default=None)
+    largest_position_trade = max(open_trades, key=lambda t: _trade_deployed_capital(t, pe_map), default=None)
+    largest_risk_trade = max(open_trades, key=lambda t: _trade_open_risk(t, pe_map), default=None)
 
     by_setup: dict[str, list[Trade]] = defaultdict(list)
     by_symbol: dict[str, list[Trade]] = defaultdict(list)
@@ -166,12 +180,12 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
         by_symbol[trade.symbol].append(trade)
 
     risk_by_setup = sorted(
-        (_bucket(name, trades, net_equity) for name, trades in by_setup.items()),
+        (_bucket(name, trades, net_equity, pe_map) for name, trades in by_setup.items()),
         key=lambda b: b.open_risk,
         reverse=True,
     )
     risk_by_symbol = sorted(
-        (_bucket(name, trades, net_equity) for name, trades in by_symbol.items()),
+        (_bucket(name, trades, net_equity, pe_map) for name, trades in by_symbol.items()),
         key=lambda b: b.deployed_capital,
         reverse=True,
     )
@@ -226,8 +240,8 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
         portfolio_heat_pct=portfolio_heat_pct,
         deployed_capital_pct=deployed_capital_pct,
         positions_without_stop=positions_without_stop,
-        largest_position=_risk_trade_out(largest_position_trade, net_equity) if largest_position_trade else None,
-        largest_risk_position=_risk_trade_out(largest_risk_trade, net_equity) if largest_risk_trade else None,
+        largest_position=_risk_trade_out(largest_position_trade, net_equity, pe_map) if largest_position_trade else None,
+        largest_risk_position=_risk_trade_out(largest_risk_trade, net_equity, pe_map) if largest_risk_trade else None,
         risk_by_setup=risk_by_setup,
         risk_by_symbol=risk_by_symbol,
         warnings=warnings,
