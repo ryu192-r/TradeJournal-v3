@@ -1,22 +1,48 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2, Circle, ChevronRight, RotateCcw, Calendar,
   TrendingUp, Activity, Brain, Target, BarChart3,
-  AlertTriangle, Sparkles, BookOpen, Loader2,
+  AlertTriangle, Sparkles, BookOpen, Loader2, ChevronLeft,
+  Sunrise, Sunset, GitCompare,
 } from 'lucide-react'
+import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import { useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow } from '@/hooks/usePerformanceOS'
 import { getCurrentWeeklyReview, updateWeeklyReview, getCurrentMonthlyReview, updateMonthlyReview } from '@/lib/endpoints'
-import { formatCurrency, formatPrice } from '@/utils/format'
+import { useJournalQuery, useCreateJournalMutation, useUpdateJournalMutation, useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJournalMutation'
+import { useTradesQuery } from '@/hooks/useTradesQuery'
+import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
+import { useToastStore } from '@/store/toastStore'
+import { cn } from '@/lib/utils'
 import type { WorkflowPhase, DailyDashboard } from '@/types/performanceOs'
+import type { DailyJournal, ApiTrade } from '@/types'
 
 type ViewTab = 'daily' | 'weekly' | 'monthly'
+type ReviewSubTab = 'journal' | 'compare'
 
 const PHASE_META: Record<WorkflowPhase, { label: string; icon: typeof Activity; color: string; desc: string }> = {
   pre_market: { label: 'Pre-Market', icon: Brain, color: 'text-blue-400', desc: 'Prepare, plan, and set your rules' },
   execution: { label: 'Execution', icon: Target, color: 'text-amber-400', desc: 'Trade with discipline and focus' },
   review: { label: 'Review', icon: BookOpen, color: 'text-emerald-400', desc: 'Grade your trades and extract lessons' },
   behavior: { label: 'Behavior', icon: Activity, color: 'text-purple-400', desc: 'Check emotions, discipline, and patterns' },
+}
+
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
+function computeDailyStats(trades: ApiTrade[], date: string) {
+  const dayTrades = trades.filter((t) => {
+    if (!t.entry_time) return false
+    return t.entry_time.split('T')[0] === date
+  })
+  const count = dayTrades.length
+  const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl ? parseFloat(t.pnl) : 0), 0)
+  const wins = dayTrades.filter((t) => t.pnl && parseFloat(t.pnl) > 0)
+  const winRate = count > 0 ? Math.round((wins.length / count) * 100) : 0
+  const rValues = dayTrades.map((t) => t.r_multiple ? parseFloat(t.r_multiple) : 0).filter((r) => !isNaN(r) && r !== 0)
+  const avgR = rValues.length > 0 ? parseFloat((rValues.reduce((a, b) => a + b, 0) / rValues.length).toFixed(2)) : 0
+  return { tradeCount: count, totalPnl, winRate, avgR }
 }
 
 function PhaseStepper({ phase, progress }: { phase: WorkflowPhase; progress: DailyDashboard['phase_progress'] }) {
@@ -64,7 +90,6 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
 
   return (
     <div className="space-y-5 animate-card-in">
-      {/* Market Regime */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Market Regime</h4>
         {regime ? (
@@ -92,12 +117,11 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         ) : (
           <div className="flex items-center gap-2 text-xs text-text-muted py-3">
             <AlertTriangle className="w-4 h-4" />
-            <span>No market data for today. Seed data from Market Context page.</span>
+            <span>No market data for today. Seed from Market Context page.</span>
           </div>
         )}
       </div>
 
-      {/* Checklist */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Pre-Market Checklist</h4>
@@ -122,10 +146,7 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         </div>
         <div className="mt-4 flex items-center justify-between">
           <div className="h-2 flex-1 bg-bg-elevated rounded-full overflow-hidden mr-3">
-            <div
-              className="h-full bg-profit rounded-full transition-all"
-              style={{ width: `${checklist.length ? (checkedCount / checklist.length) * 100 : 0}%` }}
-            />
+            <div className="h-full bg-profit rounded-full transition-all" style={{ width: `${checklist.length ? (checkedCount / checklist.length) * 100 : 0}%` }} />
           </div>
           <button
             onClick={() => advanceMut.mutate()}
@@ -138,14 +159,13 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         </div>
       </div>
 
-      {/* Notes */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Pre-Market Notes</h4>
         <textarea
           value={wf.pre_market_notes ?? ''}
           onChange={(e) => updateMut.mutate({ pre_market_notes: e.target.value })}
-          placeholder="Market bias, setups to watch, risk plan..."
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[80px]"
+          placeholder="Market context, key levels, setups to watch, risk plan..."
+          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[120px]"
         />
       </div>
     </div>
@@ -161,7 +181,6 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
 
   return (
     <div className="space-y-5 animate-card-in">
-      {/* Open Positions */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Open Positions</h4>
         {positions.length === 0 ? (
@@ -175,7 +194,7 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
                   <span className="text-xs text-text-muted ml-2">{p.setup}</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-text-muted">Entry {formatPrice(Number(p.entry_price))} × {p.quantity}</div>
+                  <div className="text-xs text-text-muted">Entry {formatPrice(Number(p.entry_price))} x {p.quantity}</div>
                   {p.stop_price && <div className="text-xs text-loss">SL {formatPrice(Number(p.stop_price))}</div>}
                 </div>
               </div>
@@ -184,7 +203,6 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         )}
       </div>
 
-      {/* Today's Trades */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Today's Trades</h4>
         {todayTrades.length === 0 ? (
@@ -214,7 +232,6 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
         )}
       </div>
 
-      {/* Intraday Notes */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Intraday Notes</h4>
         <textarea
@@ -237,83 +254,117 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
   )
 }
 
+function CompareView({ journal }: { journal: DailyJournal | null | undefined }) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="rounded-xl border border-border bg-bg-card p-5">
+        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
+          <Sunrise className="w-[15px] h-[15px] text-accent" /> Pre-market
+        </div>
+        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
+          {journal?.pre_trade_notes || <span className="text-text-muted italic">No pre-market notes yet.</span>}
+        </div>
+      </div>
+      <div className="rounded-xl border border-border bg-bg-card p-5">
+        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
+          <Sunset className="w-[15px] h-[15px] text-accent" /> Post-market
+        </div>
+        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
+          {journal?.post_trade_notes || <span className="text-text-muted italic">No post-market notes yet.</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateStr: string }) {
-  const updateMut = useUpdateWorkflow(dateStr)
   const advanceMut = useAdvancePhase(dateStr)
-  const wf = dashboard.workflow!
-  const todayTrades = dashboard.today_trades
-  const closedTrades = todayTrades.filter(t => t.exit_price)
+  const addToast = useToastStore((s) => s.addToast)
+  const [subTab, setSubTab] = useState<ReviewSubTab>('journal')
+
+  const { data: journal, isLoading: journalLoading } = useJournalQuery(dateStr)
+  const { data: tradesData } = useTradesQuery()
+  const createMutation = useCreateJournalMutation()
+  const updateMutation = useUpdateJournalMutation()
+
+  const summaryStats = useMemo(() => {
+    const trades = tradesData?.items ?? []
+    return computeDailyStats(trades, dateStr)
+  }, [tradesData?.items, dateStr])
+
+  const handleSave = useCallback((payload: import('@/types').DailyJournalPayload) => {
+    if (journal) {
+      updateMutation.mutate(
+        { date: dateStr, payload },
+        {
+          onSuccess: () => addToast({ title: 'Journal updated', message: `Entry for ${formatDate(dateStr)} saved.`, variant: 'success' }),
+          onError: (err: Error) => addToast({ title: 'Save failed', message: err.message, variant: 'error' }),
+        }
+      )
+    } else {
+      createMutation.mutate(payload, {
+        onSuccess: () => addToast({ title: 'Journal created', message: `Entry for ${formatDate(dateStr)} saved.`, variant: 'success' }),
+        onError: (err: Error) => addToast({ title: 'Save failed', message: err.message, variant: 'error' }),
+      })
+    }
+  }, [journal, dateStr, createMutation, updateMutation, addToast])
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
+  const todayPnl = dashboard.today_trades.filter(t => t.exit_price).reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0)
 
   return (
     <div className="space-y-5 animate-card-in">
-      {/* Trade Performance Summary */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Post-Market Summary</h4>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Trades</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{todayTrades.length}</div>
+            <div className="text-lg font-data font-semibold text-text-heading">{dashboard.today_trades.length}</div>
           </div>
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Closed</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{closedTrades.length}</div>
+            <div className="text-lg font-data font-semibold text-text-heading">{dashboard.today_trades.filter(t => t.exit_price).length}</div>
           </div>
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Day P&amp;L</div>
-            <div className={`text-lg font-data font-semibold ${
-              closedTrades.reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0) >= 0 ? 'text-profit' : 'text-loss'
-            }`}>
-              {formatCurrency(closedTrades.reduce((s, t) => s + (t.pnl ? Number(t.pnl) : 0), 0))}
-            </div>
+            <div className={`text-lg font-data font-semibold ${todayPnl >= 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(todayPnl)}</div>
           </div>
         </div>
       </div>
 
-      {/* Mood & Discipline Rating */}
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-4">How Was Your Day?</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-text-muted block mb-2">Mood Rating</label>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  onClick={() => updateMut.mutate({ mood_rating: n })}
-                  className={`w-10 h-10 rounded-lg text-sm font-medium cursor-pointer transition-all ${
-                    wf.mood_rating === n ? 'bg-accent text-white scale-105' : 'bg-bg-elevated/50 text-text-muted hover:bg-bg-card-h'
-                  }`}
-                >{n}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-text-muted block mb-2">Discipline Rating</label>
-            <div className="flex gap-1.5">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  onClick={() => updateMut.mutate({ discipline_rating: n })}
-                  className={`w-10 h-10 rounded-lg text-sm font-medium cursor-pointer transition-all ${
-                    wf.discipline_rating === n ? 'bg-accent text-white scale-105' : 'bg-bg-elevated/50 text-text-muted hover:bg-bg-card-h'
-                  }`}
-                >{n}</button>
-              ))}
-            </div>
-          </div>
-        </div>
+      <div className="flex gap-1 p-1 rounded-xl bg-bg-card border border-border overflow-x-auto">
+        {([
+          { id: 'journal' as ReviewSubTab, label: 'Journal Entry', icon: BookOpen },
+          { id: 'compare' as ReviewSubTab, label: 'Compare', icon: GitCompare },
+        ]).map(t => {
+          const Icon = t.icon
+          const active = subTab === t.id
+          return (
+            <button
+              key={t.id}
+              onClick={() => setSubTab(t.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap',
+                active ? 'bg-accent-muted text-accent font-semibold' : 'text-text hover:text-text-heading'
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Post-Market Notes */}
-      <div className="bg-card rounded-2xl border border-border p-5">
-        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Lessons Learned</h4>
-        <textarea
-          value={wf.post_market_notes ?? ''}
-          onChange={(e) => updateMut.mutate({ post_market_notes: e.target.value })}
-          placeholder="What worked? What didn't? What will I do differently tomorrow?"
-          className="w-full rounded-xl border border-border bg-bg-elevated/50 px-4 py-3 text-sm text-text placeholder:text-text-faint focus:outline-none focus:border-accent/50 resize-y min-h-[100px]"
-        />
-      </div>
+      {subTab === 'journal' && !journalLoading && (
+        <DailyJournalForm journal={journal} date={dateStr} onSave={handleSave} isSaving={isSaving} summaryStats={summaryStats} />
+      )}
+      {subTab === 'journal' && journalLoading && (
+        <div className="bg-card rounded-2xl border border-border p-8 text-center">
+          <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
+          <p className="text-sm text-text-muted mt-3">Loading entry...</p>
+        </div>
+      )}
+      {subTab === 'compare' && <CompareView journal={journal} />}
 
       <button
         onClick={() => advanceMut.mutate()}
@@ -328,13 +379,12 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
 }
 
 function BehaviorPhase({ dashboard }: { dashboard: DailyDashboard }) {
-  const wf = dashboard.workflow!
+  const { data: journal } = useJournalQuery(new Date().toISOString().slice(0, 10))
   const ds = dashboard.discipline_score
-  const journal = dashboard.journal
+  const wf = dashboard.workflow!
 
   return (
     <div className="space-y-5 animate-card-in">
-      {/* Discipline Score */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Execution Discipline</h4>
         {ds ? (
@@ -350,11 +400,10 @@ function BehaviorPhase({ dashboard }: { dashboard: DailyDashboard }) {
         )}
       </div>
 
-      {/* Journal Summary */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Today's Journal</h4>
         {journal ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
               <div className="text-[10px] text-text-faint uppercase">Mood</div>
               <div className="text-lg font-data font-semibold text-text-heading">{journal.mood_rating ?? '—'}/5</div>
@@ -363,13 +412,16 @@ function BehaviorPhase({ dashboard }: { dashboard: DailyDashboard }) {
               <div className="text-[10px] text-text-faint uppercase">Discipline</div>
               <div className="text-lg font-data font-semibold text-text-heading">{journal.discipline_rating ?? '—'}/5</div>
             </div>
+            <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 col-span-2">
+              <div className="text-[10px] text-text-faint uppercase">Rules Followed</div>
+              <div className="text-sm text-text-heading whitespace-pre-wrap mt-1">{journal.rules_followed || '—'}</div>
+            </div>
           </div>
         ) : (
           <div className="text-sm text-text-muted py-2">Fill in your journal from the Review phase</div>
         )}
       </div>
 
-      {/* Day Complete */}
       {wf.behavior_done ? (
         <div className="bg-profit-muted/10 border border-profit/20 rounded-2xl p-5 text-center">
           <CheckCircle2 className="w-10 h-10 text-profit mx-auto mb-2" />
@@ -396,12 +448,21 @@ const PHASE_COMPONENTS: Record<WorkflowPhase, typeof PreMarketPhase> = {
 
 export function PerformanceOSPage() {
   const [viewTab, setViewTab] = useState<ViewTab>('daily')
+  const [selectedDate, setSelectedDate] = useState<string>(toISODate(new Date()))
   const today = new Date().toISOString().slice(0, 10)
-  const { data: dashboard, isLoading } = useDailyDashboard()
+  const isToday = selectedDate === today
+
+  const { data: dashboard, isLoading } = useDailyDashboard(isToday ? undefined : selectedDate)
   const resetMut = useResetWorkflow(today)
   const qc = useQueryClient()
 
-  if (isLoading) {
+  const shiftDate = (days: number) => {
+    const d = new Date(selectedDate)
+    d.setDate(d.getDate() + days)
+    setSelectedDate(toISODate(d))
+  }
+
+  if (isLoading && isToday) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 text-accent animate-spin" /></div>
   }
 
@@ -411,23 +472,38 @@ export function PerformanceOSPage() {
 
   return (
     <div className="space-y-[var(--page-gap)] px-[var(--page-px)] py-[var(--page-py)]">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl sm:text-2xl font-semibold text-text-heading">Performance OS</h1>
           <p className="text-sm text-text-muted mt-0.5">Your daily trading workflow</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-elevated/50 text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-all cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
+          <button onClick={() => shiftDate(-1)} className="flex items-center justify-center w-8 h-8 rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer">
+            <ChevronLeft className="w-4 h-4" />
           </button>
+          <div className="relative">
+            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-8 pl-8 pr-2 rounded-lg border border-border bg-bg-card text-xs text-text-heading font-data focus:outline-none focus:border-accent/40 cursor-pointer [color-scheme:dark]"
+            />
+          </div>
+          <button onClick={() => shiftDate(1)} className="flex items-center justify-center w-8 h-8 rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          {isToday && (
+            <button
+              onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-elevated/50 text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
         </div>
       </div>
 
-      {/* View tabs */}
       <div className="flex items-center gap-2">
         {([
           { id: 'daily' as ViewTab, label: 'Daily', icon: Calendar },
@@ -449,10 +525,8 @@ export function PerformanceOSPage() {
 
       {viewTab === 'daily' && dashboard && (
         <>
-          {/* Phase Stepper */}
           <PhaseStepper phase={phase} progress={dashboard.phase_progress} />
-          {/* Phase Content */}
-          <PhaseComponent dashboard={dashboard} dateStr={today} />
+          <PhaseComponent dashboard={dashboard} dateStr={selectedDate} />
         </>
       )}
 
@@ -462,15 +536,15 @@ export function PerformanceOSPage() {
         </div>
       )}
 
-      {viewTab === 'weekly' && <WeeklyReviewSection />}
+      {viewTab === 'weekly' && <WeeklyReviewSection selectedDate={selectedDate} onSelectDate={setSelectedDate} />}
       {viewTab === 'monthly' && <MonthlyReviewSection />}
     </div>
   )
 }
 
-function WeeklyReviewSection() {
+function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: string; onSelectDate: (d: string) => void }) {
   const qc = useQueryClient()
-  const { data: review, isLoading } = useQuery({
+  const { data: review, isLoading: reviewLoading } = useQuery({
     queryKey: ['weekly-review', 'current'],
     queryFn: () => getCurrentWeeklyReview(),
   })
@@ -479,42 +553,83 @@ function WeeklyReviewSection() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['weekly-review'] }) },
   })
 
-  if (isLoading) return <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
+  const d = new Date(selectedDate)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(new Date(d).setDate(diff))
+  const mondayISO = toISODate(monday)
+  const weekDays = Array.from({ length: 5 }, (_, i) => {
+    const cd = new Date(monday)
+    cd.setDate(monday.getDate() + i)
+    return cd
+  })
+
+  const { data: stats } = useWeeklyJournalStatsQuery(mondayISO)
+  const { data: weekJournals } = useWeeklyJournalsQuery(mondayISO)
+
+  if (reviewLoading && !review) return <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
 
   const pnl = review ? Number(review.total_pnl) : 0
+
   return (
     <div className="space-y-5 animate-card-in">
-      {/* Week Header */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-text-heading">
-            Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : 'This Week'}
+            Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}
           </h3>
           <span className={`text-lg font-data font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Trades</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.total_trades ?? 0}</div>
+            <div className="text-lg font-data font-semibold text-text-heading">{review?.total_trades ?? stats?.trade_count ?? 0}</div>
           </div>
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Win Rate</div>
-            <div className="text-lg font-data font-semibold text-text-heading">{review?.win_rate ?? '—'}</div>
+            <div className="text-lg font-data font-semibold text-text-heading">{review?.win_rate ?? (stats ? `${parseFloat(stats.win_rate).toFixed(1)}%` : '—')}</div>
           </div>
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
             <div className="text-[10px] text-text-faint uppercase">Best Setup</div>
             <div className="text-sm font-medium text-text-heading">{review?.top_setup ?? '—'}</div>
           </div>
           <div className="rounded-xl border border-border bg-bg-elevated/30 p-3 text-center">
-            <div className="text-[10px] text-text-faint uppercase">Rules</div>
-            <div className="text-sm font-medium text-text-heading">{review?.rules_followed ?? 0} / {(review?.rules_followed ?? 0) + (review?.rules_violated ?? 0)}</div>
+            <div className="text-[10px] text-text-faint uppercase">P&amp;L</div>
+            <div className={`text-lg font-data font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+            </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+          {weekDays.map(wd => {
+            const iso = toISODate(wd)
+            const isToday = iso === toISODate(new Date())
+            const isSelected = iso === selectedDate
+            return (
+              <button
+                key={iso}
+                onClick={() => onSelectDate(iso)}
+                className={cn(
+                  'text-left rounded-xl border p-3 transition-all cursor-pointer',
+                  isSelected ? 'border-accent/30 bg-accent-muted' : 'border-border bg-bg-card hover:border-medium'
+                )}
+              >
+                <div className="text-[10px] text-text-muted uppercase tracking-wider font-medium mb-1">
+                  {wd.toLocaleDateString('en-IN', { weekday: 'short' })}
+                </div>
+                <div className={cn('text-sm font-semibold', isToday ? 'text-accent' : 'text-text-heading')}>
+                  {formatDate(wd)}
+                </div>
+                <div className="text-[10px] text-text-muted mt-1">{isToday ? 'Today' : 'Tap to open'}</div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Daily Breakdown */}
       {review?.daily_breakdown && review.daily_breakdown.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
           <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Daily Breakdown</h4>
@@ -530,7 +645,27 @@ function WeeklyReviewSection() {
         </div>
       )}
 
-      {/* Key Lessons */}
+      {weekJournals && weekJournals.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-5">
+          <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Journal Entries</h4>
+          <div className="space-y-2">
+            {weekJournals.map(j => (
+              <button
+                key={j.id}
+                onClick={() => onSelectDate(j.date)}
+                className="w-full text-left rounded-lg border border-border bg-bg-card hover:bg-accent-muted transition-all cursor-pointer p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-heading">{j.date} — {new Date(j.date).toLocaleDateString('en-IN', { weekday: 'long' })}</span>
+                  {j.mood_rating != null && <span className="text-[10px] text-text-muted">Mood: {j.mood_rating}/5</span>}
+                </div>
+                {j.lessons_learned && <p className="text-xs text-text-muted mt-1 line-clamp-2">{j.lessons_learned}</p>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Key Lessons</h4>
         <textarea
@@ -587,7 +722,6 @@ function MonthlyReviewSection() {
         </div>
       </div>
 
-      {/* Setup Performance */}
       {review?.setup_performance && review.setup_performance.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
           <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Setup Performance</h4>
@@ -603,7 +737,6 @@ function MonthlyReviewSection() {
         </div>
       )}
 
-      {/* Top Emotions */}
       {review?.top_emotions && review.top_emotions.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
           <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Emotional Landscape</h4>
@@ -615,7 +748,6 @@ function MonthlyReviewSection() {
         </div>
       )}
 
-      {/* Notes */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Month Notes</h4>
         <textarea
