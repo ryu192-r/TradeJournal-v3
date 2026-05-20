@@ -1,34 +1,17 @@
 """Market data provider integration service.
 
-Abstracts external quote fetching and normalizes provider responses into
-a consistent format for the live_quotes upsert endpoint.
+Fetches live NSE stock quotes using nsetools (official NSE India data).
+Falls back gracefully if nsetools is unavailable.
 
-Current provider: Tapetide-compatible batch quote API.
+Normalizes provider responses into a consistent format for the
+live_quotes upsert endpoint.
 """
 
 from typing import Any
 from decimal import Decimal
-import requests
-from app.core.config import settings
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-def _map_tapetide_quote(raw: dict) -> dict[str, Any]:
-    """Normalize a single Tapetide quote into LiveQuote-compatible fields.
-
-    Tapetide fields:  symbol, price, change, change_pct, volume, high, low, open, prev_close, name
-    LiveQuote fields: symbol, ltp, change, change_pct, volume, company_name
-    """
-    return {
-        "symbol": raw.get("symbol"),
-        "company_name": raw.get("name"),
-        "ltp": _to_decimal(raw.get("price")),
-        "change": _to_decimal(raw.get("change")),
-        "change_pct": _to_decimal(raw.get("change_pct")),
-        "volume": _to_decimal(raw.get("volume")),
-    }
 
 
 def _to_decimal(v):
@@ -40,61 +23,84 @@ def _to_decimal(v):
         return None
 
 
-def fetch_live_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
-    """Fetch fresh live quotes for the given symbols from the external provider.
+def _map_nsetools_quote(raw: dict) -> dict[str, Any]:
+    """Normalize an nsetools quote dict into LiveQuote-compatible fields.
 
+    NSE fields (raw):     lastPrice, change, pChange, totalTradedVolume, companyName
+    LiveQuote fields:     symbol, ltp, change, change_pct, volume, company_name
+    """
+    ltp = raw.get("lastPrice")
+    change = raw.get("change")
+    change_pct = raw.get("pChange")
+    volume = raw.get("totalTradedVolume")
+    company_name = raw.get("companyName")
+
+    return {
+        "symbol": raw.get("symbol"),
+        "company_name": company_name,
+        "ltp": _to_decimal(ltp),
+        "change": _to_decimal(change),
+        "change_pct": _to_decimal(change_pct),
+        "volume": _to_decimal(volume),
+    }
+
+
+def _fetch_nsetools_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
+    """Fetch live quotes via nsetools (NSE India official)."""
+    try:
+        from nsetools import Nse
+    except ImportError:
+        return [], ["nsetools not installed"]
+
+    nse = Nse()
+    quotes = []
+    errors = []
+
+    for sym in symbols:
+        try:
+            raw = nse.get_quote(sym)
+            if not raw or not raw.get("lastPrice"):
+                errors.append(f"{sym}: no price data returned")
+                continue
+            raw["symbol"] = sym
+            mapped = _map_nsetools_quote(raw)
+            if mapped.get("symbol") and mapped.get("ltp") is not None:
+                quotes.append(mapped)
+        except Exception as e:
+            errors.append(f"{sym}: {str(e)}")
+
+    logger.info(
+        "nsetools_fetch_complete",
+        requested=len(symbols),
+        received=len(quotes),
+        errors=len(errors),
+    )
+    return quotes, errors
+
+
+def fetch_live_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
+    """Fetch fresh live quotes for the given symbols.
+
+    Primary provider: nsetools (NSE India).
     Returns: (quotes_list, error_messages)
     """
     if not symbols:
         return [], []
 
-    url = settings.MARKET_DATA_API_URL or "https://api.tapetide.in/v1/quotes"
-    api_key = settings.MARKET_DATA_API_KEY
-
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
     logger.info(
         "fetching_live_quotes",
-        provider_url=url,
+        provider="nsetools",
         symbol_count=len(symbols),
         symbols=symbols,
     )
 
-    try:
-        resp = requests.post(
-            url,
-            headers=headers,
-            json={"symbols": symbols},
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    quotes, errors = _fetch_nsetools_quotes(symbols)
 
-        if "data" in data:
-            raw_quotes = data["data"]
-        elif "quotes" in data:
-            raw_quotes = data["quotes"]
-        else:
-            raw_quotes = data if isinstance(data, list) else []
-
-        mapped = [_map_tapetide_quote(q) for q in raw_quotes]
-        mapped = [q for q in mapped if q.get("symbol")]
-
-        logger.info(
-            "live_quotes_fetched",
+    if not quotes and errors:
+        logger.warning(
+            "all_nsetools_quotes_failed",
             requested=len(symbols),
-            received=len(mapped),
+            errors=errors[:5],
         )
-        return mapped, []
 
-    except requests.exceptions.Timeout:
-        logger.error("live_quotes_fetch_timeout")
-        return [], ["Provider timeout after 15s"]
-    except requests.exceptions.RequestException as exc:
-        logger.error("live_quotes_fetch_failed", error=str(exc))
-        return [], [f"Provider request failed: {str(exc)}"]
-    except Exception as exc:
-        logger.error("live_quotes_fetch_error", error=str(exc))
-        return [], [f"Unexpected error: {str(exc)}"]
+    return quotes, errors
