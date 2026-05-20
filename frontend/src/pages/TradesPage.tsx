@@ -138,7 +138,7 @@ export function TradesPage() {
   const { data: peExitsData } = usePartialExitsQuery(partialExitTradeId)
   const peMaxQty = peExitsData ? Number(peExitsData.remaining_qty) : null
 
-  const { data: liveQuotesData } = useLiveQuotesQuery()
+  const { data: liveQuotesData } = useLiveQuotesQuery(60_000)
   const quoteMap = useMemo(() => {
     return new Map<string, LiveQuote>(
       (liveQuotesData?.quotes ?? []).map((q: LiveQuote) => [q.symbol, q])

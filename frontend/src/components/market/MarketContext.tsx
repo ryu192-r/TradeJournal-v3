@@ -139,7 +139,7 @@ function SectorStrengthCard({ data }: { data: MarketRegimeSummary }) {
 }
 
 function LiveWatchlistCard() {
-  const { data, isLoading } = useLiveQuotesQuery()
+  const { data, isLoading } = useLiveQuotesQuery(60_000)
 
   if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
   if (!data || data.quotes.length === 0) return null
