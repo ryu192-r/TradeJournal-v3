@@ -199,7 +199,7 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
             {positions.map(p => (
               <div key={p.id} className="flex items-center justify-between py-2.5">
                 <div>
-                  <span className="text-sm font-medium text-text-heading">{p.symbol}</span>
+                  <span className="text-[length:var(--text-sm)] font-medium text-text-heading">{p.symbol}</span>
                   {p.setup && <span className="text-[length:var(--text-xs)] text-text-muted ml-2">{p.setup}</span>}
                 </div>
                 <div className="text-right font-data text-[length:var(--text-xs)] text-text-muted">
@@ -223,7 +223,7 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
               return (
                 <div key={t.id} className="flex items-center justify-between py-2.5">
                   <div>
-                    <span className="text-sm font-medium text-text-heading">{t.symbol}</span>
+                    <span className="text-[length:var(--text-sm)] font-medium text-text-heading">{t.symbol}</span>
                     {t.setup && <span className="text-[length:var(--text-xs)] text-text-muted ml-2">{t.setup}</span>}
                   </div>
                   <div className="text-right">
@@ -483,7 +483,7 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
     <div className="space-y-5 animate-card-in">
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
         <div className="flex items-baseline justify-between mb-4">
-          <span className="text-sm font-medium text-text-heading">Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}</span>
+          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}</span>
           <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
@@ -583,7 +583,7 @@ function MonthlyReviewSection() {
     <div className="space-y-5 animate-card-in">
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
         <div className="flex items-baseline justify-between mb-4">
-          <span className="text-sm font-medium text-text-heading">{review?.month ?? 'Current Month'}</span>
+          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">{review?.month ?? 'Current Month'}</span>
           <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>

@@ -6,6 +6,7 @@ export function useEmotionSummaryQuery(fromDate?: string, toDate?: string) {
     queryKey: ['lifecycle', 'emotion-summary', fromDate, toDate],
     queryFn: () => getEmotionSummary(fromDate, toDate),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -14,6 +15,7 @@ export function useGradeSummaryQuery(fromDate?: string, toDate?: string) {
     queryKey: ['lifecycle', 'grade-summary', fromDate, toDate],
     queryFn: () => getGradeSummary(fromDate, toDate),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -22,6 +24,7 @@ export function useBehavioralAnalyticsQuery(fromDate?: string, toDate?: string) 
     queryKey: ['lifecycle', 'behavioral', fromDate, toDate],
     queryFn: () => getBehavioralAnalytics(fromDate, toDate),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -30,5 +33,6 @@ export function useRevengeTradesQuery(fromDate?: string, toDate?: string, hoursW
     queryKey: ['lifecycle', 'revenge-trades', fromDate, toDate, hoursWindow],
     queryFn: () => getRevengeTrades(fromDate, toDate, hoursWindow),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }

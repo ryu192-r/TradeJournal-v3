@@ -10,7 +10,7 @@ import type {
   PlaybookOverviewSetup, SetupIntelligenceResponse, TacticPerformance, RecentTrade,
 } from '@/types'
 
-const CARD = 'bg-card rounded-2xl border border-border p-5 animate-card-in'
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 function ScoreChip({ label, value, suffix }: { label: string; value: string | number | null; suffix?: string }) {
   if (value == null) return null
@@ -33,7 +33,7 @@ function OverviewCard({ setup, onClick }: { setup: PlaybookOverviewSetup; onClic
     <button onClick={onClick} className={`${CARD} w-full text-left hover:border-accent/40 transition-colors`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-text-heading">{setup.setup_name}</h3>
+          <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{setup.setup_name}</h3>
           {setup.closed_count > 0 && (
             <span className={`text-[10px] font-data px-1.5 py-0.5 rounded-full ${isPositive ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'}`}>
               {isPositive ? '+' : ''}{formatCurrency(setup.total_pnl ?? 0)}
@@ -54,7 +54,7 @@ function OverviewCard({ setup, onClick }: { setup: PlaybookOverviewSetup; onClic
 }
 
 function PerformanceSection({ perf }: { perf: SetupIntelligenceResponse['performance'] }) {
-  if (perf.closed_count === 0) return <div className="text-sm text-text-muted py-4">No closed trades yet.</div>
+  if (perf.closed_count === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-4">No closed trades yet.</div>
   return (
     <div className="grid grid-cols-3 gap-3">
       <ScoreChip label="Win Rate" value={perf.win_rate} suffix="%" />
@@ -68,9 +68,9 @@ function PerformanceSection({ perf }: { perf: SetupIntelligenceResponse['perform
 }
 
 function HoldTimeSection({ holdTime }: { holdTime: SetupIntelligenceResponse['hold_time'] }) {
-  if (holdTime.sample_size === 0) return <div className="text-sm text-text-muted py-2">No holding data yet.</div>
+  if (holdTime.sample_size === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No holding data yet.</div>
   return (
-    <div className="space-y-3">
+    <div className="space-y-[var(--cell-py)]">
       <div className="grid grid-cols-4 gap-3">
         <div className="text-center">
           <div className="text-lg font-bold font-data text-text-heading">{holdTime.avg_hours?.toFixed(1)}h</div>
@@ -115,12 +115,12 @@ function HoldTimeSection({ holdTime }: { holdTime: SetupIntelligenceResponse['ho
 
 function MarketConditionsSection({ conditions }: { conditions: SetupIntelligenceResponse['market_conditions'] }) {
   const hasData = conditions.best_time || conditions.best_day || conditions.worst_time || conditions.worst_day
-  if (!hasData && conditions.time_of_day.length === 0) return <div className="text-sm text-text-muted py-2">No market condition data yet.</div>
+  if (!hasData && conditions.time_of_day.length === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No market condition data yet.</div>
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       {(conditions.best_time || conditions.worst_time) && (
         <div>
-          <div className="text-xs text-text-muted mb-2 font-medium">Time of Day</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-medium">Time of Day</div>
           <div className="space-y-1.5">
             {conditions.best_time && (
               <div className="flex items-center gap-2 text-xs">
@@ -149,7 +149,7 @@ function MarketConditionsSection({ conditions }: { conditions: SetupIntelligence
       )}
       {(conditions.best_day || conditions.worst_day) && (
         <div>
-          <div className="text-xs text-text-muted mb-2 font-medium">Day of Week</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-medium">Day of Week</div>
           <div className="space-y-1.5">
             {conditions.best_day && (
               <div className="flex items-center gap-2 text-xs">
@@ -176,7 +176,7 @@ function MarketConditionsSection({ conditions }: { conditions: SetupIntelligence
       )}
       {conditions.time_of_day.length > 0 && (
         <div className="pt-2 border-t border-border">
-          <div className="text-xs text-text-muted mb-1">All time slots:</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1">All time slots:</div>
           <div className="flex flex-wrap gap-1.5">
             {conditions.time_of_day.map((t) => (
               <span key={t.hour} className={`text-[10px] font-data px-1.5 py-0.5 rounded ${t.avg_pnl != null && t.avg_pnl >= 0 ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'}`}>
@@ -191,9 +191,9 @@ function MarketConditionsSection({ conditions }: { conditions: SetupIntelligence
 }
 
 function FailurePatternsSection({ patterns }: { patterns: SetupIntelligenceResponse['failure_patterns'] }) {
-  if (patterns.loss_count === 0) return <div className="text-sm text-text-muted py-2">No losses recorded yet. Great discipline!</div>
+  if (patterns.loss_count === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No losses recorded yet. Great discipline!</div>
   return (
-    <div className="space-y-3">
+    <div className="space-y-[var(--cell-py)]">
       <div className="grid grid-cols-3 gap-3">
         <div className="text-center">
           <div className="text-lg font-bold font-data text-loss">{patterns.loss_count}</div>
@@ -210,7 +210,7 @@ function FailurePatternsSection({ patterns }: { patterns: SetupIntelligenceRespo
       </div>
       {patterns.exit_reasons_on_losses.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs text-text-muted mb-1 font-medium">Exit reasons on losses:</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1 font-medium">Exit reasons on losses:</div>
           {patterns.exit_reasons_on_losses.map((r) => (
             <div key={r.reason} className="flex items-center justify-between text-xs">
               <span className="text-text-heading capitalize">{r.reason.replace('_', ' ')}</span>
@@ -240,13 +240,13 @@ function FailurePatternsSection({ patterns }: { patterns: SetupIntelligenceRespo
 
 function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceResponse['behavior_crossover'] }) {
   if (!behavior.emotion_breakdown.length && !behavior.grade_breakdown.length) {
-    return <div className="text-sm text-text-muted py-2">No emotion/grade data for this setup.</div>
+    return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No emotion/grade data for this setup.</div>
   }
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       {behavior.emotion_breakdown.length > 0 && (
         <div>
-          <div className="text-xs text-text-muted mb-2 font-medium">Emotion performance</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-medium">Emotion performance</div>
           <div className="space-y-1">
             {behavior.emotion_breakdown.map((e) => {
               const isPos = (e.avg_pnl ?? 0) >= 0
@@ -269,7 +269,7 @@ function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceRes
       )}
       {behavior.grade_breakdown.length > 0 && (
         <div>
-          <div className="text-xs text-text-muted mb-2 font-medium">Grade performance</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-medium">Grade performance</div>
           <div className="space-y-1">
             {behavior.grade_breakdown.map((g) => {
               const gradeColor = g.grade === 'A' || g.grade === 'B' ? 'text-profit' : g.grade === 'F' ? 'text-loss' : 'text-amber-400'
@@ -292,7 +292,7 @@ function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceRes
 }
 
 function TacticsSection({ tactics }: { tactics: TacticPerformance[] }) {
-  if (!tactics.length) return <div className="text-sm text-text-muted py-2">No tactic data for this setup.</div>
+  if (!tactics.length) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No tactic data for this setup.</div>
   return (
     <div className="space-y-1.5">
       {tactics.map((t) => {
@@ -346,11 +346,11 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-[var(--page-gap)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-accent" />
-            <h3 className="text-sm font-medium text-text-heading">{setupName}</h3>
+            <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{setupName}</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-border/20"><X className="w-4 h-4 text-text-muted" /></button>
         </div>
@@ -359,20 +359,20 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
     )
   }
 
-  if (!data) return <div className={CARD}><div className="text-sm text-text-muted">No data for {setupName}</div></div>
+  if (!data) return <div className={CARD}><div className="text-[length:var(--text-sm)] text-text-muted">No data for {setupName}</div></div>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-accent" />
-          <h3 className="text-sm font-medium text-text-heading">{data.setup_name}</h3>
+          <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.setup_name}</h3>
           <span className="text-[10px] text-text-muted font-data">{data.performance.closed_count} closed</span>
         </div>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-border/20"><X className="w-4 h-4 text-text-muted" /></button>
       </div>
 
-      {data.description && <div className="text-xs text-text-muted italic">{data.description}</div>}
+      {data.description && <div className="text-[length:var(--text-xs)] text-text-muted italic">{data.description}</div>}
 
       {data.ideal_conditions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -472,10 +472,10 @@ export function PlaybookIntelligenceFull() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-[var(--page-gap)]">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-accent animate-pulse" />
-          <span className="text-sm text-text-muted">Loading playbook intelligence...</span>
+          <span className="text-[length:var(--text-sm)] text-text-muted">Loading playbook intelligence...</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => <div key={i} className={`${CARD} h-32 animate-pulse`} />)}
@@ -488,8 +488,8 @@ export function PlaybookIntelligenceFull() {
     return (
       <div className="py-12 text-center">
         <BarChart3 className="w-8 h-8 text-text-muted mx-auto mb-3" />
-        <h3 className="text-sm font-medium text-text-heading mb-1">No playbook data</h3>
-        <p className="text-xs text-text-muted">Create setups and close some trades to unlock intelligence.</p>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading mb-1">No playbook data</h3>
+        <p className="text-[length:var(--text-xs)] text-text-muted">Create setups and close some trades to unlock intelligence.</p>
       </div>
     )
   }
@@ -545,8 +545,8 @@ export function PlaybookIntelligenceFull() {
         </div>
       ) : (
         <div className="py-8 text-center">
-          <p className="text-sm text-text-muted">No trades linked to any setup yet.</p>
-          <p className="text-xs text-text-muted mt-1">Assign setups to your trades to unlock intelligence.</p>
+          <p className="text-[length:var(--text-sm)] text-text-muted">No trades linked to any setup yet.</p>
+          <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Assign setups to your trades to unlock intelligence.</p>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getExecutionGrade, createExecutionGrade, updateExecutionGrade, deleteExecutionGrade } from '@/lib/endpoints'
-import { invalidateTradeDomain } from '@/lib/queryInvalidation'
+import { invalidateLifecycle, invalidateTradeDetail, invalidateBehavioral } from '@/lib/queryInvalidation'
 import type { ExecutionGrade, ExecutionGradeCreatePayload, ExecutionGradeUpdatePayload } from '@/types'
 
 export function useExecutionGradeQuery(tradeId: number | null) {
@@ -15,41 +15,41 @@ export function useExecutionGradeQuery(tradeId: number | null) {
       }
     },
     enabled: tradeId != null,
-    staleTime: 5 * 1000,
   })
 }
 
 export function useCreateExecutionGradeMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<ExecutionGrade, Error, { tradeId: number; payload: ExecutionGradeCreatePayload }>({
     mutationFn: ({ tradeId, payload }) => createExecutionGrade(tradeId, payload),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['execution-grade', tradeId] })
-      queryClient.invalidateQueries({ queryKey: ['timeline', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateBehavioral(qc)
     },
   })
 }
 
 export function useUpdateExecutionGradeMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<ExecutionGrade, Error, { tradeId: number; payload: ExecutionGradeUpdatePayload }>({
     mutationFn: ({ tradeId, payload }) => updateExecutionGrade(tradeId, payload),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['execution-grade', tradeId] })
-      queryClient.invalidateQueries({ queryKey: ['timeline', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateBehavioral(qc)
     },
   })
 }
 
 export function useDeleteExecutionGradeMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: (tradeId) => deleteExecutionGrade(tradeId),
-    onSuccess: async (_, tradeId) => {
-      queryClient.invalidateQueries({ queryKey: ['execution-grade', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onSuccess: (_, tradeId) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateBehavioral(qc)
     },
   })
 }

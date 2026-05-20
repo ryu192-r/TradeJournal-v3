@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useOvertradingQuery, useEarlyExitQuery, useDisciplineScoreQuery, useBehavioralScoreMutation } from '@/hooks/useBehavioralIntelligenceQuery'
 import { formatCurrency } from '@/utils/format'
 import { Brain, AlertTriangle, Shield, Activity, LogOut, Zap, TrendingDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import type { OvertradingDay, EarlyExit, DisciplineInsight, AIAssessment } from '@/types'
 
-const CARD = 'bg-card rounded-2xl border border-border p-5 animate-card-in'
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 function ScoreGauge({ score, grade }: { score: number | null; grade: string | null }) {
-  if (score == null) return <div className="text-sm text-text-muted">No data yet</div>
+  if (score == null) return <div className="text-[length:var(--text-sm)] text-text-muted">No data yet</div>
   const color = score >= 85 ? 'text-emerald-400' : score >= 70 ? 'text-emerald-300' : score >= 55 ? 'text-amber-400' : score >= 40 ? 'text-orange-400' : 'text-red-400'
   return (
     <div className="flex items-baseline gap-2">
@@ -26,7 +26,7 @@ function ComponentScore({ label, score }: { label: string; score: number }) {
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(score, 100)}%` }} />
       </div>
       <span className="text-xs font-data text-text-muted w-8 text-right">{score}%</span>
-      <span className="text-xs text-text-muted w-32">{label}</span>
+      <span className="text-[length:var(--text-xs)] text-text-muted w-32">{label}</span>
     </div>
   )
 }
@@ -36,25 +36,27 @@ function DisciplineScoreCard() {
   if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
   if (!data || data.overall_score == null) return null
 
-  const components = data.components
-  const componentLabels: Record<string, string> = {
-    execution_grade: 'Execution Quality',
-    stop_discipline: 'Stop Discipline',
-    plan_adherence: 'Plan Adherence',
-    journal_consistency: 'Journal Habits',
-    revenge_resistance: 'Revenge Resistance',
-  }
+  const { components, componentLabels } = useMemo(() => {
+    const labels: Record<string, string> = {
+      execution_grade: 'Execution Quality',
+      stop_discipline: 'Stop Discipline',
+      plan_adherence: 'Plan Adherence',
+      journal_consistency: 'Journal Habits',
+      revenge_resistance: 'Revenge Resistance',
+    }
+    return { components: data.components, componentLabels: labels }
+  }, [data])
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Shield className="w-4 h-4 text-accent" />
-        <h3 className="text-sm font-medium text-text-heading">Discipline Score</h3>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Discipline Score</h3>
       </div>
-      <div className="mb-4">
+      <div className="mb-[var(--page-gap)]">
         <ScoreGauge score={data.overall_score} grade={data.grade} />
       </div>
-      <div className="space-y-2 mb-4">
+      <div className="space-y-2 mb-[var(--page-gap)]">
         {Object.entries(components).map(([key, val]) => (
           <ComponentScore key={key} label={componentLabels[key] || key} score={val} />
         ))}
@@ -82,9 +84,9 @@ function OvertradingCard() {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Activity className="w-4 h-4 text-amber-400" />
-        <h3 className="text-sm font-medium text-text-heading">Overtrading Detection</h3>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Overtrading Detection</h3>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -134,7 +136,7 @@ function OvertradingCard() {
       ))}
 
       {!hasIssues && (
-        <div className="text-sm text-text-muted text-center py-4">No overtrading detected — you're within healthy trade frequency limits.</div>
+        <div className="text-[length:var(--text-sm)] text-text-muted text-center py-4">No overtrading detected — you're within healthy trade frequency limits.</div>
       )}
     </div>
   )
@@ -150,9 +152,9 @@ function EarlyExitCard() {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <LogOut className="w-4 h-4 text-purple-400" />
-        <h3 className="text-sm font-medium text-text-heading">Early Exit Analysis</h3>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Early Exit Analysis</h3>
       </div>
 
       {stats && (
@@ -258,9 +260,9 @@ function AIAssessmentCard() {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Brain className="w-4 h-4 text-accent" />
-        <h3 className="text-sm font-medium text-text-heading">AI Behavioral Assessment</h3>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">AI Behavioral Assessment</h3>
       </div>
 
       {!assessment && !mutation.isPending && (
@@ -275,22 +277,22 @@ function AIAssessmentCard() {
       {mutation.isPending && (
         <div className="flex items-center justify-center gap-2 py-6">
           <Loader2 className="w-5 h-5 animate-spin text-accent" />
-          <span className="text-sm text-text-muted">Analyzing your trading behavior...</span>
+          <span className="text-[length:var(--text-sm)] text-text-muted">Analyzing your trading behavior...</span>
         </div>
       )}
 
       {error && <div className="text-sm text-loss py-2">{error}</div>}
 
       {assessment && !mutation.isPending && (
-        <div className="space-y-4">
+        <div className="space-y-[var(--page-gap)]">
           <div>
-            <div className="text-xs text-text-muted mb-1">Summary</div>
-            <div className="text-sm text-text-heading">{assessment.behavioral_summary}</div>
+            <div className="text-[length:var(--text-xs)] text-text-muted mb-1">Summary</div>
+            <div className="text-[length:var(--text-sm)] text-text-heading">{assessment.behavioral_summary}</div>
           </div>
 
           {assessment.risk_level && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">Risk Level:</span>
+              <span className="text-[length:var(--text-xs)] text-text-muted">Risk Level:</span>
               <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                 assessment.risk_level === 'low' ? 'bg-emerald-400/10 text-emerald-400' :
                 assessment.risk_level === 'medium' ? 'bg-amber-400/10 text-amber-400' :
@@ -362,7 +364,7 @@ export function BehavioralIntelligence() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       <div className="flex items-center gap-2">
         <Brain className="w-[15px] h-[15px] text-accent" />
         <h2 className="font-display text-[length:var(--heading-size)] text-text-heading">Behavioral Intelligence</h2>

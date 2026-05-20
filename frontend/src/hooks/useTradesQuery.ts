@@ -16,6 +16,6 @@ export function useTradesQuery(options?: UseTradesQueryOptions) {
   return useQuery<ApiTradeListResponse>({
     queryKey: ['trades', { status, symbol, from_date, to_date, skip, limit }],
     queryFn: () => listTrades({ status, symbol, from_date, to_date, skip, limit }),
-    staleTime: 5 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }

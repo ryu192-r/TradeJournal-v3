@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listPartialExits, createPartialExit, deletePartialExit } from '@/lib/endpoints'
-import { invalidateTradeDomain } from '@/lib/queryInvalidation'
+import { invalidateTradeDetail, invalidateRisk, invalidateLifecycle, invalidateAnalytics, invalidateTradeList } from '@/lib/queryInvalidation'
+import { span } from '@/utils/performance'
+import { useRef } from 'react'
 import type { PartialExit, PartialExitCreatePayload, PartialExitListResponse } from '@/types'
 
 export function usePartialExitsQuery(tradeId: number | null) {
@@ -8,28 +10,54 @@ export function usePartialExitsQuery(tradeId: number | null) {
     queryKey: ['partial-exits', tradeId],
     queryFn: () => listPartialExits(tradeId!),
     enabled: tradeId != null,
-    staleTime: 5 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
 export function useCreatePartialExitMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
+  const endSpanRef = useRef<(() => void) | null>(null)
   return useMutation<PartialExit, Error, { tradeId: number; payload: PartialExitCreatePayload }>({
     mutationFn: ({ tradeId, payload }) => createPartialExit(tradeId, payload),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['partial-exits', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onMutate: () => {
+      endSpanRef.current = span('mutation:partial-exit')
+    },
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      endSpanRef.current?.()
+      endSpanRef.current = null
+    },
+    onError: () => {
+      endSpanRef.current?.()
+      endSpanRef.current = null
     },
   })
 }
 
 export function useDeletePartialExitMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
+  const endSpanRef = useRef<(() => void) | null>(null)
   return useMutation<void, Error, { tradeId: number; exitId: number }>({
     mutationFn: ({ tradeId, exitId }) => deletePartialExit(tradeId, exitId),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['partial-exits', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onMutate: () => {
+      endSpanRef.current = span('mutation:delete-partial-exit')
+    },
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      endSpanRef.current?.()
+      endSpanRef.current = null
+    },
+    onError: () => {
+      endSpanRef.current?.()
+      endSpanRef.current = null
     },
   })
 }

@@ -17,17 +17,17 @@ export function RiskExposureTable({ title, buckets, variant }: RiskExposureTable
   const Icon = variant === 'setup' ? Layers : PieChart
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-5 animate-card-in min-w-0">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in min-w-0">
+      <div className="mb-[var(--page-gap)] flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-accent" />
-          <h3 className="truncate font-display text-sm text-text-heading">{title}</h3>
+          <h3 className="truncate font-display text-[length:var(--text-sm)] text-text-heading">{title}</h3>
         </div>
-        <div className="shrink-0 text-xs text-text-muted font-data">{buckets.length}</div>
+        <div className="shrink-0 text-[length:var(--text-xs)] text-text-muted font-data">{buckets.length}</div>
       </div>
 
       {buckets.length === 0 ? (
-        <div className="py-8 text-center text-sm text-text-muted">No open exposure</div>
+        <div className="py-8 text-center text-[length:var(--text-sm)] text-text-muted">No open exposure</div>
       ) : (
         <div className="overflow-x-auto scrollbar-thin">
           <table className="min-w-[520px] w-full text-xs">

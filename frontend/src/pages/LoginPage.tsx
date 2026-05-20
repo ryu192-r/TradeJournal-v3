@@ -57,13 +57,13 @@ export function LoginPage() {
             <BarChart3 className="w-6 h-6 text-accent" />
           </div>
           <h1 className="font-display text-2xl text-text-heading">TradeJournal</h1>
-          <p className="text-sm text-text-muted mt-1">
+          <p className="text-[length:var(--text-sm)] text-text-muted mt-1">
             {isSignup ? 'Create your account' : 'Sign in to continue'}
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
+        <div className="bg-card rounded-2xl border border-border p-[var(--page-px)] space-y-[var(--page-gap)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name (signup only) */}
             {isSignup && (
@@ -136,7 +136,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -150,7 +150,7 @@ export function LoginPage() {
 
           {/* Switch between login/signup */}
           <div className="text-center">
-            <span className="text-sm text-text-muted">
+            <span className="text-[length:var(--text-sm)] text-text-muted">
               {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
             </span>
             <button
@@ -160,7 +160,7 @@ export function LoginPage() {
                 setFormError('')
                 clearError()
               }}
-              className="text-sm font-medium text-accent hover:text-accent-hover transition-colors cursor-pointer"
+              className="text-[length:var(--text-sm)] font-medium text-accent hover:text-accent-hover transition-colors cursor-pointer"
             >
               {isSignup ? 'Sign In' : 'Sign Up'}
             </button>

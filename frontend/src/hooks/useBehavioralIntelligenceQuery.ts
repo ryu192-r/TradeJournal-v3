@@ -6,6 +6,7 @@ export function useOvertradingQuery(fromDate?: string, toDate?: string, dailyThr
     queryKey: ['lifecycle', 'overtrading', fromDate, toDate, dailyThreshold, weeklyThreshold],
     queryFn: () => getOvertradingDetection(fromDate, toDate, dailyThreshold, weeklyThreshold),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -14,6 +15,7 @@ export function useEarlyExitQuery(fromDate?: string, toDate?: string) {
     queryKey: ['lifecycle', 'early-exits', fromDate, toDate],
     queryFn: () => getEarlyExitAnalysis(fromDate, toDate),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -22,6 +24,7 @@ export function useDisciplineScoreQuery(fromDate?: string, toDate?: string) {
     queryKey: ['lifecycle', 'discipline-score', fromDate, toDate],
     queryFn: () => getDisciplineScore(fromDate, toDate),
     staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 

@@ -1,9 +1,10 @@
+import { useMemo } from 'react'
 import { useEmotionSummaryQuery, useGradeSummaryQuery, useBehavioralAnalyticsQuery, useRevengeTradesQuery } from '@/hooks/useLifecycleAnalyticsQuery'
 import { formatCurrency } from '@/utils/format'
 import { Brain, AlertTriangle, Target, Shield, Zap, TrendingDown } from 'lucide-react'
 import type { EmotionSummaryEntry, GradePnlEntry, BehavioralInsight, RevengeTrade } from '@/types'
 
-const CARD = 'bg-card rounded-2xl border border-border p-5 animate-card-in'
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 const EMOTION_COLORS: Record<string, string> = {
   calm: 'text-blue-400',
@@ -35,9 +36,9 @@ const GRADE_COLORS: Record<string, string> = {
 
 function EmotionBreakdown({ emotions, mostFrequent }: { emotions: EmotionSummaryEntry[]; mostFrequent: string | null }) {
   if (!emotions.length) {
-    return <div className="text-sm text-text-muted text-center py-6">No emotion data yet. Log emotions on your trades to see patterns.</div>
+    return <div className="text-[length:var(--text-sm)] text-text-muted text-center py-6">No emotion data yet. Log emotions on your trades to see patterns.</div>
   }
-  const total = emotions.reduce((s, e) => s + e.count, 0)
+  const total = useMemo(() => emotions.reduce((s, e) => s + e.count, 0), [emotions])
   return (
     <div className="space-y-2">
       {emotions.map((e) => {
@@ -49,13 +50,13 @@ function EmotionBreakdown({ emotions, mostFrequent }: { emotions: EmotionSummary
             <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
               <div className={`h-full rounded-full ${EMOTION_BG[e.emotion] ?? 'bg-accent/20'}`} style={{ width: `${pct}%` }} />
             </div>
-            <span className="text-xs text-text-muted font-data w-8 text-right">{e.count}</span>
+            <span className="text-[length:var(--text-xs)] text-text-muted font-data w-8 text-right">{e.count}</span>
             {e.win_rate != null && <span className={`text-xs font-data w-14 text-right ${e.win_rate >= 50 ? 'text-profit' : 'text-loss'}`}>{e.win_rate}%</span>}
           </div>
         )
       })}
       {mostFrequent && (
-        <div className="mt-3 pt-3 border-t border-border text-xs text-text-muted">
+        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border text-[length:var(--text-xs)] text-text-muted">
           Most frequent: <span className="font-medium text-text-heading">{mostFrequent}</span>
         </div>
       )}
@@ -65,7 +66,7 @@ function EmotionBreakdown({ emotions, mostFrequent }: { emotions: EmotionSummary
 
 function GradeDistribution({ gradePnl, avgOverall }: { gradePnl: GradePnlEntry[]; avgOverall: number | null }) {
   if (!gradePnl.length) {
-    return <div className="text-sm text-text-muted text-center py-6">No execution grades yet. Grade your trades to see distribution.</div>
+    return <div className="text-[length:var(--text-sm)] text-text-muted text-center py-6">No execution grades yet. Grade your trades to see distribution.</div>
   }
   return (
     <div className="space-y-2">
@@ -78,7 +79,7 @@ function GradeDistribution({ gradePnl, avgOverall }: { gradePnl: GradePnlEntry[]
         </div>
       ))}
       {avgOverall != null && (
-        <div className="mt-3 pt-3 border-t border-border text-xs text-text-muted">
+        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border text-[length:var(--text-xs)] text-text-muted">
           Average grade: <span className="font-medium text-text-heading">{avgOverall}/5</span>
         </div>
       )}
@@ -90,21 +91,21 @@ function Decimal(v: string): number { return parseFloat(v) }
 
 function BehavioralInsights({ insights, disciplineScore }: { insights: BehavioralInsight[]; disciplineScore: number | null }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-[var(--cell-py)]">
       {disciplineScore != null && (
         <div className="flex items-center gap-3 mb-2">
           <Shield className="w-4 h-4 text-accent" />
-          <span className="text-sm text-text-muted">Discipline Score</span>
+          <span className="text-[length:var(--text-sm)] text-text-muted">Discipline Score</span>
           <span className="font-data text-lg font-bold text-text-heading">{disciplineScore}%</span>
         </div>
       )}
       {insights.length === 0 && disciplineScore == null && (
-        <div className="text-sm text-text-muted text-center py-4">No behavioral patterns detected yet.</div>
+        <div className="text-[length:var(--text-sm)] text-text-muted text-center py-4">No behavioral patterns detected yet.</div>
       )}
       {insights.map((insight, i) => (
         <div key={i} className={`flex items-start gap-2 p-3 rounded-lg ${insight.type === 'warning' ? 'bg-loss-muted/20' : 'bg-accent-muted/20'}`}>
           {insight.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-loss shrink-0 mt-0.5" /> : <Brain className="w-4 h-4 text-accent shrink-0 mt-0.5" />}
-          <div className="text-sm text-text-heading">{insight.message}</div>
+          <div className="text-[length:var(--text-sm)] text-text-heading">{insight.message}</div>
         </div>
       ))}
     </div>
@@ -115,7 +116,7 @@ function RevengeTradesSection({ revengeTrades, totalFlagged, avgPnlFlagged, avgP
   revengeTrades: RevengeTrade[]; totalFlagged: number; avgPnlFlagged: number | null; avgPnlUnflagged: number | null
 }) {
   if (!totalFlagged) {
-    return <div className="text-sm text-text-muted text-center py-4">No revenge trade patterns detected.</div>
+    return <div className="text-[length:var(--text-sm)] text-text-muted text-center py-4">No revenge trade patterns detected.</div>
   }
   return (
     <div className="space-y-2">
@@ -158,15 +159,15 @@ export function LifecycleInsights() {
   const { data: behavioralData } = useBehavioralAnalyticsQuery()
   const { data: revengeData } = useRevengeTradesQuery()
 
-  const hasEmotionData = emotionData && emotionData.total_logs > 0
-  const hasGradeData = gradeData && Object.keys(gradeData.grade_distribution).length > 0
+  const hasEmotionData = Boolean(emotionData && emotionData.total_logs > 0)
+  const hasGradeData = Boolean(gradeData && Object.keys(gradeData.grade_distribution).length > 0)
 
   if (!hasEmotionData && !hasGradeData) {
     return null
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       <div className="flex items-center gap-2">
         <Brain className="w-[15px] h-[15px] text-accent" />
         <h2 className="font-display text-[length:var(--heading-size)] text-text-heading">Lifecycle Insights</h2>
@@ -177,9 +178,9 @@ export function LifecycleInsights() {
           <div className={CARD}>
             <div className="flex items-center gap-2 mb-3">
               <Zap className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-medium text-text-heading">Emotion Breakdown</h3>
+              <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Emotion Breakdown</h3>
             </div>
-            <EmotionBreakdown emotions={emotionData.emotions} mostFrequent={emotionData.most_frequent} />
+            <EmotionBreakdown emotions={emotionData?.emotions ?? []} mostFrequent={emotionData?.most_frequent ?? null} />
           </div>
         )}
 
@@ -187,9 +188,9 @@ export function LifecycleInsights() {
           <div className={CARD}>
             <div className="flex items-center gap-2 mb-3">
               <Target className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-medium text-text-heading">Execution Grades</h3>
+              <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Execution Grades</h3>
             </div>
-            <GradeDistribution gradePnl={gradeData.grade_pnl} avgOverall={gradeData.avg_overall} />
+            <GradeDistribution gradePnl={gradeData?.grade_pnl ?? []} avgOverall={gradeData?.avg_overall ?? null} />
           </div>
         )}
 
@@ -197,7 +198,7 @@ export function LifecycleInsights() {
           <div className={CARD}>
             <div className="flex items-center gap-2 mb-3">
               <Shield className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-medium text-text-heading">Behavioral Patterns</h3>
+              <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Behavioral Patterns</h3>
             </div>
             <BehavioralInsights insights={behavioralData.insights} disciplineScore={behavioralData.discipline_score} />
           </div>
@@ -208,7 +209,7 @@ export function LifecycleInsights() {
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="w-4 h-4 text-loss" />
-            <h3 className="text-sm font-medium text-text-heading">Revenge Trade Detection</h3>
+            <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Revenge Trade Detection</h3>
           </div>
           <RevengeTradesSection
             revengeTrades={revengeData.revenge_trades}

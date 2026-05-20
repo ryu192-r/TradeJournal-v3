@@ -9,6 +9,7 @@ import { InstallPrompt } from '@/components/ui/InstallPrompt'
 import { EdgeSwipe } from '@/components/ui/EdgeSwipe'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { lazy, Suspense, useEffect } from 'react'
+import { mark } from '@/utils/performance'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -16,6 +17,7 @@ const AnalyticsDashboardPage = lazy(() => import('@/pages/AnalyticsDashboardPage
 const TradesPage = lazy(() => import('@/pages/TradesPage').then((m) => ({ default: m.TradesPage })))
 const CreateTradePage = lazy(() => import('@/pages/CreateTradePage').then((m) => ({ default: m.CreateTradePage })))
 const EditTradePage = lazy(() => import('@/pages/EditTradePage').then((m) => ({ default: m.EditTradePage })))
+const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
 const SetupPlaybookPage = lazy(() => import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })))
 const TradeIdeasPage = lazy(() => import('@/components/ideas/TradeIdeasPage').then((m) => ({ default: m.TradeIdeasPage })))
 const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
@@ -28,11 +30,12 @@ const DailySANotesPage = lazy(() => import('@/pages/DailySANotesPage').then((m) 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
+      retry: 1,
     },
     mutations: {
       networkMode: 'online',
@@ -55,6 +58,41 @@ function App() {
   useEffect(() => {
     fetchMe()
   }, [fetchMe])
+
+  /*
+    Global Performance Listener:
+    * Logs query success/fetch durations
+    * Logs mutation success/failure durations
+    * Measures dashboard full paint time
+  */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+
+    const unsubQuery = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated') return
+      const query = event.query
+      if (query.state.status === 'success' && query.state.dataUpdateCount === 1) {
+        const key = query.queryKey.join('/')
+        mark(`query:${key}:success`)
+        console.log(`[perf] query resolved: ${key}`)
+      }
+    })
+
+    const unsubMutation = queryClient.getMutationCache().subscribe((event) => {
+      if (event.type !== 'updated') return
+      const m = event.mutation
+      if (m && (m.state.status === 'success' || m.state.status === 'error')) {
+        const name = m.options.mutationKey?.join('/') ?? 'unknown'
+        const status = m.state.status
+        console.log(`[perf] mutation ${name} → ${status}`)
+      }
+    })
+
+    return () => {
+      unsubQuery()
+      unsubMutation()
+    }
+  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -86,6 +124,7 @@ function App() {
                 {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
+                {activeView === 'trades' && tradeFormMode === 'detail' && <ErrorBoundary name="TradeDetail"><TradeDetailPage tradeId={selectedTradeId ?? 0} /></ErrorBoundary>}
                 {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
                 {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
                 {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}

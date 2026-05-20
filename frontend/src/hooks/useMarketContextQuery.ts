@@ -6,6 +6,7 @@ export function useMarketSnapshotsQuery(days?: number) {
     queryKey: ['market', 'snapshots', days],
     queryFn: () => getMarketSnapshots(days),
     staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -14,6 +15,7 @@ export function useMarketCorrelationQuery(fromDate?: string, toDate?: string) {
     queryKey: ['market', 'correlation', fromDate, toDate],
     queryFn: () => getMarketPerformanceCorrelation(fromDate, toDate),
     staleTime: 60 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -22,6 +24,26 @@ export function useMarketRegimeQuery(days?: number) {
     queryKey: ['market', 'regime', days],
     queryFn: () => getMarketRegimeSummary(days),
     staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useMySymbolsQuery() {
+  return useQuery({
+    queryKey: ['market', 'my-symbols'],
+    queryFn: () => getMySymbols(),
+    staleTime: 60 * 1000,
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useLiveQuotesQuery(refreshInterval?: number) {
+  return useQuery({
+    queryKey: ['market', 'live-quotes'],
+    queryFn: () => getLiveQuotes(),
+    staleTime: 30 * 1000,
+    refetchInterval: refreshInterval ?? false,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -42,23 +64,6 @@ export function useSeedMarketSnapshotsMutation() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['market'] })
     },
-  })
-}
-
-export function useMySymbolsQuery() {
-  return useQuery({
-    queryKey: ['market', 'my-symbols'],
-    queryFn: () => getMySymbols(),
-    staleTime: 60 * 1000,
-  })
-}
-
-export function useLiveQuotesQuery(refreshInterval?: number) {
-  return useQuery({
-    queryKey: ['market', 'live-quotes'],
-    queryFn: () => getLiveQuotes(),
-    staleTime: 30 * 1000,
-    refetchInterval: refreshInterval ?? false,
   })
 }
 

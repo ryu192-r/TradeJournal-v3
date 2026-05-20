@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { mark, measure } from '@/utils/performance'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
@@ -7,7 +8,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 30000,
 })
 
 let isRefreshing = false
@@ -26,12 +27,30 @@ apiClient.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  const timingKey = `api:${config.method?.toUpperCase() ?? 'GET'} ${config.url ?? 'unknown'}`
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(config as any)._timingKey = timingKey
+  mark(`${timingKey}:start`)
   return config
 })
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const timingKey = (response.config as any)._timingKey as string | undefined
+    if (timingKey) {
+      mark(`${timingKey}:end`)
+      measure(timingKey, `${timingKey}:start`, `${timingKey}:end`)
+    }
+    return response
+  },
   async (error) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const timingKey = (error.config as any)._timingKey as string | undefined
+    if (timingKey) {
+      mark(`${timingKey}:end`)
+      measure(timingKey, `${timingKey}:start`, `${timingKey}:end`)
+    }
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('refresh_token')

@@ -38,13 +38,13 @@ export function LifecycleReviewPanel({ trade }: LifecycleReviewPanelProps) {
   }
 
   return (
-    <div className="border-t border-border pt-4 mt-4">
+    <div className="pt-[var(--page-gap)]">
       <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider mb-3">Lifecycle Intelligence</div>
 
       <div className="flex flex-wrap gap-1.5 mb-3">
         <button
           onClick={() => togglePanel('emotion')}
-          className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'emotion' ? 'border-amber-400/50 bg-amber-400/10 text-amber-400' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
+          className={`flex items-center gap-1 text-[length:var(--text-xs)] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'emotion' ? 'border-amber-400/50 bg-amber-400/10 text-amber-400' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
         >
           <Flame className="w-3.5 h-3.5" />
           Emotion
@@ -52,7 +52,7 @@ export function LifecycleReviewPanel({ trade }: LifecycleReviewPanelProps) {
 
         <button
           onClick={() => togglePanel('partial_exit')}
-          className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'partial_exit' ? 'border-accent/50 bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
+          className={`flex items-center gap-1 text-[length:var(--text-xs)] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'partial_exit' ? 'border-accent/50 bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
         >
           <ArrowDownToLine className="w-3.5 h-3.5" />
           Partial Exit
@@ -60,7 +60,7 @@ export function LifecycleReviewPanel({ trade }: LifecycleReviewPanelProps) {
 
         <button
           onClick={() => togglePanel('grade')}
-          className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'grade' ? 'border-accent/50 bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
+          className={`flex items-center gap-1 text-[length:var(--text-xs)] px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${activePanel === 'grade' ? 'border-accent/50 bg-accent-faint text-accent' : 'border-border text-text-muted hover:text-text-heading hover:border-text-muted'}`}
         >
           <BarChart3 className="w-3.5 h-3.5" />
           Grade
@@ -80,6 +80,7 @@ export function LifecycleReviewPanel({ trade }: LifecycleReviewPanelProps) {
             tradeId={trade.id}
             entryPrice={Number(trade.entry_price)}
             currentQty={Number(trade.quantity)}
+            remainingQty={trade.remaining_qty != null ? Number(trade.remaining_qty) : undefined}
             onClose={() => setActivePanel(null)}
           />
         </div>

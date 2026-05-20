@@ -9,6 +9,7 @@ from app.models.trade import Trade
 from app.db.database import SessionLocal
 import app.models  # noqa: F401 — registers all models on Base.metadata
 import logging
+import time
 from alembic.config import Config
 from alembic import command
 import os
@@ -57,7 +58,16 @@ app = FastAPI(
 # Register rate limiter middleware
 app.add_middleware(RateLimiter)
 
-# Include routers
+# Timing middleware — logs every HTTP endpoint duration
+@app.middleware("http")
+async def timing_middleware(request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration = (time.perf_counter() - start) * 1000
+    # Skip health/ping noise
+    if settings.DEBUG and request.url.path not in ("/health", "/"):
+        logger.info(f"{request.method} {request.url.path} {duration:.1f}ms")
+    return response
 app.include_router(api_router)
 
 # Serve uploaded chart images

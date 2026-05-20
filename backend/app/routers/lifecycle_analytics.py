@@ -72,7 +72,9 @@ def emotion_summary(
     start, end = _parse_date_range(from_date, to_date)
 
     trades_q = _base_trade_query(db, start, end)
-    trade_ids = [t.id for t in trades_q.all()]
+    trades = trades_q.all()
+    trade_ids = [t.id for t in trades]
+    trades_map = {t.id: t for t in trades}
 
     if not trade_ids:
         return {"emotions": [], "total_logs": 0, "most_frequent": None, "worst_performing": None}
@@ -92,21 +94,20 @@ def emotion_summary(
         .all()
     )
 
+    all_emotion_logs = db.query(EmotionLog).filter(EmotionLog.trade_id.in_(trade_ids)).all()
+    emotion_trade_ids: dict[str, list[int]] = defaultdict(list)
+    for log in all_emotion_logs:
+        emotion_trade_ids[log.emotion].append(log.trade_id)
+
     emotion_pnl: dict[str, dict] = {}
     for emotion_type in set(r.emotion for r in rows):
-        trade_ids_with_emotion = [
-            log.trade_id for log in db.query(EmotionLog.trade_id)
-            .filter(EmotionLog.trade_id.in_(trade_ids), EmotionLog.emotion == emotion_type)
-            .distinct().all()
-        ]
-        trades_with = db.query(Trade).filter(
-            Trade.id.in_(trade_ids_with_emotion), Trade.exit_price.isnot(None)
-        ).all()
+        ids = list(set(emotion_trade_ids[emotion_type]))
+        trades_with = [trades_map[tid] for tid in ids if tid in trades_map and trades_map[tid].exit_price is not None]
         pnls = [float(t.pnl or 0) for t in trades_with]
         wins = [p for p in pnls if p > 0]
         emotion_pnl[emotion_type] = {
             "trade_count": len(trades_with),
-            "total_pnl": str(Decimal(str(sum(pnls))).quantize(Decimal("0.01"))),
+            "total_pnl": str(Decimal(str(sum(pnls))).quantize(Decimal("0.01"))) if pnls else "0.00",
             "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
         }
 
@@ -158,12 +159,14 @@ def grade_summary(
     """Aggregate execution grade distribution + PnL by overall grade."""
     start, end = _parse_date_range(from_date, to_date)
     trades_q = _base_trade_query(db, start, end)
-    trade_ids = [t.id for t in trades_q.all()]
+    trades = trades_q.all()
+    trade_ids = [t.id for t in trades]
 
     if not trade_ids:
         return {"grade_distribution": {}, "dimension_averages": {}, "grade_pnl": [], "avg_overall": None}
 
     grades = db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(trade_ids)).all()
+    trades_map = {t.id: t for t in trades}
 
     grade_dist: dict[str, int] = {}
     dim_vals: dict[str, list[str]] = {
@@ -184,7 +187,7 @@ def grade_summary(
             if val:
                 dim_vals[dim].append(val)
 
-        trade = next((t for t in trades_q.all() if t.id == g.trade_id), None)
+        trade = trades_map.get(g.trade_id)
         if trade and trade.exit_price is not None:
             grade_pnl.append({
                 "trade_id": g.trade_id,
@@ -339,6 +342,7 @@ def revenge_trades(
     start, end = _parse_date_range(from_date, to_date)
     trades_q = _base_trade_query(db, start, end)
     all_trades = trades_q.order_by(Trade.entry_time.asc()).all()
+    trades_map = {t.id: t for t in all_trades}
 
     if not all_trades:
         return {"revenge_trades": [], "total_flagged": 0, "avg_pnl_flagged": None, "avg_pnl_unflagged": None}
@@ -346,12 +350,7 @@ def revenge_trades(
     trade_ids = [t.id for t in all_trades]
     all_emotions = {e.trade_id: e for e in db.query(EmotionLog).filter(EmotionLog.trade_id.in_(trade_ids)).all()}
 
-    revenge_trades_list = []
-    loss_times = []
-    for t in all_trades:
-        if t.exit_price is not None and t.pnl is not None and t.pnl < 0:
-            loss_times.append(t.entry_time)
-
+    loss_times_sorted = [t.entry_time for t in all_trades if t.exit_price is not None and t.pnl is not None and t.pnl < 0 and t.entry_time]
     for t in all_trades:
         revenge_emotion = False
         emotion = all_emotions.get(t.id)
@@ -359,10 +358,14 @@ def revenge_trades(
             revenge_emotion = True
 
         within_window = False
-        for loss_time in loss_times:
-            if loss_time < t.entry_time and (t.entry_time - loss_time).total_seconds() <= hours_window * 3600:
-                within_window = True
-                break
+        # binary search in loss_times_sorted for nearest loss before t.entry_time
+        if loss_times_sorted and t.entry_time:
+            import bisect
+            idx = bisect.bisect_left(loss_times_sorted, t.entry_time) - 1
+            if idx >= 0:
+                nearest = loss_times_sorted[idx]
+                if (t.entry_time - nearest).total_seconds() <= hours_window * 3600:
+                    within_window = True
 
         if revenge_emotion or within_window:
             revenge_trades_list.append({
@@ -376,18 +379,9 @@ def revenge_trades(
                 "hours_after_loss": None,
             })
 
-    flagged_pnls = []
-    unflagged_pnls = []
-    flagged_ids = {r["trade_id"] for r in revenge_trades_list}
-    for t in all_trades:
-        if t.id in flagged_ids:
-            flagged_pnls.append(float(t.pnl or 0))
-        else:
-            unflagged_pnls.append(float(t.pnl or 0))
-
-    loss_times_sorted = sorted(loss_times)
+    loss_times_sorted = sorted(loss_times_sorted)
     for rt in revenge_trades_list:
-        trade = next((t for t in all_trades if t.id == rt["trade_id"]), None)
+        trade = trades_map.get(rt["trade_id"])
         if trade and trade.entry_time:
             nearest_loss = None
             for lt in reversed(loss_times_sorted):

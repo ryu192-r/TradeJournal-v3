@@ -7,7 +7,7 @@ import os
 import uuid
 import shutil
 
-from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest
+from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
@@ -172,6 +172,36 @@ def list_trades(
         resp.unrealized_pnl = extra["unrealized_pnl"]
         items.append(resp)
     return {"total": total, "items": items}
+
+
+@router.get("/open-live", response_model=List[OpenLiveTradeResponse])
+def list_open_live_trades(db: Session = Depends(get_db)):
+    """Return only open trades with the minimal fields needed by the live dashboard."""
+    trades = (
+        db.query(Trade)
+        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
+        .order_by(Trade.entry_time.desc())
+        .all()
+    )
+    result = []
+    for t in trades:
+        partials = (
+            db.query(PartialExit)
+            .filter(PartialExit.trade_id == t.id)
+            .all()
+        )
+        total_exited_qty = sum(p.qty for p in partials)
+        remaining = t.quantity - total_exited_qty
+        result.append({
+            "id": t.id,
+            "symbol": t.symbol,
+            "entry_price": t.entry_price,
+            "quantity": t.quantity,
+            "remaining_qty": remaining,
+            "stop_price": t.stop_price,
+            "fees": t.fees,
+        })
+    return result
 
 
 @router.get("/{trade_id}", response_model=TradeResponse)

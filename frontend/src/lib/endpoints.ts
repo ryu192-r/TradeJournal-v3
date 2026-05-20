@@ -1,6 +1,6 @@
 // API endpoint definitions — single source of truth for every backend call
 import apiClient from '@/lib/api'
-import type { ApiTrade, ApiTradeListResponse, BackendTradeStatus } from '@/types'
+import type { ApiTrade, ApiTradeListResponse, BackendTradeStatus, OpenLiveTrade } from '@/types'
 import type { DailyJournal, DailyJournalPayload } from '@/types'
 import type { WeeklyJournalStats } from '@/types'
 import type { FullDashboardPayload, CapitalDashboardPayload } from '@/types'
@@ -42,6 +42,10 @@ export function listTrades(params?: ListTradesParams) {
   searchParams.append('skip', String(skip))
   searchParams.append('limit', String(limit))
   return apiClient.get<ApiTradeListResponse>(`/trades/?${searchParams.toString()}`).then(r => r.data)
+}
+
+export function getOpenLiveTrades() {
+  return apiClient.get<OpenLiveTrade[]>('/trades/open-live').then(r => r.data)
 }
 
 export function getTrade(id: number) {
@@ -104,6 +108,16 @@ export function createJournal(payload: DailyJournalPayload) {
 
 export function updateJournal(date: string, payload: DailyJournalPayload) {
   return apiClient.put<DailyJournal>(`/journal/${date}`, payload).then(r => r.data)
+}
+
+// ────────────────────────── Dashboard Aggregates ──────────────────────────
+
+export function getOperationalDashboard() {
+  return apiClient.get<import('@/types').OperationalDashboardPayload>('/dashboard/operational').then(r => r.data)
+}
+
+export function getIntelligenceDashboard() {
+  return apiClient.get<import('@/types').IntelligenceDashboardPayload>('/dashboard/intelligence').then(r => r.data)
 }
 
 // ────────────────────────── Analytics ──────────────────────────

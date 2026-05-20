@@ -123,6 +123,25 @@ class TradeListResponse(BaseModel):
     items: List[TradeResponse]
 
 
+class OpenLiveTradeResponse(BaseModel):
+    """Lightweight open-trade payload for the live dashboard."""
+    id: int
+    symbol: str
+    entry_price: Decimal
+    quantity: Decimal
+    remaining_qty: Decimal
+    stop_price: Optional[Decimal] = None
+    fees: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("entry_price", "quantity", "remaining_qty", "stop_price", "fees")
+    def serialize_decimal(self, v):
+        if v is None:
+            return None
+        return str(v) if isinstance(v, Decimal) else v
+
+
 class PyramidTradeRequest(BaseModel):
     entry_price: Decimal = Field(..., description="Entry price of the pyramid lot")
     quantity: Decimal = Field(..., description="Quantity to add")

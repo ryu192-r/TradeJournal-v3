@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useExecutionGradeQuery, useCreateExecutionGradeMutation, useUpdateExecutionGradeMutation } from '@/hooks/useExecutionGradeQuery'
 import type { GradeLetter } from '@/types'
 
@@ -42,15 +42,30 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
   const updateMutation = useUpdateExecutionGradeMutation()
 
   const [fields, setFields] = useState<ExecutionGradeFields>({
-    entry_quality: existingGrade?.entry_quality ?? null,
-    sizing_quality: existingGrade?.sizing_quality ?? null,
-    stop_quality: existingGrade?.stop_quality ?? null,
-    patience: existingGrade?.patience ?? null,
-    rule_adherence: existingGrade?.rule_adherence ?? null,
-    exit_quality: existingGrade?.exit_quality ?? null,
-    overall_grade: existingGrade?.overall_grade ?? null,
-    notes: existingGrade?.notes ?? '',
+    entry_quality: null,
+    sizing_quality: null,
+    stop_quality: null,
+    patience: null,
+    rule_adherence: null,
+    exit_quality: null,
+    overall_grade: null,
+    notes: '',
   })
+
+  useEffect(() => {
+    if (existingGrade) {
+      setFields({
+        entry_quality: existingGrade.entry_quality ?? null,
+        sizing_quality: existingGrade.sizing_quality ?? null,
+        stop_quality: existingGrade.stop_quality ?? null,
+        patience: existingGrade.patience ?? null,
+        rule_adherence: existingGrade.rule_adherence ?? null,
+        exit_quality: existingGrade.exit_quality ?? null,
+        overall_grade: existingGrade.overall_grade ?? null,
+        notes: existingGrade.notes ?? '',
+      })
+    }
+  }, [existingGrade])
 
   const isExisting = !!existingGrade
   const mutation = isExisting ? updateMutation : createMutation
@@ -82,7 +97,7 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
     <div className="space-y-3">
       {CATEGORIES.map(({ key, label }) => (
         <div key={key} className="flex items-center justify-between gap-3">
-          <span className="text-sm text-text-muted w-14 shrink-0">{label}</span>
+          <span className="text-[length:var(--text-sm)] text-text-muted w-14 shrink-0">{label}</span>
           <div className="flex gap-1.5">
             {GRADES.map((g) => (
               <button
@@ -98,7 +113,7 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
       ))}
 
       <div className="border-t border-border pt-3 flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-text-heading">Overall</span>
+        <span className="text-[length:var(--text-sm)] font-medium text-text-heading">Overall</span>
         <div className="flex gap-1.5">
           {GRADES.map((g) => (
             <button
@@ -123,7 +138,7 @@ export function ExecutionGrader({ tradeId }: ExecutionGraderProps) {
       <button
         onClick={handleSubmit}
         disabled={isPending}
-        className="w-full text-sm font-medium py-2 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+        className="w-full text-[length:var(--text-sm)] font-medium py-2 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
       >
         {isPending ? 'Saving...' : isExisting ? 'Update Grade' : 'Save Grade'}
       </button>

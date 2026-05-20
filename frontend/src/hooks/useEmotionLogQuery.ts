@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listEmotionLogs, createEmotionLog, deleteEmotionLog } from '@/lib/endpoints'
-import { invalidateTradeDomain } from '@/lib/queryInvalidation'
+import { invalidateLifecycle, invalidateTradeDetail, invalidateBehavioral } from '@/lib/queryInvalidation'
 import type { EmotionLog, EmotionLogCreatePayload, EmotionLogListResponse } from '@/types'
 
 export function useEmotionLogsQuery(tradeId: number | null) {
@@ -8,30 +8,30 @@ export function useEmotionLogsQuery(tradeId: number | null) {
     queryKey: ['emotion-logs', tradeId],
     queryFn: () => listEmotionLogs(tradeId!),
     enabled: tradeId != null,
-    staleTime: 5 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
 export function useCreateEmotionLogMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<EmotionLog, Error, { tradeId: number; payload: EmotionLogCreatePayload }>({
     mutationFn: ({ tradeId, payload }) => createEmotionLog(tradeId, payload),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['emotion-logs', tradeId] })
-      queryClient.invalidateQueries({ queryKey: ['timeline', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateBehavioral(qc)
     },
   })
 }
 
 export function useDeleteEmotionLogMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<void, Error, { tradeId: number; logId: number }>({
     mutationFn: ({ tradeId, logId }) => deleteEmotionLog(tradeId, logId),
-    onSuccess: async (_, { tradeId }) => {
-      queryClient.invalidateQueries({ queryKey: ['emotion-logs', tradeId] })
-      queryClient.invalidateQueries({ queryKey: ['timeline', tradeId] })
-      await invalidateTradeDomain(queryClient)
+    onSuccess: (_, { tradeId }) => {
+      void invalidateLifecycle(qc, tradeId)
+      void invalidateTradeDetail(qc, tradeId)
+      void invalidateBehavioral(qc)
     },
   })
 }

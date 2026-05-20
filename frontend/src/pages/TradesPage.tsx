@@ -1,8 +1,6 @@
 import { GlassButton } from '@/components/ui/GlassButton'
 import { BrokerImportModal } from '@/components/trades/BrokerImportModal'
-import { TradeDetailSwipeContent } from '@/components/trades/TradeDetailSwipeContent'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
-import { SwipeModal } from '@/components/ui/SwipeModal'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { useLiveQuotesQuery } from '@/hooks/useMarketContextQuery'
@@ -16,8 +14,8 @@ import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Up
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
-import { invalidateTradeDomain, setTradeCache } from '@/lib/queryInvalidation'
-import { useState, useCallback, useEffect } from 'react'
+import { invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook, invalidateTradeDetail, invalidateLifecycle, setTradeCache, patchTradeInLists, removeTradeFromLists } from '@/lib/queryInvalidation'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 
 function statusBadgeClass(trade: ApiTrade): string {
   if (trade.status === 'deleted') return 'bg-text-faint text-text-muted'
@@ -27,12 +25,11 @@ function statusBadgeClass(trade: ApiTrade): string {
 
 export function TradesPage() {
   const addToast = useToastStore((s) => s.addToast)
-  const { openCreateTrade, openEditTrade } = useAppStore()
+  const { openCreateTrade, openEditTrade, openDetailTrade } = useAppStore()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [symbolFilter, setSymbolFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [detailTrade, setDetailTrade] = useState<ApiTrade | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pyramidingTradeId, setPyramidingTradeId] = useState<number | null>(null)
@@ -76,7 +73,11 @@ export function TradesPage() {
       })
       addToast({ title: 'Pyramided', message: 'Shares added to position.', variant: 'success' })
       setTradeCache(queryClient, trade)
-      invalidateTradeDomain(queryClient)
+      patchTradeInLists(queryClient, trade)
+      void invalidateRisk(queryClient)
+      void invalidateAnalytics(queryClient)
+      void invalidatePlaybook(queryClient)
+      void invalidateTradeList(queryClient)
       closePyramid()
     } catch {
       addToast({ title: 'Error', message: 'Failed to pyramid trade.', variant: 'error' })
@@ -105,7 +106,11 @@ export function TradesPage() {
         note: peNote || null,
       })
       addToast({ title: 'Partial exit recorded', message: `${peQty} shares exited.`, variant: 'success' })
-      invalidateTradeDomain(queryClient)
+      void invalidateLifecycle(queryClient, tradeId)
+      void invalidateTradeDetail(queryClient, tradeId)
+      void invalidateRisk(queryClient)
+      void invalidateAnalytics(queryClient)
+      void invalidateTradeList(queryClient)
       closePartialExit()
     } catch {
       addToast({ title: 'Error', message: 'Failed to record partial exit.', variant: 'error' })
@@ -126,7 +131,7 @@ export function TradesPage() {
   const { data: capitalData } = useQuery({
     queryKey: ['capital-dashboard'],
     queryFn: getCapitalDashboard,
-    staleTime: 5 * 1000,
+    staleTime: 30 * 1000,
   })
   const netEquity = capitalData?.net_equity ?? null
 
@@ -134,9 +139,11 @@ export function TradesPage() {
   const peMaxQty = peExitsData ? Number(peExitsData.remaining_qty) : null
 
   const { data: liveQuotesData } = useLiveQuotesQuery()
-  const quoteMap: Map<string, LiveQuote> = new Map(
-    (liveQuotesData?.quotes ?? []).map((q: LiveQuote) => [q.symbol, q])
-  )
+  const quoteMap = useMemo(() => {
+    return new Map<string, LiveQuote>(
+      (liveQuotesData?.quotes ?? []).map((q: LiveQuote) => [q.symbol, q])
+    )
+  }, [liveQuotesData])
 
   const toggleSelect = useCallback((id: number) => {
     setSelectedIds((prev) => {
@@ -158,13 +165,17 @@ export function TradesPage() {
     }
     addToast({ title: 'Deleted', message: `${success} trades deleted.`, variant: 'info' })
     setSelectedIds(new Set())
-    invalidateTradeDomain(queryClient)
+    selectedIds.forEach((id) => removeTradeFromLists(queryClient, id))
+    void invalidateRisk(queryClient)
+    void invalidateAnalytics(queryClient)
+    void invalidatePlaybook(queryClient)
+    void invalidateTradeList(queryClient)
   }, [selectedIds, addToast, queryClient])
 
   const allSelected = data?.items?.length === selectedIds.size
 
   const handleRefresh = useCallback(async () => {
-    await invalidateTradeDomain(queryClient)
+    void invalidateTradeList(queryClient)
   }, [queryClient])
 
   // Keyboard shortcuts
@@ -310,9 +321,9 @@ export function TradesPage() {
                          trade={trade}
                          selectedIds={selectedIds}
                          toggleSelect={toggleSelect}
-                         openEditTrade={openEditTrade}
-                         setDetailTrade={setDetailTrade}
-                         setPyramidingTradeId={setPyramidingTradeId}
+                          openEditTrade={openEditTrade}
+                          openDetailTrade={openDetailTrade}
+                          setPyramidingTradeId={setPyramidingTradeId}
                          setPartialExitTradeId={setPartialExitTradeId}
                          netEquity={netEquity}
                          quoteMap={quoteMap}
@@ -327,7 +338,7 @@ export function TradesPage() {
             </table>
             {/* Pagination */}
             {!isLoading && !error && data && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-border px-3 sm:px-5 pb-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border px-3 sm:px-5 pb-4">
                 <span className="text-xs text-text-muted font-data">
                   {data.total === 0 ? '0 trades' : `${data.items.length} of ${data.total} trades · Page ${page} of ${totalPages}`}
                 </span>
@@ -351,24 +362,24 @@ export function TradesPage() {
       {/* Pyramid bottom sheet */}
       <BottomSheet open={pyramidingTradeId !== null} onClose={closePyramid} title="Pyramid Position">
         <p className="text-sm text-text-muted mb-4">Add more shares to this open position. Entry price will be averaged.</p>
-        <div className="space-y-3 mb-5">
+        <div className="space-y-3 mb-[var(--page-gap)]">
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Entry Price (₹)</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Entry Price (₹)</label>
             <input type="number" step="0.01" value={pyramidEntryPrice} onChange={(e) => setPyramidEntryPrice(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Quantity</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Quantity</label>
             <input type="number" step="1" value={pyramidQty} onChange={(e) => setPyramidQty(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Fees (optional)</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Fees (optional)</label>
             <input type="number" step="0.01" value={pyramidFees} onChange={(e) => setPyramidFees(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Stop Price (optional)</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Stop Price (optional)</label>
             <input type="number" step="0.01" value={pyramidStopPrice} onChange={(e) => setPyramidStopPrice(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
@@ -385,7 +396,7 @@ export function TradesPage() {
       {/* Partial exit bottom sheet */}
       <BottomSheet open={partialExitTradeId !== null} onClose={closePartialExit} title="Partial Exit">
         <p className="text-sm text-text-muted mb-4">Sell a portion of your open position.</p>
-        <div className="space-y-3 mb-5">
+        <div className="space-y-3 mb-[var(--page-gap)]">
           {peMaxQty != null && (
             <div className="flex items-center justify-between text-xs font-data">
               <span className="text-text-muted">Remaining shares</span>
@@ -393,17 +404,17 @@ export function TradesPage() {
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Qty</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Qty</label>
             <input type="number" step="1" value={peQty} onChange={(e) => setPeQty(e.target.value)} max={peMaxQty ?? undefined}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder={peMaxQty != null ? `max ${peMaxQty}` : '0'} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Exit Price (₹)</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Exit Price (₹)</label>
             <input type="number" step="0.01" value={pePrice} onChange={(e) => setPePrice(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Reason</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Reason</label>
             <select value={peReason} onChange={(e) => setPeReason(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer">
               <option value="">Select reason...</option>
@@ -413,7 +424,7 @@ export function TradesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted mb-1">Note (optional)</label>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Note (optional)</label>
             <textarea value={peNote} onChange={(e) => setPeNote(e.target.value)} rows={2}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all resize-none" placeholder="Optional note..." />
           </div>
@@ -425,21 +436,14 @@ export function TradesPage() {
             {peSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><ArrowDownToLine className="w-4 h-4" /> Record Exit</>}
           </button>
         </div>
-      </BottomSheet>
+       </BottomSheet>
 
-      {/* Trade detail modal */}
-      {detailTrade && (
-        <SwipeModal open={true} onClose={() => setDetailTrade(null)}>
-          <TradeDetailSwipeContent
-            trade={detailTrade}
-            trades={data?.items ?? []}
-            onSelect={setDetailTrade}
-            onClose={() => setDetailTrade(null)}
-          />
-        </SwipeModal>
-      )}
-
-      <BrokerImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => invalidateTradeDomain(queryClient)} />
+      <BrokerImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => {
+        void invalidateRisk(queryClient)
+        void invalidateAnalytics(queryClient)
+        void invalidatePlaybook(queryClient)
+        void invalidateTradeList(queryClient)
+      }} />
     </div>
     </PullToRefresh>
   )
@@ -456,7 +460,7 @@ interface TradeRowProps {
   selectedIds: Set<number>
   toggleSelect: (id: number) => void
   openEditTrade: (id: number) => void
-  setDetailTrade: (t: ApiTrade) => void
+  openDetailTrade: (id: number) => void
   setPyramidingTradeId: (id: number | null) => void
   setPartialExitTradeId: (id: number | null) => void
   netEquity: string | null
@@ -469,7 +473,7 @@ const STOP_TYPE_OPTIONS = [
   { value: 'breakeven', label: 'Breakeven' },
 ]
 
-function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTrade, setPyramidingTradeId, setPartialExitTradeId, netEquity, quoteMap }: TradeRowProps) {
+function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, setPartialExitTradeId, netEquity, quoteMap }: TradeRowProps) {
   const entryCost = Number(trade.entry_price) * Number(trade.quantity)
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const capPct = netEquity && Number(netEquity) > 0 ? ((pnlNum / Number(netEquity)) * 100) : null
@@ -532,7 +536,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, setDetailTr
       </td>
       <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
         <button
-          onClick={() => setDetailTrade(trade)}
+          onClick={() => openDetailTrade(trade.id)}
           className="font-medium text-text-heading hover:text-accent transition-colors cursor-pointer"
         >
           {trade.symbol}

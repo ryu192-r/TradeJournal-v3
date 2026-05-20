@@ -21,7 +21,7 @@ function SliderField({ label, value, onChange }: { label: string; value: number 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-text-muted">{label}</span>
+        <span className="text-[length:var(--text-sm)] text-text-muted">{label}</span>
         <span className="text-sm font-data text-text-heading">{value ?? '—'}</span>
       </div>
       <input

@@ -28,13 +28,13 @@ const severityStyles: Record<RiskWarningSeverity, { icon: LucideIcon; iconColor:
 
 export function RiskWarningsPanel({ warnings }: { warnings: RiskWarning[] }) {
   return (
-    <div className="bg-card rounded-2xl border border-border p-5 animate-card-in min-w-0">
+    <div className="bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in min-w-0">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 text-accent" />
-          <h3 className="truncate font-display text-sm text-text-heading">Risk Warnings</h3>
+          <h3 className="truncate font-display text-[length:var(--text-sm)] text-text-heading">Risk Warnings</h3>
         </div>
-        <div className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-text-muted font-data">
+        <div className="shrink-0 rounded-md border border-border px-2 py-1 text-[length:var(--text-xs)] text-text-muted font-data">
           {warnings.length}
         </div>
       </div>
@@ -43,7 +43,7 @@ export function RiskWarningsPanel({ warnings }: { warnings: RiskWarning[] }) {
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-profit/20 bg-profit-faint p-4">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-profit" />
           <div>
-            <div className="text-sm font-medium text-text-heading">Risk checks clear</div>
+            <div className="text-[length:var(--text-sm)] font-medium text-text-heading">Risk checks clear</div>
             <div className="mt-1 text-[length:var(--text-xs)] text-text-muted">
               No open-position alerts.
             </div>

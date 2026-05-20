@@ -11,10 +11,11 @@ interface PartialExitFormProps {
   tradeId: number
   entryPrice: number
   currentQty: number
+  remainingQty?: number
   onClose: () => void
 }
 
-export function PartialExitForm({ tradeId, entryPrice, currentQty, onClose }: PartialExitFormProps) {
+export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty: initialRemaining, onClose }: PartialExitFormProps) {
   const [qty, setQty] = useState('')
   const [exitPrice, setExitPrice] = useState('')
   const [exitReason, setExitReason] = useState<string>('')
@@ -24,7 +25,7 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, onClose }: Pa
   const addToast = useToastStore((s) => s.addToast)
   const { data: exitsData, isLoading: exitsLoading } = usePartialExitsQuery(tradeId)
 
-  const remainingQty = exitsData ? Number(exitsData.remaining_qty) : currentQty
+  const remainingQty = exitsData ? Number(exitsData.remaining_qty) : (initialRemaining ?? currentQty)
   const existingExits = exitsData?.items ?? []
 
   const qtyNum = parseFloat(qty) || 0
@@ -199,7 +200,7 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, onClose }: Pa
           </div>
         </div>
       ) : (
-        <div className="text-center py-3 text-xs text-text-muted">
+        <div className="text-center py-3 text-[length:var(--text-xs)] text-text-muted">
           All shares have been partially exited.
         </div>
       )}

@@ -20,10 +20,11 @@ export function useRiskDashboardQuery() {
         throw error
       }
     },
-    staleTime: 10 * 1000,
+    staleTime: 15 * 1000,
     retry: (failureCount, error) => {
       if (isMissingAccount(error)) return false
       return failureCount < 2
     },
+    placeholderData: (previousData) => previousData,
   })
 }

@@ -8,7 +8,7 @@ import { useStopHistoryQuery } from '@/hooks/useStopHistoryQuery'
 import { useEmotionLogsQuery } from '@/hooks/useEmotionLogQuery'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useExecutionGradeQuery } from '@/hooks/useExecutionGradeQuery'
-import { formatPrice, formatDate } from '@/utils/format'
+import { formatPrice, formatCurrency, formatDate } from '@/utils/format'
 import type { TimelineEvent } from '@/types'
 
 interface UnifiedTimelineProps {
@@ -99,14 +99,17 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
 
     if (partialData?.items) {
       for (const p of partialData.items) {
+        const pnl = p.realized_pnl ? Number(p.realized_pnl) : null
+        const pnlStr = pnl != null ? ` · ${pnl >= 0 ? '+' : ''}${formatCurrency(pnl)}` : ''
         all.push({
           id: `pe-${p.id}`,
           type: 'partial_exit',
           timestamp: p.exit_time,
           icon: EVENT_CONFIG.partial_exit.icon,
           label: 'Partial Exit',
-          detail: `${p.qty} @ ${formatPrice(Number(p.exit_price))}`,
+          detail: `${p.qty} @ ${formatPrice(Number(p.exit_price))}${pnlStr}`,
           badge: p.exit_reason || undefined,
+          badgeClass: pnl != null ? (pnl >= 0 ? 'text-profit' : 'text-loss') : undefined,
         })
       }
     }
@@ -144,7 +147,7 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
 
   if (items.length === 0) {
     return (
-      <div className="border-t border-border pt-4 mt-4">
+      <div className="pt-[var(--page-gap)]">
         <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
         <p className="text-sm text-text-muted text-center py-4">No lifecycle events recorded yet.</p>
       </div>
@@ -152,7 +155,7 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
   }
 
   return (
-    <div className="border-t border-border pt-4 mt-4">
+    <div className="pt-[var(--page-gap)]">
       <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider mb-3">Lifecycle</div>
       <div className="relative pl-4">
         <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" />
@@ -166,9 +169,9 @@ export function TradeLifecycleTimeline({ tradeId }: UnifiedTimelineProps) {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-medium text-text-heading">{item.label}</span>
                   {item.badge && (
-                    <span className={`text-[length:var(--text-xs)] px-1.5 py-px rounded-full bg-bg-elevated ${item.badgeClass || 'text-text-muted'}`}>{item.badge}</span>
+                    <span className={`text-xs px-1.5 py-px rounded-full bg-bg-elevated ${item.badgeClass || 'text-text-muted'}`}>{item.badge}</span>
                   )}
-                  <span className="text-[length:var(--text-xs)] text-text-muted ml-auto font-data shrink-0">{formatDate(item.timestamp)}</span>
+                  <span className="text-xs text-text-muted ml-auto font-data shrink-0">{formatDate(item.timestamp)}</span>
                 </div>
                 {item.detail && (
                   <p className="text-sm text-text-muted mt-0.5 truncate">{item.detail}</p>

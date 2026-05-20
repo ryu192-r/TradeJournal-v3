@@ -18,11 +18,11 @@ export function PortfolioHeatGauge({ data }: { data: RiskDashboardPayload }) {
   const openRisk = parseDecimal(data.open_risk, 0)
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-5 animate-card-in min-w-0">
+    <div className="bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in min-w-0">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="h-4 w-4 shrink-0 text-accent" />
-          <h3 className="truncate font-display text-sm text-text-heading">Portfolio Heat</h3>
+          <h3 className="truncate font-display text-[length:var(--text-sm)] text-text-heading">Portfolio Heat</h3>
         </div>
         <div className={`shrink-0 rounded-md border border-border px-2 py-1 text-xs font-data ${tone.className}`}>
           {tone.label}

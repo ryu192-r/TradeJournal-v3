@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, market_context, performance_os
+from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, market_context, performance_os, operational_dashboard
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, tags=["auth"])
@@ -28,3 +28,4 @@ api_router.include_router(lifecycle_analytics.router, tags=["lifecycle-analytics
 api_router.include_router(playbook_intelligence.router, tags=["playbook-intelligence"])
 api_router.include_router(market_context.router, tags=["market-context"])
 api_router.include_router(performance_os.router, tags=["performance-os"])
+api_router.include_router(operational_dashboard.router, tags=["dashboard"])

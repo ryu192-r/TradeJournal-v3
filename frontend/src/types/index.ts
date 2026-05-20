@@ -82,6 +82,16 @@ export interface ApiTradeListResponse {
   items: ApiTrade[]
 }
 
+export interface OpenLiveTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  quantity: string
+  remaining_qty: string
+  stop_price: string | null
+  fees: string
+}
+
 export interface ApiTradeUpdatePayload {
   symbol?: string
   direction?: string
@@ -960,4 +970,108 @@ export interface LiveQuotesResponse {
 
 export interface MySymbolsResponse {
   symbols: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Aggregated Dashboard payloads
+// ---------------------------------------------------------------------------
+
+export interface OperationalOpenTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  quantity: string
+  remaining_qty: string
+  stop_price: string | null
+  fees: string
+}
+
+export interface OperationalRiskSummary {
+  net_equity: string
+  open_positions: number
+  deployed_capital: string
+  available_capital: string
+  open_risk: string
+  portfolio_heat_pct: number | null
+  deployed_capital_pct: number | null
+  positions_without_stop: number
+  warnings: Array<{
+    severity: string
+    code: string
+    message: string
+    trade_id: number | null
+    symbol: string | null
+  }>
+}
+
+export interface OperationalCapitalSummary {
+  net_equity: string
+  initial_balance: string
+  total_deposits: string
+  total_withdrawals: string
+  total_realized_pnl: string
+  total_trades: number
+  win_rate: number | null
+}
+
+export interface OperationalStreaks {
+  current_type: string | null
+  current_count: number
+  longest_win: number
+  longest_loss: number
+}
+
+export interface OperationalDashboardPayload {
+  kpi: AnalyticsKpi
+  open_trades: OperationalOpenTrade[]
+  risk: OperationalRiskSummary
+  capital: OperationalCapitalSummary
+  streaks: OperationalStreaks
+}
+
+export interface IntelligenceLifecycleHighlight {
+  total_emotion_logs: number
+  most_frequent_emotion: string | null
+  worst_performing_emotion: string | null
+  graded_trades: number
+  avg_grade_score: number | null
+  high_grade_rate: number | null
+  discipline_score: number | null
+}
+
+export interface IntelligenceBehavioralHighlight {
+  overtrading_days: number
+  overtrading_weeks: number
+  revenge_trades: number
+  early_exit_rate: number | null
+  avg_capture_ratio: number | null
+}
+
+export interface IntelligencePlaybookHighlight {
+  setups: Array<{
+    name: string
+    trade_count: number
+    win_rate: number | null
+    avg_r: string | null
+    total_pnl: string | null
+  }>
+}
+
+export interface IntelligenceMarketHighlight {
+  date: string | null
+  nifty_close: number | null
+  nifty_change_pct: number | null
+  nifty_regime: string | null
+  india_vix: number | null
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
+  breadth_advance: number | null
+  breadth_decline: number | null
+}
+
+export interface IntelligenceDashboardPayload {
+  lifecycle: IntelligenceLifecycleHighlight
+  behavioral: IntelligenceBehavioralHighlight
+  playbook: IntelligencePlaybookHighlight
+  market: IntelligenceMarketHighlight
 }

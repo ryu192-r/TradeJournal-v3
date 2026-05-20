@@ -12,6 +12,7 @@ from app.models.capital_event import CapitalEvent
 from app.models.trade import Trade
 from app.models.partial_exit import PartialExit
 from app.utils.decimal_utils import ensure_decimal
+from sqlalchemy import func
 
 
 router = APIRouter(prefix="/risk-dashboard", tags=["risk-dashboard"])
@@ -75,40 +76,45 @@ class RiskDashboardResponse(BaseModel):
         return str(v)
 
 
-def _remaining_qty(trade: Trade, pe_map: dict[int, list]) -> Decimal:
-    total_exited = sum(pe.qty for pe in pe_map.get(trade.id, []))
+def _remaining_qty(trade: Trade, pe_map: dict[int, list[Decimal]]) -> Decimal:
+    total_exited = sum(pe_map.get(trade.id, []), Decimal("0"))
     return trade.quantity - total_exited
 
 
-def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list]) -> Decimal:
+def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list[Decimal]]) -> Decimal:
     initial_balance = ensure_decimal(account.initial_balance)
-    events = db.query(CapitalEvent).filter(CapitalEvent.account_id == account.id).all()
-    total_deposits = Decimal("0")
-    total_withdrawals = Decimal("0")
-    for evt in events:
-        amt = ensure_decimal(evt.amount)
-        if evt.event_type == "deposit":
-            total_deposits += amt
-        elif evt.event_type == "withdrawal":
-            total_withdrawals += abs(amt)
-    capital_net = total_deposits - total_withdrawals
 
-    realized_pnl = Decimal("0")
-    for t in db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all():
-        realized_pnl += ensure_decimal(t.pnl)
-    for t in db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted").all():
-        for pe in pe_map.get(t.id, []):
-            if pe.realized_pnl:
-                realized_pnl += ensure_decimal(pe.realized_pnl)
-    return initial_balance + capital_net + realized_pnl
+    # Capital events — deposits minus withdrawals
+    capital_net = (
+        db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
+        .filter(CapitalEvent.account_id == account.id)
+        .scalar()
+    ) or Decimal("0")
+
+    # Realized PnL — aggregate closed trades in SQL (pnl is already net of fees)
+    realized_pnl = (
+        db.query(func.coalesce(func.sum(Trade.pnl), 0))
+        .filter(Trade.pnl.isnot(None), Trade.status != "deleted")
+        .scalar()
+    ) or Decimal("0")
+
+    # Add partial-exit realized PnL for still-open trades
+    open_trade_ids = list(pe_map.keys())
+    pe_realized = (
+        db.query(func.coalesce(func.sum(PartialExit.realized_pnl), 0))
+        .filter(PartialExit.trade_id.in_(open_trade_ids))
+        .scalar()
+    ) if open_trade_ids else Decimal("0")
+
+    return initial_balance + ensure_decimal(capital_net) + ensure_decimal(realized_pnl) + pe_realized
 
 
-def _trade_deployed_capital(trade: Trade, pe_map: dict[int, list]) -> Decimal:
+def _trade_deployed_capital(trade: Trade, pe_map: dict[int, list[Decimal]]) -> Decimal:
     rem = _remaining_qty(trade, pe_map)
     return ensure_decimal(trade.entry_price) * rem
 
 
-def _trade_open_risk(trade: Trade, pe_map: dict[int, list]) -> Decimal:
+def _trade_open_risk(trade: Trade, pe_map: dict[int, list[Decimal]]) -> Decimal:
     if trade.stop_price is None:
         return Decimal("0")
     entry = ensure_decimal(trade.entry_price)
@@ -117,7 +123,7 @@ def _trade_open_risk(trade: Trade, pe_map: dict[int, list]) -> Decimal:
     return (entry - stop) * rem
 
 
-def _risk_trade_out(trade: Trade, net_equity: Decimal, pe_map: dict[int, list]) -> RiskTradeOut:
+def _risk_trade_out(trade: Trade, net_equity: Decimal, pe_map: dict[int, list[Decimal]]) -> RiskTradeOut:
     deployed = _trade_deployed_capital(trade, pe_map)
     risk = _trade_open_risk(trade, pe_map)
     rem = _remaining_qty(trade, pe_map)
@@ -135,7 +141,7 @@ def _risk_trade_out(trade: Trade, net_equity: Decimal, pe_map: dict[int, list]) 
     )
 
 
-def _bucket(name: str, trades: list[Trade], net_equity: Decimal, pe_map: dict[int, list]) -> RiskBucketOut:
+def _bucket(name: str, trades: list[Trade], net_equity: Decimal, pe_map: dict[int, list[Decimal]]) -> RiskBucketOut:
     deployed = sum((_trade_deployed_capital(t, pe_map) for t in trades), Decimal("0"))
     risk = sum((_trade_open_risk(t, pe_map) for t in trades), Decimal("0"))
     exposure_pct = round(float((deployed / net_equity) * 100), 2) if net_equity > 0 else None
@@ -164,11 +170,17 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
         .all()
     )
 
-    # Load partial exits for all open trades
-    all_pe = db.query(PartialExit).order_by(PartialExit.exit_time.asc()).all()
-    pe_map: dict[int, list[PartialExit]] = defaultdict(list)
-    for pe in all_pe:
-        pe_map[pe.trade_id].append(pe)
+    open_trade_ids = [t.id for t in open_trades]
+
+    # Load partial exits only for open trades
+    pe_map: dict[int, list[Decimal]] = defaultdict(list)
+    if open_trade_ids:
+        partial_rows = (
+            db.query(PartialExit.trade_id, PartialExit.qty)
+            .filter(PartialExit.trade_id.in_(open_trade_ids))
+        )
+        for trade_id, qty in partial_rows:
+            pe_map[trade_id].append(ensure_decimal(qty))
 
     net_equity = _compute_net_equity(account, db, pe_map)
     deployed_capital = sum((_trade_deployed_capital(t, pe_map) for t in open_trades), Decimal("0"))

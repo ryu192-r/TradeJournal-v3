@@ -85,23 +85,23 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
 function CompareView({ journal }: { journal: DailyJournal | null | undefined }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="rounded-xl border border-border bg-bg-card p-5">
-        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
+      <div className="rounded-2xl border border-border bg-bg-card p-5">
+        <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-medium text-text-heading mb-3">
           <Sunrise className="w-[15px] h-[15px] text-accent" />
           Pre-market
         </div>
-        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
+        <div className="text-[length:var(--text-sm)] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
           {journal?.pre_trade_notes || (
             <span className="text-text-muted italic">No pre-market notes yet.</span>
           )}
         </div>
       </div>
-      <div className="rounded-xl border border-border bg-bg-card p-5">
-        <div className="flex items-center gap-2 text-[.8125rem] font-medium text-text-heading mb-3">
+      <div className="rounded-2xl border border-border bg-bg-card p-5">
+        <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-medium text-text-heading mb-3">
           <Sunset className="w-[15px] h-[15px] text-accent" />
           Post-market
         </div>
-        <div className="text-[.8125rem] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
+        <div className="text-[length:var(--text-sm)] text-text whitespace-pre-wrap min-h-[12rem] leading-relaxed">
           {journal?.post_trade_notes || (
             <span className="text-text-muted italic">No post-market notes yet.</span>
           )}
@@ -134,7 +134,7 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <h3 className="text-[.8125rem] font-medium text-text-heading">
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">
           Week of {formatDate(monday)}
         </h3>
         {isLoading && <Loader2 className="w-[14px] h-[14px] text-accent animate-spin" />}
@@ -155,7 +155,7 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
                   : 'border-border bg-bg-card hover:border-medium'
               )}
             >
-              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.05em] font-medium mb-1.5">
+              <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.05em] font-medium mb-1.5">
                 {wd.toLocaleDateString('en-IN', { weekday: 'short' })}
               </div>
               <div
@@ -166,7 +166,7 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
               >
                 {formatDate(wd)}
               </div>
-              <div className="mt-1.5 text-[.6875rem] text-text-muted">
+              <div className="mt-1.5 text-[length:var(--text-xs)] text-text-muted">
                 {isToday ? 'Today' : 'Tap to open'}
               </div>
             </button>
@@ -176,14 +176,14 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
 
       {/* Stats rollup */}
       {stats ? (
-        <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
+        <div className="rounded-2xl border border-border bg-bg-card overflow-hidden">
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border border-b border-border">
-            <div className="px-4 py-3.5">
-              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Trades</div>
+            <div className="px-[var(--cell-px)] py-[var(--cell-py)]">
+              <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Trades</div>
               <div className="font-data text-lg font-semibold text-text-heading">{stats.trade_count}</div>
             </div>
-            <div className="px-4 py-3.5">
-              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">P&amp;L</div>
+            <div className="px-[var(--cell-px)] py-[var(--cell-py)]">
+              <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">P&amp;L</div>
               <div className={cn(
                 'font-data text-lg font-semibold',
                 parseFloat(stats.total_pnl) >= 0 ? 'text-profit' : 'text-loss'
@@ -191,19 +191,19 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
                 {formatCurrency(stats.total_pnl)}
               </div>
             </div>
-            <div className="px-4 py-3.5">
-              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Win Rate</div>
+            <div className="px-[var(--cell-px)] py-[var(--cell-py)]">
+              <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Win Rate</div>
               <div className="font-data text-lg font-semibold text-text-heading">{parseFloat(stats.win_rate).toFixed(1)}%</div>
             </div>
-            <div className="px-4 py-3.5">
-              <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Avg R</div>
+            <div className="px-[var(--cell-px)] py-[var(--cell-py)]">
+              <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Avg R</div>
               <div className="font-data text-lg font-semibold text-text-heading">{parseFloat(stats.avg_r).toFixed(2)}R</div>
             </div>
           </div>
 
           {/* Daily journal entries for the week */}
           <div className="p-4">
-            <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-2">Daily Entries</div>
+            <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-2">Daily Entries</div>
             {weekJournals && weekJournals.length > 0 ? (
               <div className="space-y-2">
                 {weekJournals.map((j) => (
@@ -213,11 +213,11 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
                     className="w-full text-left rounded-lg border border-border bg-bg-card hover:bg-accent-muted transition-all cursor-pointer p-3"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[.8125rem] font-medium text-text-heading">
+                      <span className="text-[length:var(--text-sm)] font-medium text-text-heading">
                         {j.date} — {new Date(j.date).toLocaleDateString('en-IN', { weekday: 'long' })}
                       </span>
                       {j.mood_rating != null && (
-                        <span className="text-[.6875rem] text-text-muted">
+                        <span className="text-[length:var(--text-xs)] text-text-muted">
                           Mood: {'⭐'.repeat(j.mood_rating)}
                         </span>
                       )}
@@ -353,7 +353,7 @@ export function JournalPage() {
           <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">
             Journal
           </h1>
-          <p className="text-[.8125rem] text-text-muted mt-1.5 leading-relaxed">
+          <p className="text-[length:var(--text-sm)] text-text-muted mt-1.5 leading-relaxed">
             Situational awareness — pre-market plan &amp; post-market reflection.
           </p>
         </div>
@@ -372,7 +372,7 @@ export function JournalPage() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-[2.25rem] pl-[2.125rem] pr-2.5 rounded-lg border border-border bg-bg-card text-[.8125rem] text-text-heading font-data focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/15 transition-all cursor-pointer [color-scheme:dark]"
+              className="h-[2.25rem] pl-[2.125rem] pr-2.5 rounded-lg border border-border bg-bg-card text-[length:var(--text-sm)] text-text-heading font-data focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/15 transition-all cursor-pointer [color-scheme:dark]"
             />
           </div>
           <button
@@ -386,8 +386,8 @@ export function JournalPage() {
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-border bg-bg-card px-4 py-3">
-          <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Trades</div>
+        <div className="rounded-2xl border border-border bg-bg-card px-4 py-3">
+          <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Trades</div>
           <div className="font-data text-lg font-semibold text-text-heading">
             {summaryStats.tradeCount}
           </div>
@@ -398,7 +398,7 @@ export function JournalPage() {
             ? 'border-profit/10 bg-bg-card'
             : 'border-loss/10 bg-bg-card'
         )}>
-          <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">P&amp;L</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">P&amp;L</div>
           <div className={cn(
             'font-data text-lg font-semibold',
             summaryStats.totalPnl >= 0 ? 'text-profit' : 'text-loss'
@@ -407,14 +407,14 @@ export function JournalPage() {
             {formatCurrency(summaryStats.totalPnl)}
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-bg-card px-4 py-3">
-          <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Win Rate</div>
+        <div className="rounded-2xl border border-border bg-bg-card px-4 py-3">
+          <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Win Rate</div>
           <div className="font-data text-lg font-semibold text-text-heading">
             {summaryStats.winRate}%
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-bg-card px-4 py-3">
-          <div className="text-[.6875rem] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Avg R</div>
+        <div className="rounded-2xl border border-border bg-bg-card px-4 py-3">
+          <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-[.06em] font-medium mb-1">Avg R</div>
           <div className="font-data text-lg font-semibold text-text-heading">
             {summaryStats.avgR}R
           </div>
@@ -424,7 +424,7 @@ export function JournalPage() {
       {/* Empty state hint */}
       {!isLoading && !isError && !journal && activeTab === 'journal' && (
         <div className="rounded-xl border-2 border-dashed border-border py-8 text-center">
-          <p className="text-[.8125rem] text-text-muted">
+          <p className="text-[length:var(--text-sm)] text-text-muted">
             No journal entry yet.{' '}
             <span className="text-text font-medium">Fill in the form below</span>
             {' '}and hit Save.
@@ -442,7 +442,7 @@ export function JournalPage() {
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               className={cn(
-                'flex items-center gap-2 px-3.5 py-2 rounded-lg text-[.8125rem] font-medium transition-all cursor-pointer whitespace-nowrap',
+                'flex items-center gap-2 px-3.5 py-2 rounded-lg text-[length:var(--text-sm)] font-medium transition-all cursor-pointer whitespace-nowrap',
                 active
                   ? 'bg-accent-muted text-accent font-semibold'
                   : 'text-text hover:text-text-heading'
@@ -457,7 +457,7 @@ export function JournalPage() {
 
       {/* Loading */}
       {isLoading && activeTab === 'journal' && (
-        <div className="rounded-xl border border-border bg-bg-card py-12 text-center">
+        <div className="rounded-2xl border border-border bg-bg-card py-12 text-center">
           <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
           <p className="text-sm text-text-muted mt-3">Loading entry…</p>
         </div>

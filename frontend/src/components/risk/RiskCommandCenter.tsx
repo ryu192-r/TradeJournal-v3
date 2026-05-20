@@ -14,25 +14,26 @@ import { PortfolioHeatGauge } from '@/components/risk/PortfolioHeatGauge'
 import { RiskExposureTable } from '@/components/risk/RiskExposureTable'
 import { RiskMetricCard } from '@/components/risk/RiskMetricCard'
 import { RiskWarningsPanel } from '@/components/risk/RiskWarningsPanel'
+import { useMemo } from 'react'
 
 function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | null }) {
   return (
-    <div className="bg-card rounded-2xl border border-border p-5 animate-card-in min-w-0">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in min-w-0">
+      <div className="mb-[var(--page-gap)] flex items-center gap-2">
         <BriefcaseBusiness className="h-4 w-4 shrink-0 text-accent" />
-        <h3 className="truncate font-display text-sm text-text-heading">{title}</h3>
+        <h3 className="truncate font-display text-[length:var(--text-sm)] text-text-heading">{title}</h3>
       </div>
 
       {trade == null ? (
-        <div className="py-5 text-sm text-text-muted">No open positions</div>
+        <div className="py-5 text-[length:var(--text-sm)] text-text-muted">No open positions</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-[var(--page-gap)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate font-data text-lg font-semibold text-text-heading">{trade.symbol}</div>
-              <div className="mt-1 truncate text-xs text-text-muted">{trade.setup ?? 'Uncategorised'}</div>
+              <div className="mt-1 truncate text-[length:var(--text-xs)] text-text-muted">{trade.setup ?? 'Uncategorised'}</div>
             </div>
-            <div className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-text-muted font-data">
+            <div className="shrink-0 rounded-md border border-border px-2 py-1 text-[length:var(--text-xs)] text-text-muted font-data">
               {formatMetricPercent(trade.risk_pct)}
             </div>
           </div>
@@ -40,7 +41,7 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
           <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Entry</div>
-              <div className="mt-1 truncate font-data text-sm text-text-heading">{formatPrice(trade.entry_price)}</div>
+              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{formatPrice(trade.entry_price)}</div>
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Stop</div>
@@ -50,7 +51,7 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Qty</div>
-              <div className="mt-1 truncate font-data text-sm text-text-heading">{formatQuantity(trade.quantity)}</div>
+              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{formatQuantity(trade.quantity)}</div>
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Risk</div>
@@ -64,21 +65,24 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
 }
 
 export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
-  const warnings = data.warnings ?? []
-  const setupBuckets = data.risk_by_setup ?? []
-  const symbolBuckets = data.risk_by_symbol ?? []
-  const deployedCapital = parseDecimal(data.deployed_capital, 0)
-  const openRisk = parseDecimal(data.open_risk, 0)
-  const hasOpenPositions = data.open_positions > 0
-  const hasMissingStops = data.positions_without_stop > 0
-  const heatTone = data.portfolio_heat_pct != null && data.portfolio_heat_pct > 6
-    ? 'loss'
-    : data.portfolio_heat_pct != null && data.portfolio_heat_pct > 4
-      ? 'warning'
-      : 'profit'
+  const { warnings, setupBuckets, symbolBuckets, deployedCapital, openRisk, hasOpenPositions, hasMissingStops, heatTone } = useMemo(() => {
+    const warnings = data.warnings ?? []
+    const setupBuckets = data.risk_by_setup ?? []
+    const symbolBuckets = data.risk_by_symbol ?? []
+    const deployedCapital = parseDecimal(data.deployed_capital, 0)
+    const openRisk = parseDecimal(data.open_risk, 0)
+    const hasOpenPositions = data.open_positions > 0
+    const hasMissingStops = data.positions_without_stop > 0
+    const heatTone = data.portfolio_heat_pct != null && data.portfolio_heat_pct > 6
+      ? 'loss' as const
+      : data.portfolio_heat_pct != null && data.portfolio_heat_pct > 4
+        ? 'warning' as const
+        : 'profit' as const
+    return { warnings, setupBuckets, symbolBuckets, deployedCapital, openRisk, hasOpenPositions, hasMissingStops, heatTone }
+  }, [data])
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-[var(--page-gap)]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[length:var(--text-xs)] text-accent font-data">
@@ -146,8 +150,8 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
             <ShieldCheck className="h-4 w-4 text-profit" />
           </div>
           <div className="min-w-0">
-            <div className="font-display text-sm text-text-heading">No open trades</div>
-            <div className="mt-1 text-sm text-text-muted">
+            <div className="font-display text-[length:var(--text-sm)] text-text-heading">No open trades</div>
+            <div className="mt-1 text-[length:var(--text-sm)] text-text-muted">
               Portfolio heat is idle. New positions will appear here with stop coverage, setup exposure, and concentration warnings.
             </div>
           </div>

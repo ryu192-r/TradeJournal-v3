@@ -76,7 +76,7 @@ function WeeklyView({ selectedDate, onSelectDate }: { selectedDate: string; onSe
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-text-heading">Week of {formatDate(monday)}</h3>
+        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Week of {formatDate(monday)}</h3>
         {isLoading && <Loader2 className="w-4 h-4 text-accent animate-spin" />}
       </div>
 
@@ -192,7 +192,7 @@ export function DailySANotesPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[length:var(--heading-size)] text-text-heading tracking-tight">Daily SA Notes</h1>
-          <p className="text-sm text-text-muted mt-0.5">Situational awareness — pre-market perception &amp; post-market reality</p>
+          <p className="text-[length:var(--text-sm)] text-text-muted mt-0.5">Situational awareness — pre-market perception &amp; post-market reality</p>
         </div>
 
         {/* Date nav */}
@@ -254,7 +254,7 @@ export function DailySANotesPage() {
       {isLoading && activeTab === 'notes' && (
         <div className="rounded-2xl border border-border bg-card p-8 text-center">
           <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
-          <p className="text-sm text-text-muted mt-3">Loading notes...</p>
+          <p className="text-[length:var(--text-sm)] text-text-muted mt-3">Loading notes...</p>
         </div>
       )}
 
@@ -262,7 +262,7 @@ export function DailySANotesPage() {
       {isError && activeTab === 'notes' && (
         <div className="rounded-2xl border border-loss/25 bg-card p-6 text-center">
           <AlertCircle className="w-5 h-5 text-loss mx-auto" />
-          <p className="text-sm text-text-heading mt-2">Failed to load notes.</p>
+          <p className="text-[length:var(--text-sm)] text-text-heading mt-2">Failed to load notes.</p>
           <p className="text-xs text-text-muted mt-1">{error instanceof Error ? error.message : 'Unknown error'}</p>
         </div>
       )}

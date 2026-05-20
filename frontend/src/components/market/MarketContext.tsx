@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import type { MarketRegimeSummary, MarketPerformanceCorrelation, LiveQuote } from '@/types'
 
-const CARD = 'bg-card rounded-2xl border border-border p-5 animate-card-in'
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 function TrendIcon({ trend }: { trend: string | null }) {
   if (trend === 'uptrend') return <TrendingUp className="w-4 h-4 text-profit" />
@@ -16,7 +16,7 @@ function TrendIcon({ trend }: { trend: string | null }) {
 }
 
 function RegimeBadge({ regime }: { regime: string | null }) {
-  if (!regime) return <span className="text-xs text-text-muted">—</span>
+  if (!regime) return <span className="text-[length:var(--text-xs)] text-text-muted">—</span>
   const styles: Record<string, string> = {
     bullish: 'bg-profit-muted text-profit',
     bearish: 'bg-loss-muted text-loss',
@@ -39,14 +39,14 @@ function CurrentRegimeCard({ data }: { data: MarketRegimeSummary }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Globe className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Market Regime</h3>
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Market Regime</h3>
         <RegimeBadge regime={cur.nifty_regime} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <div className="text-xs text-text-muted mb-1">NIFTY 50</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1">NIFTY 50</div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-lg font-bold font-data text-text-heading">
               {cur.nifty_close ? `₹${Number(cur.nifty_close).toLocaleString('en-IN')}` : '—'}
@@ -60,25 +60,25 @@ function CurrentRegimeCard({ data }: { data: MarketRegimeSummary }) {
           </div>
         </div>
         <div>
-          <div className="text-xs text-text-muted mb-1">Trend</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1">Trend</div>
           <div className="flex items-center gap-1.5">
             <TrendIcon trend={cur.nifty_trend} />
             <span className="text-sm font-data text-text-heading capitalize">{cur.nifty_trend || '—'}</span>
           </div>
         </div>
         <div>
-          <div className="text-xs text-text-muted mb-1">India VIX</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1">India VIX</div>
           <span className="text-sm font-bold font-data text-text-heading">{cur.india_vix ?? '—'}</span>
         </div>
         <div>
-          <div className="text-xs text-text-muted mb-1">Breadth A/D</div>
+          <div className="text-[length:var(--text-xs)] text-text-muted mb-1">Breadth A/D</div>
           <span className="text-sm font-data text-text-heading">
             {cur.advance_count ?? '—'}/{cur.decline_count ?? '—'}
           </span>
         </div>
       </div>
       {data.total_days > 0 && (
-        <div className="mt-3 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
+        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border flex items-center gap-3 flex-wrap">
           <span className="text-[10px] text-text-muted">Regime (90d):</span>
           {Object.entries(data.regime_distribution).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
             <span key={k} className="text-[10px] font-data text-text-muted">
@@ -108,9 +108,9 @@ function SectorStrengthCard({ data }: { data: MarketRegimeSummary }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Building2 className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Sector Strength</h3>
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Sector Strength</h3>
       </div>
       <div className="space-y-1.5">
         {sectors.slice(0, 8).map((s) => {
@@ -118,7 +118,7 @@ function SectorStrengthCard({ data }: { data: MarketRegimeSummary }) {
           const isPos = ch >= 0
           return (
             <div key={s.name} className="flex items-center justify-between">
-              <span className="text-xs text-text-muted truncate max-w-[140px]">{s.name}</span>
+              <span className="text-[length:var(--text-xs)] text-text-muted truncate max-w-[140px]">{s.name}</span>
               <div className="flex items-center gap-1.5">
                 <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
                   <div
@@ -146,9 +146,9 @@ function LiveWatchlistCard() {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Eye className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-sm text-text-heading">My Stocks</h3>
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">My Stocks</h3>
         <span className="text-[10px] text-text-muted font-data">{data.total} live</span>
       </div>
       <div className="space-y-1">
@@ -192,18 +192,18 @@ function CorrelationCard({ data }: { data: MarketPerformanceCorrelation }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <BarChart3 className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Performance vs Market</h3>
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Performance vs Market</h3>
         <span className="text-[10px] text-text-muted font-data">{data.total_matched_trades} trades matched</span>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-[var(--page-gap)]">
         {bucketRows.map(({ label, data: buckets }) => {
           const entries = Object.entries(buckets)
           if (entries.length === 0) return null
           return (
             <div key={label}>
-              <div className="text-xs text-text-muted mb-2 font-display">{label}</div>
+              <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-display">{label}</div>
               <div className="space-y-1">
                 {entries.map(([key, val]) => (
                   <div key={key} className="flex items-center justify-between text-xs">
@@ -229,7 +229,7 @@ function CorrelationCard({ data }: { data: MarketPerformanceCorrelation }) {
         })}
       </div>
       {data.insights.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border space-y-1.5">
           {data.insights.map((ins, i) => (
             <div key={i} className={`text-xs font-data ${ins.type === 'warning' ? 'text-amber-400' : 'text-text-muted'}`}>
               <ChevronRight className="w-3 h-3 inline mr-1" />
@@ -276,11 +276,11 @@ export function MarketContext() {
 
   if (regimeLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-[var(--page-gap)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Globe className="w-[15px] h-[15px] text-accent" />
-            <h2 className="font-display text-sm text-text-heading">Market Context</h2>
+            <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Market Context</h2>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -293,11 +293,11 @@ export function MarketContext() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Globe className="w-[15px] h-[15px] text-accent" />
-          <h2 className="font-display text-sm text-text-heading">Market Context</h2>
+          <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Market Context</h2>
           {regimeData?.current && (
             <span className="text-[10px] text-text-muted font-data">{regimeData.current.date}</span>
           )}

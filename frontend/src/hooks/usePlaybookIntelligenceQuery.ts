@@ -5,7 +5,7 @@ export function usePlaybookOverviewQuery(fromDate?: string, toDate?: string) {
   return useQuery({
     queryKey: ['playbook-intelligence', 'overview', fromDate, toDate],
     queryFn: () => getPlaybookOverview(fromDate, toDate),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -14,6 +14,6 @@ export function useSetupIntelligenceQuery(setupName: string | null, fromDate?: s
     queryKey: ['playbook-intelligence', 'setup', setupName, fromDate, toDate],
     queryFn: () => getSetupIntelligence(setupName!, fromDate, toDate),
     enabled: !!setupName,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
 }

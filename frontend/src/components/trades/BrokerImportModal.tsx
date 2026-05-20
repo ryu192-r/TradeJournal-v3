@@ -150,7 +150,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
 
         {step === 'select' && (
           <div className="space-y-4">
-            <p className="text-sm text-text-muted">
+            <p className="text-[length:var(--text-sm)] text-text-muted">
               Import trades from your broker's CSV export. Select your broker to continue.
             </p>
             <GlassSelect
@@ -167,7 +167,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">
                   Broker:
                 </span>
                 <span className="text-sm text-accent font-medium">
@@ -208,14 +208,14 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
                 <div className="flex items-center justify-center gap-3">
                   <FileText className="w-8 h-8 text-accent" />
                   <div className="text-left">
-                    <p className="text-sm text-text-heading font-medium">{file.name}</p>
-                    <p className="text-xs text-text-muted">{(file.size / 1024).toFixed(1)} KB</p>
+                    <p className="text-[length:var(--text-sm)] text-text-heading font-medium">{file.name}</p>
+                    <p className="text-[length:var(--text-xs)] text-text-muted">{(file.size / 1024).toFixed(1)} KB</p>
                   </div>
                 </div>
               ) : (
                 <>
                   <Upload className="w-8 h-8 text-text-muted mx-auto mb-2" />
-                  <p className="text-sm text-text-muted">
+                  <p className="text-[length:var(--text-sm)] text-text-muted">
                     Drop your CSV file here or <span className="text-accent">browse</span>
                   </p>
                   <p className="text-xs text-text-faint mt-1">.csv files only</p>
@@ -279,20 +279,20 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-xl font-data font-bold text-profit">{result.total - result.skipped}</p>
-                <p className="text-xs text-text-muted mt-1">Will Add</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Will Add</p>
               </div>
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-xl font-data font-bold text-yellow-400">{result.skipped}</p>
-                <p className="text-xs text-text-muted mt-1">Will Skip</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Will Skip</p>
               </div>
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-xl font-data font-bold text-text-heading">{result.total}</p>
-                <p className="text-xs text-text-muted mt-1">Total Rows</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Total Rows</p>
               </div>
             </div>
             {result.preview && result.preview.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wider">
+                <p className="text-[length:var(--text-xs)] font-medium text-text-muted mb-2 uppercase tracking-wider">
                   Preview ({result.skipped > 0 ? 'greyed rows will be skipped' : `first ${result.preview.length} rows`})
                 </p>
                 <div className="overflow-x-auto rounded-lg border border-border max-h-64 overflow-y-auto">
@@ -370,29 +370,29 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
             <div className="grid grid-cols-4 gap-3">
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-2xl font-data font-bold text-profit">{result.added}</p>
-                <p className="text-xs text-text-muted mt-1">Added</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Added</p>
               </div>
               {result.merged != null && (
                 <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                   <p className="text-2xl font-data font-bold text-accent">{result.merged}</p>
-                  <p className="text-xs text-text-muted mt-1">Merged</p>
+                  <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Merged</p>
                 </div>
               )}
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-2xl font-data font-bold text-yellow-400">{result.skipped}</p>
-                <p className="text-xs text-text-muted mt-1">Skipped</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Skipped</p>
               </div>
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-2xl font-data font-bold text-text-heading">{result.total}</p>
-                <p className="text-xs text-text-muted mt-1">Total</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Total</p>
               </div>
             </div>
 
             {result.errors.length > 0 && (
               <div className="rounded-lg border border-loss/20 bg-loss-muted/10 p-3 max-h-32 overflow-y-auto">
-                <p className="text-xs font-medium text-loss mb-1">Warnings ({result.errors.length})</p>
+                <p className="text-[length:var(--text-xs)] font-medium text-loss mb-1">Warnings ({result.errors.length})</p>
                 {result.errors.slice(0, 10).map((err, i) => (
-                  <p key={i} className="text-xs text-text-muted">{err}</p>
+                  <p key={i} className="text-[length:var(--text-xs)] text-text-muted">{err}</p>
                 ))}
                 {result.errors.length > 10 && (
                   <p className="text-xs text-text-faint mt-1">...and {result.errors.length - 10} more</p>
@@ -402,7 +402,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
 
             {result.preview && result.preview.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wider">
+                <p className="text-[length:var(--text-xs)] font-medium text-text-muted mb-2 uppercase tracking-wider">
                   Preview (first {result.preview.length} trades)
                 </p>
                 <div className="overflow-x-auto rounded-lg border border-border">

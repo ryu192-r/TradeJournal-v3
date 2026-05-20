@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pyramidTrade as pyramidTradeEndpoint } from '@/lib/endpoints'
-import { invalidateTradeDomain, setTradeCache } from '@/lib/queryInvalidation'
+import {
+  setTradeCache, patchTradeInLists,
+  invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook,
+} from '@/lib/queryInvalidation'
+import { span } from '@/utils/performance'
 import type { ApiTrade } from '@/types'
 
 interface PyramidTradePayload {
@@ -12,12 +16,21 @@ interface PyramidTradePayload {
 }
 
 export function usePyramidMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<ApiTrade, Error, { id: number; payload: PyramidTradePayload }>({
     mutationFn: ({ id, payload }) => pyramidTradeEndpoint(id, payload),
-    onSuccess: async (trade) => {
-      setTradeCache(queryClient, trade)
-      await invalidateTradeDomain(queryClient)
+    onMutate: () => span('mutation:pyramid'),
+    onSuccess: (trade, _vars, endSpan) => {
+      setTradeCache(qc, trade)
+      patchTradeInLists(qc, trade)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidatePlaybook(qc)
+      void invalidateTradeList(qc)
+      if (typeof endSpan === 'function') endSpan()
+    },
+    onError: (_err, _vars, endSpan) => {
+      if (typeof endSpan === 'function') endSpan()
     },
   })
 }

@@ -1,65 +1,91 @@
-// Dashboard — key metrics at a glance
-import { useDashboardQuery } from '@/hooks/useDashboardQuery'
-import { useRiskDashboardQuery } from '@/hooks/useRiskDashboardQuery'
+import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
 import { useLiveQuotesQuery } from '@/hooks/useMarketContextQuery'
-import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
-import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
-import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
-import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
-import { MarketContext } from '@/components/market/MarketContext'
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
+import { formatCurrency, formatPercent, formatDate } from '@/utils/format'
 import {
-  formatCurrency, formatPercent, parseDecimal, formatDate,
-} from '@/utils/format'
-import {
-  TrendingUp, Wallet, Activity, Target, Calendar, Flame, AlertTriangle,
+  TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle, RefreshCw,
+  ChevronDown, ChevronRight, Brain, Shield, BookOpen, BarChart3,
 } from 'lucide-react'
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
-import type {
-  AnalyticsKpi, DailyPnlEntry, MonthlyPnlEntry, AnalyticsStreaks,
-} from '@/types'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { mark, measure } from '@/utils/performance'
+import type { OperationalDashboardPayload } from '@/types'
 
-function pnlNum(v: string | null): number { return parseDecimal(v, 0) }
+const LifecycleInsights = lazy(() => import('@/components/lifecycle/LifecycleInsights').then(m => ({ default: m.LifecycleInsights })))
+const BehavioralIntelligence = lazy(() => import('@/components/lifecycle/BehavioralIntelligence').then(m => ({ default: m.BehavioralIntelligence })))
+const PlaybookIntelligence = lazy(() => import('@/components/lifecycle/PlaybookIntelligence').then(m => ({ default: m.PlaybookIntelligence })))
+const MarketContext = lazy(() => import('@/components/market/MarketContext').then(m => ({ default: m.MarketContext })))
 
-const COLORS = { profit: 'var(--profit)', loss: 'var(--loss)', accent: 'var(--accent)', text: 'var(--text)', grid: 'var(--border)' }
-const CARD = 'bg-card rounded-2xl border border-border p-5 animate-card-in'
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
-function GlassTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
+function SyncIndicator() {
   return (
-    <div className="bg-card rounded-lg p-3 border border-border text-xs shadow-lg">
-      <div className="text-text-muted mb-1 font-medium font-display">{label}</div>
-      {payload.map((entry: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ background: entry.color || COLORS.accent }} />
-          <span className="text-text-heading font-data">{entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}</span>
+    <span className="flex items-center gap-1 text-[10px] text-text-muted font-data animate-pulse">
+      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+      Syncing
+    </span>
+  )
+}
+
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  icon: React.ElementType
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  return (
+    <div className={CARD}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between gap-2 cursor-pointer group"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-accent shrink-0" />
+          <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">{title}</h2>
         </div>
-      ))}
+        <div className="flex items-center gap-2">
+          {isOpen && (
+            <span className="text-[10px] text-text-muted font-data">Expanded</span>
+          )}
+          {isOpen ? (
+            <ChevronDown className="w-4 h-4 text-text-muted group-hover:text-text-heading transition-colors" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-heading transition-colors" />
+          )}
+        </div>
+      </button>
+      {isOpen && (
+        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
+          {children}
+        </div>
+      )}
     </div>
   )
 }
 
-function KpiCards({ kpi }: { kpi: AnalyticsKpi }) {
-  const cards = [
-    { label: 'Net P&L', value: kpi.net_pnl != null ? formatCurrency(pnlNum(kpi.net_pnl)) : 'N/A', sub: `${kpi.trade_count} trades`, icon: TrendingUp, color: pnlNum(kpi.net_pnl) >= 0 ? 'profit' : 'loss', bg: pnlNum(kpi.net_pnl) >= 0 ? 'bg-profit-muted' : 'bg-loss-muted' },
+function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
+  const cards = useMemo(() => [
+    { label: 'Net P&L', value: kpi.net_pnl != null ? formatCurrency(Number(kpi.net_pnl)) : 'N/A', sub: `${kpi.trade_count} trades`, icon: TrendingUp, color: Number(kpi.net_pnl) >= 0 ? 'profit' : 'loss', bg: Number(kpi.net_pnl) >= 0 ? 'bg-profit-muted' : 'bg-loss-muted' },
     { label: 'Win Rate', value: kpi.win_rate != null ? formatPercent(kpi.win_rate) : 'N/A', sub: `${kpi.trade_count} trades`, icon: Target, color: kpi.win_rate != null && kpi.win_rate >= 50 ? 'profit' : 'loss', bg: kpi.win_rate != null && kpi.win_rate >= 50 ? 'bg-profit-muted' : 'bg-loss-muted' },
     { label: 'Profit Factor', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : 'N/A', sub: 'ratio', icon: Activity, color: kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'text-accent' : 'loss' },
-    { label: 'Avg R', value: kpi.avg_r_multiple != null ? kpi.avg_r_multiple.toFixed(2) + 'R' : 'N/A', sub: `${kpi.avg_r_multiple != null ? 'per trade' : ''}`, icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss' },
+    { label: 'Avg R', value: kpi.avg_r_multiple != null ? kpi.avg_r_multiple.toFixed(2) + 'R' : 'N/A', sub: 'per trade', icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss' },
     { label: 'Expectancy', value: kpi.expectancy != null ? formatCurrency(kpi.expectancy) : 'N/A', sub: 'per trade', icon: TrendingUp, color: kpi.expectancy != null && kpi.expectancy >= 0 ? 'profit' : 'loss' },
     { label: 'Max DD', value: kpi.max_drawdown_pct != null ? formatPercent(-kpi.max_drawdown_pct) : 'N/A', sub: 'drawdown', icon: Flame, color: 'text-loss' },
-  ]
+  ], [kpi])
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
       {cards.map((card) => {
         const Icon = card.icon
         return (
-          <div key={card.label} className={`${CARD} p-4`}>
+          <div key={card.label} className={`${CARD}`}>
             <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center mb-2`}>
               <Icon className={`w-4 h-4 text-${card.color}`} />
             </div>
@@ -68,97 +94,6 @@ function KpiCards({ kpi }: { kpi: AnalyticsKpi }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function EquityCurve({ data }: { data: DailyPnlEntry[] }) {
-  const chartData = data.map((d) => ({ date: formatDate(d.date), pnl: pnlNum(d.net_pnl), cum: pnlNum(d.cumulative_pnl) }))
-  const isPositive = chartData.length > 0 && (chartData[chartData.length - 1]?.cum ?? 0) >= 0
-  return (
-    <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
-        <Activity className="w-[15px] h-[15px] text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Equity Curve</h3>
-      </div>
-      {chartData.length === 0 ? (
-        <div className="h-40 flex items-center justify-center text-text-muted text-sm">No trade data</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isPositive ? COLORS.profit : COLORS.loss} stopOpacity={0.25} />
-                <stop offset="95%" stopColor={isPositive ? COLORS.profit : COLORS.loss} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" />
-            <XAxis dataKey="date" tick={{ fill: COLORS.text, fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: COLORS.text, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} width={70} />
-            <Tooltip content={<GlassTooltip />} />
-            <Area type="monotone" dataKey="cum" stroke={isPositive ? COLORS.profit : COLORS.loss} fill="url(#equityFill)" strokeWidth={2} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  )
-}
-
-function StreakCard({ data }: { data: AnalyticsStreaks }) {
-  const { current_streak, longest_win_streak, longest_loss_streak } = data || {}
-  return (
-    <div className={CARD}>
-      <div className="flex items-center gap-2 mb-3">
-        <Flame className="w-[15px] h-[15px] text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Streaks</h3>
-      </div>
-      <div className="space-y-3">
-        <div>
-          <div className="text-xs text-text-muted mb-1">Current</div>
-          <div className={`font-data text-lg font-bold ${current_streak?.type === 'win' ? 'text-profit' : current_streak?.type === 'loss' ? 'text-loss' : 'text-text-muted'}`}>
-            {current_streak?.type ? `${current_streak.count} ${current_streak.type}` : '—'}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-          <div>
-            <div className="text-xs text-text-muted mb-1">Best</div>
-            <div className="font-data text-base font-bold text-profit">{longest_win_streak || 0}W</div>
-          </div>
-          <div>
-            <div className="text-xs text-text-muted mb-1">Worst</div>
-            <div className="font-data text-base font-bold text-loss">{longest_loss_streak || 0}L</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MonthlyPnl({ data }: { data: MonthlyPnlEntry[] }) {
-  const chartData = (data || []).map((d) => ({ month: d.month, pnl: pnlNum(d.net_pnl), count: d.trade_count }))
-  return (
-    <div className={CARD}>
-      <div className="flex items-center gap-2 mb-4">
-        <Calendar className="w-[15px] h-[15px] text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Monthly P&L</h3>
-      </div>
-      {chartData.length === 0 ? (
-        <div className="h-40 flex items-center justify-center text-text-muted text-sm">No data</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-            <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" />
-            <XAxis dataKey="month" tick={{ fill: COLORS.text, fontSize: 10 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fill: COLORS.text, fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} width={70} />
-            <Tooltip content={<GlassTooltip />} />
-            <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
-              {chartData.map((entry, i) => (
-                <rect key={i} fill={entry.pnl >= 0 ? COLORS.profit : COLORS.loss} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      )}
     </div>
   )
 }
@@ -185,40 +120,82 @@ function RiskCommandCenterSkeleton() {
   )
 }
 
-function RiskCommandCenterError({ error }: { error: unknown }) {
+function StreakCard({ data }: { data: OperationalDashboardPayload['streaks'] }) {
+  const { current_type, current_count, longest_win, longest_loss } = data || {}
   return (
-    <div className={`${CARD} flex items-start gap-3`}>
-      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-loss" />
-      <div>
-        <h2 className="font-display text-sm text-text-heading">Risk layer unavailable</h2>
-        <p className="mt-1 text-sm text-text-muted">
-          {(error as Error)?.message || 'Unable to load current risk metrics.'}
-        </p>
+    <div className={CARD}>
+      <div className="flex items-center gap-2 mb-3">
+        <Flame className="w-[15px] h-[15px] text-accent" />
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Streaks</h3>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <div className="text-xs text-text-muted mb-1">Current</div>
+          <div className={`font-data text-lg font-bold ${current_type === 'win' ? 'text-profit' : current_type === 'loss' ? 'text-loss' : 'text-text-muted'}`}>
+            {current_type ? `${current_count} ${current_type}` : '—'}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+          <div>
+            <div className="text-xs text-text-muted mb-1">Best</div>
+            <div className="font-data text-base font-bold text-profit">{longest_win || 0}W</div>
+          </div>
+          <div>
+            <div className="text-xs text-text-muted mb-1">Worst</div>
+            <div className="font-data text-base font-bold text-loss">{longest_loss || 0}L</div>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-function RiskCommandCenterNoAccount() {
+function AlertsCard({ warnings }: { warnings: Array<{ severity: string; message: string; code: string }> }) {
+  const visible = warnings.filter(w => w.severity !== 'info').slice(0, 5)
+  if (visible.length === 0) {
+    return (
+      <div className={CARD}>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-emerald-400" />
+          <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Alerts</h3>
+        </div>
+        <div className="text-sm text-text-muted">No active alerts. Portfolio is within limits.</div>
+      </div>
+    )
+  }
   return (
-    <div className={`${CARD} flex items-start gap-3`}>
-      <Wallet className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-      <div>
-        <h2 className="font-display text-sm text-text-heading">Risk layer waiting for account</h2>
-        <p className="mt-1 text-sm text-text-muted">
-          Create a capital account to activate portfolio heat, deployment, and open-risk metrics.
-        </p>
+    <div className={CARD}>
+      <div className="flex items-center gap-2 mb-3">
+        <AlertTriangle className="w-4 h-4 text-amber-400" />
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Alerts ({visible.length})</h3>
+      </div>
+      <div className="space-y-2">
+        {visible.map((w, i) => (
+          <div key={i} className={`flex items-start gap-2 p-2 rounded-lg text-sm ${w.severity === 'high' ? 'bg-loss-muted/20' : w.severity === 'medium' ? 'bg-amber-400/10' : 'bg-accent-muted/20'}`}>
+            <span className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full ${w.severity === 'high' ? 'bg-loss' : w.severity === 'medium' ? 'bg-amber-400' : 'bg-accent'}`} />
+            <span className={`${w.severity === 'high' ? 'text-loss' : w.severity === 'medium' ? 'text-amber-400' : 'text-text-heading'}`}>{w.message}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
 export function DashboardPage() {
-  const { data, isLoading, error } = useDashboardQuery()
-  const { data: riskData, isLoading: isRiskLoading, error: riskError } = useRiskDashboardQuery()
+  const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
-  const { data: tradesData } = useTradesQuery({ limit: 500 })
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    mark('dashboard:mount')
+    return () => mark('dashboard:unmount')
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    mark('dashboard:data-visible')
+    measure('dashboard:mount-to-data-visible', 'dashboard:mount', 'dashboard:data-visible')
+  }, [data])
 
   const quoteMap = useMemo(() => {
     const map = new Map<string, import('@/types').LiveQuote>()
@@ -228,34 +205,64 @@ export function DashboardPage() {
     return map
   }, [liveQuotes])
 
+  const operationalData = data as OperationalDashboardPayload | undefined
+  const riskPayload = useMemo(() => {
+    if (!operationalData?.risk) return null
+    return {
+      net_equity: operationalData.risk.net_equity,
+      open_positions: operationalData.risk.open_positions,
+      deployed_capital: operationalData.risk.deployed_capital,
+      available_capital: operationalData.risk.available_capital,
+      open_risk: operationalData.risk.open_risk,
+      portfolio_heat_pct: operationalData.risk.portfolio_heat_pct ?? null,
+      deployed_capital_pct: operationalData.risk.deployed_capital_pct ?? null,
+      positions_without_stop: operationalData.risk.positions_without_stop,
+      largest_position: null,
+      largest_risk_position: null,
+      risk_by_setup: [],
+      risk_by_symbol: [],
+      warnings: operationalData.risk.warnings,
+    }
+  }, [operationalData?.risk])
+
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['analytics'] })
-    await queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
-    await queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
-    await queryClient.invalidateQueries({ queryKey: ['market', 'live-quotes'] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] }),
+      queryClient.invalidateQueries({ queryKey: ['market', 'live-quotes'] }),
+    ])
   }, [queryClient])
 
-  if (isLoading) {
+  // ── First load — show skeletons only if truly no data ──
+  if (isLoading && !data) {
     return (
       <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className={`${CARD} h-24 animate-pulse`} />
           ))}
         </div>
         <div className={`${CARD} h-40 animate-pulse`} />
+        <RiskCommandCenterSkeleton />
       </div>
     )
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="px-[var(--page-px)] py-[var(--page-py)]">
         <div className={`${CARD} py-12 text-center`}>
           <AlertTriangle className="w-8 h-8 text-loss mx-auto mb-3" />
           <h2 className="text-lg font-medium text-text-heading font-display mb-2">Failed to load</h2>
           <p className="text-text-muted text-sm">{(error as Error)?.message || 'Something went wrong.'}</p>
+          <button
+            onClick={handleRefresh}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs text-accent-foreground hover:bg-accent/90 transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />Retry
+          </button>
         </div>
       </div>
     )
@@ -271,36 +278,65 @@ export function DashboardPage() {
     )
   }
 
+  const dashboardData = operationalData as OperationalDashboardPayload
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
-        <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
-      </div>
-      <KpiCards kpi={data.kpi} />
-      <LiveDashboard trades={tradesData?.items ?? []} quoteMap={quoteMap} />
-      {isRiskLoading ? (
-        <RiskCommandCenterSkeleton />
-      ) : riskData ? (
-        <RiskCommandCenter data={riskData} />
-      ) : riskData === null ? (
-        <RiskCommandCenterNoAccount />
-      ) : (
-        <RiskCommandCenterError error={riskError} />
-      )}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <EquityCurve data={data.daily_pnl} />
+      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+        {/* ── TODAY ── */}
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
+          <div className="flex items-center gap-3">
+            {isFetching && <SyncIndicator />}
+            <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
+          </div>
         </div>
-        <StreakCard data={data.streaks} />
+
+        <KpiCards kpi={dashboardData.kpi} />
+
+        {/* ── OPEN POSITIONS ── */}
+        <LiveDashboard trades={dashboardData.open_trades} quoteMap={quoteMap} />
+
+        {/* ── RISK ── */}
+        {isLoading && !riskPayload ? (
+          <RiskCommandCenterSkeleton />
+        ) : riskPayload ? (
+          <RiskCommandCenter data={riskPayload as any} />
+        ) : null}
+
+        {/* ── STREAKS + ALERTS ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StreakCard data={dashboardData.streaks} />
+          <AlertsCard warnings={dashboardData.risk?.warnings ?? []} />
+        </div>
+
+        {/* ── COLLAPSIBLE INTELLIGENCE (OFF BY DEFAULT) ── */}
+        <div className="space-y-[var(--page-gap)]">
+          <CollapsibleSection title="Lifecycle Intelligence" icon={Brain}>
+            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+              <LifecycleInsights />
+            </Suspense>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Behavioral Intelligence" icon={Shield}>
+            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+              <BehavioralIntelligence />
+            </Suspense>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Playbook Intelligence" icon={BookOpen}>
+            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+              <PlaybookIntelligence />
+            </Suspense>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Market Context" icon={BarChart3}>
+            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+              <MarketContext />
+            </Suspense>
+          </CollapsibleSection>
+        </div>
       </div>
-      <MonthlyPnl data={data.monthly_pnl} />
-      <LifecycleInsights />
-      <BehavioralIntelligence />
-      <PlaybookIntelligence />
-      <MarketContext />
-    </div>
     </PullToRefresh>
   )
 }
