@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMarketSnapshots, getMarketPerformanceCorrelation, getMarketRegimeSummary, fetchMarketData, seedMarketSnapshots, getMySymbols, upsertLiveQuotes, getLiveQuotes, syncLiveQuotes } from '@/lib/endpoints'
+import { useToastStore } from '@/store/toastStore'
 
 export function useMarketSnapshotsQuery(days?: number) {
   return useQuery({
@@ -49,10 +50,18 @@ export function useLiveQuotesQuery(refreshInterval?: number) {
 
 export function useSyncLiveQuotesMutation() {
   const qc = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
   return useMutation({
     mutationFn: () => syncLiveQuotes(),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['market', 'live-quotes'] })
+      const msg = data.upserted != null && data.upserted > 0
+        ? `Synced ${data.upserted} open trade prices`
+        : data.message || 'No prices updated'
+      addToast({ title: 'Prices synced', message: msg, variant: 'success' })
+    },
+    onError: (err) => {
+      addToast({ title: 'Sync failed', message: (err as Error)?.message || 'Could not fetch live prices', variant: 'error' })
     },
   })
 }

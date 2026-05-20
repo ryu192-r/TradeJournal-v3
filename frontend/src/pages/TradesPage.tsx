@@ -201,6 +201,9 @@ export function TradesPage() {
           <p className="text-sm text-text-muted mt-0.5">Track and manage every trade in your journal.</p>
         </div>
         <div className="flex items-center gap-2">
+          <GlassButton variant="ghost" size="sm" onClick={() => syncQuotes.mutate()} disabled={syncQuotes.isPending}>
+            {syncQuotes.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync
+          </GlassButton>
           <GlassButton variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4" /> Import
           </GlassButton>
@@ -242,19 +245,6 @@ export function TradesPage() {
           title="Export to Excel"
         >
           <Download className="w-3.5 h-3.5" /> Export
-        </button>
-        <button
-          onClick={() => syncQuotes.mutate()}
-          disabled={syncQuotes.isPending}
-          className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-50"
-          title="Sync live prices"
-        >
-          {syncQuotes.isPending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
-          )}
-          Sync
         </button>
       </div>
 

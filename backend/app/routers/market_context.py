@@ -621,7 +621,7 @@ def sync_live_quotes(
 ):
     """Fetch fresh live quotes for all tracked symbols and cache them.
 
-    1. Collects all distinct symbols from non-deleted trades.
+    1. Collects all distinct symbols from non-deleted OPEN trades.
     2. Calls the external market data provider (Tapetide MCP via
        app.services.market_data_service.fetch_live_quotes).
     3. Upserts the returned quotes into the live_quotes table.
@@ -629,7 +629,7 @@ def sync_live_quotes(
     """
     symbols = (
         db.query(Trade.symbol)
-        .filter(Trade.status != "deleted")
+        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
         .distinct()
         .order_by(Trade.symbol)
         .all()

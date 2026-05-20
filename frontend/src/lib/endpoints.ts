@@ -544,7 +544,7 @@ export function getLiveQuotes() {
 }
 
 export function syncLiveQuotes() {
-  return apiClient.post<{ symbols: string[]; count: number; message: string }>('/market/sync-quotes').then(r => r.data)
+  return apiClient.post<{ symbols: string[]; count: number; fetched?: number; upserted?: number; errors?: string[]; message?: string }>('/market/sync-quotes').then(r => r.data)
 }
 
 // ────────────────────────── Performance OS ──────────────────────────
