@@ -1,5 +1,6 @@
 """
-Market Context Router — daily market environment snapshots and trade-vs-market correlation.
+Market Context Router — daily market environment snapshots, trade-vs-market correlation,
+and live price sync from external market data providers.
 
 GET  /api/v1/market/snapshot/{date}            — get a specific day's market snapshot
 GET  /api/v1/market/snapshots                  — list recent snapshots
@@ -9,8 +10,9 @@ POST /api/v1/market/seed                       — bulk-seed historical snapshot
 GET  /api/v1/market/performance-correlation    — correlate user trades vs market environment
 GET  /api/v1/market/regime-summary             — summarize NIFTY regimes and win rates
 GET  /api/v1/market/my-symbols                 — distinct symbols from user's trades
-POST /api/v1/market/live-quotes                — upsert live quotes from Tapetide
+POST /api/v1/market/live-quotes                — upsert live quotes from provider
 GET  /api/v1/market/live-quotes                — get cached live quotes
+POST /api/v1/market/sync-quotes                — fetch + cache fresh live quotes
 """
 
 from datetime import datetime, date, timedelta
@@ -26,6 +28,7 @@ from app.models.trade import Trade
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.logging import get_logger
+from app.services.market_data_service import fetch_live_quotes
 
 logger = get_logger(__name__)
 
@@ -618,9 +621,11 @@ def sync_live_quotes(
 ):
     """Fetch fresh live quotes for all tracked symbols and cache them.
 
-    Current implementation returns symbols ready for external sync.
-    In production this should call an external market data provider
-    (Tapetide MCP) to fetch real-time quotes and upsert via POST /live-quotes.
+    1. Collects all distinct symbols from non-deleted trades.
+    2. Calls the external market data provider (Tapetide MCP via
+       app.services.market_data_service.fetch_live_quotes).
+    3. Upserts the returned quotes into the live_quotes table.
+    4. Returns a summary of what was fetched and cached.
     """
     symbols = (
         db.query(Trade.symbol)
@@ -630,11 +635,61 @@ def sync_live_quotes(
         .all()
     )
     symbol_list = [s[0] for s in symbols]
-    logger.info("sync_quotes_requested", symbols=symbol_list, count=len(symbol_list))
+
+    if not symbol_list:
+        return {
+            "symbols": [],
+            "count": 0,
+            "upserted": 0,
+            "errors": [],
+            "message": "No tracked symbols found. Add trades first.",
+        }
+
+    fetched_quotes, errors = fetch_live_quotes(symbol_list)
+
+    upserted = 0
+    for q in fetched_quotes:
+        try:
+            sym = q.get("symbol")
+            if not sym:
+                errors.append(f"missing symbol in fetched quote: {q}")
+                continue
+
+            existing = db.query(LiveQuote).filter(LiveQuote.symbol == sym).first()
+            if not existing:
+                existing = LiveQuote(symbol=sym)
+                db.add(existing)
+
+            for field in (
+                "company_name", "ltp", "change", "change_pct", "volume",
+            ):
+                if field in q and q[field] is not None:
+                    val = q[field]
+                    if field != "company_name" and isinstance(val, (int, float, Decimal)):
+                        val = Decimal(str(val))
+                    setattr(existing, field, val)
+
+            upserted += 1
+        except Exception as e:
+            errors.append(f"row ({q.get('symbol', '?')}): {str(e)}")
+
+    db.commit()
+
+    logger.info(
+        "sync_quotes_complete",
+        symbols=symbol_list,
+        fetched=len(fetched_quotes),
+        upserted=upserted,
+        errors=len(errors),
+    )
+
     return {
         "symbols": symbol_list,
         "count": len(symbol_list),
-        "message": "Pass these symbols to your market data provider, then POST results to /market/live-quotes",
+        "fetched": len(fetched_quotes),
+        "upserted": upserted,
+        "errors": errors,
+        "message": f"Synced {upserted}/{len(symbol_list)} symbols" if upserted else "No quotes fetched from provider",
     }
 
 
