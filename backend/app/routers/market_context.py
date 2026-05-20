@@ -612,6 +612,32 @@ def upsert_live_quotes(
     return {"upserted": upserted, "errors": errors, "total": len(quotes)}
 
 
+@router.post("/sync-quotes")
+def sync_live_quotes(
+    db: Session = Depends(get_db),
+):
+    """Fetch fresh live quotes for all tracked symbols and cache them.
+
+    Current implementation returns symbols ready for external sync.
+    In production this should call an external market data provider
+    (Tapetide MCP) to fetch real-time quotes and upsert via POST /live-quotes.
+    """
+    symbols = (
+        db.query(Trade.symbol)
+        .filter(Trade.status != "deleted")
+        .distinct()
+        .order_by(Trade.symbol)
+        .all()
+    )
+    symbol_list = [s[0] for s in symbols]
+    logger.info("sync_quotes_requested", symbols=symbol_list, count=len(symbol_list))
+    return {
+        "symbols": symbol_list,
+        "count": len(symbol_list),
+        "message": "Pass these symbols to your market data provider, then POST results to /market/live-quotes",
+    }
+
+
 @router.get("/live-quotes")
 def get_live_quotes(
     db: Session = Depends(get_db),

@@ -543,6 +543,10 @@ export function getLiveQuotes() {
   return apiClient.get<import('@/types').LiveQuotesResponse>('/market/live-quotes').then(r => r.data)
 }
 
+export function syncLiveQuotes() {
+  return apiClient.post<{ symbols: string[]; count: number; message: string }>('/market/sync-quotes').then(r => r.data)
+}
+
 // ────────────────────────── Performance OS ──────────────────────────
 
 export function getDailyDashboard(date?: string) {

@@ -1,11 +1,11 @@
 import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
-import { useLiveQuotesQuery } from '@/hooks/useMarketContextQuery'
+import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
 import { formatCurrency, formatPercent, formatDate } from '@/utils/format'
 import {
   TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle, RefreshCw,
-  ChevronDown, ChevronRight, Brain, Shield, BookOpen, BarChart3,
+  ChevronDown, ChevronRight, Brain, Shield, BookOpen, BarChart3, Loader2,
 } from 'lucide-react'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
@@ -184,6 +184,7 @@ function AlertsCard({ warnings }: { warnings: Array<{ severity: string; message:
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
+  const syncQuotes = useSyncLiveQuotesMutation()
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -288,6 +289,19 @@ export function DashboardPage() {
           <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
           <div className="flex items-center gap-3">
             {isFetching && <SyncIndicator />}
+            <button
+              onClick={() => syncQuotes.mutate()}
+              disabled={syncQuotes.isPending}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-50"
+              title="Sync live prices"
+            >
+              {syncQuotes.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              Sync
+            </button>
             <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
           </div>
         </div>

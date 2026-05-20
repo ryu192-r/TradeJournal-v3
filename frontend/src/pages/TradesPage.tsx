@@ -3,14 +3,14 @@ import { BrokerImportModal } from '@/components/trades/BrokerImportModal'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
-import { useLiveQuotesQuery } from '@/hooks/useMarketContextQuery'
+import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { useToastStore } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatPrice, formatQuantity, formatDate } from '@/utils/format'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
 import { pyramidTrade, exportTradesXlsx, deleteTrade, getCapitalDashboard, createPartialExit } from '@/lib/endpoints'
-import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw } from 'lucide-react'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
@@ -139,6 +139,7 @@ export function TradesPage() {
   const peMaxQty = peExitsData ? Number(peExitsData.remaining_qty) : null
 
   const { data: liveQuotesData } = useLiveQuotesQuery(60_000)
+  const syncQuotes = useSyncLiveQuotesMutation()
   const quoteMap = useMemo(() => {
     return new Map<string, LiveQuote>(
       (liveQuotesData?.quotes ?? []).map((q: LiveQuote) => [q.symbol, q])
@@ -241,6 +242,19 @@ export function TradesPage() {
           title="Export to Excel"
         >
           <Download className="w-3.5 h-3.5" /> Export
+        </button>
+        <button
+          onClick={() => syncQuotes.mutate()}
+          disabled={syncQuotes.isPending}
+          className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-50"
+          title="Sync live prices"
+        >
+          {syncQuotes.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="w-3.5 h-3.5" />
+          )}
+          Sync
         </button>
       </div>
 

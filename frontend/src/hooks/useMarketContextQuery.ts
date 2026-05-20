@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMarketSnapshots, getMarketPerformanceCorrelation, getMarketRegimeSummary, fetchMarketData, seedMarketSnapshots, getMySymbols, upsertLiveQuotes, getLiveQuotes } from '@/lib/endpoints'
+import { getMarketSnapshots, getMarketPerformanceCorrelation, getMarketRegimeSummary, fetchMarketData, seedMarketSnapshots, getMySymbols, upsertLiveQuotes, getLiveQuotes, syncLiveQuotes } from '@/lib/endpoints'
 
 export function useMarketSnapshotsQuery(days?: number) {
   return useQuery({
@@ -44,6 +44,16 @@ export function useLiveQuotesQuery(refreshInterval?: number) {
     staleTime: 30 * 1000,
     refetchInterval: refreshInterval ?? false,
     placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useSyncLiveQuotesMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => syncLiveQuotes(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['market', 'live-quotes'] })
+    },
   })
 }
 
