@@ -109,7 +109,9 @@ export function removeTradeFromLists(qc: QueryClient, tradeId: number) {
     { queryKey: ['trades'] },
     (old) => {
       if (!old?.items) return old
-      return { total: Math.max(0, old.total - 1), items: old.items.filter((t) => t.id !== tradeId) }
+      const exists = old.items.some((t) => t.id === tradeId)
+      if (!exists) return old
+      return { ...old, total: Math.max(0, old.total - 1), items: old.items.filter((t) => t.id !== tradeId) }
     },
   )
 }

@@ -251,7 +251,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
         if gross_loss_val > 0:
             profit_factor = round(gross_profit_val / gross_loss_val, 2)
         elif gross_profit_val > 0:
-            profit_factor = float('inf')
+            profit_factor = None  # no losses yet; avoid Infinity
 
         loss_count = total_trades - int(win_count or 0)
         avg_win = gross_profit_val / int(win_count) if win_count else 0
