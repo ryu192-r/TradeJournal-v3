@@ -8,13 +8,27 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react'
-import { formatCurrency, formatMetricPercent, formatPrice, formatQuantity, parseDecimal } from '@/utils/format'
-import type { RiskDashboardPayload, RiskTrade } from '@/types/riskDashboard'
+import { formatCurrency, formatMetricPercent, parseDecimal } from '@/utils/format'
+import type { RiskDashboardPayload, RiskTrade, RiskWarning } from '@/types/riskDashboard'
+import type { OperationalRiskSummary } from '@/types'
 import { PortfolioHeatGauge } from '@/components/risk/PortfolioHeatGauge'
 import { RiskExposureTable } from '@/components/risk/RiskExposureTable'
 import { RiskMetricCard } from '@/components/risk/RiskMetricCard'
 import { RiskWarningsPanel } from '@/components/risk/RiskWarningsPanel'
 import { useMemo } from 'react'
+
+/** Compact risk data that the dashboard passes. */
+type CompactRiskInput = OperationalRiskSummary & {
+  largest_position?: null
+  largest_risk_position?: null
+  risk_by_setup?: []
+  risk_by_symbol?: []
+  account_name?: string
+}
+
+function isFullPayload(data: RiskDashboardPayload | CompactRiskInput): data is RiskDashboardPayload {
+  return 'largest_position' in data && data.largest_position !== undefined
+}
 
 function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | null }) {
   return (
@@ -41,17 +55,17 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
           <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Entry</div>
-              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{formatPrice(trade.entry_price)}</div>
+              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{formatCurrency(trade.entry_price)}</div>
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Stop</div>
               <div className={`mt-1 truncate font-data text-sm ${trade.stop_price ? 'text-text-heading' : 'text-loss'}`}>
-                {trade.stop_price ? formatPrice(trade.stop_price) : 'Missing'}
+                {trade.stop_price ? formatCurrency(trade.stop_price) : 'Missing'}
               </div>
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Qty</div>
-              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{formatQuantity(trade.quantity)}</div>
+              <div className="mt-1 truncate font-data text-[length:var(--text-sm)] text-text-heading">{trade.quantity}</div>
             </div>
             <div>
               <div className="text-[length:var(--text-xs)] text-text-muted">Risk</div>
@@ -64,11 +78,12 @@ function RiskPositionCard({ title, trade }: { title: string; trade: RiskTrade | 
   )
 }
 
-export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
+export function RiskCommandCenter({ data }: { data: RiskDashboardPayload | CompactRiskInput }) {
+  const full = isFullPayload(data) ? data : null
   const { warnings, setupBuckets, symbolBuckets, deployedCapital, openRisk, hasOpenPositions, hasMissingStops, heatTone } = useMemo(() => {
-    const warnings = data.warnings ?? []
-    const setupBuckets = data.risk_by_setup ?? []
-    const symbolBuckets = data.risk_by_symbol ?? []
+    const warnings = (data.warnings ?? []) as RiskWarning[]
+    const setupBuckets = full?.risk_by_setup ?? []
+    const symbolBuckets = full?.risk_by_symbol ?? []
     const deployedCapital = parseDecimal(data.deployed_capital, 0)
     const openRisk = parseDecimal(data.open_risk, 0)
     const hasOpenPositions = data.open_positions > 0
@@ -79,7 +94,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
         ? 'warning' as const
         : 'profit' as const
     return { warnings, setupBuckets, symbolBuckets, deployedCapital, openRisk, hasOpenPositions, hasMissingStops, heatTone }
-  }, [data])
+  }, [data, full])
 
   return (
     <section className="space-y-[var(--page-gap)]">
@@ -92,7 +107,7 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
           <h2 className="mt-1 font-display text-xl text-text-heading sm:text-2xl">Risk Command Center</h2>
         </div>
         <div className="truncate text-[length:var(--text-xs)] text-text-muted font-data">
-          {data.account_name || 'Primary account'}
+          {full?.account_name || 'Primary account'}
         </div>
       </div>
 
@@ -158,18 +173,22 @@ export function RiskCommandCenter({ data }: { data: RiskDashboardPayload }) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <RiskPositionCard title="Largest Position" trade={data.largest_position} />
-          <RiskPositionCard title="Largest Risk" trade={data.largest_risk_position} />
-        </div>
-        <RiskWarningsPanel warnings={warnings} />
-      </div>
+      {full && (
+        <>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="xl:col-span-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <RiskPositionCard title="Largest Position" trade={full.largest_position} />
+              <RiskPositionCard title="Largest Risk" trade={full.largest_risk_position} />
+            </div>
+            <RiskWarningsPanel warnings={warnings} />
+          </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <RiskExposureTable title="Setup Exposure" variant="setup" buckets={setupBuckets} />
-        <RiskExposureTable title="Symbol Exposure" variant="symbol" buckets={symbolBuckets} />
-      </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <RiskExposureTable title="Setup Exposure" variant="setup" buckets={setupBuckets} />
+            <RiskExposureTable title="Symbol Exposure" variant="symbol" buckets={symbolBuckets} />
+          </div>
+        </>
+      )}
     </section>
   )
 }

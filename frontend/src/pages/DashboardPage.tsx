@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { mark, measure } from '@/utils/performance'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
+import type { RiskDashboardPayload } from '@/types/riskDashboard'
 
 const LifecycleInsights = lazy(() => import('@/components/lifecycle/LifecycleInsights').then(m => ({ default: m.LifecycleInsights })))
 const BehavioralIntelligence = lazy(() => import('@/components/lifecycle/BehavioralIntelligence').then(m => ({ default: m.BehavioralIntelligence })))
@@ -267,20 +268,9 @@ export function DashboardPage() {
   const riskPayload = useMemo(() => {
     if (!operationalData?.risk) return null
     return {
-      net_equity: operationalData.risk.net_equity,
-      open_positions: operationalData.risk.open_positions,
-      deployed_capital: operationalData.risk.deployed_capital,
-      available_capital: operationalData.risk.available_capital,
-      open_risk: operationalData.risk.open_risk,
-      portfolio_heat_pct: operationalData.risk.portfolio_heat_pct ?? null,
-      deployed_capital_pct: operationalData.risk.deployed_capital_pct ?? null,
-      positions_without_stop: operationalData.risk.positions_without_stop,
-      largest_position: null,
-      largest_risk_position: null,
-      risk_by_setup: [],
-      risk_by_symbol: [],
-      warnings: operationalData.risk.warnings,
-    }
+      ...operationalData.risk,
+      account_name: 'Primary account',
+    } as RiskDashboardPayload
   }, [operationalData?.risk])
 
   const handleRefresh = useCallback(async () => {
@@ -369,7 +359,7 @@ export function DashboardPage() {
 
         {/* ── RISK COMMAND CENTER ── */}
         {riskPayload ? (
-          <RiskCommandCenter data={riskPayload as any} />
+          <RiskCommandCenter data={riskPayload} />
         ) : (
           <RiskSkeleton />
         )}

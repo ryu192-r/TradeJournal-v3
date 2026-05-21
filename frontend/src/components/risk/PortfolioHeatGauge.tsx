@@ -9,7 +9,7 @@ function heatTone(value: number | null) {
   return { label: 'Controlled', color: 'var(--profit)', className: 'text-profit' }
 }
 
-export function PortfolioHeatGauge({ data }: { data: RiskDashboardPayload }) {
+export function PortfolioHeatGauge({ data }: { data: Pick<RiskDashboardPayload, 'portfolio_heat_pct' | 'open_risk' | 'positions_without_stop'> }) {
   const heat = data.portfolio_heat_pct
   const progress = heat == null ? 0 : Math.min(Math.max(heat / 8, 0), 1)
   const strokeDasharray = 283
