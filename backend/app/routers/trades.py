@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 from datetime import datetime
 from typing import List, Optional
 from decimal import Decimal
@@ -8,10 +7,12 @@ import os
 import uuid
 import shutil
 
-from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest
+from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
+from app.models.trade_timeline import TradeTimeline
+from app.models.partial_exit import PartialExit
 from app.models.account import Account
 from app.services.trade_service import TradeService
 from app.db.database import get_db
@@ -20,10 +21,38 @@ from app.models.capital_event import CapitalEvent
 from app.models.setup_playbook import SetupPlaybook
 from app.core.config import settings
 
+
 def _auto_reconcile(db: Session):
     account = db.query(Account).first()
     if account:
         _reconcile_account(account.id, db)
+
+
+def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
+    partials = (
+        db.query(PartialExit)
+        .filter(PartialExit.trade_id == trade.id)
+        .order_by(PartialExit.exit_time.asc())
+        .all()
+    )
+    total_exited_qty = sum(p.qty for p in partials)
+    partial_realized = sum(p.realized_pnl or Decimal("0") for p in partials)
+    remaining_qty = trade.quantity - total_exited_qty
+
+    if trade.exit_price is not None:
+        unrealized = Decimal("0")
+    elif partials and remaining_qty > 0:
+        unrealized = Decimal("0")
+    else:
+        unrealized = None
+
+    d = {
+        "remaining_qty": remaining_qty,
+        "partial_realized_pnl": partial_realized if partials else None,
+        "unrealized_pnl": unrealized,
+    }
+    return d
+
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -51,9 +80,23 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
     if trade.exit_price is None:
         return "system"
 
+    exit_price = Decimal(str(trade.exit_price))
+    if trade.stop_price:
+        stop = Decimal(str(trade.stop_price))
+        if abs(exit_price - stop) <= max(Decimal("0.01") * stop, Decimal("1")):
+            return "stop_loss"
+    if trade.target_price:
+        target = Decimal(str(trade.target_price))
+        if abs(exit_price - target) <= max(Decimal("0.01") * target, Decimal("1")):
+            return "target"
+    return "manual"
+
 
 def _update_setup_stats(db: Session, setup_name: str | None):
-    """Recompute trade_count, win_rate, avg_r for a setup playbook."""
+    """Recompute trade_count, win_rate, avg_r for a setup playbook.
+
+    This helper intentionally does not commit; callers own transaction boundaries.
+    """
     if not setup_name:
         return
     playbook = db.query(SetupPlaybook).filter(SetupPlaybook.name == setup_name).first()
@@ -69,17 +112,6 @@ def _update_setup_stats(db: Session, setup_name: str | None):
     playbook.win_rate = f"{round(len(wins) / len(closed) * 100, 1)}%" if closed else None
     r_values = [t.r_multiple for t in closed if t.r_multiple is not None]
     playbook.avg_r = f"{round(sum(float(r) for r in r_values) / len(r_values), 2)}" if r_values else None
-    db.commit()
-    exit_price = Decimal(str(trade.exit_price))
-    if trade.stop_price:
-        stop = Decimal(str(trade.stop_price))
-        if abs(exit_price - stop) <= max(Decimal("0.01") * stop, Decimal("1")):
-            return "stop_loss"
-    if trade.target_price:
-        target = Decimal(str(trade.target_price))
-        if abs(exit_price - target) <= max(Decimal("0.01") * target, Decimal("1")):
-            return "target"
-    return "manual"
 
 
 # ─────────────────────── endpoints ───────────────────────
@@ -93,9 +125,17 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     _auto_set_status(db_trade)
     db.commit()
     db.refresh(db_trade)
-    action_log = "merged" if action == "merged" else "created"
+    timeline = TradeTimeline(
+        trade_id=db_trade.id,
+        event_type="trade_opened",
+        new_value=f"{db_trade.symbol} @ {db_trade.entry_price}",
+        note=f"qty={db_trade.quantity}",
+    )
+    db.add(timeline)
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
+    db.commit()
+    db.refresh(db_trade)
     return db_trade
 
 
@@ -123,7 +163,45 @@ def list_trades(
         query = query.filter(Trade.entry_time <= datetime.fromisoformat(to_date + " 23:59:59"))
     total = query.count()
     trades = query.order_by(Trade.entry_time.desc()).offset(skip).limit(limit).all()
-    return {"total": total, "items": trades}
+    items = []
+    for t in trades:
+        resp = TradeResponse.model_validate(t)
+        extra = _enrich_trade_with_partials(t, db)
+        resp.remaining_qty = extra["remaining_qty"]
+        resp.partial_realized_pnl = extra["partial_realized_pnl"]
+        resp.unrealized_pnl = extra["unrealized_pnl"]
+        items.append(resp)
+    return {"total": total, "items": items}
+
+
+@router.get("/open-live", response_model=List[OpenLiveTradeResponse])
+def list_open_live_trades(db: Session = Depends(get_db)):
+    """Return only open trades with the minimal fields needed by the live dashboard."""
+    trades = (
+        db.query(Trade)
+        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
+        .order_by(Trade.entry_time.desc())
+        .all()
+    )
+    result = []
+    for t in trades:
+        partials = (
+            db.query(PartialExit)
+            .filter(PartialExit.trade_id == t.id)
+            .all()
+        )
+        total_exited_qty = sum(p.qty for p in partials)
+        remaining = t.quantity - total_exited_qty
+        result.append({
+            "id": t.id,
+            "symbol": t.symbol,
+            "entry_price": t.entry_price,
+            "quantity": t.quantity,
+            "remaining_qty": remaining,
+            "stop_price": t.stop_price,
+            "fees": t.fees,
+        })
+    return result
 
 
 @router.get("/{trade_id}", response_model=TradeResponse)
@@ -132,7 +210,12 @@ def read_trade(trade_id: int, db: Session = Depends(get_db)):
     trade = db.query(Trade).filter(Trade.id == trade_id).first()
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
-    return trade
+    resp = TradeResponse.model_validate(trade)
+    extra = _enrich_trade_with_partials(trade, db)
+    resp.remaining_qty = extra["remaining_qty"]
+    resp.partial_realized_pnl = extra["partial_realized_pnl"]
+    resp.unrealized_pnl = extra["unrealized_pnl"]
+    return resp
 
 
 @router.put("/{trade_id}", response_model=TradeResponse)
@@ -143,7 +226,6 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
 
     update_data = trade_update.model_dump(exclude_unset=True)
-
     old_setup = db_trade.setup
 
     for field, value in update_data.items():
@@ -154,16 +236,49 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
 
     if "exit_price" in update_data:
         _auto_set_status(db_trade)
-        # Auto-detect exit_reason if exit price was set but reason wasn't explicitly provided
         if "exit_reason" not in update_data:
             db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
+        if db_trade.exit_price is not None:
+            timeline = TradeTimeline(
+                trade_id=db_trade.id,
+                event_type="trade_closed",
+                new_value=f"PnL={db_trade.pnl}",
+                note=f"exit_reason={db_trade.exit_reason}",
+            )
+            db.add(timeline)
+    if "notes" in update_data and update_data["notes"]:
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="note_added",
+            new_value=update_data["notes"][:200] if update_data["notes"] else None,
+            note="Notes updated",
+        )
+        db.add(timeline)
+    if "stop_price" in update_data:
+        old_stop = str(db_trade.stop_price) if db_trade.stop_price else None
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="stop_updated",
+            old_value=old_stop,
+            new_value=str(update_data["stop_price"]),
+        )
+        db.add(timeline)
+    if "target_price" in update_data:
+        old_target = str(db_trade.target_price) if db_trade.target_price else None
+        timeline = TradeTimeline(
+            trade_id=db_trade.id,
+            event_type="target_updated",
+            old_value=old_target,
+            new_value=str(update_data["target_price"]),
+        )
+        db.add(timeline)
 
-    db.commit()
-    db.refresh(db_trade)
     _auto_reconcile(db)
     _update_setup_stats(db, db_trade.setup)
     if "setup" in update_data and old_setup != db_trade.setup:
         _update_setup_stats(db, old_setup)
+    db.commit()
+    db.refresh(db_trade)
     return db_trade
 
 
@@ -185,8 +300,16 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
                                    payload.entry_time, payload.fees, payload.stop_price)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    timeline = TradeTimeline(
+        trade_id=trade_id,
+        event_type="pyramided",
+        new_value=f"+{payload.quantity} @ {payload.entry_price}",
+    )
+    db.add(timeline)
     _auto_reconcile(db)
     _update_setup_stats(db, trade.setup)
+    db.commit()
+    db.refresh(trade)
     return trade
 
 
@@ -221,7 +344,16 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
         timestamp=payload.timestamp,
     )
     db.add(entry)
+    old_stop = str(trade.stop_price) if trade.stop_price else None
     trade.stop_price = payload.price
+    timeline = TradeTimeline(
+        trade_id=trade_id,
+        event_type="stop_updated",
+        old_value=old_stop,
+        new_value=str(payload.price),
+        note=f"type={payload.stop_type}",
+    )
+    db.add(timeline)
     db.commit()
     db.refresh(entry)
     return entry
@@ -274,7 +406,6 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     images.remove(url)
     trade.chart_images = images
 
-    # Try to delete the file from disk
     rel_path = url.lstrip("/uploads/")
     filepath = os.path.join(settings.UPLOAD_DIR, rel_path)
     if os.path.exists(filepath):
@@ -291,8 +422,13 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
     trade.status = "deleted"
+    timeline = TradeTimeline(
+        trade_id=trade.id,
+        event_type="trade_closed",
+        note="Trade deleted",
+    )
+    db.add(timeline)
 
-    # Create trade_deletion event if trade was closed (had realized PnL)
     if trade.pnl is not None:
         deletion_event = CapitalEvent(
             event_type="trade_deletion",
@@ -303,7 +439,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         )
         db.add(deletion_event)
 
-    db.commit()
     _auto_reconcile(db)
     _update_setup_stats(db, trade.setup)
+    db.commit()
     return None

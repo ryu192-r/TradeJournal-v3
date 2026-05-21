@@ -105,11 +105,13 @@ class TradeResponse(BaseModel):
     exit_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    remaining_qty: Optional[Decimal] = None
+    partial_realized_pnl: Optional[Decimal] = None
+    unrealized_pnl: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-    # Do NOT serialize Decimal to float — keep as string in JSON
-    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
+    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl")
     def serialize_decimal(self, v):
         if v is None:
             return None
@@ -119,6 +121,25 @@ class TradeResponse(BaseModel):
 class TradeListResponse(BaseModel):
     total: int
     items: List[TradeResponse]
+
+
+class OpenLiveTradeResponse(BaseModel):
+    """Lightweight open-trade payload for the live dashboard."""
+    id: int
+    symbol: str
+    entry_price: Decimal
+    quantity: Decimal
+    remaining_qty: Decimal
+    stop_price: Optional[Decimal] = None
+    fees: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("entry_price", "quantity", "remaining_qty", "stop_price", "fees")
+    def serialize_decimal(self, v):
+        if v is None:
+            return None
+        return str(v) if isinstance(v, Decimal) else v
 
 
 class PyramidTradeRequest(BaseModel):

@@ -42,6 +42,10 @@ class Settings:
     UPLOAD_DIR: str = config("UPLOAD_DIR", default="uploads/charts")
     MAX_UPLOAD_SIZE_MB: int = config("MAX_UPLOAD_SIZE_MB", default=10, cast=int)
     
+    # Market Data Provider (Tapetide or other)
+    MARKET_DATA_API_URL: str = config("MARKET_DATA_API_URL", default="")
+    MARKET_DATA_API_KEY: str = config("MARKET_DATA_API_KEY", default="")
+    
     class Config:
         case_sensitive = True
 

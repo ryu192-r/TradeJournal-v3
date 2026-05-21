@@ -6,10 +6,10 @@ import { User, Database, Palette, LogOut, Sun, Moon, Cpu, ChevronDown, ChevronUp
 import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection, getAiMentors } from '@/lib/endpoints'
 import type { AIProviderInfo } from '@/types/ai'
 
-const inputStyle = 'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all'
-const primaryBtnStyle = 'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
-const ghostBtnStyle = 'inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer'
-const testBtnStyle = 'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-accent border border-accent/20 hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+const inputStyle = 'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-[length:var(--text-sm)] text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all'
+const primaryBtnStyle = 'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+const ghostBtnStyle = 'inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[length:var(--text-sm)] font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer'
+const testBtnStyle = 'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium text-accent border border-accent/20 hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
 
 export function SettingsPage() {
   const { user, logout } = useAuthStore()
@@ -136,18 +136,18 @@ export function SettingsPage() {
     <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div>
         <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Settings</h1>
-        <p className="text-sm text-text-muted mt-1">Your profile, connection, and display preferences</p>
+        <p className="text-[length:var(--text-sm)] text-text-muted mt-1">Your profile, connection, and display preferences</p>
       </div>
 
       {/* Account Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
+      <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-accent-muted flex items-center justify-center">
             <User className="w-5 h-5 text-accent" />
           </div>
           <div>
             <h2 className="font-medium text-text-heading">Account</h2>
-            <p className="text-sm text-text-muted">Your profile and session</p>
+            <p className="text-[length:var(--text-sm)] text-text-muted">Your profile and session</p>
           </div>
         </div>
 
@@ -169,10 +169,10 @@ export function SettingsPage() {
                 </span>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
               <button
                 onClick={logout}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-loss text-white hover:bg-loss/80 transition-all duration-[150ms] ease-out cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-loss text-white hover:bg-loss/80 transition-all duration-[150ms] ease-out cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out
@@ -189,14 +189,14 @@ export function SettingsPage() {
       </div>
 
       {/* Connection Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
+      <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-profit-muted flex items-center justify-center">
             <Database className="w-5 h-5 text-profit" />
           </div>
           <div>
             <h2 className="font-medium text-text-heading">Connection</h2>
-            <p className="text-sm text-text-muted">API and database status</p>
+            <p className="text-[length:var(--text-sm)] text-text-muted">API and database status</p>
           </div>
         </div>
         <div className="space-y-2 text-sm">
@@ -214,21 +214,21 @@ export function SettingsPage() {
       </div>
 
       {/* Display Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
+      <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-gold-faint flex items-center justify-center">
             <Palette className="w-5 h-5 text-gold" />
           </div>
           <div>
             <h2 className="font-medium text-text-heading">Display</h2>
-            <p className="text-sm text-text-muted">Appearance preferences</p>
+            <p className="text-[length:var(--text-sm)] text-text-muted">Appearance preferences</p>
           </div>
         </div>
         <div className="flex items-center justify-between py-2">
           <span className="text-text-muted text-sm">Theme</span>
           <button
             onClick={toggleTheme}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-[150ms] ease-out cursor-pointer border"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[length:var(--text-sm)] font-medium transition-all duration-[150ms] ease-out cursor-pointer border"
             style={{
               backgroundColor: theme === 'dark' ? 'var(--accent-muted)' : 'var(--profit-faint)',
               color: theme === 'dark' ? 'var(--accent)' : 'var(--profit)',
@@ -245,19 +245,19 @@ export function SettingsPage() {
       </div>
 
       {/* AI Provider Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
+      <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-accent-faint flex items-center justify-center">
             <Cpu className="w-5 h-5 text-accent" />
           </div>
           <div>
             <h2 className="font-medium text-text-heading">AI Provider</h2>
-            <p className="text-sm text-text-muted">Configure your AI coach connection</p>
+            <p className="text-[length:var(--text-sm)] text-text-muted">Configure your AI coach connection</p>
           </div>
         </div>
 
         {loaded ? (
-          <div className="space-y-4">
+          <div className="space-y-[var(--page-gap)]">
             {/* Provider Selection */}
             <div>
               <label className="block text-xs font-medium text-text-muted mb-1.5">Provider</label>
@@ -370,7 +370,7 @@ export function SettingsPage() {
               </button>
 
               {!aiCollapsed && (
-                <div className="px-4 pb-4 space-y-4">
+                <div className="px-4 pb-4 space-y-[var(--page-gap)]">
                   {/* Timeout */}
                   <div>
                     <label className="block text-xs font-medium text-text-muted mb-1.5">Timeout (seconds)</label>
@@ -482,17 +482,17 @@ export function SettingsPage() {
 
       {/* AI Coach Personality Section */}
       {loaded && mentors.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-lg bg-accent-faint flex items-center justify-center">
               <Cpu className="w-5 h-5 text-accent" />
             </div>
             <div>
               <h2 className="font-medium text-text-heading">Coach Personality</h2>
-              <p className="text-sm text-text-muted">Blend mentor influences to match your style</p>
+              <p className="text-[length:var(--text-sm)] text-text-muted">Blend mentor influences to match your style</p>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-[var(--page-gap)]">
             {mentors.map((m) => (
               <div key={m.key}>
                 <div className="flex items-center justify-between mb-1.5">

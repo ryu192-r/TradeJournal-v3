@@ -26,7 +26,7 @@ export interface RuleReminderResponse {
 
 export interface CoachReviewResponse {
   insight: string
-  review_type: 'daily' | 'weekly' | 'insight' | 'answer'
+  review_type: 'daily' | 'weekly' | 'insight' | 'answer' | 'trade_review'
   trades_analyzed: number
   model_used: string
   generated_at: string
@@ -69,4 +69,40 @@ export interface PatternDetectionRequest {
 export interface RuleReminderRequest {
   lookback_days?: number
   rules?: string[]
+}
+
+// ──────────────── Trade Review Engine ────────────────
+
+export interface TradeReviewRequest {
+  trade_id: number
+}
+
+export interface TradeReviewScores {
+  entry_timing: number
+  exit_timing: number
+  risk_management: number
+  plan_adherence: number
+  psychology: number
+  overall: number
+}
+
+export interface MissedOpportunity {
+  better_exit_price: number | null
+  potential_r: number | null
+  note: string
+}
+
+export interface TradeReviewResponse {
+  trade_id: number
+  overall_verdict: string
+  summary: string
+  scores: TradeReviewScores
+  strengths: string[]
+  weaknesses: string[]
+  rule_violations: string[]
+  missed_opportunity: MissedOpportunity | null
+  coaching_notes: string
+  discipline_score: number
+  model_used: string
+  generated_at: string
 }

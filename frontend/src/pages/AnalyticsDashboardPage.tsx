@@ -11,9 +11,13 @@ import type {
   DailyPnlEntry, MonthlyPnlEntry, AnalyticsRDist, SetupPerformanceItem,
   DayOfWeekEntry, TimeOfDayEntry, AnalyticsStreaks, HoldingPeriodEntry,
 } from '@/types'
+import { LifecycleInsights } from '@/components/lifecycle/LifecycleInsights'
+import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelligence'
+import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
+import { MarketContext } from '@/components/market/MarketContext'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 // ───────────────────────── helpers ─────────────────────────
 
@@ -31,7 +35,7 @@ const COLORS = {
   grid: 'var(--border)',
 }
 
-const CARD_CLASS = 'bg-card rounded-2xl border border-border p-5'
+const CARD_CLASS = 'bg-card rounded-2xl border border-border p-[var(--page-px)]'
 const CARD_STATIC = `${CARD_CLASS} animate-card-in`
 
 function GlassTooltip({ active, payload, label }: any) {
@@ -60,11 +64,13 @@ function GlassTooltip({ active, payload, label }: any) {
 // @ts-ignore - kept for reference
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
-  const chartData = data.map((d) => ({
-    date: d.date.slice(0, 10),
-    cumulative: pnlNum(d.cumulative_pnl),
-    daily: pnlNum(d.net_pnl),
-  }))
+  const chartData = useMemo(() => {
+    return data.map((d) => ({
+      date: d.date.slice(0, 10),
+      cumulative: pnlNum(d.cumulative_pnl),
+      daily: pnlNum(d.net_pnl),
+    }))
+  }, [data])
 
   if (chartData.length === 0) {
     return (
@@ -75,7 +81,7 @@ function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Wallet className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Equity Curve</h3>
@@ -174,9 +180,9 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
 
   return (
     <div className={`${CARD_STATIC}`}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Calendar className="w-[15px] h-[15px] text-accent" />
-        <h3 className="font-display text-sm text-text-heading">Trading Heatmap</h3>
+        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Trading Heatmap</h3>
       </div>
       <div className="overflow-x-auto scrollbar-thin">
         <div className="flex gap-6 min-w-fit">
@@ -255,7 +261,7 @@ function MonthlyPnlChart({ data }: { data: MonthlyPnlEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Calendar className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Monthly P\u0026L</h3>
@@ -304,13 +310,13 @@ function RDistributionChart({ data }: { data: AnalyticsRDist }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-accent" />
           <h3 className="text-sm font-medium text-text-heading font-display">R-Multiple Distribution</h3>
         </div>
-        <div className="text-xs text-text-muted font-data">
+        <div className="text-[length:var(--text-xs)] text-text-muted font-data">
           μ={data.mean_r?.toFixed(2) ?? '-'}  σ={data.std_r?.toFixed(2) ?? '-'}
         </div>
       </div>
@@ -330,12 +336,14 @@ function RDistributionChart({ data }: { data: AnalyticsRDist }) {
 // ───────────────────────── Setup Performance Matrix ─────────────────────────
 
 function SetupPerformanceChart({ data }: { data: SetupPerformanceItem[] }) {
-  const chartData = data.map((d) => ({
-    setup: d.setup,
-    totalPnl: pnlNum(d.total_pnl),
-    tradeCount: d.trade_count,
-    winRate: d.win_rate ?? 0,
-  }))
+  const chartData = useMemo(() => {
+    return data.map((d) => ({
+      setup: d.setup,
+      totalPnl: pnlNum(d.total_pnl),
+      tradeCount: d.trade_count,
+      winRate: d.win_rate ?? 0,
+    }))
+  }, [data])
 
   if (chartData.length === 0) {
     return (
@@ -346,7 +354,7 @@ function SetupPerformanceChart({ data }: { data: SetupPerformanceItem[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Target className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Setup Performance</h3>
@@ -400,18 +408,19 @@ function SetupPerformanceChart({ data }: { data: SetupPerformanceItem[] }) {
 // ───────────────────────── Day-of-Week Heatmap ─────────────────────────
 
 function DayOfWeekChart({ data }: { data: DayOfWeekEntry[] }) {
-  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-  const ordered = dayOrder.map((day) => {
-    const found = data.find((d) => d.day.slice(0, 3) === day)
-    return found ?? { day, day_index: 0, trade_count: 0, net_pnl: '0', win_rate: 0, avg_r: 0 }
-  })
-
-  const chartData = ordered.map((d) => ({
-    day: d.day.slice(0, 3),
-    pnl: pnlNum(d.net_pnl),
-    winRate: d.win_rate ?? 0,
-    trades: d.trade_count,
-  }))
+  const chartData = useMemo(() => {
+    const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+    const ordered = dayOrder.map((day) => {
+      const found = data.find((d) => d.day.slice(0, 3) === day)
+      return found ?? { day, day_index: 0, trade_count: 0, net_pnl: '0', win_rate: 0, avg_r: 0 }
+    })
+    return ordered.map((d) => ({
+      day: d.day.slice(0, 3),
+      pnl: pnlNum(d.net_pnl),
+      winRate: d.win_rate ?? 0,
+      trades: d.trade_count,
+    }))
+  }, [data])
 
   if (chartData.every((d) => d.trades === 0)) {
     return (
@@ -422,7 +431,7 @@ function DayOfWeekChart({ data }: { data: DayOfWeekEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Calendar className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Day of Week</h3>
@@ -459,12 +468,14 @@ function DayOfWeekChart({ data }: { data: DayOfWeekEntry[] }) {
 // ───────────────────────── Time-of-Day Heatmap ─────────────────────────
 
 function TimeOfDayChart({ data }: { data: TimeOfDayEntry[] }) {
-  const chartData = data.map((d) => ({
-    hour: d.label,
-    pnl: pnlNum(d.net_pnl),
-    winRate: d.win_rate ?? 0,
-    trades: d.trade_count,
-  }))
+  const chartData = useMemo(() => {
+    return data.map((d) => ({
+      hour: d.label,
+      pnl: pnlNum(d.net_pnl),
+      winRate: d.win_rate ?? 0,
+      trades: d.trade_count,
+    }))
+  }, [data])
 
   if (chartData.length === 0) {
     return (
@@ -475,7 +486,7 @@ function TimeOfDayChart({ data }: { data: TimeOfDayEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Clock className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Time of Day</h3>
@@ -512,17 +523,19 @@ function TimeOfDayChart({ data }: { data: TimeOfDayEntry[] }) {
 // ───────────────────────── Drawdown Timeline ─────────────────────────
 
 function DrawdownChart({ data }: { data: DailyPnlEntry[] }) {
-  let peak = 0
-  const chartData = data.map((d) => {
-    const cum = pnlNum(d.cumulative_pnl)
-    if (cum > peak) peak = cum
-    const drawdown = cum - peak
-    return {
-      date: d.date.slice(0, 10),
-      drawdown,
-      cumulative: cum,
-    }
-  })
+  const chartData = useMemo(() => {
+    let peak = 0
+    return data.map((d) => {
+      const cum = pnlNum(d.cumulative_pnl)
+      if (cum > peak) peak = cum
+      const drawdown = cum - peak
+      return {
+        date: d.date.slice(0, 10),
+        drawdown,
+        cumulative: cum,
+      }
+    })
+  }, [data])
 
   if (chartData.length === 0) {
     return (
@@ -533,7 +546,7 @@ function DrawdownChart({ data }: { data: DailyPnlEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-loss" />
         <h3 className="text-sm font-medium text-text-heading font-display">Drawdown Timeline</h3>
@@ -587,27 +600,27 @@ function StreakMiniCard({ data }: { data: AnalyticsStreaks }) {
   const isWin = currentType === 'win'
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Flame className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Streaks</h3>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-[var(--cell-py)]">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-text-muted kpi-label">Current</span>
+          <span className="text-[length:var(--text-xs)] text-text-muted kpi-label">Current</span>
           <GlassBadge variant={isWin ? 'profit' : currentType === 'loss' ? 'loss' : 'muted'}>
             {currentCount} {currentType}
           </GlassBadge>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-text-muted kpi-label">Longest Win</span>
+          <span className="text-[length:var(--text-xs)] text-text-muted kpi-label">Longest Win</span>
           <span className="text-sm font-medium text-profit font-data">{data.longest_win_streak}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-text-muted kpi-label">Longest Loss</span>
+          <span className="text-[length:var(--text-xs)] text-text-muted kpi-label">Longest Loss</span>
           <span className="text-sm font-medium text-loss font-data">{data.longest_loss_streak}</span>
         </div>
-        <div className="text-xs text-text-muted pt-3 border-t border-border font-data">
+        <div className="text-[length:var(--text-xs)] text-text-muted pt-3 border-t border-border font-data">
           {data.streaks.length} streaks total
         </div>
       </div>
@@ -618,12 +631,14 @@ function StreakMiniCard({ data }: { data: AnalyticsStreaks }) {
 // ───────────────────────── Holding Period Scatter ─────────────────────────
 
 function HoldingPeriodChart({ data }: { data: HoldingPeriodEntry[] }) {
-  const chartData = data.map((d) => ({
-    hours: d.holding_hours,
-    rMultiple: d.r_multiple ?? 0,
-    pnl: pnlNum(d.pnl),
-    symbol: d.symbol,
-  }))
+  const chartData = useMemo(() => {
+    return data.map((d) => ({
+      hours: d.holding_hours,
+      rMultiple: d.r_multiple ?? 0,
+      pnl: pnlNum(d.pnl),
+      symbol: d.symbol,
+    }))
+  }, [data])
 
   if (chartData.length === 0) {
     return (
@@ -634,7 +649,7 @@ function HoldingPeriodChart({ data }: { data: HoldingPeriodEntry[] }) {
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-3`}>
+    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Clock className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Holding Period vs R-Multiple</h3>
@@ -687,15 +702,15 @@ export function AnalyticsDashboardPage() {
   const queryClient = useQueryClient()
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    void queryClient.invalidateQueries({ queryKey: ['analytics'] })
   }, [queryClient])
 
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="p-4 sm:p-6 space-y-[var(--page-gap)] sm:space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
-          <div className="text-xs sm:text-sm text-text-muted font-data">{formatDate(new Date())}</div>
+          <div className="text-xs sm:text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -736,7 +751,7 @@ export function AnalyticsDashboardPage() {
     <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Analytics</h1>
-        <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
+        <div className="text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>
       </div>
 
       <TradingHeatmap data={data.daily_pnl} />
@@ -754,6 +769,11 @@ export function AnalyticsDashboardPage() {
       </div>
 
       <HoldingPeriodChart data={data.holding_period} />
+
+      <LifecycleInsights />
+      <BehavioralIntelligence />
+      <PlaybookIntelligence />
+      <MarketContext />
     </div>
     </PullToRefresh>
   )

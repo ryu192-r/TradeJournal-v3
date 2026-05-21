@@ -17,7 +17,6 @@ export function useJournalQuery(date: string) {
         throw error
       }
     },
-    staleTime: 2 * 60 * 1000,
     enabled: date.length > 0,
   })
 }
@@ -26,7 +25,6 @@ export function useWeeklyJournalsQuery(weekStart: string) {
   return useQuery<DailyJournal[]>({
     queryKey: [...JOURNAL_KEY, 'weekly', weekStart],
     queryFn: () => getWeeklyJournals(weekStart),
-    staleTime: 2 * 60 * 1000,
     enabled: weekStart.length > 0,
   })
 }
@@ -35,7 +33,6 @@ export function useWeeklyJournalStatsQuery(weekStart: string) {
   return useQuery<WeeklyJournalStats>({
     queryKey: [...JOURNAL_KEY, 'weekly-stats', weekStart],
     queryFn: () => getWeeklyJournalStats(weekStart),
-    staleTime: 2 * 60 * 1000,
     enabled: weekStart.length > 0,
   })
 }

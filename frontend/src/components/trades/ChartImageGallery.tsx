@@ -50,9 +50,9 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
   }
 
   return (
-    <div className="border-t border-border pt-4">
+    <div className="pt-[var(--page-gap)]">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs text-text-muted uppercase tracking-wide">Charts</h3>
+        <h3 className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wide">Charts</h3>
         <div className="flex items-center gap-1">
           {images.length > 0 && (
             <button
@@ -66,7 +66,7 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadMutation.isPending}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-accent hover:bg-accent-muted transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[length:var(--text-xs)] font-medium text-accent hover:bg-accent-muted transition-colors cursor-pointer disabled:opacity-50"
           >
             {uploadMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
             Upload

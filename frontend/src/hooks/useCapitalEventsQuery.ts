@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listCapitalEvents, createCapitalEvent, updateCapitalEvent, deleteCapitalEvent } from '@/lib/endpoints'
-import { invalidateCapitalDomain } from '@/lib/queryInvalidation'
+import {
+  invalidateCapital, invalidateRisk, invalidateAnalytics, invalidateTradeList,
+  invalidateOperationalDashboard,
+} from '@/lib/queryInvalidation'
 import type { CapitalEvent, CapitalEventType } from '@/types'
 
 export function useCapitalEventsQuery(accountId: number | null, eventType?: string, startDate?: string, endDate?: string) {
@@ -8,12 +11,12 @@ export function useCapitalEventsQuery(accountId: number | null, eventType?: stri
     queryKey: ['capital-events', accountId, eventType, startDate, endDate],
     queryFn: () => listCapitalEvents(accountId!, eventType, startDate, endDate),
     enabled: accountId != null,
-    staleTime: 2 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   })
 }
 
 export function useCreateCapitalEventMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<CapitalEvent, Error, {
     event_type: CapitalEventType
     amount: string
@@ -21,26 +24,47 @@ export function useCreateCapitalEventMutation() {
     description?: string
     account_id: number
   }>({
+    mutationKey: ['capital-event', 'create'],
     mutationFn: (payload) => createCapitalEvent(payload),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: () => {
+      void invalidateCapital(qc)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+    },
   })
 }
 
 export function useUpdateCapitalEventMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<CapitalEvent, Error, {
     eventId: number
     payload: { event_type?: CapitalEventType; amount?: string; timestamp?: string; description?: string }
   }>({
+    mutationKey: ['capital-event', 'update'],
     mutationFn: ({ eventId, payload }) => updateCapitalEvent(eventId, payload),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: () => {
+      void invalidateCapital(qc)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+    },
   })
 }
 
 export function useDeleteCapitalEventMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<void, Error, number>({
+    mutationKey: ['capital-event', 'delete'],
     mutationFn: (eventId) => deleteCapitalEvent(eventId),
-    onSuccess: () => invalidateCapitalDomain(queryClient),
+    onSuccess: () => {
+      void invalidateCapital(qc)
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+    },
   })
 }

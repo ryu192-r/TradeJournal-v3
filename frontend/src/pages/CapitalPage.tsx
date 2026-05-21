@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getCapitalDashboard,
@@ -24,7 +24,7 @@ import {
 } from 'recharts'
 import { GlassBadge } from '@/components/ui/GlassBadge'
 
-const CARD_CLASS = 'bg-card rounded-2xl border border-border p-5'
+const CARD_CLASS = 'bg-card rounded-2xl border border-border p-[var(--page-px)]'
 const CARD_STATIC = `${CARD_CLASS} animate-card-in`
 const COLORS = {
   profit: 'var(--profit)',
@@ -68,7 +68,7 @@ function NetEquityCard({ data, onEdit }: { data: CapitalDashboardPayload; onEdit
     <div className={`${CARD_STATIC} relative overflow-hidden`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs uppercase tracking-wider text-text-muted mb-1 font-display">Net Equity</div>
+          <div className="text-[length:var(--text-xs)] uppercase tracking-wider text-text-muted mb-1 font-display">Net Equity</div>
           <div className={`text-4xl sm:text-5xl font-bold font-data ${isProfit ? 'text-profit' : 'text-loss'}`}>
             {formatCurrency(data.net_equity)}
           </div>
@@ -100,15 +100,17 @@ function NetEquityCard({ data, onEdit }: { data: CapitalDashboardPayload; onEdit
 
 function PnlStatsCard({ data }: { data: CapitalDashboardPayload }) {
   const realized = pnlNum(data.total_realized_pnl)
-
-  const rows = [
-    { label: 'Total Realized P&L', value: formatCurrency(data.total_realized_pnl), color: realized >= 0 ? 'text-profit' : 'text-loss' },
-    { label: 'Best Trade', value: formatCurrency(data.best_trade), color: 'text-profit' },
-    { label: 'Worst Trade', value: formatCurrency(data.worst_trade), color: 'text-loss' },
-    { label: 'Average Win', value: formatCurrency(data.average_win), color: 'text-profit' },
-    { label: 'Average Loss', value: formatCurrency(data.average_loss), color: 'text-loss' },
-    { label: 'Profit Factor', value: data.profit_factor?.toFixed(2) ?? '-', color: 'text-text-heading' },
-  ]
+  const rows = useMemo(
+    () => [
+      { label: 'Total Realized P&L', value: formatCurrency(data.total_realized_pnl), color: realized >= 0 ? 'text-profit' : 'text-loss' },
+      { label: 'Best Trade', value: formatCurrency(data.best_trade), color: 'text-profit' },
+      { label: 'Worst Trade', value: formatCurrency(data.worst_trade), color: 'text-loss' },
+      { label: 'Average Win', value: formatCurrency(data.average_win), color: 'text-profit' },
+      { label: 'Average Loss', value: formatCurrency(data.average_loss), color: 'text-loss' },
+      { label: 'Profit Factor', value: data.profit_factor?.toFixed(2) ?? '-', color: 'text-text-heading' },
+    ],
+    [realized, data.total_realized_pnl, data.best_trade, data.worst_trade, data.average_win, data.average_loss, data.profit_factor]
+  )
 
   return (
     <div className={`${CARD_STATIC} space-y-3`}>
@@ -118,7 +120,7 @@ function PnlStatsCard({ data }: { data: CapitalDashboardPayload }) {
       </div>
       <div className="space-y-2">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+          <div key={r.label} className="flex items-center justify-between py-[var(--cell-py)] border-b border-border/50 last:border-0">
             <span className="text-xs text-text-muted">{r.label}</span>
             <span className={`text-sm font-data font-medium ${r.color}`}>{r.value}</span>
           </div>
@@ -129,14 +131,17 @@ function PnlStatsCard({ data }: { data: CapitalDashboardPayload }) {
 }
 
 function AccountActivityCard({ data }: { data: CapitalDashboardPayload }) {
-  const rows = [
-    { label: 'Total Deposits', value: formatCurrency(data.total_deposits), color: 'text-profit' },
-    { label: 'Total Withdrawals', value: formatCurrency(data.total_withdrawals), color: 'text-loss' },
-    { label: 'Deployed Capital', value: formatCurrency(data.deployed_capital), color: 'text-text-heading' },
-    { label: 'Available Capital', value: formatCurrency(data.available_capital), color: 'text-text-heading' },
-    { label: 'Total Trades', value: String(data.total_trades), color: 'text-text-heading' },
-    { label: 'Win Rate', value: data.win_rate != null ? `${data.win_rate.toFixed(1)}%` : '-', color: 'text-text-heading' },
-  ]
+  const rows = useMemo(
+    () => [
+      { label: 'Total Deposits', value: formatCurrency(data.total_deposits), color: 'text-profit' },
+      { label: 'Total Withdrawals', value: formatCurrency(data.total_withdrawals), color: 'text-loss' },
+      { label: 'Deployed Capital', value: formatCurrency(data.deployed_capital), color: 'text-text-heading' },
+      { label: 'Available Capital', value: formatCurrency(data.available_capital), color: 'text-text-heading' },
+      { label: 'Total Trades', value: String(data.total_trades), color: 'text-text-heading' },
+      { label: 'Win Rate', value: data.win_rate != null ? `${data.win_rate.toFixed(1)}%` : '-', color: 'text-text-heading' },
+    ],
+    [data]
+  )
 
   return (
     <div className={`${CARD_STATIC} space-y-3`}>
@@ -146,7 +151,7 @@ function AccountActivityCard({ data }: { data: CapitalDashboardPayload }) {
       </div>
       <div className="space-y-2">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+          <div key={r.label} className="flex items-center justify-between py-[var(--cell-py)] border-b border-border/50 last:border-0">
             <span className="text-xs text-text-muted">{r.label}</span>
             <span className={`text-sm font-data font-medium ${r.color}`}>{r.value}</span>
           </div>
@@ -157,10 +162,12 @@ function AccountActivityCard({ data }: { data: CapitalDashboardPayload }) {
 }
 
 function EquityCurveSection({ data }: { data: CapitalDashboardPayload }) {
-  const chartData = data.equity_curve.map((p) => ({
-    date: p.date,
-    equity: pnlNum(p.equity),
-  }))
+  const chartData = useMemo(() => {
+    return data.equity_curve.map((p) => ({
+      date: p.date,
+      equity: pnlNum(p.equity),
+    }))
+  }, [data.equity_curve])
 
   return (
     <div className={`${CARD_STATIC} space-y-3`}>
@@ -226,6 +233,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: (payload: { event_type: CapitalEventType; amount: string; timestamp: string; description?: string; account_id: number }) => createCapitalEvent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       setShowModal(false)
       setAmount('')
       setDescription('')
@@ -238,6 +246,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: deleteCapitalEvent,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       addToast({ title: 'Deleted', message: 'Capital event removed.', variant: 'success' })
     },
     onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
@@ -247,6 +256,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     mutationFn: () => reconcileAccount(data.account_id),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       if (res.event_created) {
         addToast({ title: 'Reconciled', message: `Balance adjusted by ${formatCurrency(res.delta)}.`, variant: 'info' })
       } else {
@@ -288,19 +298,19 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
             <button
               onClick={() => reconcileMutation.mutate()}
               disabled={reconcileMutation.isPending}
-              className="inline-flex items-center gap-1 rounded-lg bg-accent/10 border border-accent/20 px-2.5 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-lg bg-accent/10 border border-accent/20 px-2.5 py-[var(--cell-py)] text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 ${reconcileMutation.isPending ? 'animate-spin' : ''}`} />Reconcile
             </button>
             <button
               onClick={() => openModal('deposit')}
-              className="inline-flex items-center gap-1 rounded-lg bg-profit/10 border border-profit/20 px-2.5 py-1.5 text-xs font-medium text-profit hover:bg-profit/20 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-lg bg-profit/10 border border-profit/20 px-2.5 py-[var(--cell-py)] text-xs font-medium text-profit hover:bg-profit/20 transition-colors cursor-pointer"
             >
               <Plus className="w-3 h-3" />Deposit
             </button>
             <button
               onClick={() => openModal('withdrawal')}
-              className="inline-flex items-center gap-1 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-1.5 text-xs font-medium text-loss hover:bg-loss/20 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-[var(--cell-py)] text-xs font-medium text-loss hover:bg-loss/20 transition-colors cursor-pointer"
             >
               <Plus className="w-3 h-3" />Withdraw
             </button>
@@ -311,10 +321,10 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted border-b border-border">
-                  <th className="text-left py-2 px-2 font-display">Date</th>
-                  <th className="text-left py-2 px-2 font-display">Type</th>
-                  <th className="text-right py-2 px-2 font-display">Amount</th>
-                  <th className="text-left py-2 px-2 font-display">Description</th>
+                  <th className="text-left px-[var(--cell-px)] py-[var(--cell-py)] font-display">Date</th>
+                  <th className="text-left px-[var(--cell-px)] py-[var(--cell-py)] font-display">Type</th>
+                  <th className="text-right px-[var(--cell-px)] py-[var(--cell-py)] font-display">Amount</th>
+                  <th className="text-left px-[var(--cell-px)] py-[var(--cell-py)] font-display">Description</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -326,15 +336,15 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                   const badgeVariant = isDeposit ? 'profit' : isWithdrawal ? 'loss' : 'muted'
                   return (
                     <tr key={i} className="border-b border-border/50 hover:bg-bg-elevated/30 transition-colors">
-                      <td className="py-2 px-2 text-text-heading font-data">{evt.date}</td>
-                      <td className="py-2 px-2">
+                      <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-heading font-data">{evt.date}</td>
+                      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
                         <GlassBadge variant={badgeVariant}>{evt.type}</GlassBadge>
                       </td>
-                      <td className={`py-2 px-2 text-right font-data ${amt >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      <td className={`px-[var(--cell-px)] py-[var(--cell-py)] text-right font-data ${amt >= 0 ? 'text-profit' : 'text-loss'}`}>
                         {formatCurrency(evt.amount)}
                       </td>
-                      <td className="py-2 px-2 text-text-muted">{evt.description ?? '-'}</td>
-                      <td className="py-2 px-2">
+                      <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-muted">{evt.description ?? '-'}</td>
+                      <td className="px-[var(--cell-px)] py-[var(--cell-py)]">
                         <button
                           onClick={() => {
                             if (confirm(`Delete this ${evt.type} of ${formatCurrency(evt.amount)}?`)) {
@@ -500,7 +510,7 @@ function TierEditor() {
   const { data, isLoading } = useQuery({
     queryKey: ['tier-config'],
     queryFn: getTierConfig,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   })
   const [tiers, setTiers] = useState<
     { name: string; min_amount: string; max_amount: string | null; sort_order: number }[]
@@ -557,7 +567,7 @@ function TierEditor() {
         <button
           onClick={handleSave}
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-[var(--cell-py)] text-xs font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" />
           {mutation.isPending ? 'Saving…' : 'Save'}
@@ -570,20 +580,20 @@ function TierEditor() {
             <input
               value={tier.name}
               onChange={(e) => updateTier(idx, 'name', e.target.value)}
-              className="w-32 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              className="w-32 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-[var(--cell-py)] text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
               placeholder="Tier name"
             />
             <input
               value={tier.min_amount}
               onChange={(e) => updateTier(idx, 'min_amount', e.target.value)}
-              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-[var(--cell-py)] text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
               placeholder="Min ₹"
               type="number"
             />
             <input
               value={tier.max_amount ?? ''}
               onChange={(e) => updateTier(idx, 'max_amount', e.target.value)}
-              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-1.5 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+              className="w-28 rounded-lg border border-border-medium bg-bg-elevated/50 px-2.5 py-[var(--cell-py)] text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
               placeholder="Max ₹ (empty = ∞)"
               type="number"
             />
@@ -600,7 +610,7 @@ function TierEditor() {
 
       <button
         onClick={addTier}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border-medium px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-heading hover:border-text-muted transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border-medium px-3 py-[var(--cell-py)] text-xs font-medium text-text-muted hover:text-text-heading hover:border-text-muted transition-colors"
       >
         <Plus className="w-3.5 h-3.5" />
         Add Tier
@@ -621,7 +631,7 @@ export function CapitalPage() {
   const { data, isLoading, error } = useQuery<CapitalDashboardPayload>({
     queryKey: ['capital-dashboard'],
     queryFn: getCapitalDashboard,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
   })
 
   const [showEditAccount, setShowEditAccount] = useState(false)
@@ -641,6 +651,7 @@ export function CapitalPage() {
     mutationFn: (payload: { name?: string; initial_balance?: string; breakeven_threshold?: string }) => updateAccount(data!.account_id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
       setShowEditAccount(false)
       addToast({ title: 'Account updated', message: 'Starting capital saved.', variant: 'success' })
     },

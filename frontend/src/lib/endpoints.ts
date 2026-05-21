@@ -1,10 +1,11 @@
 // API endpoint definitions — single source of truth for every backend call
 import apiClient from '@/lib/api'
-import type { ApiTrade, ApiTradeListResponse, BackendTradeStatus } from '@/types'
+import type { ApiTrade, ApiTradeListResponse, BackendTradeStatus, OpenLiveTrade } from '@/types'
 import type { DailyJournal, DailyJournalPayload } from '@/types'
 import type { WeeklyJournalStats } from '@/types'
 import type { FullDashboardPayload, CapitalDashboardPayload } from '@/types'
 import type { CapitalEvent, CapitalEventType, AccountInfo, BrokerInfo, BrokerImportResult } from '@/types'
+import type { RiskDashboardPayload } from '@/types/riskDashboard'
 import type {
   SetupPlaybookItem, SetupPlaybookListResponse,
   SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload,
@@ -41,6 +42,10 @@ export function listTrades(params?: ListTradesParams) {
   searchParams.append('skip', String(skip))
   searchParams.append('limit', String(limit))
   return apiClient.get<ApiTradeListResponse>(`/trades/?${searchParams.toString()}`).then(r => r.data)
+}
+
+export function getOpenLiveTrades() {
+  return apiClient.get<OpenLiveTrade[]>('/trades/open-live').then(r => r.data)
 }
 
 export function getTrade(id: number) {
@@ -103,6 +108,16 @@ export function createJournal(payload: DailyJournalPayload) {
 
 export function updateJournal(date: string, payload: DailyJournalPayload) {
   return apiClient.put<DailyJournal>(`/journal/${date}`, payload).then(r => r.data)
+}
+
+// ────────────────────────── Dashboard Aggregates ──────────────────────────
+
+export function getOperationalDashboard() {
+  return apiClient.get<import('@/types').OperationalDashboardPayload>('/dashboard/operational').then(r => r.data)
+}
+
+export function getIntelligenceDashboard() {
+  return apiClient.get<import('@/types').IntelligenceDashboardPayload>('/dashboard/intelligence').then(r => r.data)
 }
 
 // ────────────────────────── Analytics ──────────────────────────
@@ -198,6 +213,10 @@ export function getAiMentors() {
 
 export function getCapitalDashboard() {
   return apiClient.get<CapitalDashboardPayload>('/accounts/capital-dashboard').then(r => r.data)
+}
+
+export function getRiskDashboard() {
+  return apiClient.get<RiskDashboardPayload>('/risk-dashboard/').then(r => r.data)
 }
 
 export function getAccountInfo(accountId: number) {
@@ -321,4 +340,252 @@ export function getCoachReview(id: number) {
 
 export function deleteCoachReview(id: number) {
   return apiClient.delete(`/coach/reviews/${id}`).then(() => {})
+}
+
+// ───────────────────────── Trade Timeline ─────────────────────────
+
+export function listTimeline(tradeId: number) {
+  return apiClient.get<import('@/types').TimelineListResponse>(`/trades/${tradeId}/timeline`).then(r => r.data)
+}
+
+export function createTimelineEvent(tradeId: number, payload: import('@/types').TimelineEventCreatePayload) {
+  return apiClient.post<import('@/types').TimelineEvent>(`/trades/${tradeId}/timeline`, payload).then(r => r.data)
+}
+
+export function deleteTimelineEvent(tradeId: number, eventId: number) {
+  return apiClient.delete(`/trades/${tradeId}/timeline/${eventId}`).then(() => {})
+}
+
+// ───────────────────────── Partial Exits ─────────────────────────
+
+export function listPartialExits(tradeId: number) {
+  return apiClient.get<import('@/types').PartialExitListResponse>(`/trades/${tradeId}/partial-exits`).then(r => r.data)
+}
+
+export function createPartialExit(tradeId: number, payload: import('@/types').PartialExitCreatePayload) {
+  return apiClient.post<import('@/types').PartialExit>(`/trades/${tradeId}/partial-exits`, payload).then(r => r.data)
+}
+
+export function deletePartialExit(tradeId: number, exitId: number) {
+  return apiClient.delete(`/trades/${tradeId}/partial-exits/${exitId}`).then(() => {})
+}
+
+// ───────────────────────── Emotion Logs ─────────────────────────
+
+export function listEmotionLogs(tradeId: number) {
+  return apiClient.get<import('@/types').EmotionLogListResponse>(`/trades/${tradeId}/emotions`).then(r => r.data)
+}
+
+export function createEmotionLog(tradeId: number, payload: import('@/types').EmotionLogCreatePayload) {
+  return apiClient.post<import('@/types').EmotionLog>(`/trades/${tradeId}/emotions`, payload).then(r => r.data)
+}
+
+export function deleteEmotionLog(tradeId: number, logId: number) {
+  return apiClient.delete(`/trades/${tradeId}/emotions/${logId}`).then(() => {})
+}
+
+// ───────────────────────── Execution Grades ─────────────────────────
+
+export function getExecutionGrade(tradeId: number) {
+  return apiClient.get<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`).then(r => r.data)
+}
+
+export function createExecutionGrade(tradeId: number, payload: import('@/types').ExecutionGradeCreatePayload) {
+  return apiClient.post<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`, payload).then(r => r.data)
+}
+
+export function updateExecutionGrade(tradeId: number, payload: import('@/types').ExecutionGradeUpdatePayload) {
+  return apiClient.put<import('@/types').ExecutionGrade>(`/trades/${tradeId}/execution-grade`, payload).then(r => r.data)
+}
+
+export function deleteExecutionGrade(tradeId: number) {
+  return apiClient.delete(`/trades/${tradeId}/execution-grade`).then(() => {})
+}
+
+// ───────────────────────── Lifecycle Analytics ─────────────────────────
+
+export function getEmotionSummary(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').EmotionSummaryResponse>('/lifecycle/emotion-summary' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getGradeSummary(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').GradeSummaryResponse>('/lifecycle/grade-summary' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getBehavioralAnalytics(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').BehavioralAnalyticsResponse>('/lifecycle/behavioral' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getRevengeTrades(fromDate?: string, toDate?: string, hoursWindow?: number) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  if (hoursWindow) params.append('hours_window', String(hoursWindow))
+  const qs = params.toString()
+  return apiClient.get<import('@/types').RevengeTradesResponse>('/lifecycle/revenge-trades' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getOvertradingDetection(fromDate?: string, toDate?: string, dailyThreshold?: number, weeklyThreshold?: number) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  if (dailyThreshold) params.append('daily_threshold', String(dailyThreshold))
+  if (weeklyThreshold) params.append('weekly_threshold', String(weeklyThreshold))
+  const qs = params.toString()
+  return apiClient.get<import('@/types').OvertradingResponse>('/lifecycle/overtrading' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getEarlyExitAnalysis(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').EarlyExitResponse>('/lifecycle/early-exits' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getDisciplineScore(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').DisciplineScoreResponse>('/lifecycle/discipline-score' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getBehavioralScore(lookbackDays?: number) {
+  return apiClient.post<import('@/types').BehavioralScoreResponse>('/coach/behavioral-score', null, {
+    params: lookbackDays ? { lookback_days: lookbackDays } : undefined,
+  }).then(r => r.data)
+}
+
+// ───────────────────────── Trade Review Engine ─────────────────────────
+
+export function generateTradeReview(tradeId: number) {
+  return apiClient.post<import('@/types/coach').TradeReviewResponse>('/coach/trade-review', { trade_id: tradeId }).then(r => r.data)
+}
+
+// ───────────────────────── Playbook Intelligence ─────────────────────────
+
+export function getPlaybookOverview(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').PlaybookOverviewResponse>('/playbook/intelligence/overview' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getSetupIntelligence(setupName: string, fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').SetupIntelligenceResponse>(`/playbook/intelligence/${encodeURIComponent(setupName)}` + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+// ───────────────────────── Market Context ─────────────────────────
+
+export function getMarketSnapshots(days?: number) {
+  return apiClient.get<import('@/types').MarketSnapshotsResponse>('/market/snapshots', {
+    params: days ? { days } : undefined,
+  }).then(r => r.data)
+}
+
+export function getMarketSnapshot(date: string) {
+  return apiClient.get<import('@/types').MarketSnapshotEntry>(`/market/snapshot/${date}`).then(r => r.data)
+}
+
+export function saveMarketSnapshot(payload: Record<string, unknown>) {
+  return apiClient.post<{ id: number; date: string; message: string }>('/market/snapshot', payload).then(r => r.data)
+}
+
+export function fetchMarketData(payload: Record<string, unknown>) {
+  return apiClient.post<{ id: number; date: string; message: string }>('/market/fetch', payload).then(r => r.data)
+}
+
+export function seedMarketSnapshots(snapshots: Record<string, unknown>[]) {
+  return apiClient.post<{ added: number; skipped: number; errors: string[]; total: number }>('/market/seed', { snapshots }).then(r => r.data)
+}
+
+export function getMarketPerformanceCorrelation(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (fromDate) params.append('from_date', fromDate)
+  if (toDate) params.append('to_date', toDate)
+  const qs = params.toString()
+  return apiClient.get<import('@/types').MarketPerformanceCorrelation>('/market/performance-correlation' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+export function getMarketRegimeSummary(days?: number) {
+  return apiClient.get<import('@/types').MarketRegimeSummary>('/market/regime-summary', {
+    params: days ? { days } : undefined,
+  }).then(r => r.data)
+}
+
+export function getMySymbols() {
+  return apiClient.get<import('@/types').MySymbolsResponse>('/market/my-symbols').then(r => r.data)
+}
+
+export function upsertLiveQuotes(quotes: Record<string, unknown>[]) {
+  return apiClient.post<{ upserted: number; errors: string[]; total: number }>('/market/live-quotes', { quotes }).then(r => r.data)
+}
+
+export function getLiveQuotes() {
+  return apiClient.get<import('@/types').LiveQuotesResponse>('/market/live-quotes').then(r => r.data)
+}
+
+export function syncLiveQuotes() {
+  return apiClient.post<{ symbols: string[]; count: number; fetched?: number; upserted?: number; errors?: string[]; message?: string }>('/market/sync-quotes').then(r => r.data)
+}
+
+// ────────────────────────── Performance OS ──────────────────────────
+
+export function getDailyDashboard(date?: string) {
+  const path = date ? `/perf-os/workflow/${date}` : '/perf-os/workflow/today'
+  return apiClient.get<import('@/types/performanceOs').DailyDashboard>(path).then(r => r.data)
+}
+
+export function updateDailyWorkflow(date: string, payload: import('@/types/performanceOs').DailyWorkflowUpdate) {
+  return apiClient.put<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}`, payload).then(r => r.data)
+}
+
+export function advanceWorkflowPhase(date: string) {
+  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/advance`).then(r => r.data)
+}
+
+export function resetWorkflow(date: string) {
+  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/reset`).then(r => r.data)
+}
+
+export function getCurrentWeeklyReview() {
+  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>('/perf-os/weekly/current').then(r => r.data)
+}
+
+export function getWeeklyReview(weekStart: string) {
+  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>(`/perf-os/weekly/${weekStart}`).then(r => r.data)
+}
+
+export function updateWeeklyReview(weekStart: string, payload: import('@/types/performanceOs').WeeklyReviewUpdate) {
+  return apiClient.put<import('@/types/performanceOs').WeeklyReview>(`/perf-os/weekly/${weekStart}`, payload).then(r => r.data)
+}
+
+export function getCurrentMonthlyReview() {
+  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>('/perf-os/monthly/current').then(r => r.data)
+}
+
+export function getMonthlyReview(month: string) {
+  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>(`/perf-os/monthly/${month}`).then(r => r.data)
+}
+
+export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
+  return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
 }

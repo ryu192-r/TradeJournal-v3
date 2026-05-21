@@ -22,13 +22,14 @@ interface AppState {
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
 
-  activeView: 'dashboard' | 'analytics' | 'coach' | 'trades' | 'journal' | 'playbook' | 'review' | 'ideas' | 'capital' | 'settings'
+  activeView: 'dashboard' | 'analytics' | 'coach' | 'trades' | 'playbook' | 'review' | 'ideas' | 'capital' | 'perf-os' | 'sa-notes' | 'settings'
   setActiveView: (view: AppState['activeView']) => void
 
-  tradeFormMode: 'list' | 'create' | 'edit'
+  tradeFormMode: 'list' | 'create' | 'edit' | 'detail'
   selectedTradeId: number | null
   openCreateTrade: () => void
   openEditTrade: (id: number) => void
+  openDetailTrade: (id: number) => void
   closeTradeForm: () => void
 
   theme: 'dark' | 'light'
@@ -65,6 +66,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedTradeId: null,
   openCreateTrade: () => set({ activeView: 'trades', tradeFormMode: 'create', selectedTradeId: null }),
   openEditTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'edit', selectedTradeId: id }),
+  openDetailTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'detail', selectedTradeId: id }),
   closeTradeForm: () => set({ tradeFormMode: 'list', selectedTradeId: null }),
 
   theme: getInitialTheme(),

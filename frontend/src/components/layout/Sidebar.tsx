@@ -1,10 +1,12 @@
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
+import { useAuthStore } from '@/store/authStore'
 import {
   BarChart3,
   BookOpen,
   Briefcase,
   ClipboardList,
+  Cpu,
   LayoutDashboard,
   Lightbulb,
   Menu,
@@ -18,7 +20,8 @@ const navItems = [
   { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
   { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
   { id: 'trades' as const, label: 'Trades', icon: Briefcase },
-  { id: 'journal' as const, label: 'Journal', icon: BookOpen },
+  { id: 'perf-os' as const, label: 'Perf OS', icon: Cpu },
+  { id: 'sa-notes' as const, label: 'SA Notes', icon: BookOpen },
   { id: 'playbook' as const, label: 'Playbook', icon: ClipboardList },
   { id: 'review' as const, label: 'Review', icon: TrendingUp },
   { id: 'ideas' as const, label: 'Ideas', icon: Lightbulb },
@@ -29,6 +32,7 @@ const navItems = [
 
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView } = useAppStore()
+  const user = useAuthStore((s) => s.user)
 
   return (
     <>
@@ -85,10 +89,10 @@ export function Sidebar() {
 
         <div className="flex items-center gap-3 px-5 pt-3.5 pb-[.875rem] border-t border-border">
           <div className="w-[30px] h-[30px] rounded-full bg-accent text-white flex items-center justify-center text-[.625rem] font-bold font-display shrink-0">
-            RC
+            {user?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
           </div>
           <div>
-            <div className="text-[.8125rem] font-semibold text-text-heading leading-tight">Ryu Chan</div>
+            <div className="text-[.8125rem] font-semibold text-text-heading leading-tight">{user?.full_name || 'User'}</div>
             <div className="flex items-center gap-[.3125rem]">
               <div className="w-[5px] h-[5px] rounded-full bg-text-muted" />
               <span className="text-[.625rem] text-text-muted">Market closed</span>

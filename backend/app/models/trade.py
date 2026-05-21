@@ -49,6 +49,10 @@ class Trade(Base):
     stop_history_entries = relationship("StopHistory", back_populates="trade")
     capital_events = relationship("CapitalEvent", back_populates="trade")
     source_idea = relationship("TradeIdea", back_populates="traded_trade", uselist=False)
+    timeline_entries = relationship("TradeTimeline", back_populates="trade", order_by="TradeTimeline.timestamp")
+    partial_exits = relationship("PartialExit", back_populates="trade", order_by="PartialExit.exit_time")
+    emotion_logs = relationship("EmotionLog", back_populates="trade", order_by="EmotionLog.timestamp")
+    execution_grade = relationship("ExecutionGrade", back_populates="trade", uselist=False)
 
     def compute_pnl(self):
         """Auto-compute PnL. All trades are LONG (Indian equities — shorting not applicable)."""
@@ -61,6 +65,9 @@ class Trade(Base):
 # Indexes for common query patterns
 Index('ix_trades_symbol_status', Trade.symbol, Trade.status)
 Index('ix_trades_entry_time_exit_time', Trade.entry_time, Trade.exit_time)
+Index('ix_trades_status', Trade.status)
+Index('ix_trades_status_exit_entry', Trade.status, Trade.exit_price, Trade.entry_time)
+Index('ix_trades_setup_status', Trade.setup, Trade.status)
 
 # Auto-update updated_at on modification
 @event.listens_for(Trade, 'before_update')

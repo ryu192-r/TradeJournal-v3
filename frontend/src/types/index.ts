@@ -72,11 +72,24 @@ export interface ApiTrade {
   exit_reason?: string | null
   created_at?: string
   updated_at?: string
+  remaining_qty?: string | null
+  partial_realized_pnl?: string | null
+  unrealized_pnl?: string | null
 }
 
 export interface ApiTradeListResponse {
   total: number
   items: ApiTrade[]
+}
+
+export interface OpenLiveTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  quantity: string
+  remaining_qty: string
+  stop_price: string | null
+  fees: string
 }
 
 export interface ApiTradeUpdatePayload {
@@ -185,6 +198,7 @@ export interface AnalyticsKpi {
   profit_factor: number | null
   expectancy: number | null
   avg_r_multiple: number | null
+  max_drawdown_amount: number | null
   max_drawdown_pct: number | null
   net_pnl: string | null
   gross_profit: string | null
@@ -375,4 +389,690 @@ export interface FullDashboardPayload {
   day_of_week: DayOfWeekEntry[]
   time_of_day: TimeOfDayEntry[]
   holding_period: HoldingPeriodEntry[]
+}
+
+// ---------------------------------------------------------------------------
+// Trade Timeline types
+// ---------------------------------------------------------------------------
+
+export type TimelineEventType = 'trade_opened' | 'stop_updated' | 'target_updated' | 'pyramided' | 'partial_exit' | 'note_added' | 'conviction_changed' | 'emotion_logged' | 'trade_closed' | 'review_added'
+
+export interface TimelineEvent {
+  id: number
+  trade_id: number
+  event_type: TimelineEventType
+  timestamp: string
+  old_value: string | null
+  new_value: string | null
+  note: string | null
+  emotion: string | null
+  confidence: number | null
+}
+
+export interface TimelineEventCreatePayload {
+  event_type: TimelineEventType
+  old_value?: string | null
+  new_value?: string | null
+  note?: string | null
+  emotion?: string | null
+  confidence?: number | null
+  timestamp?: string | null
+}
+
+export interface TimelineListResponse {
+  items: TimelineEvent[]
+}
+
+// ---------------------------------------------------------------------------
+// Partial Exit types
+// ---------------------------------------------------------------------------
+
+export interface PartialExit {
+  id: number
+  trade_id: number
+  qty: string
+  exit_price: string
+  exit_time: string
+  realized_pnl: string | null
+  r_captured: string | null
+  exit_reason: string | null
+  note: string | null
+}
+
+export interface PartialExitCreatePayload {
+  qty: string
+  exit_price: string
+  exit_time: string
+  realized_pnl?: string | null
+  r_captured?: string | null
+  exit_reason?: string | null
+  note?: string | null
+}
+
+export interface PartialExitListResponse {
+  items: PartialExit[]
+  remaining_qty: string
+}
+
+// ---------------------------------------------------------------------------
+// Emotion Log types
+// ---------------------------------------------------------------------------
+
+export type EmotionType = 'calm' | 'fearful' | 'euphoric' | 'revenge' | 'fomo' | 'hesitant' | 'disciplined'
+
+export interface EmotionLog {
+  id: number
+  trade_id: number
+  emotion: EmotionType
+  confidence: number | null
+  stress: number | null
+  conviction: number | null
+  patience: number | null
+  focus: number | null
+  note: string | null
+  timestamp: string
+}
+
+export interface EmotionLogCreatePayload {
+  emotion: EmotionType
+  confidence?: number | null
+  stress?: number | null
+  conviction?: number | null
+  patience?: number | null
+  focus?: number | null
+  note?: string | null
+  timestamp?: string | null
+}
+
+export interface EmotionLogListResponse {
+  items: EmotionLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Execution Grade types
+// ---------------------------------------------------------------------------
+
+export type GradeLetter = 'A' | 'B' | 'C' | 'D' | 'F'
+
+export interface ExecutionGrade {
+  id: number
+  trade_id: number
+  entry_quality: GradeLetter | null
+  sizing_quality: GradeLetter | null
+  stop_quality: GradeLetter | null
+  patience: GradeLetter | null
+  rule_adherence: GradeLetter | null
+  exit_quality: GradeLetter | null
+  overall_grade: GradeLetter | null
+  notes: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ExecutionGradeCreatePayload {
+  entry_quality?: GradeLetter | null
+  sizing_quality?: GradeLetter | null
+  stop_quality?: GradeLetter | null
+  patience?: GradeLetter | null
+  rule_adherence?: GradeLetter | null
+  exit_quality?: GradeLetter | null
+  overall_grade?: GradeLetter | null
+  notes?: string | null
+}
+
+export interface ExecutionGradeUpdatePayload extends ExecutionGradeCreatePayload {}
+
+// ---------------------------------------------------------------------------
+// Lifecycle Analytics types
+// ---------------------------------------------------------------------------
+
+export interface EmotionSummaryEntry {
+  emotion: string
+  count: number
+  avg_confidence: number | null
+  avg_stress: number | null
+  avg_conviction: number | null
+  avg_patience: number | null
+  avg_focus: number | null
+  trade_count: number
+  total_pnl: string
+  win_rate: number | null
+}
+
+export interface EmotionSummaryResponse {
+  emotions: EmotionSummaryEntry[]
+  total_logs: number
+  most_frequent: string | null
+  worst_performing: string | null
+}
+
+export interface GradePnlEntry {
+  grade: string
+  count: number
+  avg_pnl: string
+  total_pnl: string
+  win_rate: number | null
+}
+
+export interface GradeSummaryResponse {
+  grade_distribution: Record<string, number>
+  dimension_averages: Record<string, number | null>
+  grade_pnl: GradePnlEntry[]
+  avg_overall: number | null
+}
+
+export interface EmotionGradeMatrixEntry {
+  emotion: string
+  count: number
+  avg_pnl: number
+  total_pnl: number
+  win_rate: number
+  avg_grade_numeric: number | null
+}
+
+export interface BehavioralInsight {
+  type: 'warning' | 'insight'
+  message: string
+  emotion: string
+}
+
+export interface BehavioralAnalyticsResponse {
+  emotion_grade_matrix: EmotionGradeMatrixEntry[]
+  discipline_score: number | null
+  insights: BehavioralInsight[]
+}
+
+export interface RevengeTrade {
+  trade_id: number
+  symbol: string
+  entry_time: string | null
+  pnl: string | null
+  emotion: string | null
+  flagged_reason: 'emotion' | 'window' | 'both'
+  hours_after_loss: number | null
+}
+
+export interface RevengeTradesResponse {
+  revenge_trades: RevengeTrade[]
+  total_flagged: number
+  avg_pnl_flagged: number | null
+  avg_pnl_unflagged: number | null
+}
+
+// ---------------------------------------------------------------------------
+// Overtrading Detection types
+// ---------------------------------------------------------------------------
+
+export interface OvertradingDay {
+  date: string
+  trade_count: number
+  threshold: number
+  total_pnl: number | null
+  avg_pnl: number | null
+  win_rate: number | null
+  emotions: string[]
+  trade_ids: number[]
+}
+
+export interface OvertradingWeek {
+  week: string
+  trade_count: number
+  threshold: number
+  total_pnl: number | null
+  avg_pnl: number | null
+  win_rate: number | null
+  top_emotions: string[]
+}
+
+export interface OvertradingResponse {
+  overtrading_days: OvertradingDay[]
+  overtrading_weeks: OvertradingWeek[]
+  total_overtrading_trades: number
+  avg_pnl_overtrading: number | null
+  avg_pnl_normal: number | null
+  summary: {
+    total_days: number
+    overtrading_days: number
+    total_weeks: number
+    overtrading_weeks: number
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Early Exit Analysis types
+// ---------------------------------------------------------------------------
+
+export interface ExitReasonBreakdown {
+  reason: string
+  count: number
+  total_pnl: number
+  avg_pnl: number
+  win_rate: number | null
+}
+
+export interface EarlyExit {
+  trade_id: number
+  symbol: string
+  entry_price: string
+  exit_price: string
+  target_price: string | null
+  stop_price: string | null
+  pnl: string
+  exit_reason: string
+  capture_ratio: number
+  actual_r: number
+  max_r: number
+  exit_quality_grade: string | null
+  entry_time: string | null
+}
+
+export interface EarlyExitResponse {
+  total_closed: number
+  exit_reason_breakdown: ExitReasonBreakdown[]
+  capture_stats: {
+    avg_capture_ratio: number | null
+    median_capture_ratio: number | null
+    target_reach_rate: number | null
+    stop_hit_rate: number | null
+    manual_exit_rate: number | null
+  } | null
+  early_exits: EarlyExit[]
+  early_exit_rate: number | null
+  avg_pnl_early_exit: number | null
+  avg_pnl_full_exit: number | null
+  dimension_scores: { exit_quality_avg: number | null; graded_count: number } | null
+}
+
+// ---------------------------------------------------------------------------
+// Composite Discipline Score types
+// ---------------------------------------------------------------------------
+
+export interface DisciplineInsight {
+  type: 'warning' | 'insight'
+  area: string
+  message: string
+}
+
+export interface DisciplineScoreResponse {
+  overall_score: number | null
+  components: Record<string, number>
+  grade: string | null
+  insights: DisciplineInsight[]
+}
+
+// ---------------------------------------------------------------------------
+// AI Behavioral Score types
+// ---------------------------------------------------------------------------
+
+export interface AIAssessment {
+  behavioral_summary: string
+  strengths: string[]
+  weaknesses: string[]
+  recommendations: string[]
+  risk_level: 'low' | 'medium' | 'high' | 'unknown'
+  composite_score: number | null
+}
+
+export interface BehavioralScoreResponse {
+  programmatic: DisciplineScoreResponse
+  ai_assessment: AIAssessment
+  lookback_days: number
+  trades_analyzed: number
+  model_used: string
+  generated_at: string
+}
+
+// ---------------------------------------------------------------------------
+// Playbook Intelligence types
+// ---------------------------------------------------------------------------
+
+export interface PlaybookOverviewSetup {
+  setup_id: number
+  setup_name: string
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  expectancy: number | null
+  profit_factor: number | null
+  total_pnl: number | null
+  avg_r: number | null
+}
+
+export interface PlaybookOverviewResponse {
+  setups: PlaybookOverviewSetup[]
+  best_by_expectancy: PlaybookOverviewSetup | null
+  best_by_win_rate: PlaybookOverviewSetup | null
+  best_by_pnl: PlaybookOverviewSetup | null
+}
+
+export interface SetupPerformance {
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  total_pnl: number | null
+  avg_pnl: number | null
+  profit_factor: number | null
+  expectancy: number | null
+  avg_r: number | null
+  max_r: number | null
+  min_r: number | null
+  r_std: number | null
+}
+
+export interface HoldTimePerformance {
+  count: number
+  avg_pnl: number | null
+  win_rate: number | null
+}
+
+export interface SetupHoldTime {
+  avg_hours: number | null
+  median_hours: number | null
+  min_hours: number | null
+  max_hours: number | null
+  sample_size: number
+  hold_performance: Record<string, HoldTimePerformance>
+  best_hold_bucket: string | null
+}
+
+export interface TimeOfDayEntry {
+  hour: number
+  label: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface DayOfWeekEntry {
+  day_of_week: number
+  day_name: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface SetupMarketConditions {
+  time_of_day: TimeOfDayEntry[]
+  day_of_week: DayOfWeekEntry[]
+  best_time: TimeOfDayEntry | null
+  best_day: DayOfWeekEntry | null
+  worst_time: TimeOfDayEntry | null
+  worst_day: DayOfWeekEntry | null
+}
+
+export interface ExitReasonOnLoss {
+  reason: string
+  count: number
+}
+
+export interface FailureInsight {
+  type: 'warning' | 'pattern'
+  message: string
+}
+
+export interface SetupFailurePatterns {
+  loss_count: number
+  avg_loss: number | null
+  max_loss: number | null
+  max_consecutive_losses: number
+  current_loss_streak: number
+  exit_reasons_on_losses: ExitReasonOnLoss[]
+  missing_stop_rate: number | null
+  insights: FailureInsight[]
+}
+
+export interface EmotionPnlEntry {
+  emotion: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface GradePnlEntry2 {
+  grade: string
+  count: number
+  win_rate: number | null
+  avg_pnl: number | null
+}
+
+export interface SetupBehaviorCrossover {
+  emotion_breakdown: EmotionPnlEntry[]
+  grade_breakdown: GradePnlEntry2[]
+}
+
+export interface TacticPerformance {
+  tactic: string
+  trade_count: number
+  closed_count: number
+  win_rate: number | null
+  avg_pnl: number | null
+  total_pnl: number | null
+}
+
+export interface RecentTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  exit_price: string | null
+  pnl: string | null
+  r_multiple: string | null
+  exit_reason: string | null
+  tactic: string | null
+  entry_time: string | null
+}
+
+export interface SetupIntelligenceResponse {
+  setup_name: string
+  description: string | null
+  ideal_conditions: string[]
+  risk_profile: Record<string, unknown>
+  rules: string[]
+  performance: SetupPerformance
+  hold_time: SetupHoldTime
+  market_conditions: SetupMarketConditions
+  failure_patterns: SetupFailurePatterns
+  behavior_crossover: SetupBehaviorCrossover
+  tactic_breakdown: TacticPerformance[]
+  recent_trades: RecentTrade[]
+}
+
+// ---------------------------------------------------------------------------
+// Market Context types
+// ---------------------------------------------------------------------------
+
+export interface MarketSnapshotEntry {
+  date: string
+  nifty_close: string | null
+  nifty_change_pct: string | null
+  nifty_trend: string | null
+  nifty_regime: string | null
+  india_vix: string | null
+  atr_pct: string | null
+  advance_count: number | null
+  decline_count: number | null
+  advance_decline_ratio: string | null
+  sector_strength: Record<string, { change_pct: number | null; last_price: number | null }>
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
+  is_earnings_season: string | null
+  macro_events: string[] | null
+}
+
+export interface MarketSnapshotsResponse {
+  snapshots: MarketSnapshotEntry[]
+  total: number
+}
+
+export interface MarketCorrelationBucket {
+  trade_count: number
+  win_rate: number | null
+  avg_pnl: number | null
+  total_pnl: number | null
+  expectancy: number | null
+}
+
+export interface MarketCorrelationInsight {
+  type: 'insight' | 'warning'
+  message: string
+}
+
+export interface MarketPerformanceCorrelation {
+  by_trend: Record<string, MarketCorrelationBucket>
+  by_regime: Record<string, MarketCorrelationBucket>
+  by_vix_bucket: Record<string, MarketCorrelationBucket>
+  by_breadth: Record<string, MarketCorrelationBucket>
+  by_earnings_season: Record<string, MarketCorrelationBucket>
+  insights: MarketCorrelationInsight[]
+  total_matched_trades: number
+}
+
+export interface MarketRegimeCurrent {
+  date: string
+  nifty_close: string | null
+  nifty_change_pct: string | null
+  nifty_trend: string | null
+  nifty_regime: string | null
+  india_vix: string | null
+  advance_count: number | null
+  decline_count: number | null
+  sector_strength: Record<string, { change_pct: number | null; last_price: number | null }> | null
+  is_earnings_season: string | null
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
+}
+
+export interface MarketRegimeSummary {
+  current: MarketRegimeCurrent | null
+  regime_distribution: Record<string, number>
+  trend_distribution: Record<string, number>
+  avg_vix: number | null
+  total_days: number
+}
+
+export interface LiveQuote {
+  symbol: string
+  company_name: string | null
+  ltp: string | null
+  change: string | null
+  change_pct: string | null
+  volume: string | null
+  high_52w: string | null
+  low_52w: string | null
+  pe: string | null
+  market_cap_cr: string | null
+  sector: string | null
+  updated_at: string | null
+}
+
+export interface LiveQuotesResponse {
+  quotes: LiveQuote[]
+  total: number
+}
+
+export interface MySymbolsResponse {
+  symbols: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Aggregated Dashboard payloads
+// ---------------------------------------------------------------------------
+
+export interface OperationalOpenTrade {
+  id: number
+  symbol: string
+  entry_price: string
+  quantity: string
+  remaining_qty: string
+  stop_price: string | null
+  fees: string
+}
+
+export interface OperationalRiskSummary {
+  net_equity: string
+  open_positions: number
+  deployed_capital: string
+  available_capital: string
+  open_risk: string
+  portfolio_heat_pct: number | null
+  deployed_capital_pct: number | null
+  positions_without_stop: number
+  warnings: Array<{
+    severity: string
+    code: string
+    message: string
+    trade_id: number | null
+    symbol: string | null
+  }>
+}
+
+export interface OperationalCapitalSummary {
+  net_equity: string
+  initial_balance: string
+  total_deposits: string
+  total_withdrawals: string
+  total_realized_pnl: string
+  total_trades: number
+  win_rate: number | null
+}
+
+export interface OperationalStreaks {
+  current_type: string | null
+  current_count: number
+  longest_win: number
+  longest_loss: number
+}
+
+export interface OperationalDashboardPayload {
+  kpi: AnalyticsKpi
+  open_trades: OperationalOpenTrade[]
+  risk: OperationalRiskSummary
+  capital: OperationalCapitalSummary
+  streaks: OperationalStreaks
+}
+
+export interface IntelligenceLifecycleHighlight {
+  total_emotion_logs: number
+  most_frequent_emotion: string | null
+  worst_performing_emotion: string | null
+  graded_trades: number
+  avg_grade_score: number | null
+  high_grade_rate: number | null
+  discipline_score: number | null
+}
+
+export interface IntelligenceBehavioralHighlight {
+  overtrading_days: number
+  overtrading_weeks: number
+  revenge_trades: number
+  early_exit_rate: number | null
+  avg_capture_ratio: number | null
+}
+
+export interface IntelligencePlaybookHighlight {
+  setups: Array<{
+    name: string
+    trade_count: number
+    win_rate: number | null
+    avg_r: string | null
+    total_pnl: string | null
+  }>
+}
+
+export interface IntelligenceMarketHighlight {
+  date: string | null
+  nifty_close: number | null
+  nifty_change_pct: number | null
+  nifty_regime: string | null
+  india_vix: number | null
+  fii_flow_cr: string | null
+  dii_flow_cr: string | null
+  breadth_advance: number | null
+  breadth_decline: number | null
+}
+
+export interface IntelligenceDashboardPayload {
+  lifecycle: IntelligenceLifecycleHighlight
+  behavioral: IntelligenceBehavioralHighlight
+  playbook: IntelligencePlaybookHighlight
+  market: IntelligenceMarketHighlight
 }

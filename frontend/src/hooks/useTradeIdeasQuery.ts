@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listIdeas, getIdea, createIdea, updateIdea, deleteIdea, convertIdeaToTrade } from '@/lib/endpoints'
-import { invalidateTradeDomain } from '@/lib/queryInvalidation'
+import {
+  invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook,
+  invalidateOperationalDashboard, invalidateIntelligenceDashboard,
+} from '@/lib/queryInvalidation'
 import type {
   TradeIdeaItem, TradeIdeaListResponse, TradeIdeaCreatePayload,
   TradeIdeaUpdatePayload, ConvertToTradePayload, ConvertToTradeResponse, TradeIdeaStatus,
@@ -10,7 +13,6 @@ export function useTradeIdeasQuery(status?: TradeIdeaStatus, symbol?: string, di
   return useQuery<TradeIdeaListResponse>({
     queryKey: ['ideas', { status, symbol, direction, confidence }],
     queryFn: () => listIdeas(status, symbol, direction, confidence),
-    staleTime: 2 * 60 * 1000,
   })
 }
 
@@ -19,44 +21,49 @@ export function useTradeIdeaQuery(id: number | null) {
     queryKey: ['idea', id],
     queryFn: () => getIdea(id!),
     enabled: id != null && id > 0,
-    staleTime: 2 * 60 * 1000,
   })
 }
 
 export function useCreateIdeaMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<TradeIdeaItem, Error, TradeIdeaCreatePayload>({
     mutationFn: createIdea,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ideas'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ideas'] }),
   })
 }
 
 export function useUpdateIdeaMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<TradeIdeaItem, Error, { id: number; payload: TradeIdeaUpdatePayload }>({
     mutationFn: ({ id, payload }) => updateIdea(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas'] })
-      queryClient.invalidateQueries({ queryKey: ['idea'] })
+      qc.invalidateQueries({ queryKey: ['ideas'] })
+      qc.invalidateQueries({ queryKey: ['idea'] })
     },
   })
 }
 
 export function useDeleteIdeaMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: deleteIdea,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ideas'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ideas'] }),
   })
 }
 
 export function useConvertToTradeMutation() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation<ConvertToTradeResponse, Error, { id: number; payload: ConvertToTradePayload }>({
+    mutationKey: ['trade-idea', 'convert-to-trade'],
     mutationFn: ({ id, payload }) => convertIdeaToTrade(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas'] })
-      invalidateTradeDomain(queryClient)
+      void qc.invalidateQueries({ queryKey: ['ideas'] })
+      void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidatePlaybook(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+      void invalidateIntelligenceDashboard(qc)
     },
   })
 }

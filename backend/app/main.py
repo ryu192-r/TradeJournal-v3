@@ -9,6 +9,7 @@ from app.models.trade import Trade
 from app.db.database import SessionLocal
 import app.models  # noqa: F401 — registers all models on Base.metadata
 import logging
+import time
 from alembic.config import Config
 from alembic import command
 import os
@@ -17,7 +18,7 @@ import os
 configure_logging()
 logger = get_logger(__name__)
 
-# Run alembic migrations on startup
+# Run alembic migrations on startup, then ensure all tables exist
 def run_migrations():
     alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
@@ -25,8 +26,9 @@ def run_migrations():
         command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations applied successfully")
     except Exception as e:
-        logger.warning(f"Alembic migration failed, falling back to create_all: {e}")
-        Base.metadata.create_all(bind=engine)
+        logger.warning(f"Alembic migration failed: {e}")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables ensured via create_all")
 
 run_migrations()
 
@@ -56,7 +58,16 @@ app = FastAPI(
 # Register rate limiter middleware
 app.add_middleware(RateLimiter)
 
-# Include routers
+# Timing middleware — logs every HTTP endpoint duration
+@app.middleware("http")
+async def timing_middleware(request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration = (time.perf_counter() - start) * 1000
+    # Skip health/ping noise
+    if settings.DEBUG and request.url.path not in ("/health", "/"):
+        logger.info(f"{request.method} {request.url.path} {duration:.1f}ms")
+    return response
 app.include_router(api_router)
 
 # Serve uploaded chart images
