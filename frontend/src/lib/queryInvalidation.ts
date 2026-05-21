@@ -67,39 +67,63 @@ export function setTradeCache(qc: QueryClient, trade: ApiTrade) {
 }
 
 export function patchTradeInLists(qc: QueryClient, trade: ApiTrade) {
-  qc.getQueriesData<TradesListData>({ queryKey: ['trades'] }).forEach(([queryKey, old]) => {
-    if (!old?.items) return
+  qc.getQueriesData<TradesListData>({ queryKey: ['trades'] }).forEach(([queryKey]) => {
     const filters = readTradeFilters(queryKey)
-    const matches = matchesTradeFilters(trade, filters)
-    const idx = old.items.findIndex((t) => t.id === trade.id)
-    if (idx === -1) return
-    if (!matches) {
-      qc.setQueryData<TradesListData>(queryKey, {
+
+    qc.setQueryData<TradesListData>(queryKey, (old) => {
+      if (!old?.items) return old
+
+      const matches = matchesTradeFilters(trade, filters)
+      const idx = old.items.findIndex((t) => t.id === trade.id)
+
+      // Case 1: trade should NOT be in this list
+      if (!matches) {
+        if (idx === -1) return old  // not present – nothing to do
+        return {
+          ...old,
+          total: Math.max(0, old.total - 1),
+          items: old.items.filter((t) => t.id !== trade.id),
+        }
+      }
+
+      // Case 2: trade should be in list and already is – patch in place
+      if (idx >= 0) {
+        const items = [...old.items]
+        items[idx] = trade
+        return { ...old, items }
+      }
+
+      // Case 3: trade matches filters but is missing from this list variant
+      //          (e.g. symbol search or status filter changed). Only add on
+      //          page 1; later pages will be corrected by background refetch.
+      if ((filters.skip ?? 0) > 0) return old
+
+      const limit = filters.limit ?? old.items.length
+      return {
         ...old,
-        total: Math.max(0, old.total - 1),
-        items: old.items.filter((t) => t.id !== trade.id),
-      })
-      return
-    }
-    const items = [...old.items]
-    items[idx] = trade
-    qc.setQueryData<TradesListData>(queryKey, { ...old, items })
+        total: old.total + 1,
+        items: [trade, ...old.items].slice(0, limit),
+      }
+    })
   })
 }
 
 export function addTradeToLists(qc: QueryClient, trade: ApiTrade) {
-  qc.getQueriesData<TradesListData>({ queryKey: ['trades'] }).forEach(([queryKey, old]) => {
-    if (!old?.items) return
+  qc.getQueriesData<TradesListData>({ queryKey: ['trades'] }).forEach(([queryKey]) => {
     const filters = readTradeFilters(queryKey)
-    if (!matchesTradeFilters(trade, filters)) return
-    if ((filters.skip ?? 0) > 0) return
-    if (old.items.some((t) => t.id === trade.id)) return
 
-    const limit = filters.limit ?? old.items.length
-    qc.setQueryData<TradesListData>(queryKey, {
-      ...old,
-      total: old.total + 1,
-      items: [trade, ...old.items].slice(0, limit),
+    qc.setQueryData<TradesListData>(queryKey, (old) => {
+      if (!old?.items) return old
+      if (!matchesTradeFilters(trade, filters)) return old
+      if ((filters.skip ?? 0) > 0) return old
+      if (old.items.some((t) => t.id === trade.id)) return old
+
+      const limit = filters.limit ?? old.items.length
+      return {
+        ...old,
+        total: old.total + 1,
+        items: [trade, ...old.items].slice(0, limit),
+      }
     })
   })
 }
@@ -111,7 +135,11 @@ export function removeTradeFromLists(qc: QueryClient, tradeId: number) {
       if (!old?.items) return old
       const exists = old.items.some((t) => t.id === tradeId)
       if (!exists) return old
-      return { ...old, total: Math.max(0, old.total - 1), items: old.items.filter((t) => t.id !== tradeId) }
+      return {
+        ...old,
+        total: Math.max(0, old.total - 1),
+        items: old.items.filter((t) => t.id !== tradeId),
+      }
     },
   )
 }
