@@ -198,6 +198,7 @@ export interface AnalyticsKpi {
   profit_factor: number | null
   expectancy: number | null
   avg_r_multiple: number | null
+  max_drawdown_amount: number | null
   max_drawdown_pct: number | null
   net_pnl: string | null
   gross_profit: string | null

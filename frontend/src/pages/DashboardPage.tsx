@@ -33,7 +33,13 @@ function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
     { label: 'Profit Factor', desc: 'Gross profit divided by gross loss. >1.5 is good, <1 is losing', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : '—', sub: 'ratio', icon: Activity, color: kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'text-heading' : 'loss' },
     { label: 'Avg R', desc: 'Average R-multiple per trade. Positive = edge exists', value: kpi.avg_r_multiple != null ? `${kpi.avg_r_multiple.toFixed(2)}R` : '—', sub: 'per trade', icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss' },
     { label: 'Expectancy', desc: 'Average profit per trade. Positive edge over time', value: kpi.expectancy != null ? formatCurrency(kpi.expectancy) : '—', sub: 'per trade', icon: TrendingUp, color: kpi.expectancy != null && kpi.expectancy >= 0 ? 'profit' : 'loss' },
-    { label: 'Max DD', desc: 'Largest peak-to-trough drawdown in account value', value: kpi.max_drawdown_pct != null ? formatCurrency(kpi.max_drawdown_pct) : '—', sub: 'drawdown', icon: Flame, color: 'loss' },
+    { label: 'Max DD', desc: 'Largest peak-to-trough drawdown in account value', value: (() => {
+      const amt = kpi.max_drawdown_amount ?? kpi.max_drawdown_pct
+      const pct = kpi.max_drawdown_pct
+      const amtStr = amt != null ? formatCurrency(amt) : '—'
+      const pctStr = pct != null ? `${pct.toFixed(1)}%` : '—'
+      return `${amtStr} (${pctStr})`
+    })(), sub: 'drawdown', icon: Flame, color: 'loss' },
   ], [kpi])
 
   return (

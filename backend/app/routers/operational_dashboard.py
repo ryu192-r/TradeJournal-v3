@@ -39,7 +39,8 @@ class _KpiSummary(BaseModel):
     profit_factor: Optional[float] = None
     expectancy: Optional[float] = None
     avg_r_multiple: Optional[float] = None
-    max_drawdown_pct: Optional[float] = None
+    max_drawdown_amount: Optional[float] = None  # absolute rupee drawdown
+    max_drawdown_pct: Optional[float] = None      # actual percentage
     net_pnl: Optional[str] = None
     gross_profit: Optional[str] = None
     gross_loss: Optional[str] = None
@@ -271,15 +272,20 @@ def operational_dashboard(db: Session = Depends(get_db)):
         .all()
     )
     peak = 0.0
-    max_dd = 0.0
+    max_dd_amount = 0.0
+    max_dd_pct = 0.0
     cum = 0.0
     for _, day_pnl in daily_rows:
         cum += float(day_pnl)
         if cum > peak:
             peak = cum
         dd = peak - cum
-        if dd > max_dd:
-            max_dd = dd
+        if dd > max_dd_amount:
+            max_dd_amount = dd
+        if peak > 0:
+            dd_pct = (dd / peak) * 100
+            if dd_pct > max_dd_pct:
+                max_dd_pct = dd_pct
 
     # ── Streaks (minimal ordered closed-trade query) ──
     sorted_closed = (
@@ -326,7 +332,8 @@ def operational_dashboard(db: Session = Depends(get_db)):
             profit_factor=profit_factor,
             expectancy=expectancy,
             avg_r_multiple=avg_r,
-            max_drawdown_pct=round(float(max_dd), 2) if max_dd else None,
+            max_drawdown_amount=round(float(max_dd_amount), 2) if max_dd_amount else None,
+            max_drawdown_pct=round(float(max_dd_pct), 2) if max_dd_pct else None,
             net_pnl=str(round(net_pnl, 2)) if net_pnl is not None else None,
             gross_profit=str(round(gross_profit_val, 2)) if gross_profit_val else None,
             gross_loss=str(round(gross_loss_val, 2)) if gross_loss_val else None,
