@@ -271,10 +271,11 @@ def operational_dashboard(db: Session = Depends(get_db)):
         .order_by("dt")
         .all()
     )
-    peak = 0.0
+    initial = float(account.initial_balance or 0)
+    peak = initial
     max_dd_amount = 0.0
     max_dd_pct = 0.0
-    cum = 0.0
+    cum = initial
     for _, day_pnl in daily_rows:
         cum += float(day_pnl)
         if cum > peak:
