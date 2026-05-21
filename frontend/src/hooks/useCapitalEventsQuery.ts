@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listCapitalEvents, createCapitalEvent, updateCapitalEvent, deleteCapitalEvent } from '@/lib/endpoints'
-import { invalidateCapital, invalidateRisk, invalidateAnalytics, invalidateTradeList } from '@/lib/queryInvalidation'
+import {
+  invalidateCapital, invalidateRisk, invalidateAnalytics, invalidateTradeList,
+  invalidateOperationalDashboard,
+} from '@/lib/queryInvalidation'
 import type { CapitalEvent, CapitalEventType } from '@/types'
 
 export function useCapitalEventsQuery(accountId: number | null, eventType?: string, startDate?: string, endDate?: string) {
@@ -21,12 +24,14 @@ export function useCreateCapitalEventMutation() {
     description?: string
     account_id: number
   }>({
+    mutationKey: ['capital-event', 'create'],
     mutationFn: (payload) => createCapitalEvent(payload),
     onSuccess: () => {
       void invalidateCapital(qc)
       void invalidateRisk(qc)
       void invalidateAnalytics(qc)
       void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
     },
   })
 }
@@ -37,10 +42,14 @@ export function useUpdateCapitalEventMutation() {
     eventId: number
     payload: { event_type?: CapitalEventType; amount?: string; timestamp?: string; description?: string }
   }>({
+    mutationKey: ['capital-event', 'update'],
     mutationFn: ({ eventId, payload }) => updateCapitalEvent(eventId, payload),
     onSuccess: () => {
       void invalidateCapital(qc)
       void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
     },
   })
 }
@@ -48,10 +57,14 @@ export function useUpdateCapitalEventMutation() {
 export function useDeleteCapitalEventMutation() {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
+    mutationKey: ['capital-event', 'delete'],
     mutationFn: (eventId) => deleteCapitalEvent(eventId),
     onSuccess: () => {
       void invalidateCapital(qc)
       void invalidateRisk(qc)
+      void invalidateAnalytics(qc)
+      void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
     },
   })
 }

@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listPartialExits, createPartialExit, deletePartialExit } from '@/lib/endpoints'
-import { invalidateTradeDetail, invalidateRisk, invalidateLifecycle, invalidateAnalytics, invalidateTradeList } from '@/lib/queryInvalidation'
+import {
+  invalidateTradeDetail, invalidateRisk, invalidateLifecycle, invalidateAnalytics,
+  invalidateTradeList, invalidateOperationalDashboard, invalidateIntelligenceDashboard,
+} from '@/lib/queryInvalidation'
 import { span } from '@/utils/performance'
 import { useRef } from 'react'
 import type { PartialExit, PartialExitCreatePayload, PartialExitListResponse } from '@/types'
@@ -18,6 +21,7 @@ export function useCreatePartialExitMutation() {
   const qc = useQueryClient()
   const endSpanRef = useRef<(() => void) | null>(null)
   return useMutation<PartialExit, Error, { tradeId: number; payload: PartialExitCreatePayload }>({
+    mutationKey: ['partial-exit', 'create'],
     mutationFn: ({ tradeId, payload }) => createPartialExit(tradeId, payload),
     onMutate: () => {
       endSpanRef.current = span('mutation:partial-exit')
@@ -28,6 +32,8 @@ export function useCreatePartialExitMutation() {
       void invalidateRisk(qc)
       void invalidateAnalytics(qc)
       void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+      void invalidateIntelligenceDashboard(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -42,6 +48,7 @@ export function useDeletePartialExitMutation() {
   const qc = useQueryClient()
   const endSpanRef = useRef<(() => void) | null>(null)
   return useMutation<void, Error, { tradeId: number; exitId: number }>({
+    mutationKey: ['partial-exit', 'delete'],
     mutationFn: ({ tradeId, exitId }) => deletePartialExit(tradeId, exitId),
     onMutate: () => {
       endSpanRef.current = span('mutation:delete-partial-exit')
@@ -52,6 +59,8 @@ export function useDeletePartialExitMutation() {
       void invalidateRisk(qc)
       void invalidateAnalytics(qc)
       void invalidateTradeList(qc)
+      void invalidateOperationalDashboard(qc)
+      void invalidateIntelligenceDashboard(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },

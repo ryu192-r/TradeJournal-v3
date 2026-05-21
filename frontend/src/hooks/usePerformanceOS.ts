@@ -10,7 +10,6 @@ export function useDailyDashboard(date?: string) {
   return useQuery({
     queryKey: ['daily-dashboard', date ?? 'today'],
     queryFn: () => getDailyDashboard(date),
-    refetchOnWindowFocus: true,
   })
 }
 

@@ -66,6 +66,8 @@ class Trade(Base):
 Index('ix_trades_symbol_status', Trade.symbol, Trade.status)
 Index('ix_trades_entry_time_exit_time', Trade.entry_time, Trade.exit_time)
 Index('ix_trades_status', Trade.status)
+Index('ix_trades_status_exit_entry', Trade.status, Trade.exit_price, Trade.entry_time)
+Index('ix_trades_setup_status', Trade.setup, Trade.status)
 
 # Auto-update updated_at on modification
 @event.listens_for(Trade, 'before_update')

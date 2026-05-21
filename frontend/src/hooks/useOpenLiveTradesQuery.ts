@@ -7,7 +7,6 @@ export function useOpenLiveTradesQuery() {
     queryKey: ['trades', 'open-live'],
     queryFn: getOpenLiveTrades,
     staleTime: 30_000,
-    refetchInterval: 60_000,
     placeholderData: (previousData) => previousData,
   })
 }

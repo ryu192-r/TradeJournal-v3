@@ -15,7 +15,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_serializer
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import case, func
 
 from app.db.database import get_db
 from app.models.account import Account
@@ -228,34 +228,36 @@ def operational_dashboard(db: Session = Depends(get_db)):
         if t.stop_price is None:
             warnings.append({"severity": "high", "code": "missing_stop", "message": f"{t.symbol} has no stop loss", "trade_id": t.id, "symbol": t.symbol})
 
-    # ── KPI (all trades, not open-only) ──
-    all_closed = db.query(Trade).filter(
-        Trade.status != "deleted", Trade.pnl.isnot(None)
-    ).all()
+    # ── KPI (all closed trades, aggregated in SQL) ──
+    total_trades, net_pnl_sum, gross_profit_sum, gross_loss_sum, win_count, avg_r_value = db.query(
+        func.count(Trade.id),
+        func.coalesce(func.sum(Trade.pnl), 0),
+        func.coalesce(func.sum(case((Trade.pnl > 0, Trade.pnl), else_=0)), 0),
+        func.coalesce(func.sum(case((Trade.pnl < 0, Trade.pnl), else_=0)), 0),
+        func.coalesce(func.sum(case((Trade.pnl > 0, 1), else_=0)), 0),
+        func.avg(Trade.r_multiple),
+    ).filter(
+        Trade.status != "deleted",
+        Trade.pnl.isnot(None),
+    ).one()
 
-    total_trades = len(all_closed)
     if total_trades:
-        pnls = [float(t.pnl) for t in all_closed]
-        wins = [p for p in pnls if p > 0]
-        gross_profit = sum(wins) if wins else 0.0
-        gross_loss = abs(sum(p for p in pnls if p < 0))
-        net_pnl = round(sum(pnls), 2)
-        win_rate = round(len(wins) / len(pnls) * 100, 1) if pnls else None
-        gross_profit_val = gross_profit
-        gross_loss_val = gross_loss
+        gross_profit_val = float(gross_profit_sum or 0)
+        gross_loss_val = abs(float(gross_loss_sum or 0))
+        net_pnl = round(float(net_pnl_sum or 0), 2)
+        win_rate = round(int(win_count or 0) / total_trades * 100, 1)
 
         profit_factor = None
-        if gross_loss > 0:
-            profit_factor = round(gross_profit_val / gross_loss, 2)
+        if gross_loss_val > 0:
+            profit_factor = round(gross_profit_val / gross_loss_val, 2)
         elif gross_profit_val > 0:
             profit_factor = float('inf')
 
-        avg_win = sum(wins) / len(wins) if wins else 0
-        avg_loss = abs(sum(p for p in pnls if p < 0)) / len([p for p in pnls if p < 0]) if any(p < 0 for p in pnls) else 0
-        expectancy = round(avg_win - avg_loss, 2) if pnls else None
-
-        r_values = [float(t.r_multiple) for t in all_closed if t.r_multiple is not None]
-        avg_r = round(sum(r_values) / len(r_values), 2) if r_values else None
+        loss_count = total_trades - int(win_count or 0)
+        avg_win = gross_profit_val / int(win_count) if win_count else 0
+        avg_loss = gross_loss_val / loss_count if loss_count else 0
+        expectancy = round(avg_win - avg_loss, 2)
+        avg_r = round(float(avg_r_value), 2) if avg_r_value is not None else None
     else:
         net_pnl, win_rate, profit_factor, expectancy, avg_r = None, None, None, None, None
         gross_profit_val, gross_loss_val = 0.0, 0.0
@@ -279,16 +281,22 @@ def operational_dashboard(db: Session = Depends(get_db)):
         if dd > max_dd:
             max_dd = dd
 
-    # ── Streaks (from closed trades) ──
-    sorted_closed = sorted(all_closed, key=lambda t: t.entry_time or datetime.min)
+    # ── Streaks (minimal ordered closed-trade query) ──
+    sorted_closed = (
+        db.query(Trade.pnl, Trade.entry_time)
+        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .order_by(Trade.entry_time.asc())
+        .all()
+    )
     current_streak_type = None
     current_streak_count = 0
     longest_win = 0
     longest_loss = 0
     for t in sorted_closed:
-        if t.pnl is None:
+        pnl = ensure_decimal(t.pnl)
+        if pnl is None:
             continue
-        t_type = "win" if t.pnl > 0 else "loss"
+        t_type = "win" if pnl > 0 else "loss"
         if t_type == current_streak_type:
             current_streak_count += 1
         else:
@@ -484,8 +492,8 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
             nifty_close=float(latest_snap.nifty_close) if latest_snap.nifty_close else None,
             nifty_change_pct=float(latest_snap.nifty_change_pct) if latest_snap.nifty_change_pct else None,
             india_vix=float(latest_snap.india_vix) if latest_snap.india_vix else None,
-            fii_flow_cr=str(latest_snap.fii_net) if latest_snap.fii_net is not None else None,
-            dii_flow_cr=str(latest_snap.dii_net) if latest_snap.dii_net is not None else None,
+            fii_flow_cr=str(latest_snap.fii_flow_cr) if latest_snap.fii_flow_cr is not None else None,
+            dii_flow_cr=str(latest_snap.dii_flow_cr) if latest_snap.dii_flow_cr is not None else None,
             breadth_advance=latest_snap.advance_count,
             breadth_decline=latest_snap.decline_count,
         )

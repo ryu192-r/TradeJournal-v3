@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
@@ -25,3 +25,7 @@ class EmotionLog(Base):
 VALID_EMOTIONS = {
     'calm', 'fearful', 'euphoric', 'revenge', 'fomo', 'hesitant', 'disciplined',
 }
+
+
+Index('ix_emotion_logs_trade_timestamp', EmotionLog.trade_id, EmotionLog.timestamp)
+Index('ix_emotion_logs_emotion', EmotionLog.emotion)

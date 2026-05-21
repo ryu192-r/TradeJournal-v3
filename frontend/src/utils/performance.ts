@@ -6,15 +6,17 @@ type PerfEntry = { name: string; start?: number; end?: number; duration?: number
 
 const entries: PerfEntry[] = []
 let active = false
+const isDev = import.meta.env.DEV
 
 /** Enable/disable logging */
 export function setPerfActive(v: boolean) {
-  active = v
-  if (v) console.log('[perf] instrumentation active')
+  active = isDev && v
+  if (active) console.log('[perf] instrumentation active')
 }
 
 /** Create a performance mark */
 export function mark(name: string) {
+  if (!isDev) return
   if (typeof performance !== 'undefined' && performance.mark) {
     try { performance.mark(name) } catch {}
   }
@@ -25,6 +27,7 @@ export function mark(name: string) {
 
 /** Measure between two marks */
 export function measure(name: string, startMark: string, endMark?: string) {
+  if (!isDev) return
   if (typeof performance !== 'undefined' && performance.measure) {
     try {
       performance.measure(name, startMark, endMark)
@@ -40,6 +43,7 @@ export function measure(name: string, startMark: string, endMark?: string) {
 
 /** Simple span timer: returns a function that ends the span */
 export function span(name: string): () => void {
+  if (!isDev) return () => {}
   const s = typeof performance !== 'undefined' ? performance.now() : Date.now()
   return () => {
     const e = typeof performance !== 'undefined' ? performance.now() : Date.now()
@@ -65,6 +69,7 @@ export function logMeasures(limit = 20) {
 
 /** Clear all marks/measures */
 export function clearPerf() {
+  if (!isDev) return
   if (typeof performance !== 'undefined') {
     try { performance.clearMarks(); performance.clearMeasures() } catch {}
   }
@@ -72,4 +77,4 @@ export function clearPerf() {
 }
 
 /** Auto-enable in development */
-if (import.meta.env.DEV) setPerfActive(true)
+if (isDev) setPerfActive(true)

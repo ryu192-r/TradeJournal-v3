@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from decimal import Decimal
@@ -19,3 +19,6 @@ class CapitalEvent(Base):
     # Relationships
     trade = relationship("Trade", back_populates="capital_events")
     account = relationship("Account", back_populates="capital_events")
+
+
+Index('ix_capital_events_account_type_time', CapitalEvent.account_id, CapitalEvent.event_type, CapitalEvent.timestamp)

@@ -14,6 +14,7 @@ export function useTimelineQuery(tradeId: number | null) {
 export function useCreateTimelineEventMutation() {
   const qc = useQueryClient()
   return useMutation<TimelineEvent, Error, { tradeId: number; payload: TimelineEventCreatePayload }>({
+    mutationKey: ['timeline', 'create'],
     mutationFn: ({ tradeId, payload }) => createTimelineEvent(tradeId, payload),
     onSuccess: (_, { tradeId }) => {
       void invalidateLifecycle(qc, tradeId)
@@ -25,6 +26,7 @@ export function useCreateTimelineEventMutation() {
 export function useDeleteTimelineEventMutation() {
   const qc = useQueryClient()
   return useMutation<void, Error, { tradeId: number; eventId: number }>({
+    mutationKey: ['timeline', 'delete'],
     mutationFn: ({ tradeId, eventId }) => deleteTimelineEvent(tradeId, eventId),
     onSuccess: (_, { tradeId }) => {
       void invalidateLifecycle(qc, tradeId)

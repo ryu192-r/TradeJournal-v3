@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -18,3 +18,6 @@ class PartialExit(Base):
     created_at = Column(Integer)
 
     trade = relationship("Trade", back_populates="partial_exits")
+
+
+Index('ix_partial_exits_trade_exit_time', PartialExit.trade_id, PartialExit.exit_time)

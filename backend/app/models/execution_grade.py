@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
@@ -24,3 +24,6 @@ class ExecutionGrade(Base):
 
 
 VALID_GRADES = {'A', 'B', 'C', 'D', 'F'}
+
+
+Index('ix_execution_grades_overall_grade', ExecutionGrade.overall_grade)

@@ -7,7 +7,6 @@ export function useOperationalDashboardQuery() {
     queryKey: ['dashboard', 'operational'],
     queryFn: getOperationalDashboard,
     staleTime: 30_000,
-    refetchInterval: 60_000,
     placeholderData: (previousData) => previousData,
   })
 }

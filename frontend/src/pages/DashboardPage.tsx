@@ -1,4 +1,5 @@
 import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
+import { useIntelligenceDashboardQuery } from '@/hooks/useIntelligenceDashboardQuery'
 import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
@@ -11,7 +12,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { mark, measure } from '@/utils/performance'
-import type { OperationalDashboardPayload } from '@/types'
+import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 
 const LifecycleInsights = lazy(() => import('@/components/lifecycle/LifecycleInsights').then(m => ({ default: m.LifecycleInsights })))
 const BehavioralIntelligence = lazy(() => import('@/components/lifecycle/BehavioralIntelligence').then(m => ({ default: m.BehavioralIntelligence })))
@@ -33,11 +34,13 @@ function CollapsibleSection({
   title,
   icon: Icon,
   defaultOpen = false,
+  summary,
   children,
 }: {
   title: string
   icon: React.ElementType
   defaultOpen?: boolean
+  summary?: React.ReactNode
   children: React.ReactNode
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
@@ -65,6 +68,11 @@ function CollapsibleSection({
       {isOpen && (
         <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
           {children}
+        </div>
+      )}
+      {!isOpen && summary && (
+        <div className="mt-3">
+          {summary}
         </div>
       )}
     </div>
@@ -181,8 +189,79 @@ function AlertsCard({ warnings }: { warnings: Array<{ severity: string; message:
   )
 }
 
+function IntelligenceSummaryRow({ items }: { items: Array<{ label: string; value: string }> }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.label} className="rounded-lg bg-bg-elevated px-3 py-2">
+          <div className="text-[10px] uppercase tracking-wide text-text-muted">{item.label}</div>
+          <div className="mt-1 truncate font-data text-sm text-text-heading">{item.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function lifecycleSummary(intelligence?: IntelligenceDashboardPayload) {
+  const lifecycle = intelligence?.lifecycle
+  return (
+    <IntelligenceSummaryRow
+      items={[
+        { label: 'Logs', value: String(lifecycle?.total_emotion_logs ?? 0) },
+        { label: 'Top Emotion', value: lifecycle?.most_frequent_emotion ?? '—' },
+        { label: 'Avg Grade', value: lifecycle?.avg_grade_score != null ? lifecycle.avg_grade_score.toFixed(2) : '—' },
+        { label: 'Discipline', value: lifecycle?.discipline_score != null ? formatPercent(lifecycle.discipline_score) : '—' },
+      ]}
+    />
+  )
+}
+
+function behavioralSummary(intelligence?: IntelligenceDashboardPayload) {
+  const behavioral = intelligence?.behavioral
+  return (
+    <IntelligenceSummaryRow
+      items={[
+        { label: 'Overtrade Days', value: String(behavioral?.overtrading_days ?? 0) },
+        { label: 'Revenge Trades', value: String(behavioral?.revenge_trades ?? 0) },
+        { label: 'Early Exits', value: behavioral?.early_exit_rate != null ? formatPercent(behavioral.early_exit_rate) : '—' },
+        { label: 'Capture', value: behavioral?.avg_capture_ratio != null ? behavioral.avg_capture_ratio.toFixed(2) : '—' },
+      ]}
+    />
+  )
+}
+
+function playbookSummary(intelligence?: IntelligenceDashboardPayload) {
+  const setups = intelligence?.playbook.setups ?? []
+  const best = setups[0]
+  return (
+    <IntelligenceSummaryRow
+      items={[
+        { label: 'Setups', value: String(setups.length) },
+        { label: 'Best Setup', value: best?.name ?? '—' },
+        { label: 'Win Rate', value: best?.win_rate != null ? formatPercent(best.win_rate) : '—' },
+        { label: 'Total P&L', value: best?.total_pnl != null ? formatCurrency(Number(best.total_pnl)) : '—' },
+      ]}
+    />
+  )
+}
+
+function marketSummary(intelligence?: IntelligenceDashboardPayload) {
+  const market = intelligence?.market
+  return (
+    <IntelligenceSummaryRow
+      items={[
+        { label: 'Regime', value: market?.nifty_regime ?? '—' },
+        { label: 'NIFTY', value: market?.nifty_close != null ? market.nifty_close.toLocaleString('en-IN') : '—' },
+        { label: 'VIX', value: market?.india_vix != null ? market.india_vix.toFixed(2) : '—' },
+        { label: 'Breadth', value: market?.breadth_advance != null && market?.breadth_decline != null ? `${market.breadth_advance}/${market.breadth_decline}` : '—' },
+      ]}
+    />
+  )
+}
+
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
+  const { data: intelligenceData } = useIntelligenceDashboardQuery()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
   const syncQuotes = useSyncLiveQuotesMutation()
   const queryClient = useQueryClient()
@@ -229,6 +308,7 @@ export function DashboardPage() {
   const handleRefresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'intelligence'] }),
       queryClient.invalidateQueries({ queryKey: ['market', 'live-quotes'] }),
     ])
   }, [queryClient])
@@ -326,25 +406,25 @@ export function DashboardPage() {
 
         {/* ── COLLAPSIBLE INTELLIGENCE (OFF BY DEFAULT) ── */}
         <div className="space-y-[var(--page-gap)]">
-          <CollapsibleSection title="Lifecycle Intelligence" icon={Brain}>
+          <CollapsibleSection title="Lifecycle Intelligence" icon={Brain} summary={lifecycleSummary(intelligenceData)}>
             <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
               <LifecycleInsights />
             </Suspense>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Behavioral Intelligence" icon={Shield}>
+          <CollapsibleSection title="Behavioral Intelligence" icon={Shield} summary={behavioralSummary(intelligenceData)}>
             <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
               <BehavioralIntelligence />
             </Suspense>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Playbook Intelligence" icon={BookOpen}>
+          <CollapsibleSection title="Playbook Intelligence" icon={BookOpen} summary={playbookSummary(intelligenceData)}>
             <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
               <PlaybookIntelligence />
             </Suspense>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Market Context" icon={BarChart3}>
+          <CollapsibleSection title="Market Context" icon={BarChart3} summary={marketSummary(intelligenceData)}>
             <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
               <MarketContext />
             </Suspense>
