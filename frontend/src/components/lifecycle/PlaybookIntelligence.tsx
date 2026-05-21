@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { usePlaybookOverviewQuery, useSetupIntelligenceQuery } from '@/hooks/usePlaybookIntelligenceQuery'
 import { formatCurrency } from '@/utils/format'
 import { BookOpen, ChevronRight, Clock, TrendingUp, TrendingDown, AlertTriangle, Target, Brain, Shield, X } from 'lucide-react'
+import { EmptyState, CardSkeleton, SectionTitle, SectionHeader } from '@/components/ui'
 import type { PlaybookOverviewSetup, SetupIntelligenceResponse, TacticPerformance, RecentTrade } from '@/types'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
@@ -15,7 +16,9 @@ function ScoreChip({ label, value, suffix }: { label: string; value: string | nu
     : numeric >= 0 ? 'text-profit' : 'text-loss'
   return (
     <div className="text-center">
-      <div className={`text-sm font-bold font-data ${color}`}>{typeof value === 'number' ? (suffix === '₹' ? formatCurrency(value) : value.toFixed(suffix === '%' ? 1 : 2)) : value}{suffix ?? ''}</div>
+      <div className={`text-sm font-bold font-data ${color}`}>
+        {typeof value === 'number' ? (suffix === '₹' ? formatCurrency(value) : value.toFixed(suffix === '%' ? 1 : 2)) : value}{suffix ?? ''}
+      </div>
       <div className="text-[10px] text-text-muted">{label}</div>
     </div>
   )
@@ -40,7 +43,7 @@ function OverviewCard({ setup, onClick }: { setup: PlaybookOverviewSetup; onClic
 }
 
 function PerformanceSection({ perf }: { perf: SetupIntelligenceResponse['performance'] }) {
-  if (perf.closed_count === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-4">No closed trades yet.</div>
+  if (perf.closed_count === 0) return <EmptyState icon={Target} title="No data" message="No closed trades yet." compact />
   return (
     <div className="grid grid-cols-3 gap-3">
       <ScoreChip label="Win Rate" value={perf.win_rate} suffix="%" />
@@ -54,7 +57,7 @@ function PerformanceSection({ perf }: { perf: SetupIntelligenceResponse['perform
 }
 
 function HoldTimeSection({ holdTime }: { holdTime: SetupIntelligenceResponse['hold_time'] }) {
-  if (holdTime.sample_size === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No holding data yet.</div>
+  if (holdTime.sample_size === 0) return <EmptyState icon={Clock} title="No data" message="No holding data yet." compact />
   return (
     <div className="space-y-[var(--cell-py)]">
       <div className="grid grid-cols-2 gap-3">
@@ -132,14 +135,14 @@ function MarketConditionsSection({ conditions }: { conditions: SetupIntelligence
         </div>
       )}
       {(!conditions.best_time && !conditions.best_day) && (
-        <div className="text-[length:var(--text-sm)] text-text-muted py-2">No market condition data yet.</div>
+        <EmptyState icon={TrendingUp} title="No data" message="No market condition data yet." compact />
       )}
     </div>
   )
 }
 
 function FailurePatternsSection({ patterns }: { patterns: SetupIntelligenceResponse['failure_patterns'] }) {
-  if (patterns.loss_count === 0) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No losses recorded yet.</div>
+  if (patterns.loss_count === 0) return <EmptyState icon={AlertTriangle} title="No losses" message="No losses recorded yet." compact />
   return (
     <div className="space-y-[var(--cell-py)]">
       <div className="grid grid-cols-3 gap-3">
@@ -183,7 +186,7 @@ function FailurePatternsSection({ patterns }: { patterns: SetupIntelligenceRespo
 
 function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceResponse['behavior_crossover'] }) {
   if (!behavior.emotion_breakdown.length && !behavior.grade_breakdown.length) {
-    return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No emotion/grade data for this setup.</div>
+    return <EmptyState icon={Brain} title="No data" message="No emotion/grade data for this setup." compact />
   }
   return (
     <div className="space-y-[var(--cell-py)]">
@@ -220,7 +223,7 @@ function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceRes
 }
 
 function TacticsSection({ tactics }: { tactics: TacticPerformance[] }) {
-  if (!tactics.length) return <div className="text-[length:var(--text-sm)] text-text-muted py-2">No tactic data for this setup.</div>
+  if (!tactics.length) return <EmptyState icon={BookOpen} title="No data" message="No tactic data for this setup." compact />
   return (
     <div className="space-y-1">
       {tactics.map((t) => (
@@ -260,8 +263,8 @@ function RecentTradesSection({ trades }: { trades: RecentTrade[] }) {
 function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: () => void }) {
   const { data, isLoading } = useSetupIntelligenceQuery(setupName)
 
-  if (isLoading) return <div className={CARD}><div className="animate-pulse h-40 bg-border/20 rounded" /></div>
-  if (!data) return <div className={CARD}><div className="text-[length:var(--text-sm)] text-text-muted">No data for {setupName}</div></div>
+  if (isLoading) return <div className="space-y-[var(--page-gap)]"><CardSkeleton height="h-48" /><CardSkeleton height="h-48" /></div>
+  if (!data) return <EmptyState icon={BookOpen} title="No data" message={`No data available for ${setupName}.`} />
 
   return (
     <div className="space-y-[var(--page-gap)]">
@@ -270,67 +273,46 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
           <BookOpen className="w-4 h-4 text-accent" />
           <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.setup_name}</h3>
         </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-border/20"><X className="w-4 h-4 text-text-muted" /></button>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-border/20 transition-colors"><X className="w-4 h-4 text-text-muted" /></button>
       </div>
 
       {data.description && <div className="text-[length:var(--text-xs)] text-text-muted italic">{data.description}</div>}
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="w-4 h-4 text-emerald-400" />
-          <h4 className="text-xs font-medium text-text-heading">Performance</h4>
-        </div>
+        <SectionHeader icon={Target} title="Performance" />
         <PerformanceSection perf={data.performance} />
       </div>
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-4 h-4 text-blue-400" />
-          <h4 className="text-xs font-medium text-text-heading">Ideal Hold Time</h4>
-        </div>
+        <SectionHeader icon={Clock} title="Ideal Hold Time" />
         <HoldTimeSection holdTime={data.hold_time} />
       </div>
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-profit" />
-          <h4 className="text-xs font-medium text-text-heading">Market Conditions</h4>
-        </div>
+        <SectionHeader icon={TrendingUp} title="Market Conditions" />
         <MarketConditionsSection conditions={data.market_conditions} />
       </div>
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4 text-loss" />
-          <h4 className="text-xs font-medium text-text-heading">Failure Patterns</h4>
-        </div>
+        <SectionHeader icon={AlertTriangle} title="Failure Patterns" />
         <FailurePatternsSection patterns={data.failure_patterns} />
       </div>
 
       {data.tactic_breakdown.length > 0 && (
         <div className={CARD}>
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen className="w-4 h-4 text-accent" />
-            <h4 className="text-xs font-medium text-text-heading">Tactic Breakdown</h4>
-          </div>
+          <SectionHeader icon={BookOpen} title="Tactic Breakdown" />
           <TacticsSection tactics={data.tactic_breakdown} />
         </div>
       )}
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <Brain className="w-4 h-4 text-purple-400" />
-          <h4 className="text-xs font-medium text-text-heading">Setup × Behavior</h4>
-        </div>
+        <SectionHeader icon={Brain} title="Setup × Behavior" />
         <BehaviorCrossoverSection behavior={data.behavior_crossover} />
       </div>
 
       {data.recent_trades.length > 0 && (
         <div className={CARD}>
-          <div className="flex items-center gap-2 mb-3">
-            <Shield className="w-4 h-4 text-text-muted" />
-            <h4 className="text-xs font-medium text-text-heading">Recent Trades</h4>
-          </div>
+          <SectionHeader icon={Shield} title="Recent Trades" />
           <RecentTradesSection trades={data.recent_trades} />
         </div>
       )}
@@ -342,18 +324,25 @@ export function PlaybookIntelligence() {
   const { data, isLoading } = usePlaybookOverviewQuery()
   const [selectedSetup, setSelectedSetup] = useState<string | null>(null)
 
-  if (isLoading) return null
-  if (!data || data.setups.length === 0) return null
+  if (isLoading) return <div className="space-y-[var(--page-gap)]"><SectionTitle icon={BookOpen} title="Playbook Intelligence" /><CardSkeleton height="h-32" /></div>
+  if (!data || data.setups.length === 0) return (
+    <div className="space-y-[var(--page-gap)]">
+      <SectionTitle icon={BookOpen} title="Playbook Intelligence" />
+      <EmptyState icon={BookOpen} title="No setups" message="Create setups in your playbook to see performance analytics." />
+    </div>
+  )
 
   const setupsWithData = data.setups.filter(s => s.closed_count > 0)
-  if (setupsWithData.length === 0 && !selectedSetup) return null
+  if (setupsWithData.length === 0 && !selectedSetup) return (
+    <div className="space-y-[var(--page-gap)]">
+      <SectionTitle icon={BookOpen} title="Playbook Intelligence" />
+      <EmptyState icon={BookOpen} title="No data" message="Close some trades to see setup performance." />
+    </div>
+  )
 
   return (
     <div className="space-y-[var(--page-gap)]">
-      <div className="flex items-center gap-2">
-        <BookOpen className="w-[15px] h-[15px] text-accent" />
-        <h2 className="font-display text-[length:var(--heading-size)] text-text-heading">Playbook Intelligence</h2>
-      </div>
+      <SectionTitle icon={BookOpen} title="Playbook Intelligence" />
 
       {selectedSetup ? (
         <SetupDetailPanel setupName={selectedSetup} onClose={() => setSelectedSetup(null)} />
@@ -361,10 +350,7 @@ export function PlaybookIntelligence() {
         <div className="space-y-[var(--cell-py)]">
           {(data.best_by_expectancy || data.best_by_win_rate || data.best_by_pnl) && (
             <div className={CARD}>
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-profit" />
-                <h3 className="text-xs font-medium text-text-heading">Top Performing</h3>
-              </div>
+              <SectionHeader icon={TrendingUp} title="Top Performing" />
               <div className="grid grid-cols-3 gap-3">
                 {data.best_by_expectancy && data.best_by_expectancy.closed_count > 0 && (
                   <button onClick={() => setSelectedSetup(data.best_by_expectancy!.setup_name)} className="text-center hover:bg-accent/5 rounded-lg p-2 transition-colors">

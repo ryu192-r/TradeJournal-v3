@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useOvertradingQuery, useEarlyExitQuery, useDisciplineScoreQuery, useBehavioralScoreMutation } from '@/hooks/useBehavioralIntelligenceQuery'
 import { formatCurrency } from '@/utils/format'
 import { Brain, AlertTriangle, Shield, Activity, LogOut, Zap, TrendingDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { EmptyState, CardSkeleton, SectionTitle } from '@/components/ui'
 import type { OvertradingDay, EarlyExit, DisciplineInsight, AIAssessment } from '@/types'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 function ScoreGauge({ score, grade }: { score: number | null; grade: string | null }) {
-  if (score == null) return <div className="text-[length:var(--text-sm)] text-text-muted">No data yet</div>
+  if (score == null) return <EmptyState icon={Shield} title="No data" message="Score will appear as you trade and log data." compact />
   const color = score >= 85 ? 'text-emerald-400' : score >= 70 ? 'text-emerald-300' : score >= 55 ? 'text-amber-400' : score >= 40 ? 'text-orange-400' : 'text-red-400'
   return (
     <div className="flex items-baseline gap-2">
@@ -26,39 +27,33 @@ function ComponentScore({ label, score }: { label: string; score: number }) {
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(score, 100)}%` }} />
       </div>
       <span className="text-xs font-data text-text-muted w-8 text-right">{score}%</span>
-      <span className="text-[length:var(--text-xs)] text-text-muted w-32">{label}</span>
+      <span className="text-[length:var(--text-xs)] text-text-muted w-28 truncate">{label}</span>
     </div>
   )
 }
 
 function DisciplineScoreCard() {
   const { data, isLoading } = useDisciplineScoreQuery()
-  if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
+  if (isLoading) return <CardSkeleton height="h-48" />
   if (!data || data.overall_score == null) return null
 
-  const { components, componentLabels } = useMemo(() => {
-    const labels: Record<string, string> = {
-      execution_grade: 'Execution Quality',
-      stop_discipline: 'Stop Discipline',
-      plan_adherence: 'Plan Adherence',
-      journal_consistency: 'Journal Habits',
-      revenge_resistance: 'Revenge Resistance',
-    }
-    return { components: data.components, componentLabels: labels }
-  }, [data])
+  const labels: Record<string, string> = {
+    execution_grade: 'Execution Quality',
+    stop_discipline: 'Stop Discipline',
+    plan_adherence: 'Plan Adherence',
+    journal_consistency: 'Journal Habits',
+    revenge_resistance: 'Revenge Resistance',
+  }
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Shield className="w-4 h-4 text-accent" />
-        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Discipline Score</h3>
-      </div>
+      <SectionTitle icon={Shield} title="Discipline Score" />
       <div className="mb-[var(--page-gap)]">
         <ScoreGauge score={data.overall_score} grade={data.grade} />
       </div>
       <div className="space-y-2 mb-[var(--page-gap)]">
-        {Object.entries(components).map(([key, val]) => (
-          <ComponentScore key={key} label={componentLabels[key] || key} score={val} />
+        {Object.entries(data.components).map(([key, val]) => (
+          <ComponentScore key={key} label={labels[key] || key} score={val} />
         ))}
       </div>
       {data.insights.length > 0 && (
@@ -77,17 +72,14 @@ function DisciplineScoreCard() {
 
 function OvertradingCard() {
   const { data, isLoading } = useOvertradingQuery()
-  if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
+  if (isLoading) return <CardSkeleton height="h-48" />
   if (!data || data.summary.total_days === 0) return null
 
   const hasIssues = data.overtrading_days.length > 0 || data.overtrading_weeks.length > 0
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Activity className="w-4 h-4 text-amber-400" />
-        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Overtrading Detection</h3>
-      </div>
+      <SectionTitle icon={Activity} title="Overtrading Detection" />
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="text-center">
@@ -107,21 +99,17 @@ function OvertradingCard() {
       {data.avg_pnl_overtrading != null && data.avg_pnl_normal != null && (
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="text-center">
-            <div className={`text-sm font-data ${data.avg_pnl_overtrading >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {formatCurrency(data.avg_pnl_overtrading)}
-            </div>
+            <div className={`text-sm font-data ${data.avg_pnl_overtrading >= 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(data.avg_pnl_overtrading)}</div>
             <div className="text-[10px] text-text-muted">Avg PnL (overtrading)</div>
           </div>
           <div className="text-center">
-            <div className={`text-sm font-data ${data.avg_pnl_normal >= 0 ? 'text-profit' : 'text-loss'}`}>
-              {formatCurrency(data.avg_pnl_normal)}
-            </div>
+            <div className={`text-sm font-data ${data.avg_pnl_normal >= 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(data.avg_pnl_normal)}</div>
             <div className="text-[10px] text-text-muted">Avg PnL (normal)</div>
           </div>
         </div>
       )}
 
-      {hasIssues && data.overtrading_days.slice(0, 5).map((day: OvertradingDay) => (
+      {hasIssues ? data.overtrading_days.slice(0, 5).map((day: OvertradingDay) => (
         <div key={day.date} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
           <div className="flex items-center gap-2">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
@@ -133,10 +121,8 @@ function OvertradingCard() {
             {day.total_pnl != null && <span className={`text-xs font-data ${day.total_pnl >= 0 ? 'text-profit' : 'text-loss'}`}>{formatCurrency(day.total_pnl)}</span>}
           </div>
         </div>
-      ))}
-
-      {!hasIssues && (
-        <div className="text-[length:var(--text-sm)] text-text-muted text-center py-4">No overtrading detected — you're within healthy trade frequency limits.</div>
+      )) : (
+        <EmptyState icon={Activity} title="All Clear" message="No overtrading detected." compact />
       )}
     </div>
   )
@@ -145,17 +131,14 @@ function OvertradingCard() {
 function EarlyExitCard() {
   const { data, isLoading } = useEarlyExitQuery()
   const [expanded, setExpanded] = useState(false)
-  if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
+  if (isLoading) return <CardSkeleton height="h-48" />
   if (!data || data.total_closed === 0) return null
 
   const stats = data.capture_stats
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <LogOut className="w-4 h-4 text-purple-400" />
-        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">Early Exit Analysis</h3>
-      </div>
+      <SectionTitle icon={LogOut} title="Early Exit Analysis" />
 
       {stats && (
         <div className="grid grid-cols-3 gap-3 mb-3">
@@ -260,10 +243,7 @@ function AIAssessmentCard() {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Brain className="w-4 h-4 text-accent" />
-        <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">AI Behavioral Assessment</h3>
-      </div>
+      <SectionTitle icon={Brain} title="AI Behavioral Assessment" />
 
       {!assessment && !mutation.isPending && (
         <button
@@ -360,15 +340,21 @@ export function BehavioralIntelligence() {
   const hasAnyData = overtrading || earlyExits || discipline
 
   if (!hasAnyData && !discipline) {
-    return null
+    return (
+      <div className="space-y-[var(--page-gap)]">
+        <SectionTitle icon={Brain} title="Behavioral Intelligence" />
+        <EmptyState
+          icon={Brain}
+          title="No behavioral data"
+          message="Trade, log emotions, and grade executions to unlock behavioral analytics."
+        />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-[var(--page-gap)]">
-      <div className="flex items-center gap-2">
-        <Brain className="w-[15px] h-[15px] text-accent" />
-        <h2 className="font-display text-[length:var(--heading-size)] text-text-heading">Behavioral Intelligence</h2>
-      </div>
+      <SectionTitle icon={Brain} title="Behavioral Intelligence" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <DisciplineScoreCard />

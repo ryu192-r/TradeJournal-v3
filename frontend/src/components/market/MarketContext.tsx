@@ -5,6 +5,7 @@ import {
   ArrowUpRight, ArrowDownRight, ChevronRight, Building2, BarChart3,
   Eye,
 } from 'lucide-react'
+import { EmptyState, SectionTitle, CardSkeleton, SectionHeader } from '@/components/ui'
 import type { MarketRegimeSummary, MarketPerformanceCorrelation, LiveQuote } from '@/types'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
@@ -39,11 +40,7 @@ function CurrentRegimeCard({ data }: { data: MarketRegimeSummary }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Globe className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Market Regime</h3>
-        <RegimeBadge regime={cur.nifty_regime} />
-      </div>
+      <SectionHeader icon={Globe} title="Market Regime" badge={<RegimeBadge regime={cur.nifty_regime} />} />
       <div className="grid grid-cols-2 gap-4">
         <div>
           <div className="text-[length:var(--text-xs)] text-text-muted mb-1">NIFTY 50</div>
@@ -108,10 +105,7 @@ function SectorStrengthCard({ data }: { data: MarketRegimeSummary }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Building2 className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Sector Strength</h3>
-      </div>
+      <SectionHeader icon={Building2} title="Sector Strength" />
       <div className="space-y-1.5">
         {sectors.slice(0, 8).map((s) => {
           const ch = s.change ?? 0
@@ -141,16 +135,12 @@ function SectorStrengthCard({ data }: { data: MarketRegimeSummary }) {
 function LiveWatchlistCard() {
   const { data, isLoading } = useLiveQuotesQuery(60_000)
 
-  if (isLoading) return <div className={CARD}><div className="animate-pulse h-32 bg-border/20 rounded" /></div>
-  if (!data || data.quotes.length === 0) return null
+  if (isLoading) return <CardSkeleton height="h-40" />
+  if (!data || data.quotes.length === 0) return <EmptyState icon={Eye} title="No watchlist" message="Open positions will appear here." compact />
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Eye className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">My Stocks</h3>
-        <span className="text-[10px] text-text-muted font-data">{data.total} live</span>
-      </div>
+      <SectionHeader icon={Eye} title="My Stocks" badge={<span className="text-[10px] text-text-muted font-data">{data.total} live</span>} />
       <div className="space-y-1">
         {data.quotes.map((q: LiveQuote) => {
           const ltp = q.ltp ? parseFloat(q.ltp) : null
@@ -192,11 +182,7 @@ function CorrelationCard({ data }: { data: MarketPerformanceCorrelation }) {
 
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <BarChart3 className="w-4 h-4 text-accent" />
-        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Performance vs Market</h3>
-        <span className="text-[10px] text-text-muted font-data">{data.total_matched_trades} trades matched</span>
-      </div>
+      <SectionHeader icon={BarChart3} title="Performance vs Market" badge={<span className="text-[10px] text-text-muted font-data">{data.total_matched_trades} trades</span>} />
       <div className="space-y-[var(--page-gap)]">
         {bucketRows.map(({ label, data: buckets }) => {
           const entries = Object.entries(buckets)
@@ -277,16 +263,11 @@ export function MarketContext() {
   if (regimeLoading) {
     return (
       <div className="space-y-[var(--page-gap)]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className="w-[15px] h-[15px] text-accent" />
-            <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Market Context</h2>
-          </div>
-        </div>
+        <SectionTitle icon={Globe} title="Market Context" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className={`${CARD} h-40 animate-pulse`} />
-          ))}
+          <CardSkeleton height="h-40" />
+          <CardSkeleton height="h-40" />
+          <CardSkeleton height="h-40" />
         </div>
       </div>
     )

@@ -3,14 +3,16 @@ import { useIntelligenceDashboardQuery } from '@/hooks/useIntelligenceDashboardQ
 import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
-import { formatCurrency, formatPercent, formatDate } from '@/utils/format'
+import { formatCurrency, formatPercent } from '@/utils/format'
 import {
-  TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle, RefreshCw,
-  ChevronDown, ChevronRight, Brain, Shield, BookOpen, BarChart3, Loader2,
+  TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle,
+  Brain, Shield, BookOpen, BarChart3,
 } from 'lucide-react'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection } from '@/components/ui/SharedUI'
+import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { mark, measure } from '@/utils/performance'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 
@@ -21,83 +23,31 @@ const MarketContext = lazy(() => import('@/components/market/MarketContext').the
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
-function SyncIndicator() {
-  return (
-    <span className="flex items-center gap-1 text-[10px] text-text-muted font-data animate-pulse">
-      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-      Syncing
-    </span>
-  )
-}
-
-function CollapsibleSection({
-  title,
-  icon: Icon,
-  defaultOpen = false,
-  summary,
-  children,
-}: {
-  title: string
-  icon: React.ElementType
-  defaultOpen?: boolean
-  summary?: React.ReactNode
-  children: React.ReactNode
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  return (
-    <div className={CARD}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between gap-2 cursor-pointer group"
-      >
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-accent shrink-0" />
-          <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">{title}</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {isOpen && (
-            <span className="text-[10px] text-text-muted font-data">Expanded</span>
-          )}
-          {isOpen ? (
-            <ChevronDown className="w-4 h-4 text-text-muted group-hover:text-text-heading transition-colors" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-text-heading transition-colors" />
-          )}
-        </div>
-      </button>
-      {isOpen && (
-        <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
-          {children}
-        </div>
-      )}
-      {!isOpen && summary && (
-        <div className="mt-3">
-          {summary}
-        </div>
-      )}
-    </div>
-  )
-}
+/* ── KPI Cards ────────────────────────────────────────────── */
 
 function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
   const cards = useMemo(() => [
-    { label: 'Net P&L', value: kpi.net_pnl != null ? formatCurrency(Number(kpi.net_pnl)) : 'N/A', sub: `${kpi.trade_count} trades`, icon: TrendingUp, color: Number(kpi.net_pnl) >= 0 ? 'profit' : 'loss', bg: Number(kpi.net_pnl) >= 0 ? 'bg-profit-muted' : 'bg-loss-muted' },
-    { label: 'Win Rate', value: kpi.win_rate != null ? formatPercent(kpi.win_rate) : 'N/A', sub: `${kpi.trade_count} trades`, icon: Target, color: kpi.win_rate != null && kpi.win_rate >= 50 ? 'profit' : 'loss', bg: kpi.win_rate != null && kpi.win_rate >= 50 ? 'bg-profit-muted' : 'bg-loss-muted' },
-    { label: 'Profit Factor', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : 'N/A', sub: 'ratio', icon: Activity, color: kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'text-accent' : 'loss' },
-    { label: 'Avg R', value: kpi.avg_r_multiple != null ? kpi.avg_r_multiple.toFixed(2) + 'R' : 'N/A', sub: 'per trade', icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss' },
-    { label: 'Expectancy', value: kpi.expectancy != null ? formatCurrency(kpi.expectancy) : 'N/A', sub: 'per trade', icon: TrendingUp, color: kpi.expectancy != null && kpi.expectancy >= 0 ? 'profit' : 'loss' },
-    { label: 'Max DD', value: kpi.max_drawdown_pct != null ? formatPercent(-kpi.max_drawdown_pct) : 'N/A', sub: 'drawdown', icon: Flame, color: 'text-loss' },
+    { label: 'Net P&L', value: kpi.net_pnl != null ? formatCurrency(Number(kpi.net_pnl)) : '—', sub: `${kpi.trade_count} trades`, icon: TrendingUp, color: Number(kpi.net_pnl) >= 0 ? 'profit' : 'loss', bg: 'bg-profit-muted' },
+    { label: 'Win Rate', value: kpi.win_rate != null ? formatPercent(kpi.win_rate) : '—', sub: `${kpi.trade_count} trades`, icon: Target, color: kpi.win_rate != null && kpi.win_rate >= 50 ? 'profit' : 'loss', bg: 'bg-profit-muted' },
+    { label: 'Profit Factor', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : '—', sub: 'ratio', icon: Activity, color: kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'accent' : 'loss', bg: 'bg-accent-muted' },
+    { label: 'Avg R', value: kpi.avg_r_multiple != null ? `${kpi.avg_r_multiple.toFixed(2)}R` : '—', sub: 'per trade', icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss', bg: 'bg-profit-muted' },
+    { label: 'Expectancy', value: kpi.expectancy != null ? formatCurrency(kpi.expectancy) : '—', sub: 'per trade', icon: TrendingUp, color: kpi.expectancy != null && kpi.expectancy >= 0 ? 'profit' : 'loss', bg: 'bg-profit-muted' },
+    { label: 'Max DD', value: kpi.max_drawdown_pct != null ? formatPercent(-kpi.max_drawdown_pct) : '—', sub: 'drawdown', icon: Flame, color: 'loss', bg: 'bg-loss-muted' },
   ], [kpi])
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
       {cards.map((card) => {
         const Icon = card.icon
+        const isLoss = card.color === 'loss'
+        const isAccent = card.color === 'accent'
+        const textClass = isLoss ? 'text-loss' : isAccent ? 'text-accent' : 'text-profit'
         return (
-          <div key={card.label} className={`${CARD}`}>
-            <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center mb-2`}>
-              <Icon className={`w-4 h-4 text-${card.color}`} />
+          <div key={card.label} className={CARD}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${isLoss ? 'bg-loss-muted' : isAccent ? 'bg-accent-muted' : 'bg-profit-muted'}`}>
+              <Icon className={`w-4 h-4 ${textClass}`} />
             </div>
-            <div className={`text-lg font-bold font-data ${card.color === 'profit' ? 'text-profit' : card.color === 'loss' ? 'text-loss' : card.color === 'text-accent' ? 'text-accent' : 'text-text-heading'}`}>{card.value}</div>
+            <div className={`text-lg font-bold font-data ${textClass}`}>{card.value}</div>
             <div className="text-[11px] text-text-muted font-data mt-0.5">{card.sub}</div>
           </div>
         )
@@ -106,27 +56,41 @@ function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
   )
 }
 
-function RiskCommandCenterSkeleton() {
+function KpiSkeleton() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <MetricSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+/* ── Risk Skeleton ────────────────────────────────────────── */
+
+function RiskSkeleton() {
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="h-4 w-32 rounded bg-bg-elevated animate-pulse" />
-          <div className="mt-2 h-7 w-52 rounded bg-bg-elevated animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-3 w-32 rounded bg-bg-elevated animate-pulse" />
+          <div className="h-7 w-52 rounded bg-bg-elevated animate-pulse" />
         </div>
-        <div className="hidden h-4 w-28 rounded bg-bg-elevated animate-pulse sm:block" />
+        <div className="hidden h-3 w-28 rounded bg-bg-elevated animate-pulse sm:block" />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <div className={`${CARD} h-72 animate-pulse`} />
+        <div className={`${CARD} h-72 animate-pulse bg-bg-elevated/50`} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={`${CARD} h-28 animate-pulse`} />
+            <MetricSkeleton key={i} />
           ))}
         </div>
       </div>
     </section>
   )
 }
+
+/* ── Streak Card ──────────────────────────────────────────── */
 
 function StreakCard({ data }: { data: OperationalDashboardPayload['streaks'] }) {
   const { current_type, current_count, longest_win, longest_loss } = data || {}
@@ -158,17 +122,18 @@ function StreakCard({ data }: { data: OperationalDashboardPayload['streaks'] }) 
   )
 }
 
+/* ── Alerts Card ──────────────────────────────────────────── */
+
 function AlertsCard({ warnings }: { warnings: Array<{ severity: string; message: string; code: string }> }) {
   const visible = warnings.filter(w => w.severity !== 'info').slice(0, 5)
   if (visible.length === 0) {
     return (
-      <div className={CARD}>
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4 text-emerald-400" />
-          <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Alerts</h3>
-        </div>
-        <div className="text-sm text-text-muted">No active alerts. Portfolio is within limits.</div>
-      </div>
+      <EmptyState
+        icon={AlertTriangle}
+        title="All Clear"
+        message="No active alerts. Portfolio is within limits."
+        compact
+      />
     )
   }
   return (
@@ -179,15 +144,26 @@ function AlertsCard({ warnings }: { warnings: Array<{ severity: string; message:
       </div>
       <div className="space-y-2">
         {visible.map((w, i) => (
-          <div key={i} className={`flex items-start gap-2 p-2 rounded-lg text-sm ${w.severity === 'high' ? 'bg-loss-muted/20' : w.severity === 'medium' ? 'bg-amber-400/10' : 'bg-accent-muted/20'}`}>
-            <span className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full ${w.severity === 'high' ? 'bg-loss' : w.severity === 'medium' ? 'bg-amber-400' : 'bg-accent'}`} />
-            <span className={`${w.severity === 'high' ? 'text-loss' : w.severity === 'medium' ? 'text-amber-400' : 'text-text-heading'}`}>{w.message}</span>
+          <div
+            key={i}
+            className={`flex items-start gap-2 p-2.5 rounded-lg text-sm ${
+              w.severity === 'high' ? 'bg-loss-muted/20' : w.severity === 'medium' ? 'bg-gold-faint' : 'bg-accent-muted/20'
+            }`}
+          >
+            <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
+              w.severity === 'high' ? 'bg-loss' : w.severity === 'medium' ? 'bg-gold' : 'bg-accent'
+            }`} />
+            <span className={w.severity === 'high' ? 'text-loss' : w.severity === 'medium' ? 'text-gold' : 'text-text-heading'}>
+              {w.message}
+            </span>
           </div>
         ))}
       </div>
     </div>
   )
 }
+
+/* ── Intelligence Summaries (collapsed) ─────────────────────── */
 
 function IntelligenceSummaryRow({ items }: { items: Array<{ label: string; value: string }> }) {
   return (
@@ -259,6 +235,8 @@ function marketSummary(intelligence?: IntelligenceDashboardPayload) {
   )
 }
 
+/* ── Dashboard Page ───────────────────────────────────────── */
+
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: intelligenceData } = useIntelligenceDashboardQuery()
@@ -317,16 +295,14 @@ export function DashboardPage() {
   if (isLoading && !data) {
     return (
       <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
+        <PageHeader title="Dashboard" right={<SyncBadge isSyncing={isFetching || syncQuotes.isPending} />} />
+        <KpiSkeleton />
+        <CardSkeleton height="h-40" />
+        <RiskSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <MetricSkeleton />
+          <MetricSkeleton />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={`${CARD} h-24 animate-pulse`} />
-          ))}
-        </div>
-        <div className={`${CARD} h-40 animate-pulse`} />
-        <RiskCommandCenterSkeleton />
       </div>
     )
   }
@@ -334,17 +310,11 @@ export function DashboardPage() {
   if (error && !data) {
     return (
       <div className="px-[var(--page-px)] py-[var(--page-py)]">
-        <div className={`${CARD} py-12 text-center`}>
-          <AlertTriangle className="w-8 h-8 text-loss mx-auto mb-3" />
-          <h2 className="text-lg font-medium text-text-heading font-display mb-2">Failed to load</h2>
-          <p className="text-text-muted text-sm">{(error as Error)?.message || 'Something went wrong.'}</p>
-          <button
-            onClick={handleRefresh}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs text-accent-foreground hover:bg-accent/90 transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />Retry
-          </button>
-        </div>
+        <ErrorState
+          title="Dashboard failed to load"
+          message={(error as Error)?.message || 'Something went wrong loading your dashboard.'}
+          onRetry={handleRefresh}
+        />
       </div>
     )
   }
@@ -352,9 +322,7 @@ export function DashboardPage() {
   if (!data) {
     return (
       <div className="px-[var(--page-px)] py-[var(--page-py)]">
-        <div className={`${CARD} py-12 text-center`}>
-          <p className="text-text-muted font-data">No data available.</p>
-        </div>
+        <EmptyState title="No data" message="Your dashboard is empty. Add trades to see performance metrics." />
       </div>
     )
   }
@@ -363,40 +331,48 @@ export function DashboardPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-        {/* ── TODAY ── */}
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
-          <div className="flex items-center gap-3">
-            {isFetching && <SyncIndicator />}
-            <button
-              onClick={() => syncQuotes.mutate()}
-              disabled={syncQuotes.isPending}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-50"
-              title="Sync live prices"
-            >
-              {syncQuotes.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5" />
-              )}
-              Sync
-            </button>
-            <div className="text-sm text-text-muted font-data">{formatDate(new Date())}</div>
-          </div>
-        </div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
+        {/* ── HEADER: Today + Sync ── */}
+        <PageHeader
+          title="Dashboard"
+          right={
+            <div className="flex items-center gap-2">
+              <SyncBadge isSyncing={isFetching || syncQuotes.isPending} onClick={() => syncQuotes.mutate()} />
+              <LastUpdated />
+            </div>
+          }
+        />
 
+        {/* ── KPI ROW ── */}
         <KpiCards kpi={dashboardData.kpi} />
 
-        {/* ── OPEN POSITIONS ── */}
+        {/* ── CRITICAL ALERTS ── */}
+        {(dashboardData.risk?.warnings ?? []).filter(w => w.severity === 'high').length > 0 && (
+          <div className={CARD + ' border-loss/30 bg-loss-muted/10'}>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-loss" />
+              <span className="text-sm font-medium text-loss">Critical Alert</span>
+            </div>
+            <div className="space-y-1">
+              {dashboardData.risk.warnings
+                .filter(w => w.severity === 'high')
+                .slice(0, 2)
+                .map((w, i) => (
+                  <div key={i} className="text-sm text-loss">{w.message}</div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── LIVE POSITIONS ── */}
         <LiveDashboard trades={dashboardData.open_trades} quoteMap={quoteMap} />
 
-        {/* ── RISK ── */}
-        {isLoading && !riskPayload ? (
-          <RiskCommandCenterSkeleton />
-        ) : riskPayload ? (
+        {/* ── RISK COMMAND CENTER ── */}
+        {riskPayload ? (
           <RiskCommandCenter data={riskPayload as any} />
-        ) : null}
+        ) : (
+          <RiskSkeleton />
+        )}
 
         {/* ── STREAKS + ALERTS ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -407,25 +383,25 @@ export function DashboardPage() {
         {/* ── COLLAPSIBLE INTELLIGENCE (OFF BY DEFAULT) ── */}
         <div className="space-y-[var(--page-gap)]">
           <CollapsibleSection title="Lifecycle Intelligence" icon={Brain} summary={lifecycleSummary(intelligenceData)}>
-            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+            <Suspense fallback={<SectionSkeleton rows={6} />}>
               <LifecycleInsights />
             </Suspense>
           </CollapsibleSection>
 
           <CollapsibleSection title="Behavioral Intelligence" icon={Shield} summary={behavioralSummary(intelligenceData)}>
-            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+            <Suspense fallback={<SectionSkeleton rows={6} />}>
               <BehavioralIntelligence />
             </Suspense>
           </CollapsibleSection>
 
           <CollapsibleSection title="Playbook Intelligence" icon={BookOpen} summary={playbookSummary(intelligenceData)}>
-            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+            <Suspense fallback={<SectionSkeleton rows={6} />}>
               <PlaybookIntelligence />
             </Suspense>
           </CollapsibleSection>
 
           <CollapsibleSection title="Market Context" icon={BarChart3} summary={marketSummary(intelligenceData)}>
-            <Suspense fallback={<div className="h-40 flex items-center justify-center text-sm text-text-muted animate-pulse">Loading…</div>}>
+            <Suspense fallback={<SectionSkeleton rows={6} />}>
               <MarketContext />
             </Suspense>
           </CollapsibleSection>
