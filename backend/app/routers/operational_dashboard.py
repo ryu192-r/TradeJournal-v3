@@ -463,7 +463,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     early_exit_rate = round(early_exits / has_target * 100, 1) if has_target else None
 
     # ── Playbook highlights ──
-    setups = db.query(SetupPlaybook).filter(SetupPlaybook.is_active == True).all()
+    setups = db.query(SetupPlaybook).filter(SetupPlaybook.is_active == "active").all()
     setup_highlights = []
     for sp in setups:
         sp_trades = [t for t in all_trades if t.setup == sp.name and t.status != "deleted"]
