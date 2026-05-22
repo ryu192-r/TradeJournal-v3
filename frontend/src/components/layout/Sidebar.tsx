@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { mobileNavigationItems, navigationSections, type ActiveView } from '@/app/navigation'
-import { Menu, PanelLeft, Sparkles } from 'lucide-react'
+import { PanelLeft, Sparkles, Plus, BarChart3, TrendingUp } from 'lucide-react'
 import { type ReactNode } from 'react'
 
 function isSelectableView(value: string): value is ActiveView {
@@ -12,7 +12,7 @@ function isSelectableView(value: string): value is ActiveView {
 }
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode } = useAppStore()
+  const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode, openCreateTrade } = useAppStore()
   const user = useAuthStore((s) => s.user)
 
   const selectView = (view: ActiveView) => {
@@ -154,36 +154,57 @@ export function Sidebar() {
         <PanelLeft className="w-5 h-5" />
       </button>
 
+      {/* ── Bottom nav (mobile) ── */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-low/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-sm lg:hidden">
-        <div className="grid grid-cols-5 gap-1">
-          {mobileNavigationItems.map((item) => {
-            if (!item.view) return null
-            const Icon = item.icon
-            const isActive = activeView === item.view
-            return (
-              <button
-                key={item.id}
-                onClick={() => selectView(item.view!)}
-                className={cn(
-                  'flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors cursor-pointer',
-                  isActive ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="max-w-full truncate">{item.label}</span>
-              </button>
-            )
-          })}
+        <div className="flex items-end justify-around gap-0.5">
+          <MobileNavButton
+            icon={mobileNavigationItems.find(i => i.id === 'dashboard')?.icon}
+            label="Dashboard"
+            isActive={activeView === 'dashboard'}
+            onClick={() => selectView('dashboard')}
+          />
+          <MobileNavButton
+            icon={mobileNavigationItems.find(i => i.id === 'trades')?.icon}
+            label="Trades"
+            isActive={activeView === 'trades'}
+            onClick={() => selectView('trades')}
+          />
           <button
-            onClick={toggleSidebar}
-            className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium text-text-muted hover:text-text-heading cursor-pointer"
+            onClick={openCreateTrade}
+            className="flex min-h-14 min-w-14 -mt-2 flex-col items-center justify-center rounded-full bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover transition-colors cursor-pointer"
           >
-            <Menu className="w-4 h-4" />
-            <span className="max-w-full truncate">More</span>
+            <Plus className="w-6 h-6" />
           </button>
+          <MobileNavButton
+            icon={BarChart3}
+            label="Analytics"
+            isActive={activeView === 'analytics'}
+            onClick={() => selectView('analytics')}
+          />
+          <MobileNavButton
+            icon={TrendingUp}
+            label="Review"
+            isActive={activeView === 'review'}
+            onClick={() => selectView('review')}
+          />
         </div>
       </nav>
     </>
+  )
+}
+
+function MobileNavButton({ icon: Icon, label, isActive, onClick }: { icon: any; label: string; isActive: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex min-h-12 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors cursor-pointer',
+        isActive ? 'text-accent' : 'text-text-muted hover:text-text-heading'
+      )}
+    >
+      {Icon && <Icon className="w-[18px] h-[18px]" />}
+      <span className="max-w-full truncate">{label}</span>
+    </button>
   )
 }
 

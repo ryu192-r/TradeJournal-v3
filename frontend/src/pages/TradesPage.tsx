@@ -12,12 +12,14 @@ import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liv
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
 import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit } from '@/lib/endpoints'
-import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3 } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList } from 'lucide-react'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
 import { invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook, invalidateTradeDetail, invalidateLifecycle, setTradeCache, patchTradeInLists, removeTradeFromLists } from '@/lib/queryInvalidation'
 import { useState, useCallback, useEffect, useMemo } from 'react'
+
+type ListingMode = 'auto' | 'table' | 'cards'
 
 function statusBadgeClass(trade: ApiTrade): string {
   if (trade.status === 'deleted') return 'bg-text-faint text-text-muted'
@@ -233,6 +235,7 @@ export function TradesPage() {
   const [peReason, setPeReason] = useState('')
   const [peNote, setPeNote] = useState('')
   const [peSubmitting, setPeSubmitting] = useState(false)
+  const [listingMode, setListingMode] = useState<ListingMode>('auto')
 
   const advancedFilterCount = Object.entries(researchFilters).filter(([, value]) => value !== '' && value !== false).length
   const hasFilters = symbolFilter !== '' || statusFilter !== '' || advancedFilterCount > 0
@@ -394,6 +397,10 @@ export function TradesPage() {
     )
   }, [liveQuotesData])
 
+  const isMobile = useMemo(() => typeof window !== 'undefined' && window.innerWidth < 768, [])
+  const showCards = listingMode === 'cards' || (listingMode === 'auto' && isMobile)
+  const showTable = listingMode === 'table' || (listingMode === 'auto' && !isMobile)
+
   const toggleSelect = useCallback((id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -494,6 +501,13 @@ export function TradesPage() {
           className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${tableConfigOpen ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
         >
           <Columns3 className="w-3.5 h-3.5" /> Columns
+        </button>
+        <button
+          onClick={() => setListingMode(mode => mode === 'cards' ? 'table' : mode === 'table' ? 'auto' : 'cards')}
+          className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer text-text-muted hover:text-text-heading hover:bg-accent-faint"
+          title={showCards ? 'Table view' : 'Card view'}
+        >
+          {showCards ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
         </button>
         {hasFilters && (
           <button onClick={clearFilters} className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer">
@@ -623,7 +637,7 @@ export function TradesPage() {
         </div>
       )}
 
-      {/* Table card */}
+      {/* Table/Card card container */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         {isLoading && (
           <div className="py-16 text-center">
@@ -637,7 +651,51 @@ export function TradesPage() {
             <p className="text-xs text-text-muted mt-1">{error.message}</p>
           </div>
         )}
-        {!isLoading && !error && (
+        {!isLoading && !error && displayedTrades.length === 0 && (
+          <div className="py-16 text-center">
+            <p className="text-sm text-text-muted">No trades found.</p>
+            <p className="text-xs text-text-faint mt-1">Adjust filters or click "New Trade" to get started.</p>
+            <button onClick={openCreateTrade} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer">
+              <Plus className="w-3.5 h-3.5" /> New Trade
+            </button>
+          </div>
+        )}
+        {!isLoading && !error && displayedTrades.length > 0 && showCards && (
+          <div className="p-[var(--page-px)]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-text-muted font-data">{displayedTrades.length} trades</span>
+              <button
+                onClick={() => setListingMode(mode => mode === 'cards' ? 'table' : mode === 'table' ? 'auto' : 'cards')}
+                className="inline-flex items-center gap-1 text-[10px] text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+              >
+                <LayoutList className="w-3 h-3" /> Table
+              </button>
+            </div>
+            <div className="grid gap-[var(--page-gap)] sm:grid-cols-2">
+              {displayedTrades.map((trade) => (
+                <TradeCard
+                  key={trade.id}
+                  trade={trade}
+                  onTap={() => openDetailTrade(trade.id)}
+                  isSelected={selectedIds.has(trade.id)}
+                  onToggleSelect={() => toggleSelect(trade.id)}
+                />
+              ))}
+            </div>
+            {data && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
+                <span className="text-xs text-text-muted font-data">Page {page} / {totalPages}</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer">Prev</button>
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer">Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {!isLoading && !error && displayedTrades.length > 0 && showTable && (
           <div className="overflow-x-auto scrollbar-thin">
             <table className="min-w-full text-sm whitespace-nowrap">
               <thead>
@@ -664,31 +722,24 @@ export function TradesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {displayedTrades.length > 0 ? (
-                  displayedTrades.map((trade) => (
-                      <TradeRow
-                         key={trade.id}
-                         trade={trade}
-                         selectedIds={selectedIds}
-                         toggleSelect={toggleSelect}
-                          openEditTrade={openEditTrade}
-                          openDetailTrade={openDetailTrade}
-                          setPyramidingTradeId={setPyramidingTradeId}
-                         setPartialExitTradeId={setPartialExitTradeId}
-                         netEquity={netEquity}
-                         quoteMap={quoteMap}
-                         activeColumns={activeColumns}
-                         density={density}
-                       />
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={activeColumns.length + 2} className="px-5 py-16 text-center text-text-muted">No trades found. Adjust filters or click "New Trade".</td>
-                  </tr>
-                )}
+                {displayedTrades.map((trade) => (
+                    <TradeRow
+                       key={trade.id}
+                       trade={trade}
+                       selectedIds={selectedIds}
+                       toggleSelect={toggleSelect}
+                        openEditTrade={openEditTrade}
+                        openDetailTrade={openDetailTrade}
+                        setPyramidingTradeId={setPyramidingTradeId}
+                       setPartialExitTradeId={setPartialExitTradeId}
+                       netEquity={netEquity}
+                       quoteMap={quoteMap}
+                       activeColumns={activeColumns}
+                       density={density}
+                     />
+                ))}
               </tbody>
             </table>
-            {/* Pagination */}
             {!isLoading && !error && data && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border px-3 sm:px-5 pb-4">
                 <span className="text-xs text-text-muted font-data">
@@ -798,6 +849,62 @@ export function TradesPage() {
       }} />
     </div>
     </PullToRefresh>
+  )
+}
+
+function TradeCard({ trade, onTap, isSelected, onToggleSelect }: { trade: ApiTrade; onTap: () => void; isSelected: boolean; onToggleSelect: () => void }) {
+  const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
+  const isProfitable = pnlNum >= 0
+  const isOpen = !trade.exit_price
+  return (
+    <button
+      onClick={onTap}
+      className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${isSelected ? 'border-accent/40 bg-accent-faint/30' : 'border-border bg-bg-elevated/30 hover:border-text-muted/30'}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm font-semibold text-text-heading truncate">{trade.symbol}</span>
+            <span className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-full text-[9px] font-medium ${isOpen ? 'bg-border text-text-muted' : isProfitable ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'}`}>
+              {isOpen ? 'Open' : 'Closed'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
+            <span>{formatDate(trade.entry_time)}</span>
+            {trade.setup && <span className="px-1 py-px rounded bg-accent-faint text-accent font-medium">{trade.setup}</span>}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className={`text-sm font-data font-bold ${pnlNum >= 0 ? 'text-profit' : 'text-loss'}`}>
+            {pnlNum >= 0 ? '+' : ''}{formatCurrency(Math.abs(pnlNum))}
+          </div>
+          {trade.r_multiple != null && (
+            <div className={`text-[10px] font-data ${Number(trade.r_multiple) >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {Number(trade.r_multiple) >= 0 ? '+' : ''}{Number(trade.r_multiple).toFixed(2)}R
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-2 text-[10px]">
+        <div className="flex items-center gap-1">
+          <span className="text-text-faint">Entry</span>
+          <span className="text-text-heading font-data font-medium">{formatPrice(Number(trade.entry_price))}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-text-faint">{isOpen ? 'LTP' : 'Exit'}</span>
+          <span className="text-text-heading font-data font-medium">{trade.exit_price ? formatPrice(Number(trade.exit_price)) : '—'}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-text-faint">Qty</span>
+          <span className="text-text-heading font-data font-medium">{formatQuantity(trade.quantity)}</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-between mt-1.5">
+        <button onClick={(e) => { e.stopPropagation(); onToggleSelect() }} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`}>
+          {isSelected ? 'Selected' : 'Select'}
+        </button>
+      </div>
+    </button>
   )
 }
 

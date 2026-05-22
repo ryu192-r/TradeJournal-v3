@@ -179,6 +179,7 @@ vi.mock('@/hooks/useTradeMutation', () => ({
     isLoading: false,
     error: null,
   }),
+  useDeleteTradeMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/hooks/useTradeReviewMutation', () => ({
