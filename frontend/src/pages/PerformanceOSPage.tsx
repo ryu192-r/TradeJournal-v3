@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState, type TextareaHTMLAttributes } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
@@ -20,6 +20,109 @@ const PHASE_LABEL: Record<WorkflowPhase, string> = {
   execution: 'Execution',
   review: 'Review',
   behavior: 'Behavior',
+}
+
+type SaveStatus = 'saved' | 'saving'
+
+type DebouncedTextareaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onBlur'> & {
+  value: string
+  onSave: (value: string) => Promise<unknown>
+  debounceMs?: number
+}
+
+export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className, ...props }: DebouncedTextareaProps) {
+  const [draft, setDraft] = useState(value)
+  const [status, setStatus] = useState<SaveStatus>('saved')
+  const draftRef = useRef(value)
+  const lastSavedRef = useRef(value)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inFlightRef = useRef(false)
+  const queuedValueRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!inFlightRef.current && queuedValueRef.current === null) {
+      setDraft(value)
+      draftRef.current = value
+      lastSavedRef.current = value
+      setStatus('saved')
+    }
+  }, [value])
+
+  async function saveNow(nextValue: string) {
+    if (nextValue === lastSavedRef.current) {
+      if (mountedRef.current) setStatus('saved')
+      return
+    }
+
+    if (inFlightRef.current) {
+      queuedValueRef.current = nextValue
+      return
+    }
+
+    inFlightRef.current = true
+    if (mountedRef.current) setStatus('saving')
+    try {
+      await onSave(nextValue)
+      lastSavedRef.current = nextValue
+    } finally {
+      inFlightRef.current = false
+      const queuedValue = queuedValueRef.current
+      queuedValueRef.current = null
+      if (queuedValue !== null && queuedValue !== lastSavedRef.current) {
+        void saveNow(queuedValue)
+      } else if (mountedRef.current) {
+        setStatus('saved')
+      }
+    }
+  }
+
+  const scheduleSave = (nextValue: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (nextValue === lastSavedRef.current) {
+      setStatus('saved')
+      return
+    }
+    setStatus('saving')
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      void saveNow(nextValue)
+    }, debounceMs)
+  }
+
+  const flushSave = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    void saveNow(draftRef.current)
+  }
+
+  return (
+    <>
+      <textarea
+        {...props}
+        value={draft}
+        onChange={(e) => {
+          const nextValue = e.target.value
+          setDraft(nextValue)
+          draftRef.current = nextValue
+          scheduleSave(nextValue)
+        }}
+        onBlur={flushSave}
+        className={className}
+      />
+      <div className="mt-1 h-3 text-[10px] text-text-faint">{status === 'saving' ? 'Saving...' : 'Saved'}</div>
+    </>
+  )
 }
 
 function toISODate(d: Date): string {
@@ -162,9 +265,9 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
 
       <div>
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
-        <textarea
+        <DebouncedTextarea
           value={wf.pre_market_notes ?? ''}
-          onChange={(e) => updateMut.mutate({ pre_market_notes: e.target.value })}
+          onSave={(value) => updateMut.mutateAsync({ pre_market_notes: value })}
           placeholder="Market context, key levels, setups to watch, risk plan..."
           rows={5}
           className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
@@ -239,9 +342,9 @@ function ExecutionPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
 
       <div>
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Intraday Notes</label>
-        <textarea
+        <DebouncedTextarea
           value={wf.intraday_notes ?? ''}
-          onChange={(e) => updateMut.mutate({ intraday_notes: e.target.value })}
+          onSave={(value) => updateMut.mutateAsync({ intraday_notes: value })}
           placeholder="Observations, emotion check-ins..."
           rows={3}
           className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
@@ -310,9 +413,9 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
 
       <div>
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Lessons</label>
-        <textarea
+        <DebouncedTextarea
           value={wf.post_market_notes ?? ''}
-          onChange={(e) => updateMut.mutate({ post_market_notes: e.target.value })}
+          onSave={(value) => updateMut.mutateAsync({ post_market_notes: value })}
           placeholder="What worked? What will you do differently?"
           rows={4}
           className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
@@ -553,9 +656,9 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
 
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Key Lessons</label>
-        <textarea
+        <DebouncedTextarea
           value={review?.key_lessons ?? ''}
-          onChange={(e) => updateMut.mutate({ key_lessons: e.target.value })}
+          onSave={(value) => updateMut.mutateAsync({ key_lessons: value })}
           placeholder="What did you learn this week?"
           rows={3}
           className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
@@ -624,9 +727,9 @@ function MonthlyReviewSection() {
 
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
-        <textarea
+        <DebouncedTextarea
           value={review?.notes ?? ''}
-          onChange={(e) => updateMut.mutate({ notes: e.target.value })}
+          onSave={(value) => updateMut.mutateAsync({ notes: value })}
           placeholder="Reflections, goals, next month targets..."
           rows={3}
           className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"

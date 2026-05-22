@@ -24,7 +24,7 @@ class TradeTimeline(Base):
 VALID_EVENT_TYPES = {
     'trade_opened', 'stop_updated', 'target_updated', 'pyramided',
     'partial_exit', 'note_added', 'conviction_changed', 'emotion_logged',
-    'trade_closed', 'review_added',
+    'trade_closed', 'trade_deleted', 'review_added',
 }
 
 Index('ix_timeline_trade_event', TradeTimeline.trade_id, TradeTimeline.event_type)

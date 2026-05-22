@@ -70,10 +70,12 @@ class RateLimiter:
         return True, 0
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or RATE_LIMIT_DISABLED:
-            if scope["type"] == "http":
-                await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
             return
+
+        if RATE_LIMIT_DISABLED:
+            await self.app(scope, receive, send)
             return
 
         request = Request(scope, receive)

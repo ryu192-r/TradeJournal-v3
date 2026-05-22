@@ -64,15 +64,9 @@ def _auto_set_status(trade: Trade):
     trade.status = "closed" if trade.exit_price is not None else "open"
 
 
-def _compute_pnl(trade: Trade) -> Optional[Decimal]:
-    if trade.exit_price is None:
-        return None
-    raw = (trade.exit_price - trade.entry_price) * trade.quantity
-    return raw - (trade.fees or Decimal("0"))
-
-
 def _update_pnl(trade: Trade):
-    trade.pnl = _compute_pnl(trade)
+    """Delegate PnL + R-multiple to the model's compute_pnl()."""
+    trade.compute_pnl()
 
 
 def _auto_detect_exit_reason(trade: Trade) -> str:
@@ -112,6 +106,19 @@ def _update_setup_stats(db: Session, setup_name: str | None):
     playbook.win_rate = f"{round(len(wins) / len(closed) * 100, 1)}%" if closed else None
     r_values = [t.r_multiple for t in closed if t.r_multiple is not None]
     playbook.avg_r = f"{round(sum(float(r) for r in r_values) / len(r_values), 2)}" if r_values else None
+
+
+def _resolve_upload_path(url: str) -> str:
+    prefix = "/uploads/"
+    if not url.startswith(prefix):
+        raise HTTPException(status_code=400, detail="Invalid upload URL")
+
+    rel_path = url[len(prefix):]
+    upload_root = os.path.abspath(settings.UPLOAD_DIR)
+    filepath = os.path.abspath(os.path.join(upload_root, rel_path))
+    if os.path.commonpath([upload_root, filepath]) != upload_root:
+        raise HTTPException(status_code=400, detail="Invalid upload URL")
+    return filepath
 
 
 # ─────────────────────── endpoints ───────────────────────
@@ -227,6 +234,8 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
 
     update_data = trade_update.model_dump(exclude_unset=True)
     old_setup = db_trade.setup
+    old_stop = db_trade.stop_price
+    old_target = db_trade.target_price
 
     for field, value in update_data.items():
         setattr(db_trade, field, value)
@@ -255,20 +264,18 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         )
         db.add(timeline)
     if "stop_price" in update_data:
-        old_stop = str(db_trade.stop_price) if db_trade.stop_price else None
         timeline = TradeTimeline(
             trade_id=db_trade.id,
             event_type="stop_updated",
-            old_value=old_stop,
+            old_value=str(old_stop) if old_stop else None,
             new_value=str(update_data["stop_price"]),
         )
         db.add(timeline)
     if "target_price" in update_data:
-        old_target = str(db_trade.target_price) if db_trade.target_price else None
         timeline = TradeTimeline(
             trade_id=db_trade.id,
             event_type="target_updated",
-            old_value=old_target,
+            old_value=str(old_target) if old_target else None,
             new_value=str(update_data["target_price"]),
         )
         db.add(timeline)
@@ -399,6 +406,7 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     if not trade:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
 
+    filepath = _resolve_upload_path(url)
     images = [i for i in (trade.chart_images or []) if i]
     if url not in images:
         raise HTTPException(status_code=404, detail="Image not found")
@@ -406,8 +414,6 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     images.remove(url)
     trade.chart_images = images
 
-    rel_path = url.lstrip("/uploads/")
-    filepath = os.path.join(settings.UPLOAD_DIR, rel_path)
     if os.path.exists(filepath):
         os.remove(filepath)
 
@@ -424,7 +430,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
     trade.status = "deleted"
     timeline = TradeTimeline(
         trade_id=trade.id,
-        event_type="trade_closed",
+        event_type="trade_deleted",
         note="Trade deleted",
     )
     db.add(timeline)

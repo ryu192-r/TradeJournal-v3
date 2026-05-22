@@ -188,6 +188,108 @@ export interface JournalEntryFormData {
   lessonsLearned: string
 }
 
+export interface CalendarTrade {
+  id: number
+  symbol: string
+  setup: string | null
+  entry_time: string | null
+  exit_time: string | null
+  entry_price: string
+  exit_price: string | null
+  quantity: string
+  pnl: string | null
+  chart_image_count: number
+}
+
+export interface CalendarEmotion {
+  id: number
+  trade_id: number
+  emotion: string
+  confidence: number | null
+  stress: number | null
+  note: string | null
+  timestamp: string | null
+}
+
+export interface CalendarDay {
+  date: string
+  trade_count: number
+  closed_count: number
+  net_pnl: string
+  win_rate: number | null
+  discipline_rating: number | null
+  discipline_score: number | null
+  journal_done: boolean
+  workflow_done: boolean
+  workflow_phase: string | null
+  warnings: string[]
+  trades: CalendarTrade[]
+  journal: {
+    pre_trade_notes: string | null
+    post_trade_notes: string | null
+    mood_rating: number | null
+    discipline_rating: number | null
+    rules_followed: string | null
+    rules_violated: string | null
+    lessons_learned: string | null
+  } | null
+  emotions: CalendarEmotion[]
+  ai_summary: string | null
+}
+
+export interface CalendarMonthPayload {
+  month: string
+  summary: {
+    trade_count: number
+    closed_count: number
+    net_pnl: string
+    journal_days: number
+    warning_days: number
+  }
+  days: CalendarDay[]
+}
+
+export interface ReportTrade {
+  id: number
+  symbol: string
+  setup: string
+  entry_time: string | null
+  exit_time: string | null
+  entry_price: string
+  exit_price: string | null
+  quantity: string
+  pnl: string | null
+  r_multiple: string | null
+  exit_reason: string | null
+}
+
+export interface DeterministicReportPayload {
+  period: 'weekly' | 'monthly'
+  start_date: string
+  end_date: string
+  summary: {
+    trade_count: number
+    closed_count: number
+    net_pnl: string
+    gross_profit: string
+    gross_loss: string
+    win_rate: number | null
+    profit_factor: number | null
+    best_trade: ReportTrade | null
+    worst_trade: ReportTrade | null
+  }
+  daily_report: { date: string; trade_count: number; net_pnl: string }[]
+  setup_report: { setup: string; trade_count: number; closed_count: number; net_pnl: string; win_rate: number | null }[]
+  behavior_report: {
+    journal_days: number
+    avg_discipline_rating: number | null
+    rule_violation_days: number
+    top_emotions: { emotion: string; count: number }[]
+  }
+  trades: ReportTrade[]
+  export_formats: string[]
+}
+
 // ---------------------------------------------------------------------------
 // Analytics API types (matches analytics schemas)
 // ---------------------------------------------------------------------------
@@ -962,11 +1064,16 @@ export interface LiveQuote {
   market_cap_cr: string | null
   sector: string | null
   updated_at: string | null
+  status?: 'fresh' | 'stale' | 'failed' | 'not_synced'
+  age_seconds?: number | null
+  stale_after_seconds?: number
 }
 
 export interface LiveQuotesResponse {
   quotes: LiveQuote[]
   total: number
+  status_counts?: Record<string, number>
+  stale_after_seconds?: number
 }
 
 export interface MySymbolsResponse {
@@ -1011,6 +1118,8 @@ export interface OperationalCapitalSummary {
   total_deposits: string
   total_withdrawals: string
   total_realized_pnl: string
+  unrealized_pnl: string
+  total_equity_unrealized: string
   total_trades: number
   win_rate: number | null
 }
@@ -1028,6 +1137,7 @@ export interface OperationalDashboardPayload {
   risk: OperationalRiskSummary
   capital: OperationalCapitalSummary
   streaks: OperationalStreaks
+  equity_curve: { date: string; equity: string }[]
 }
 
 export interface IntelligenceLifecycleHighlight {

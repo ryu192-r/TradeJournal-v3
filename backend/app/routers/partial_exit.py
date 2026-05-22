@@ -55,10 +55,10 @@ def create_partial_exit(trade_id: int, payload: PartialExitCreate, db: Session =
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot add partial exit to a fully closed trade")
 
     remaining = _remaining_qty(trade, db)
-    if payload.qty > remaining:
+    if payload.qty >= remaining:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Qty {payload.qty} exceeds remaining {remaining}",
+            detail=f"Qty {payload.qty} must be less than remaining {remaining}. Use full close for remaining quantity.",
         )
 
     realized_pnl = payload.realized_pnl

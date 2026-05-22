@@ -1,7 +1,7 @@
 // Analytics Dashboard Page — 8 live widgets wired to /analytics/dashboard
 import { useDashboardQuery } from '@/hooks/useDashboardQuery'
 import { GlassBadge } from '@/components/ui/GlassBadge'
-import { formatCurrency, formatPercent, formatRMultiple, parseDecimal, formatDate } from '@/utils/format'
+import { formatCurrency, formatRMultiple, parseDecimal, formatDate, formatMetricPercent, formatPrice } from '@/utils/format'
 import { Wallet, Flame, Target, BarChart3, Calendar, Clock, AlertTriangle } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, ScatterChart, Scatter, Line, XAxis, YAxis,
@@ -16,8 +16,11 @@ import { BehavioralIntelligence } from '@/components/lifecycle/BehavioralIntelli
 import { PlaybookIntelligence } from '@/components/lifecycle/PlaybookIntelligence'
 import { MarketContext } from '@/components/market/MarketContext'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
+import { CardSkeleton, ErrorState, EmptyState } from '@/components/ui/StateComponents'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { ArrowDownRight, ArrowUpRight, Gauge, Radar } from 'lucide-react'
 
 // ───────────────────────── helpers ─────────────────────────
 
@@ -54,6 +57,105 @@ function GlassTooltip({ active, payload, label }: any) {
           </span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function formatCompactCurrency(value: number) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${formatCurrency(Math.abs(value))}`
+}
+
+function formatSignedPrice(value: number) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${formatPrice(Math.abs(value))}`
+}
+
+function getMetricTone(value: number | null | undefined, positiveIsGood = true): 'neutral' | 'profit' | 'loss' {
+  if (value == null || Number.isNaN(value) || value === 0) return 'neutral'
+  const isPositive = value > 0
+  const good = positiveIsGood ? isPositive : !isPositive
+  return good ? 'profit' : 'loss'
+}
+
+function SectionBand({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title: string
+  subtitle: string
+  right?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="space-y-4">
+      <SectionHeader title={title} subtitle={subtitle} right={right} />
+      {children}
+    </section>
+  )
+}
+
+function OverviewMetrics({
+  netPnl,
+  winRate,
+  profitFactor,
+  avgR,
+  expectancy,
+  maxDrawdown,
+}: {
+  netPnl: number
+  winRate: number | null
+  profitFactor: number | null
+  avgR: number | null
+  expectancy: number | null
+  maxDrawdown: number | null
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <MetricCard
+        label="Net P&L"
+        value={formatCompactCurrency(netPnl)}
+        detail="Closed-trade result"
+        icon={netPnl >= 0 ? ArrowUpRight : ArrowDownRight}
+        tone={getMetricTone(netPnl)}
+      />
+      <MetricCard
+        label="Win Rate"
+        value={winRate != null ? formatMetricPercent(winRate) : '-'}
+        detail="Winning trades / total trades"
+        icon={Target}
+        tone={getMetricTone((winRate ?? 0) - 50)}
+      />
+      <MetricCard
+        label="Profit Factor"
+        value={profitFactor != null ? profitFactor.toFixed(2) : '-'}
+        detail="Gross profit / gross loss"
+        icon={Gauge}
+        tone={getMetricTone((profitFactor ?? 0) - 1)}
+      />
+      <MetricCard
+        label="Average R"
+        value={avgR != null ? formatRMultiple(avgR) : '-'}
+        detail="Average reward-to-risk"
+        icon={BarChart3}
+        tone={getMetricTone(avgR)}
+      />
+      <MetricCard
+        label="Expectancy"
+        value={expectancy != null ? formatSignedPrice(expectancy) : '-'}
+        detail="Average edge per trade"
+        icon={Radar}
+        tone={getMetricTone(expectancy)}
+      />
+      <MetricCard
+        label="Max Drawdown"
+        value={maxDrawdown != null ? formatCurrency(maxDrawdown) : '-'}
+        detail="Worst peak-to-trough stretch"
+        icon={AlertTriangle}
+        tone={getMetricTone(maxDrawdown, false)}
+      />
     </div>
   )
 }
@@ -130,91 +232,243 @@ function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+type HeatmapCell = {
+  date: string
+  day: number
+  value: number
+  tradeCount: number
+  isInMonth: boolean
+}
+
+function getHeatmapCellColor(value: number, maxAbs: number, hasTrade: boolean) {
+  if (!hasTrade) {
+    return 'var(--bg-low)'
+  }
+  if (value === 0) {
+    return 'color-mix(in srgb, var(--text-faint) 18%, var(--bg-card))'
+  }
+
+  const intensity = Math.max(18, Math.min(78, Math.round((Math.abs(value) / maxAbs) * 100)))
+  if (value > 0) {
+    return `color-mix(in srgb, var(--profit) ${intensity}%, var(--bg-card))`
+  }
+  return `color-mix(in srgb, var(--loss) ${intensity}%, var(--bg-card))`
+}
+
 function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
   if (!data || data.length === 0) return null
 
-  const pnlByDate = new Map<string, number>()
-  let maxAbs = 1
-  for (const d of data) {
-    const v = pnlNum(d.net_pnl)
-    pnlByDate.set(d.date, v)
-    maxAbs = Math.max(maxAbs, Math.abs(v))
-  }
+  const [activeDate, setActiveDate] = useState<string | null>(data[data.length - 1]?.date ?? null)
 
-  const months: { label: string; weeks: { cells: { date: string; day: number; value: number }[] }[] }[] = []
-  const allDates = data.map((d) => d.date).sort()
-  if (allDates.length === 0) return null
+  const {
+    maxAbs,
+    months,
+    activeCell,
+    totalNetPnl,
+    profitableDays,
+    losingDays,
+    flatDays,
+    tradedDays,
+    averageTradingDay,
+    monthRangeLabel,
+    bestDay,
+    worstDay,
+  } = useMemo(() => {
+    const pnlByDate = new Map<string, { value: number; tradeCount: number }>()
+    let nextMaxAbs = 1
 
-  const first = new Date(allDates[0])
-  const last = new Date(allDates[allDates.length - 1])
-  const cursor = new Date(first)
-  cursor.setDate(1)
-
-  while (cursor <= last) {
-    const monthStart = new Date(cursor)
-    const monthLabel = monthStart.toLocaleString('default', { month: 'short', year: '2-digit' })
-    const cells: { date: string; day: number; value: number }[] = []
-    const wstart = new Date(monthStart)
-    wstart.setDate(wstart.getDate() - wstart.getDay())
-    const wend = new Date(monthStart)
-    wend.setMonth(wend.getMonth() + 1)
-    wend.setDate(0)
-    wend.setDate(wend.getDate() + (6 - wend.getDay()))
-
-    const walk = new Date(wstart)
-    while (walk <= wend) {
-      const dateStr = walk.toISOString().slice(0, 10)
-      const value = pnlByDate.get(dateStr) ?? 0
-      cells.push({ date: dateStr, day: walk.getDay(), value })
-      walk.setDate(walk.getDate() + 1)
+    for (const entry of data) {
+      const value = pnlNum(entry.net_pnl)
+      pnlByDate.set(entry.date, { value, tradeCount: entry.trade_count })
+      nextMaxAbs = Math.max(nextMaxAbs, Math.abs(value))
     }
 
-    const weeks: { cells: typeof cells }[] = []
-    for (let i = 0; i < cells.length; i += 7) {
-      weeks.push({ cells: cells.slice(i, i + 7) })
+    const orderedDates = data.map((entry) => entry.date).sort()
+    if (orderedDates.length === 0) {
+      return {
+        maxAbs: 1,
+        months: [],
+        activeCell: null,
+        totalNetPnl: 0,
+        profitableDays: 0,
+        losingDays: 0,
+        flatDays: 0,
+        tradedDays: 0,
+        averageTradingDay: 0,
+        monthRangeLabel: '',
+        bestDay: null as HeatmapCell | null,
+        worstDay: null as HeatmapCell | null,
+      }
     }
 
-    months.push({ label: monthLabel, weeks })
-    cursor.setMonth(cursor.getMonth() + 1)
-  }
+    const first = new Date(orderedDates[0])
+    const last = new Date(orderedDates[orderedDates.length - 1])
+    const cursor = new Date(first)
+    cursor.setDate(1)
+
+    const nextMonths: { label: string; weeks: { cells: HeatmapCell[] }[] }[] = []
+    let nextTotalNetPnl = 0
+    let nextProfitableDays = 0
+    let nextLosingDays = 0
+    let nextFlatDays = 0
+    let nextTradedDays = 0
+    let nextBestDay: HeatmapCell | null = null
+    let nextWorstDay: HeatmapCell | null = null
+
+    for (const entry of data) {
+      const value = pnlNum(entry.net_pnl)
+      nextTotalNetPnl += value
+      nextTradedDays += 1
+      if (value > 0) nextProfitableDays += 1
+      else if (value < 0) nextLosingDays += 1
+      else nextFlatDays += 1
+
+      const cell = {
+        date: entry.date,
+        day: new Date(entry.date).getDay(),
+        value,
+        tradeCount: entry.trade_count,
+        isInMonth: true,
+      }
+      if (!nextBestDay || value > nextBestDay.value) nextBestDay = cell
+      if (!nextWorstDay || value < nextWorstDay.value) nextWorstDay = cell
+    }
+
+    while (cursor <= last) {
+      const monthStart = new Date(cursor)
+      const monthIndex = monthStart.getMonth()
+      const monthLabel = monthStart.toLocaleString('default', { month: 'short', year: '2-digit' })
+      const cells: HeatmapCell[] = []
+      const wstart = new Date(monthStart)
+      wstart.setDate(wstart.getDate() - wstart.getDay())
+      const wend = new Date(monthStart)
+      wend.setMonth(wend.getMonth() + 1)
+      wend.setDate(0)
+      wend.setDate(wend.getDate() + (6 - wend.getDay()))
+
+      const walk = new Date(wstart)
+      while (walk <= wend) {
+        const dateStr = walk.toISOString().slice(0, 10)
+        const quote = pnlByDate.get(dateStr)
+        cells.push({
+          date: dateStr,
+          day: walk.getDay(),
+          value: quote?.value ?? 0,
+          tradeCount: quote?.tradeCount ?? 0,
+          isInMonth: walk.getMonth() === monthIndex,
+        })
+        walk.setDate(walk.getDate() + 1)
+      }
+
+      const weeks: { cells: HeatmapCell[] }[] = []
+      for (let i = 0; i < cells.length; i += 7) {
+        weeks.push({ cells: cells.slice(i, i + 7) })
+      }
+
+      nextMonths.push({ label: monthLabel, weeks })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+
+    const average = nextTradedDays > 0 ? nextTotalNetPnl / nextTradedDays : 0
+    const active = activeDate ? (() => {
+      for (const month of nextMonths) {
+        for (const week of month.weeks) {
+          for (const cell of week.cells) {
+            if (cell.date === activeDate) return cell
+          }
+        }
+      }
+      return null
+    })() : null
+
+    const rangeLabel = `${first.toLocaleString('default', { month: 'short', year: 'numeric' })} - ${last.toLocaleString('default', { month: 'short', year: 'numeric' })}`
+
+    return {
+      maxAbs: nextMaxAbs,
+      months: nextMonths,
+      activeCell: active,
+      totalNetPnl: nextTotalNetPnl,
+      profitableDays: nextProfitableDays,
+      losingDays: nextLosingDays,
+      flatDays: nextFlatDays,
+      tradedDays: nextTradedDays,
+      averageTradingDay: average,
+      monthRangeLabel: rangeLabel,
+      bestDay: nextBestDay,
+      worstDay: nextWorstDay,
+    }
+  }, [activeDate, data])
+
+  if (months.length === 0) return null
+
+  const detailCell = activeCell ?? bestDay ?? worstDay
+  const winRate = tradedDays > 0 ? (profitableDays / tradedDays) * 100 : 0
 
   return (
-    <div className={`${CARD_STATIC}`}>
-      <div className="flex items-center gap-2 mb-[var(--page-gap)]">
-        <Calendar className="w-[15px] h-[15px] text-accent" />
-        <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Trading Heatmap</h3>
+    <div className={`${CARD_STATIC} space-y-[var(--page-gap)]`}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-[15px] h-[15px] text-accent" />
+            <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Trading Heatmap</h3>
+          </div>
+          <div className="text-[11px] text-text-muted font-data">{monthRangeLabel}</div>
+        </div>
+        <div className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-2 text-[11px] font-data sm:grid-cols-4">
+          <div>
+            <div className="text-text-faint">Net</div>
+            <div className={`${totalNetPnl >= 0 ? 'text-profit' : 'text-loss'} text-sm`}>{totalNetPnl >= 0 ? '+' : ''}{formatCurrency(totalNetPnl)}</div>
+          </div>
+          <div>
+            <div className="text-text-faint">Trading Days</div>
+            <div className="text-sm text-text-heading">{tradedDays}</div>
+          </div>
+          <div>
+            <div className="text-text-faint">Green Days</div>
+            <div className="text-sm text-profit">{profitableDays} <span className="text-text-muted">{winRate.toFixed(0)}%</span></div>
+          </div>
+          <div>
+            <div className="text-text-faint">Avg Day</div>
+            <div className={`${averageTradingDay >= 0 ? 'text-profit' : 'text-loss'} text-sm`}>{averageTradingDay >= 0 ? '+' : ''}{formatCurrency(averageTradingDay)}</div>
+          </div>
+        </div>
       </div>
-      <div className="overflow-x-auto scrollbar-thin">
-        <div className="flex gap-6 min-w-fit">
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="overflow-x-auto scrollbar-thin">
+          <div className="flex min-w-fit gap-6">
+            <div className="sticky left-0 z-[1] flex flex-col gap-2 bg-card pr-2">
+              {DAYS.map((day, index) => (
+                <div
+                  key={day}
+                  className={`flex h-[18px] items-center text-[10px] font-data ${index === 0 || index === 6 ? 'text-text-faint' : 'text-text-muted'}`}
+                >
+                  {index % 2 === 1 ? day.slice(0, 3) : ''}
+                </div>
+              ))}
+            </div>
           {months.map((m) => (
             <div key={m.label}>
-              <div className="text-[.625rem] text-text-muted font-data mb-1.5 text-center">{m.label}</div>
-              <div className="flex gap-0.5">
-                <div className="flex flex-col gap-0.5 mr-0.5">
-                  {DAYS.map((d) => (
-                    <div key={d} className="w-[14px] h-[14px] text-[.5rem] text-text-faint flex items-center justify-center">
-                      {d[0]}
-                    </div>
-                  ))}
-                </div>
+              <div className="mb-2 text-center text-[10px] font-data text-text-muted">{m.label}</div>
+              <div className="flex gap-1">
                 {m.weeks.map((w, wi) => (
-                  <div key={wi} className="flex flex-col gap-0.5">
+                  <div key={wi} className="flex flex-col gap-1">
                     {w.cells.map((c) => {
-                      const intensity = Math.abs(c.value) / maxAbs
-                      const isProfit = c.value >= 0
-                      const hasTrade = pnlByDate.has(c.date)
-                      let bg = 'bg-bg-low'
-                      if (hasTrade && c.value !== 0) {
-                        const alpha = Math.min(0.15 + intensity * 0.6, 0.75).toFixed(2)
-                        bg = isProfit
-                          ? `bg-[color:rgba(74,222,128,${alpha})]`
-                          : `bg-[color:rgba(248,113,113,${alpha})]`
-                      }
+                      const hasTrade = c.tradeCount > 0
+                      const isActive = detailCell?.date === c.date
                       return (
-                        <div
+                        <button
                           key={c.date}
-                          className={`w-[14px] h-[14px] rounded-[2px] ${bg}`}
-                          title={`${c.date}: ${c.value >= 0 ? '+' : ''}${formatCurrency(c.value)}`}
+                          type="button"
+                          onMouseEnter={() => setActiveDate(c.date)}
+                          onFocus={() => setActiveDate(c.date)}
+                          className={`h-[18px] w-[18px] rounded-[4px] border transition-transform ${c.isInMonth ? 'border-border/50' : 'border-transparent opacity-40'} ${isActive ? 'scale-[1.08]' : 'hover:scale-[1.04]'}`}
+                          style={{
+                            backgroundColor: getHeatmapCellColor(c.value, maxAbs, hasTrade),
+                            boxShadow: isActive ? 'inset 0 0 0 1px var(--text-heading)' : undefined,
+                          }}
+                          aria-label={`${c.date} ${hasTrade ? `${c.value >= 0 ? 'profit' : 'loss'} ${formatCurrency(Math.abs(c.value))}` : 'no trades'}`}
+                          title={`${c.date} • ${hasTrade ? `${c.tradeCount} trade${c.tradeCount === 1 ? '' : 's'} • ${c.value >= 0 ? '+' : ''}${formatCurrency(c.value)}` : 'No trades'}`}
                         />
                       )
                     })}
@@ -223,18 +477,76 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
               </div>
             </div>
           ))}
+          </div>
+        </div>
+
+        <div className="space-y-4 border border-border/70 bg-bg-elevated/35 p-4">
+          <div className="space-y-1">
+            <div className="text-[10px] font-data uppercase text-text-faint">Selected Day</div>
+            <div className="text-sm font-display text-text-heading">
+              {detailCell ? new Date(detailCell.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No selection'}
+            </div>
+          </div>
+
+          {detailCell ? (
+            <div className="space-y-2 text-xs font-data">
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted">Net P&L</span>
+                <span className={detailCell.value >= 0 ? 'text-profit' : 'text-loss'}>
+                  {detailCell.value >= 0 ? '+' : ''}{formatCurrency(detailCell.value)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted">Trades</span>
+                <span className="text-text-heading">{detailCell.tradeCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted">Day Type</span>
+                <span className={detailCell.tradeCount === 0 ? 'text-text-faint' : detailCell.value > 0 ? 'text-profit' : detailCell.value < 0 ? 'text-loss' : 'text-text-muted'}>
+                  {detailCell.tradeCount === 0 ? 'No Trade' : detailCell.value > 0 ? 'Green' : detailCell.value < 0 ? 'Red' : 'Flat'}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2 border-t border-border pt-3 text-xs font-data">
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted">Best Day</span>
+              <span className="text-profit">{bestDay ? `${bestDay.value >= 0 ? '+' : ''}${formatCurrency(bestDay.value)}` : '-'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted">Worst Day</span>
+              <span className="text-loss">{worstDay ? `${worstDay.value >= 0 ? '+' : ''}${formatCurrency(worstDay.value)}` : '-'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted">Flat Days</span>
+              <span className="text-text-heading">{flatDays}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted">Red Days</span>
+              <span className="text-loss">{losingDays}</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-3 justify-end">
-        <span className="text-[.5625rem] text-text-faint">Less</span>
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.15)]" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.4)]" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(248,113,113,0.7)]" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-bg-low" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.15)]" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.4)]" />
-        <div className="w-[10px] h-[10px] rounded-[2px] bg-[color:rgba(74,222,128,0.7)]" />
-        <span className="text-[.5625rem] text-text-faint">More</span>
+
+      <div className="flex flex-wrap items-center gap-3 text-[10px] font-data text-text-faint">
+        <div className="flex items-center gap-1.5">
+          <span className="h-[10px] w-[10px] rounded-[3px] border border-border/50 bg-bg-low" />
+          No Trade
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-[10px] w-[10px] rounded-[3px] border border-border/50" style={{ backgroundColor: 'color-mix(in srgb, var(--text-faint) 18%, var(--bg-card))' }} />
+          Flat
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-[10px] w-[10px] rounded-[3px] border border-border/50" style={{ backgroundColor: 'color-mix(in srgb, var(--loss) 58%, var(--bg-card))' }} />
+          Loss
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-[10px] w-[10px] rounded-[3px] border border-border/50" style={{ backgroundColor: 'color-mix(in srgb, var(--profit) 58%, var(--bg-card))' }} />
+          Profit
+        </div>
       </div>
     </div>
   )
@@ -245,7 +557,7 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
 
 // @ts-ignore - kept for reference
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function MonthlyPnlChart({ data }: { data: MonthlyPnlEntry[] }) {
+function MonthlyPnlChart({ data, framed = true }: { data: MonthlyPnlEntry[]; framed?: boolean }) {
   const chartData = data.map((d) => ({
     month: d.month,
     netPnl: pnlNum(d.net_pnl),
@@ -254,14 +566,14 @@ function MonthlyPnlChart({ data }: { data: MonthlyPnlEntry[] }) {
 
   if (chartData.length === 0) {
     return (
-      <div className={`${CARD_STATIC} h-64 flex items-center justify-center`}>
+      <div className={`${framed ? CARD_STATIC : 'h-64'} flex items-center justify-center`}>
         <div className="text-text-muted text-sm">No monthly data</div>
       </div>
     )
   }
 
   return (
-    <div className={`${CARD_STATIC} space-y-[var(--cell-py)]`}>
+    <div className={`${framed ? CARD_STATIC : ''} space-y-[var(--cell-py)]`}>
       <div className="flex items-center gap-2">
         <Calendar className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading font-display">Monthly P\u0026L</h3>
@@ -392,10 +704,10 @@ function SetupPerformanceChart({ data }: { data: SetupPerformanceItem[] }) {
               <tr key={s.setup} className="border-b border-border/50 hover:bg-bg-elevated/30 transition-colors">
                 <td className="py-2 px-2 text-text-heading font-medium font-display">{s.setup}</td>
                 <td className="py-2 px-2 text-right text-text font-data">{s.trade_count}</td>
-                <td className="py-2 px-2 text-right text-text font-data">{s.win_rate != null ? formatPercent(s.win_rate) : '-'}</td>
+                <td className="py-2 px-2 text-right text-text font-data">{s.win_rate != null ? formatMetricPercent(s.win_rate) : '-'}</td>
                 <td className="py-2 px-2 text-right text-text font-data">{s.avg_r_multiple != null ? formatRMultiple(s.avg_r_multiple) : '-'}</td>
                 <td className="py-2 px-2 text-right text-text font-data">{s.profit_factor?.toFixed(2) ?? '-'}</td>
-                <td className="py-2 px-2 text-right text-text font-data">{s.expectancy?.toFixed(2) ?? '-'}</td>
+                <td className="py-2 px-2 text-right text-text font-data">{s.expectancy != null ? formatSignedPrice(s.expectancy) : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -707,74 +1019,150 @@ export function AnalyticsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 space-y-[var(--page-gap)] sm:space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Dashboard</h1>
-          <div className="text-xs sm:text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+        <PageHeader
+          title="Analytics"
+          subtitle="Loading your performance map, edge diagnostics, and timing reads."
+          right={<div className="text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>}
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} height="h-28" />)}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`${CARD_STATIC} h-28 animate-pulse`} />
-          ))}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+          <CardSkeleton height="h-[360px]" />
+          <CardSkeleton height="h-[360px]" />
         </div>
-        <div className={`${CARD_STATIC} h-72 animate-pulse`} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <CardSkeleton height="h-[320px]" />
+          <CardSkeleton height="h-[320px]" />
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className={`${CARD_STATIC} py-12 text-center`}>
-          <AlertTriangle className="w-8 h-8 text-loss mx-auto mb-3" />
-          <h2 className="text-lg font-medium text-text-heading font-display mb-2">Failed to load dashboard</h2>
-          <p className="text-text-muted text-sm font-data">
-            {(error as Error)?.message || 'Something went wrong fetching analytics data.'}
-          </p>
-        </div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)]">
+        <ErrorState
+          title="Failed to load analytics"
+          message={(error as Error)?.message || 'Something went wrong fetching analytics data.'}
+          onRetry={handleRefresh}
+        />
       </div>
     )
   }
 
   if (!data) {
     return (
-      <div className="p-6">
-        <div className={`${CARD_STATIC} py-12 text-center`}>
-          <p className="text-text-muted font-data">No analytics data available.</p>
-        </div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)]">
+        <EmptyState
+          title="No analytics data"
+          message="Create and close some trades to unlock performance analysis."
+          compact
+        />
       </div>
     )
   }
 
+  const netPnl = pnlNum(data.kpi.net_pnl)
+  const tradeCount = data.kpi.trade_count
+  const winRate = data.kpi.win_rate
+  const monthlyNetPnl = data.monthly_pnl.map((entry) => pnlNum(entry.net_pnl))
+  const bestMonth = monthlyNetPnl.length ? Math.max(...monthlyNetPnl) : null
+  const worstMonth = monthlyNetPnl.length ? Math.min(...monthlyNetPnl) : null
+  const currentStreak = data.streaks.current_streak
+  const streakLabel = currentStreak.type ? `${currentStreak.count} ${currentStreak.type}` : 'No active streak'
+  const avgTradesPerDay = data.daily_pnl.length > 0
+    ? data.daily_pnl.reduce((sum, entry) => sum + entry.trade_count, 0) / data.daily_pnl.length
+    : 0
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Analytics</h1>
-        <div className="text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-8">
+        <PageHeader
+          title="Analytics"
+          subtitle="A cleaner read on performance, edge quality, timing, and behavior."
+          right={<div className="text-[length:var(--text-sm)] text-text-muted font-data">{formatDate(new Date())}</div>}
+        />
+
+        <SectionBand
+          title="Overview"
+          subtitle="Start with the headline numbers and the shape of the equity curve."
+          right={<div className="text-[11px] font-data text-text-muted">{tradeCount} trades analysed</div>}
+        >
+          <OverviewMetrics
+            netPnl={netPnl}
+            winRate={winRate}
+            profitFactor={data.kpi.profit_factor}
+            avgR={data.kpi.avg_r_multiple}
+            expectancy={data.kpi.expectancy}
+            maxDrawdown={data.kpi.max_drawdown_amount}
+          />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+            <EquityCurveChart data={data.daily_pnl} />
+            <div className="grid grid-cols-1 gap-4">
+              <StreakMiniCard data={data.streaks} />
+              <div className={`${CARD_STATIC} space-y-4`}>
+                <SectionHeader title="Monthly Pulse" subtitle="How volatility is landing across months." />
+                <div className="grid grid-cols-2 gap-4 text-xs font-data">
+                  <div>
+                    <div className="text-text-faint">Best Month</div>
+                    <div className="mt-1 text-sm text-profit">{bestMonth != null ? formatCompactCurrency(bestMonth) : '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-text-faint">Worst Month</div>
+                    <div className="mt-1 text-sm text-loss">{worstMonth != null ? formatCompactCurrency(worstMonth) : '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-text-faint">Current Streak</div>
+                    <div className="mt-1 text-sm text-text-heading">{streakLabel}</div>
+                  </div>
+                  <div>
+                    <div className="text-text-faint">Avg Trades / Day</div>
+                    <div className="mt-1 text-sm text-text-heading">{avgTradesPerDay.toFixed(1)}</div>
+                  </div>
+                </div>
+                <MonthlyPnlChart data={data.monthly_pnl} framed={false} />
+              </div>
+            </div>
+          </div>
+        </SectionBand>
+
+        <SectionBand
+          title="Performance Structure"
+          subtitle="Understand what is driving results, how outcomes distribute, and where risk expands."
+        >
+          <TradingHeatmap data={data.daily_pnl} />
+          <SetupPerformanceChart data={data.setup_performance} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <RDistributionChart data={data.r_distribution} />
+            <DrawdownChart data={data.daily_pnl} />
+          </div>
+          <HoldingPeriodChart data={data.holding_period} />
+        </SectionBand>
+
+        <SectionBand
+          title="Timing"
+          subtitle="See whether timing bias is helping or hurting execution."
+        >
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <DayOfWeekChart data={data.day_of_week} />
+            <TimeOfDayChart data={data.time_of_day} />
+          </div>
+        </SectionBand>
+
+        <SectionBand
+          title="Behavior & Context"
+          subtitle="Keep the deeper readouts separate from core trade performance so the page stays navigable."
+        >
+          <div className="grid grid-cols-1 gap-4">
+            <LifecycleInsights />
+            <BehavioralIntelligence />
+            <PlaybookIntelligence />
+            <MarketContext />
+          </div>
+        </SectionBand>
       </div>
-
-      <TradingHeatmap data={data.daily_pnl} />
-
-      <SetupPerformanceChart data={data.setup_performance} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RDistributionChart data={data.r_distribution} />
-        <DrawdownChart data={data.daily_pnl} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DayOfWeekChart data={data.day_of_week} />
-        <TimeOfDayChart data={data.time_of_day} />
-      </div>
-
-      <HoldingPeriodChart data={data.holding_period} />
-
-      <LifecycleInsights />
-      <BehavioralIntelligence />
-      <PlaybookIntelligence />
-      <MarketContext />
-    </div>
     </PullToRefresh>
   )
 }

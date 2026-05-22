@@ -55,7 +55,7 @@ def test_kpi_empty():
 def test_kpi_single_win():
     result = _calc_kpi(SINGLE_WIN)
     assert result["trade_count"] == 1
-    assert result["win_rate"] == 1.0
+    assert result["win_rate"] == 100.0
     assert float(result["net_pnl"]) > 0
 
 
@@ -70,17 +70,18 @@ def test_kpi_golden():
     result = _calc_kpi(GOLDEN_TRADES)
     assert result["trade_count"] == 8
     # GOLDEN_TRADES: 5 wins (1,2,5,6,8), 3 losses (3,4,7)
-    assert result["win_rate"] == pytest.approx(5 / 8, abs=0.01)
+    assert result["win_rate"] == pytest.approx(62.5, abs=0.01)
     assert float(result["gross_profit"]) > 0
     assert float(result["gross_loss"]) > 0
 
 
 def test_kpi_drawdown():
-    """Verify drawdown is calculated when trades have mixed results."""
+    """Verify drawdown amount and percent are calculated when trades have mixed results."""
     result = _calc_kpi(GOLDEN_TRADES)
-    # Should have a negative max drawdown due to losses in sequence
+    assert result["max_drawdown_amount"] is not None
+    assert result["max_drawdown_amount"] > 0
     assert result["max_drawdown_pct"] is not None
-    assert result["max_drawdown_pct"] <= 0
+    assert result["max_drawdown_pct"] > 0
 
 
 def test_kpi_no_r_multiple():
@@ -127,7 +128,7 @@ def test_streaks_empty():
 
 def test_streaks_single_trade():
     result = _calc_streaks(SINGLE_WIN)
-    assert result["current_streak"]["type"] == "WIN"
+    assert result["current_streak"]["type"] == "win"
     assert result["current_streak"]["count"] == 1
     assert result["longest_win_streak"] == 1
 
@@ -182,6 +183,7 @@ def test_monthly_golden():
     assert len(result) == 1
     assert result[0]["month"] == "2025-01"
     assert result[0]["trade_count"] == 8
+    assert result[0]["win_rate"] == pytest.approx(62.5, abs=0.01)
 
 
 # ── _calc_daily_pnl ──
@@ -209,6 +211,7 @@ def test_dow_golden():
     assert len(result) == 5  # Mon-Fri always present
     # At least some days have trades
     assert any(d["trade_count"] > 0 for d in result)
+    assert any(d["win_rate"] == 100.0 for d in result if d["trade_count"] > 0)
 
 
 def test_dow_weekends_excluded():

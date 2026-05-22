@@ -28,7 +28,7 @@ from app.models.trade import Trade
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.logging import get_logger
-from app.services.market_data_service import fetch_live_quotes
+from app.services.live_quote_sync import LIVE_QUOTE_STALE_AFTER_SECONDS, sync_open_trade_quotes
 
 logger = get_logger(__name__)
 
@@ -68,6 +68,17 @@ def _classify_trend(snap: MarketSnapshot) -> tuple[str, str]:
         regime = "neutral"
 
     return trend, regime
+
+
+def _live_quote_status(q: LiveQuote, now: datetime) -> tuple[str, Optional[int]]:
+    if q.updated_at is None:
+        return "not_synced", None
+    age_seconds = max(0, int((now - q.updated_at.replace(tzinfo=None)).total_seconds()))
+    if q.ltp is None:
+        return "failed", age_seconds
+    if age_seconds > LIVE_QUOTE_STALE_AFTER_SECONDS:
+        return "stale", age_seconds
+    return "fresh", age_seconds
 
 
 # ─────────────────────── CRUD ───────────────────────
@@ -473,7 +484,7 @@ def performance_correlation(
         best_regime = max(by_regime.items(), key=lambda x: x[1].get("avg_pnl") or -999999)
         insights.append({
             "type": "insight",
-            "message": f"You trade best in {best_regime[0]} markets (avg ₹{best_regime[0]} PnL, {best_regime[1].get('win_rate')}% win rate).",
+            "message": f"You trade best in {best_regime[0]} markets (avg ₹{best_regime[1].get('avg_pnl')} PnL, {best_regime[1].get('win_rate')}% win rate).",
         })
 
     if by_vix_bucket:
@@ -612,85 +623,22 @@ def upsert_live_quotes(
             errors.append(f"row {i} ({q.get('symbol', '?')}): {str(e)}")
 
     db.commit()
-    return {"upserted": upserted, "errors": errors, "total": len(quotes)}
+    provider_status = "fresh" if upserted and not errors else "partial" if upserted else "failed" if errors else "not_synced"
+    return {
+        "upserted": upserted,
+        "errors": errors,
+        "total": len(quotes),
+        "provider_status": provider_status,
+        "stale_after_seconds": LIVE_QUOTE_STALE_AFTER_SECONDS,
+    }
 
 
 @router.post("/sync-quotes")
 def sync_live_quotes(
     db: Session = Depends(get_db),
 ):
-    """Fetch fresh live quotes for all tracked symbols and cache them.
-
-    1. Collects all distinct symbols from non-deleted OPEN trades.
-    2. Calls the external market data provider (Tapetide MCP via
-       app.services.market_data_service.fetch_live_quotes).
-    3. Upserts the returned quotes into the live_quotes table.
-    4. Returns a summary of what was fetched and cached.
-    """
-    symbols = (
-        db.query(Trade.symbol)
-        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
-        .distinct()
-        .order_by(Trade.symbol)
-        .all()
-    )
-    symbol_list = [s[0] for s in symbols]
-
-    if not symbol_list:
-        return {
-            "symbols": [],
-            "count": 0,
-            "upserted": 0,
-            "errors": [],
-            "message": "No tracked symbols found. Add trades first.",
-        }
-
-    fetched_quotes, errors = fetch_live_quotes(symbol_list)
-
-    upserted = 0
-    for q in fetched_quotes:
-        try:
-            sym = q.get("symbol")
-            if not sym:
-                errors.append(f"missing symbol in fetched quote: {q}")
-                continue
-
-            existing = db.query(LiveQuote).filter(LiveQuote.symbol == sym).first()
-            if not existing:
-                existing = LiveQuote(symbol=sym)
-                db.add(existing)
-
-            for field in (
-                "company_name", "ltp", "change", "change_pct", "volume",
-            ):
-                if field in q and q[field] is not None:
-                    val = q[field]
-                    if field != "company_name" and isinstance(val, (int, float, Decimal)):
-                        val = Decimal(str(val))
-                    setattr(existing, field, val)
-
-            upserted += 1
-        except Exception as e:
-            errors.append(f"row ({q.get('symbol', '?')}): {str(e)}")
-
-    db.commit()
-
-    logger.info(
-        "sync_quotes_complete",
-        symbols=symbol_list,
-        fetched=len(fetched_quotes),
-        upserted=upserted,
-        errors=len(errors),
-    )
-
-    return {
-        "symbols": symbol_list,
-        "count": len(symbol_list),
-        "fetched": len(fetched_quotes),
-        "upserted": upserted,
-        "errors": errors,
-        "message": f"Synced {upserted}/{len(symbol_list)} symbols" if upserted else "No quotes fetched from provider",
-    }
+    """Fetch fresh live quotes for all tracked open symbols and cache them."""
+    return sync_open_trade_quotes(db)
 
 
 @router.get("/live-quotes")
@@ -699,24 +647,33 @@ def get_live_quotes(
 ):
     """Get cached live quotes for all tracked stocks."""
     quotes = db.query(LiveQuote).order_by(LiveQuote.symbol).all()
+    now = datetime.utcnow()
+    status_counts: dict[str, int] = defaultdict(int)
+    quote_rows = []
+    for q in quotes:
+        quote_status, age_seconds = _live_quote_status(q, now)
+        status_counts[quote_status] += 1
+        quote_rows.append({
+            "symbol": q.symbol,
+            "company_name": q.company_name,
+            "ltp": str(q.ltp) if q.ltp else None,
+            "change": str(q.change) if q.change else None,
+            "change_pct": str(q.change_pct) if q.change_pct else None,
+            "volume": str(q.volume) if q.volume else None,
+            "high_52w": str(q.high_52w) if q.high_52w else None,
+            "low_52w": str(q.low_52w) if q.low_52w else None,
+            "pe": str(q.pe) if q.pe else None,
+            "market_cap_cr": str(q.market_cap_cr) if q.market_cap_cr else None,
+            "sector": q.sector,
+            "updated_at": q.updated_at.isoformat() if q.updated_at else None,
+            "status": quote_status,
+            "age_seconds": age_seconds,
+            "stale_after_seconds": LIVE_QUOTE_STALE_AFTER_SECONDS,
+        })
 
     return {
-        "quotes": [
-            {
-                "symbol": q.symbol,
-                "company_name": q.company_name,
-                "ltp": str(q.ltp) if q.ltp else None,
-                "change": str(q.change) if q.change else None,
-                "change_pct": str(q.change_pct) if q.change_pct else None,
-                "volume": str(q.volume) if q.volume else None,
-                "high_52w": str(q.high_52w) if q.high_52w else None,
-                "low_52w": str(q.low_52w) if q.low_52w else None,
-                "pe": str(q.pe) if q.pe else None,
-                "market_cap_cr": str(q.market_cap_cr) if q.market_cap_cr else None,
-                "sector": q.sector,
-                "updated_at": q.updated_at.isoformat() if q.updated_at else None,
-            }
-            for q in quotes
-        ],
+        "quotes": quote_rows,
         "total": len(quotes),
+        "status_counts": dict(status_counts),
+        "stale_after_seconds": LIVE_QUOTE_STALE_AFTER_SECONDS,
     }

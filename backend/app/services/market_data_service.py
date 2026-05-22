@@ -1,42 +1,36 @@
-"""Market data provider integration service.
+"""Market data provider integration service."""
 
-Fetches live NSE stock quotes using nsetools (official NSE India data).
-Falls back gracefully if nsetools is unavailable.
-
-Normalizes provider responses into a consistent format for the
-live_quotes upsert endpoint.
-"""
-
-from typing import Any
 from decimal import Decimal
+from typing import Any
+
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def _to_decimal(v):
-    if v is None:
+def _to_decimal(value):
+    if value is None:
         return None
     try:
-        return Decimal(str(v))
+        return Decimal(str(value))
     except Exception:
         return None
 
 
 def _map_nsetools_quote(raw: dict) -> dict[str, Any]:
-    """Normalize an nsetools quote dict into LiveQuote-compatible fields.
-
-    NSE fields (raw):     lastPrice, change, pChange, totalTradedVolume, companyName
-    LiveQuote fields:     symbol, ltp, change, change_pct, volume, company_name
-    """
-    ltp = raw.get("lastPrice")
-    change = raw.get("change")
-    change_pct = raw.get("pChange")
-    volume = raw.get("totalTradedVolume")
-    company_name = raw.get("companyName")
-
     return {
         "symbol": raw.get("symbol"),
+        "company_name": raw.get("companyName"),
+        "ltp": _to_decimal(raw.get("lastPrice")),
+        "change": _to_decimal(raw.get("change")),
+        "change_pct": _to_decimal(raw.get("pChange")),
+        "volume": _to_decimal(raw.get("totalTradedVolume")),
+    }
+
+
+def _map_yfinance_quote(symbol: str, company_name: str | None, ltp, change, change_pct, volume) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
         "company_name": company_name,
         "ltp": _to_decimal(ltp),
         "change": _to_decimal(change),
@@ -45,29 +39,34 @@ def _map_nsetools_quote(raw: dict) -> dict[str, Any]:
     }
 
 
-def _fetch_nsetools_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
-    """Fetch live quotes via nsetools (NSE India official)."""
+def _to_nse_ticker(symbol: str) -> str:
+    return symbol if symbol.endswith(".NS") else f"{symbol}.NS"
+
+
+def _fetch_nsetools_quotes(symbols: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     try:
         from nsetools import Nse
     except ImportError:
-        return [], ["nsetools not installed"]
+        return {}, {sym: "nsetools not installed" for sym in symbols}
 
     nse = Nse()
-    quotes = []
-    errors = []
+    quotes: dict[str, dict[str, Any]] = {}
+    errors: dict[str, str] = {}
 
     for sym in symbols:
         try:
             raw = nse.get_quote(sym)
-            if not raw or not raw.get("lastPrice"):
-                errors.append(f"{sym}: no price data returned")
+            if not raw or raw.get("lastPrice") is None:
+                errors[sym] = "no price data returned"
                 continue
             raw["symbol"] = sym
             mapped = _map_nsetools_quote(raw)
-            if mapped.get("symbol") and mapped.get("ltp") is not None:
-                quotes.append(mapped)
-        except Exception as e:
-            errors.append(f"{sym}: {str(e)}")
+            if mapped.get("ltp") is None:
+                errors[sym] = "invalid quote payload"
+                continue
+            quotes[sym] = mapped
+        except Exception as exc:
+            errors[sym] = str(exc)
 
     logger.info(
         "nsetools_fetch_complete",
@@ -78,27 +77,107 @@ def _fetch_nsetools_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
     return quotes, errors
 
 
-def fetch_live_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
-    """Fetch fresh live quotes for the given symbols.
+def _fetch_yfinance_quotes(symbols: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    try:
+        import yfinance as yf
+    except ImportError:
+        return {}, {sym: "yfinance not installed" for sym in symbols}
 
-    Primary provider: nsetools (NSE India).
-    Returns: (quotes_list, error_messages)
-    """
+    quotes: dict[str, dict[str, Any]] = {}
+    errors: dict[str, str] = {}
+
+    for sym in symbols:
+        try:
+            ticker = yf.Ticker(_to_nse_ticker(sym))
+            history = ticker.history(period="5d", interval="1d", auto_adjust=False)
+            fast_info = getattr(ticker, "fast_info", {}) or {}
+            try:
+                info = ticker.info or {}
+            except Exception:
+                info = {}
+
+            ltp = fast_info.get("lastPrice")
+            close_series = history["Close"].dropna() if not history.empty and "Close" in history else None
+            if ltp is None and close_series is not None and not close_series.empty:
+                ltp = close_series.iloc[-1]
+            if ltp is None:
+                errors[sym] = "no price data returned"
+                continue
+
+            previous_close = fast_info.get("previousClose")
+            if previous_close is None and close_series is not None and len(close_series) >= 2:
+                previous_close = close_series.iloc[-2]
+
+            change = None
+            change_pct = None
+            if previous_close not in (None, 0):
+                change = float(ltp) - float(previous_close)
+                change_pct = (change / float(previous_close)) * 100
+
+            volume = fast_info.get("lastVolume")
+            if volume is None and not history.empty and "Volume" in history:
+                volume_series = history["Volume"].dropna()
+                if not volume_series.empty:
+                    volume = volume_series.iloc[-1]
+
+            company_name = info.get("shortName") or info.get("longName")
+            quotes[sym] = _map_yfinance_quote(sym, company_name, ltp, change, change_pct, volume)
+        except Exception as exc:
+            errors[sym] = str(exc)
+
+    logger.info(
+        "yfinance_fetch_complete",
+        requested=len(symbols),
+        received=len(quotes),
+        errors=len(errors),
+    )
+    return quotes, errors
+
+
+def fetch_live_quotes(symbols: list[str]) -> tuple[list[dict], list[str]]:
     if not symbols:
         return [], []
 
     logger.info(
         "fetching_live_quotes",
-        provider="nsetools",
+        providers=["nsetools", "yfinance"],
         symbol_count=len(symbols),
         symbols=symbols,
     )
 
-    quotes, errors = _fetch_nsetools_quotes(symbols)
+    nsetools_quotes, nsetools_errors = _fetch_nsetools_quotes(symbols)
+    missing_symbols = [sym for sym in symbols if sym not in nsetools_quotes]
+    yfinance_quotes: dict[str, dict[str, Any]] = {}
+    yfinance_errors: dict[str, str] = {}
+
+    if missing_symbols:
+        logger.info(
+            "fetching_live_quotes_fallback",
+            provider="yfinance",
+            symbol_count=len(missing_symbols),
+            symbols=missing_symbols,
+        )
+        yfinance_quotes, yfinance_errors = _fetch_yfinance_quotes(missing_symbols)
+
+    quotes_by_symbol = {**nsetools_quotes, **yfinance_quotes}
+    quotes = [quotes_by_symbol[sym] for sym in symbols if sym in quotes_by_symbol]
+    errors: list[str] = []
+
+    for sym in symbols:
+        if sym in quotes_by_symbol:
+            continue
+        provider_errors = []
+        if sym in nsetools_errors:
+            provider_errors.append(f"nsetools: {nsetools_errors[sym]}")
+        if sym in yfinance_errors:
+            provider_errors.append(f"yfinance: {yfinance_errors[sym]}")
+        if not provider_errors:
+            provider_errors.append("quote fetch failed")
+        errors.append(f"{sym}: {'; '.join(provider_errors)}")
 
     if not quotes and errors:
         logger.warning(
-            "all_nsetools_quotes_failed",
+            "all_quote_providers_failed",
             requested=len(symbols),
             errors=errors[:5],
         )

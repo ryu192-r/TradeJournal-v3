@@ -31,6 +31,20 @@ function RegimeBadge({ regime }: { regime: string | null }) {
   )
 }
 
+function quoteStatusLabel(status?: LiveQuote['status']) {
+  if (status === 'fresh') return 'Fresh'
+  if (status === 'stale') return 'Stale'
+  if (status === 'failed') return 'Failed'
+  return 'Not Synced'
+}
+
+function quoteStatusClass(status?: LiveQuote['status']) {
+  if (status === 'fresh') return 'text-profit'
+  if (status === 'stale') return 'text-amber-400'
+  if (status === 'failed') return 'text-loss'
+  return 'text-text-faint'
+}
+
 function CurrentRegimeCard({ data }: { data: MarketRegimeSummary }) {
   const cur = data.current
   if (!cur) return null
@@ -146,11 +160,15 @@ function LiveWatchlistCard() {
           const ltp = q.ltp ? parseFloat(q.ltp) : null
           const chg = q.change_pct ? parseFloat(q.change_pct) : null
           const isUp = (chg ?? 0) >= 0
+          const status = q.status ?? 'not_synced'
           return (
             <div key={q.symbol} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
               <div className="min-w-0">
                 <div className="text-xs font-medium font-display text-text-heading truncate">{q.symbol}</div>
-                {q.sector && <div className="text-[10px] text-text-muted truncate">{q.sector}</div>}
+                <div className="flex items-center gap-1.5">
+                  {q.sector && <span className="text-[10px] text-text-muted truncate">{q.sector}</span>}
+                  <span className={`text-[10px] font-data ${quoteStatusClass(status)}`}>{quoteStatusLabel(status)}</span>
+                </div>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <span className="text-xs font-data text-text-heading">

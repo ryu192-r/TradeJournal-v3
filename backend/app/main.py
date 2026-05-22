@@ -1,3 +1,7 @@
+from contextlib import asynccontextmanager
+from threading import Lock
+import sys
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
@@ -7,6 +11,7 @@ from app.utils.logging import configure_logging, get_logger
 from app.db.database import Base, engine
 from app.models.trade import Trade
 from app.db.database import SessionLocal
+from app.services.live_quote_sync import is_market_open, sync_open_trade_quotes
 import app.models  # noqa: F401 — registers all models on Base.metadata
 import logging
 import time
@@ -49,10 +54,69 @@ def _backfill_trade_statuses():
 
 _backfill_trade_statuses()
 
+quote_sync_lock = Lock()
+
+
+def _run_live_quote_sync_job():
+    if not is_market_open():
+        return
+    if not quote_sync_lock.acquire(blocking=False):
+        logger.info("live_quote_sync_skipped", reason="previous_sync_still_running")
+        return
+
+    db = SessionLocal()
+    try:
+        result = sync_open_trade_quotes(db)
+        logger.info(
+            "live_quote_scheduler_tick",
+            fetched=result.get("fetched", 0),
+            upserted=result.get("upserted", 0),
+            errors=len(result.get("errors", [])),
+            provider_status=result.get("provider_status"),
+        )
+    except Exception as exc:
+        logger.exception("live_quote_scheduler_failed", error=str(exc))
+        db.rollback()
+    finally:
+        db.close()
+        quote_sync_lock.release()
+
+
+def _should_start_live_quote_scheduler() -> bool:
+    return "pytest" not in sys.modules
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    scheduler = None
+    if _should_start_live_quote_scheduler():
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+        scheduler.add_job(
+            _run_live_quote_sync_job,
+            trigger=IntervalTrigger(seconds=60),
+            id="live-quote-sync",
+            max_instances=1,
+            coalesce=True,
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("live_quote_scheduler_started", interval_seconds=60)
+
+    try:
+        yield
+    finally:
+        if scheduler:
+            scheduler.shutdown(wait=False)
+            logger.info("live_quote_scheduler_stopped")
+
+
 app = FastAPI(
     title=settings.API_TITLE,
     version=settings.API_VERSION,
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # Register rate limiter middleware

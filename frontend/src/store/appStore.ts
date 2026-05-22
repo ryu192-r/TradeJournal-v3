@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { ActiveView, NavMode } from '@/app/navigation'
 
 interface Position {
   id: number
@@ -22,7 +23,10 @@ interface AppState {
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
 
-  activeView: 'dashboard' | 'analytics' | 'coach' | 'trades' | 'playbook' | 'review' | 'ideas' | 'capital' | 'perf-os' | 'sa-notes' | 'settings'
+  navMode: NavMode
+  setNavMode: (mode: NavMode) => void
+
+  activeView: ActiveView
   setActiveView: (view: AppState['activeView']) => void
 
   tradeFormMode: 'list' | 'create' | 'edit' | 'detail'
@@ -48,6 +52,11 @@ const applyTheme = (theme: 'dark' | 'light') => {
   localStorage.setItem('tjv3-theme', theme)
 }
 
+const getInitialNavMode = (): NavMode => {
+  const stored = localStorage.getItem('tjv3-nav-mode')
+  return stored === 'advanced' ? 'advanced' : 'simple'
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   positions: [],
   setPositions: (positions) => set({ positions }),
@@ -58,6 +67,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+
+  navMode: getInitialNavMode(),
+  setNavMode: (mode) => {
+    localStorage.setItem('tjv3-nav-mode', mode)
+    set({ navMode: mode })
+  },
 
   activeView: 'dashboard',
   setActiveView: (view) => set({ activeView: view }),

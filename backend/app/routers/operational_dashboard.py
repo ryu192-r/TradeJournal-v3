@@ -7,7 +7,7 @@ GET /api/v1/dashboard/intelligence — lifecycle + behavioral + playbook + marke
 Purpose: reduce waterfall requests and improve first paint.
 """
 
-from datetime import datetime
+from datetime import date
 from typing import Optional
 from decimal import Decimal
 from collections import defaultdict
@@ -26,7 +26,9 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
 from app.models.market_snapshot import MarketSnapshot
+from app.models.live_quote import LiveQuote
 from app.utils.decimal_utils import ensure_decimal
+from app.utils.calculations import calculate_trade_metrics, compute_aggregate_kpis, compute_streaks
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -75,12 +77,19 @@ class _StreakSummary(BaseModel):
     longest_loss: int = 0
 
 
+class _EquityPoint(BaseModel):
+    date: str
+    equity: str
+
+
 class _CapitalSummary(BaseModel):
     net_equity: str
     initial_balance: str
     total_deposits: str
     total_withdrawals: str
     total_realized_pnl: str
+    unrealized_pnl: str
+    total_equity_unrealized: str
     total_trades: int
     win_rate: Optional[float] = None
 
@@ -91,6 +100,7 @@ class OperationalDashboardResponse(BaseModel):
     risk: _RiskSummary
     capital: _CapitalSummary
     streaks: _StreakSummary
+    equity_curve: list[_EquityPoint]
 
     class Config:
         from_attributes = True
@@ -180,11 +190,18 @@ def operational_dashboard(db: Session = Depends(get_db)):
         ))
 
     # ── Net equity (SQL aggregates) ──
-    capital_net = (
+    # Only deposits/withdrawals — adjustments are reconciliation artifacts
+    total_deposits = (
         db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
-        .filter(CapitalEvent.account_id == account.id)
+        .filter(CapitalEvent.account_id == account.id, CapitalEvent.event_type == "deposit")
         .scalar()
     ) or Decimal("0")
+    total_withdrawals = abs(
+        db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
+        .filter(CapitalEvent.account_id == account.id, CapitalEvent.event_type == "withdrawal")
+        .scalar()
+    ) or Decimal("0")
+    capital_net = total_deposits - total_withdrawals
 
     realized_pnl = (
         db.query(func.coalesce(func.sum(Trade.pnl), 0))
@@ -200,6 +217,30 @@ def operational_dashboard(db: Session = Depends(get_db)):
 
     net_equity = ensure_decimal(account.initial_balance) + ensure_decimal(capital_net) + ensure_decimal(realized_pnl) + pe_realized
 
+    # ── Unrealized PnL (live quotes × open positions) ──
+    live_quotes = {q.symbol: q for q in db.query(LiveQuote).all()}
+    unrealized_pnl = Decimal("0")
+    for t in open_trades:
+        exited = sum(pe_map.get(t.id, []), Decimal("0"))
+        rem = t.quantity - exited
+        ltp = None
+        if t.symbol in live_quotes and live_quotes[t.symbol].ltp is not None:
+            ltp = ensure_decimal(live_quotes[t.symbol].ltp)
+        if ltp is not None:
+            from app.utils.calculations import compute_live_pnl
+            live_pnl = compute_live_pnl(
+                entry_price=t.entry_price,
+                ltp=ltp,
+                quantity=t.quantity,
+                remaining_qty=rem,
+                fees=t.fees,
+                direction=t.direction,
+            )
+            if live_pnl is not None:
+                unrealized_pnl += live_pnl
+
+    total_equity_unrealized = net_equity + unrealized_pnl
+
     # ── Risk (open-trade derived, but we only need totals) ──
     deployed = Decimal("0")
     open_risk = Decimal("0")
@@ -209,7 +250,14 @@ def operational_dashboard(db: Session = Depends(get_db)):
         rem = t.quantity - exited
         deployed += ensure_decimal(t.entry_price) * rem
         if t.stop_price:
-            open_risk += (ensure_decimal(t.entry_price) - ensure_decimal(t.stop_price)) * rem
+            calc = calculate_trade_metrics(
+                entry_price=t.entry_price,
+                quantity=rem,
+                stop_price=t.stop_price,
+                direction=t.direction,
+            )
+            if calc.risk_amount is not None:
+                open_risk += calc.risk_amount
         else:
             pos_without_stop += 1
 
@@ -254,10 +302,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
         elif gross_profit_val > 0:
             profit_factor = None  # no losses yet; avoid Infinity
 
-        loss_count = total_trades - int(win_count or 0)
-        avg_win = gross_profit_val / int(win_count) if win_count else 0
-        avg_loss = gross_loss_val / loss_count if loss_count else 0
-        expectancy = round(avg_win - avg_loss, 2)
+        expectancy = round(net_pnl / total_trades, 2)
         avg_r = round(float(avg_r_value), 2) if avg_r_value is not None else None
     else:
         net_pnl, win_rate, profit_factor, expectancy, avg_r = None, None, None, None, None
@@ -314,17 +359,52 @@ def operational_dashboard(db: Session = Depends(get_db)):
         else:
             longest_loss = max(longest_loss, current_streak_count)
 
-    # ── Capital summary ──
-    total_deposits = (
-        db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
-        .filter(CapitalEvent.account_id == account.id, CapitalEvent.amount > 0)
-        .scalar()
-    ) or Decimal("0")
-    total_withdrawals = abs(
-        db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
-        .filter(CapitalEvent.account_id == account.id, CapitalEvent.amount < 0)
-        .scalar()
-    ) or Decimal("0")
+    # ── Capital summary already computed above (total_deposits, total_withdrawals) ──
+
+    # ── Equity curve (realized PnL + capital events by date) ──
+    initial_balance = ensure_decimal(account.initial_balance)
+    daily_balance: dict[date, Decimal] = defaultdict(Decimal)
+
+    closed_for_curve = (
+        db.query(Trade)
+        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .all()
+    )
+    for t in closed_for_curve:
+        day = t.exit_time.date() if t.exit_time else t.entry_time.date()
+        daily_balance[day] += ensure_decimal(t.pnl)
+
+    open_for_pe = (
+        db.query(PartialExit)
+        .filter(PartialExit.trade_id.in_(open_trade_ids))
+        .all()
+    ) if open_trade_ids else []
+    for pe in open_for_pe:
+        day = pe.exit_time.date() if pe.exit_time else date.today()
+        pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
+        daily_balance[day] += pe_pnl
+
+    capital_events = (
+        db.query(CapitalEvent)
+        .filter(CapitalEvent.account_id == account.id, CapitalEvent.event_type.in_(("deposit", "withdrawal")))
+        .order_by(CapitalEvent.timestamp.asc())
+        .all()
+    )
+    for evt in capital_events:
+        day = evt.timestamp.date()
+        amt = ensure_decimal(evt.amount)
+        if evt.event_type == "withdrawal":
+            amt = -abs(amt)
+        daily_balance[day] += amt
+
+    equity_curve: list[_EquityPoint] = []
+    running = initial_balance
+    for day_val in sorted(daily_balance.keys()):
+        running += daily_balance[day_val]
+        equity_curve.append(_EquityPoint(date=str(day_val), equity=str(round(running, 2))))
+
+    if not equity_curve:
+        equity_curve.append(_EquityPoint(date=str(date.today()), equity=str(net_equity)))
 
     return OperationalDashboardResponse(
         kpi=_KpiSummary(
@@ -357,6 +437,8 @@ def operational_dashboard(db: Session = Depends(get_db)):
             total_deposits=str(total_deposits),
             total_withdrawals=str(total_withdrawals),
             total_realized_pnl=str(realized_pnl),
+            unrealized_pnl=str(round(unrealized_pnl, 2)),
+            total_equity_unrealized=str(round(total_equity_unrealized, 2)),
             total_trades=total_trades,
             win_rate=win_rate,
         ),
@@ -366,6 +448,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
             longest_win=longest_win,
             longest_loss=longest_loss,
         ),
+        equity_curve=equity_curve,
     )
 
 
@@ -451,20 +534,21 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     early_exits = 0
     has_target = 0
     for t in closed:
-        entry = float(t.entry_price or 0)
-        stop = float(t.stop_price or 0) if t.stop_price else None
-        target = float(t.target_price or 0) if t.target_price else None
+        calc = calculate_trade_metrics(
+            entry_price=t.entry_price,
+            exit_price=t.exit_price,
+            quantity=t.quantity,
+            fees=t.fees,
+            stop_price=t.stop_price,
+            target_price=t.target_price,
+            direction=t.direction,
+        )
         reason = t.exit_reason or "manual"
-        if target and stop and entry and (target - entry) != 0 and (entry - stop) != 0:
-            risk = entry - stop
-            reward = target - entry
-            actual_r = float(t.pnl) / risk if risk != 0 else None
-            max_r = reward / risk if risk != 0 else None
-            if actual_r is not None and max_r is not None and max_r != 0:
-                capture = actual_r / max_r
-                capture_ratios.append(capture)
-                if reason not in ("target",) and capture < 0.8:
-                    early_exits += 1
+        if calc.is_valid_for_risk_reward and calc.risk_reward_ratio is not None and calc.r_multiple is not None and calc.risk_reward_ratio != 0:
+            capture = float(calc.r_multiple) / float(calc.risk_reward_ratio)
+            capture_ratios.append(capture)
+            if reason not in ("target",) and capture < 0.8:
+                early_exits += 1
             has_target += 1
 
     avg_capture = round(sum(capture_ratios) / len(capture_ratios), 3) if capture_ratios else None

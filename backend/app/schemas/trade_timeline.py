@@ -8,7 +8,7 @@ from app.utils.decimal_utils import ensure_decimal
 
 
 class TimelineEventCreate(BaseSchema):
-    event_type: str = Field(..., description="trade_opened|stop_updated|target_updated|pyramided|partial_exit|note_added|conviction_changed|emotion_logged|trade_closed|review_added")
+    event_type: str = Field(..., description="trade_opened|stop_updated|target_updated|pyramided|partial_exit|note_added|conviction_changed|emotion_logged|trade_closed|trade_deleted|review_added")
     old_value: Optional[str] = None
     new_value: Optional[str] = None
     note: Optional[str] = None

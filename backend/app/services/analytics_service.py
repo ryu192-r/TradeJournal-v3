@@ -63,6 +63,56 @@ def _safe_sum(series: pd.Series) -> float:
     return float(series.sum())
 
 
+def _as_percent(ratio: Optional[float], ndigits: int = 2) -> Optional[float]:
+    """Convert a 0-1 ratio into a percentage, preserving None."""
+    if ratio is None:
+        return None
+    return round(ratio * 100, ndigits)
+
+
+def _realized_time_series(df: pd.DataFrame) -> pd.Series:
+    """Return the timestamp when a realized outcome should land in analytics."""
+    return df["exit_time"].fillna(df["entry_time"])
+
+
+def _calc_max_drawdown(df: pd.DataFrame) -> tuple[Optional[float], Optional[float]]:
+    """Return max drawdown amount and percent from realized daily P&L."""
+    if df.empty:
+        return None, None
+
+    realized_time = _realized_time_series(df)
+    daily = (
+        pd.DataFrame({
+            "realized_date": realized_time.dt.date,
+            "pnl": df["pnl"],
+        })
+        .groupby("realized_date", as_index=False)["pnl"]
+        .sum()
+        .sort_values("realized_date")
+    )
+
+    if daily.empty:
+        return None, None
+
+    cumulative = daily["pnl"].cumsum()
+    running_peak = cumulative.cummax().clip(lower=0)
+    drawdown_amount = running_peak - cumulative
+    max_drawdown_amount = float(drawdown_amount.max()) if len(drawdown_amount) > 0 else None
+
+    positive_peaks = running_peak.replace(0, np.nan)
+    drawdown_pct = (drawdown_amount / positive_peaks) * 100
+    max_drawdown_pct = float(drawdown_pct.max()) if len(drawdown_pct) > 0 else None
+
+    if max_drawdown_amount is not None:
+        max_drawdown_amount = round(max_drawdown_amount, 2)
+    if max_drawdown_pct is not None and not np.isnan(max_drawdown_pct):
+        max_drawdown_pct = round(max_drawdown_pct, 2)
+    else:
+        max_drawdown_pct = None
+
+    return max_drawdown_amount, max_drawdown_pct
+
+
 # ────────────────────────── Layer 2: Calc functions ──────────────────────────
 # These take a DataFrame (from fetch_trades) and return plain dicts/lists.
 # They are the primary unit-test surface.
@@ -77,6 +127,7 @@ def _calc_kpi(df: pd.DataFrame) -> Dict[str, Any]:
             "profit_factor": None,
             "expectancy": None,
             "avg_r_multiple": None,
+            "max_drawdown_amount": None,
             "max_drawdown_pct": None,
             "net_pnl": "0",
             "gross_profit": "0",
@@ -87,7 +138,7 @@ def _calc_kpi(df: pd.DataFrame) -> Dict[str, Any]:
     winners = df[df["pnl"] > 0]
     losers = df[df["pnl"] < 0]
 
-    win_rate = _safe_divide(len(winners), trade_count)
+    win_rate_ratio = _safe_divide(len(winners), trade_count)
 
     gross_profit = _safe_sum(winners["pnl"]) if len(winners) > 0 else 0.0
     gross_loss = abs(_safe_sum(losers["pnl"])) if len(losers) > 0 else 0.0
@@ -95,28 +146,22 @@ def _calc_kpi(df: pd.DataFrame) -> Dict[str, Any]:
 
     avg_win = float(winners["pnl"].mean()) if len(winners) > 0 else 0.0
     avg_loss = float(losers["pnl"].mean()) if len(losers) > 0 else 0.0
-    w_rate = win_rate or 0.0
+    w_rate = win_rate_ratio or 0.0
     expectancy = (w_rate * avg_win) + ((1 - w_rate) * avg_loss)
 
     avg_r = _safe_mean(df["r_multiple"].dropna())
-
-    # Equity curve for drawdown
-    df_sorted = df.sort_values("entry_time")
-    cumulative = df_sorted["pnl"].cumsum()
-    running_max = cumulative.cummax()
-    drawdown = cumulative - running_max
-    drawdown_pct = drawdown / running_max.replace(0, np.nan)
-    max_drawdown_pct = float(drawdown_pct.min()) if len(drawdown_pct) > 0 else None
+    max_drawdown_amount, max_drawdown_pct = _calc_max_drawdown(df)
 
     net_pnl = _safe_sum(df["pnl"])
 
     return {
         "trade_count": trade_count,
-        "win_rate": round(win_rate, 4) if win_rate is not None else None,
+        "win_rate": _as_percent(win_rate_ratio, 2),
         "profit_factor": round(profit_factor, 2) if profit_factor is not None else None,
         "expectancy": round(expectancy, 2) if expectancy is not None else None,
         "avg_r_multiple": round(avg_r, 2) if avg_r is not None else None,
-        "max_drawdown_pct": round(max_drawdown_pct, 4) if max_drawdown_pct is not None else None,
+        "max_drawdown_amount": max_drawdown_amount,
+        "max_drawdown_pct": max_drawdown_pct,
         "net_pnl": _dec_to_str(net_pnl),
         "gross_profit": _dec_to_str(gross_profit),
         "gross_loss": _dec_to_str(gross_loss),
@@ -139,7 +184,7 @@ def _calc_setup_performance(df: pd.DataFrame) -> List[Dict[str, Any]]:
         winners = group[group["pnl"] > 0]
         losers = group[group["pnl"] < 0]
 
-        win_rate = _safe_divide(len(winners), count)
+        win_rate_ratio = _safe_divide(len(winners), count)
         total_pnl = _safe_sum(group["pnl"])
         avg_pnl = _safe_mean(group["pnl"])
         avg_r = _safe_mean(group["r_multiple"].dropna())
@@ -153,13 +198,13 @@ def _calc_setup_performance(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
         avg_w = float(winners["pnl"].mean()) if len(winners) > 0 else 0.0
         avg_l = float(losers["pnl"].mean()) if len(losers) > 0 else 0.0
-        wr = win_rate or 0.0
+        wr = win_rate_ratio or 0.0
         exp = (wr * avg_w) + ((1 - wr) * avg_l)
 
         results.append({
             "setup": setup_name,
             "trade_count": count,
-            "win_rate": round(win_rate, 4) if win_rate is not None else None,
+            "win_rate": _as_percent(win_rate_ratio, 2),
             "total_pnl": _dec_to_str(total_pnl),
             "avg_pnl": _dec_to_str(avg_pnl),
             "avg_r_multiple": round(avg_r, 4) if avg_r is not None else None,
@@ -184,7 +229,9 @@ def _calc_streaks(df: pd.DataFrame) -> Dict[str, Any]:
             "streaks": [],
         }
 
-    df = df.sort_values("entry_time").copy()
+    df = df.copy()
+    df["realized_time"] = _realized_time_series(df)
+    df = df.sort_values("realized_time")
 
     streaks: List[Dict[str, Any]] = []
     current_type = None
@@ -193,10 +240,10 @@ def _calc_streaks(df: pd.DataFrame) -> Dict[str, Any]:
     current_end = None
 
     for _, row in df.iterrows():
-        outcome = "WIN" if row["pnl"] > 0 else "LOSS"
+        outcome = "win" if row["pnl"] > 0 else "loss"
         if outcome == current_type:
             current_count += 1
-            current_end = row["entry_time"]
+            current_end = row["realized_time"]
         else:
             if current_type is not None:
                 streaks.append({
@@ -207,8 +254,8 @@ def _calc_streaks(df: pd.DataFrame) -> Dict[str, Any]:
                 })
             current_type = outcome
             current_count = 1
-            current_start = row["entry_time"]
-            current_end = row["entry_time"]
+            current_start = row["realized_time"]
+            current_end = row["realized_time"]
 
     if current_type is not None:
         streaks.append({
@@ -219,8 +266,8 @@ def _calc_streaks(df: pd.DataFrame) -> Dict[str, Any]:
         })
 
     current_streak = streaks[-1] if streaks else {"type": None, "count": 0}
-    win_streaks = [s["count"] for s in streaks if s["type"] == "WIN"]
-    loss_streaks = [s["count"] for s in streaks if s["type"] == "LOSS"]
+    win_streaks = [s["count"] for s in streaks if s["type"] == "win"]
+    loss_streaks = [s["count"] for s in streaks if s["type"] == "loss"]
 
     return {
         "current_streak": {"type": current_streak["type"], "count": current_streak["count"]},
@@ -262,14 +309,15 @@ def _calc_monthly_pnl(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["month"] = df["entry_time"].dt.to_period("M")
+    df["realized_time"] = _realized_time_series(df)
+    df["month"] = df["realized_time"].dt.to_period("M")
     monthly = df.groupby("month").agg(
         trade_count=("id", "count"),
         net_pnl=("pnl", "sum"),
         win_count=("pnl", lambda x: (x > 0).sum()),
     ).reset_index()
     monthly["win_rate"] = monthly.apply(
-        lambda r: round(r["win_count"] / r["trade_count"], 4) if r["trade_count"] > 0 else None,
+        lambda r: _as_percent(r["win_count"] / r["trade_count"], 2) if r["trade_count"] > 0 else None,
         axis=1,
     )
 
@@ -291,7 +339,7 @@ def _calc_daily_pnl(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["date"] = df["entry_time"].dt.date
+    df["date"] = _realized_time_series(df).dt.date
     daily = df.groupby("date").agg(
         trade_count=("id", "count"),
         net_pnl=("pnl", "sum"),
@@ -317,7 +365,7 @@ def _calc_day_of_week(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["dow"] = df["entry_time"].dt.dayofweek
+    df["dow"] = _realized_time_series(df).dt.dayofweek
     df = df[df["dow"] < 5]  # Weekdays only
 
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
@@ -342,7 +390,7 @@ def _calc_day_of_week(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 "day_index": dow,
                 "trade_count": count,
                 "net_pnl": _dec_to_str(_safe_sum(subset["pnl"])),
-                "win_rate": round(_safe_divide(wins, count), 4) if count > 0 else None,
+                "win_rate": _as_percent(_safe_divide(wins, count), 2) if count > 0 else None,
                 "avg_r": _safe_round(_safe_mean(subset["r_multiple"].dropna()), 4),
             })
 
@@ -377,7 +425,7 @@ def _calc_time_of_day(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 "label": f"{hour}:00-{hour}:59",
                 "trade_count": count,
                 "net_pnl": _dec_to_str(_safe_sum(subset["pnl"])),
-                "win_rate": round(_safe_divide(wins, count), 4) if count > 0 else None,
+                "win_rate": _as_percent(_safe_divide(wins, count), 2) if count > 0 else None,
                 "avg_r": _safe_round(_safe_mean(subset["r_multiple"].dropna()), 4),
             })
 

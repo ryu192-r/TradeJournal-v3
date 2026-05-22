@@ -12,8 +12,11 @@ import { useToastStore } from '@/store/toastStore'
 import type { ApiTrade } from '@/types'
 import { useSetupsQuery } from '@/hooks/useSetupPlaybookQuery'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Save, Loader2 } from 'lucide-react'
-import { useForm, Controller } from 'react-hook-form'
+import { Save, Loader2, Target, ShieldAlert, Info } from 'lucide-react'
+import { useForm, Controller, useWatch } from 'react-hook-form'
+import { calculateTradeMetrics } from '@/utils/calculations'
+import { formatCurrency } from '@/utils/format'
+import { useMemo } from 'react'
 
 const TACTIC_OPTIONS = [
   { value: '', label: '— Select Tactic —' },
@@ -45,10 +48,33 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     tactic: trade.tactic || undefined,
     stop_price: trade.stop_price != null ? String(trade.stop_price) : undefined,
     target_price: trade.target_price != null ? String(trade.target_price) : undefined,
-    r_multiple: trade.r_multiple != null ? String(trade.r_multiple) : undefined,
     notes: trade.notes || undefined,
   }
 }
+
+function parseInput(v: string | undefined): number | undefined {
+  if (v == null || v === '') return undefined
+  const n = parseFloat(v)
+  return isNaN(n) ? undefined : n
+}
+
+function fmt(n: number | null | undefined): string {
+  if (n == null) return '—'
+  return formatCurrency(Math.abs(n))
+}
+
+function fmtRatio(n: number | null): string {
+  if (n == null) return '—'
+  return `1:${n.toFixed(2)}`
+}
+
+function fmtR(n: number | null): string {
+  if (n == null) return '—'
+  const sign = n >= 0 ? '+' : ''
+  return `${sign}${n.toFixed(2)}R`
+}
+
+const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 export function TradeEntryForm({
   mode = 'create',
@@ -80,7 +106,6 @@ export function TradeEntryForm({
         tactic: undefined,
         stop_price: undefined,
         target_price: undefined,
-        r_multiple: undefined,
         notes: undefined,
       }
 
@@ -94,6 +119,30 @@ export function TradeEntryForm({
     resolver: zodResolver(tradeFormSchema) as never,
     defaultValues,
   })
+
+  const [entryPrice, exitPrice, quantity, fees, stopPrice, targetPrice] = useWatch({
+    control,
+    name: ['entry_price', 'exit_price', 'quantity', 'fees', 'stop_price', 'target_price'],
+  })
+
+  const liveMetrics = useMemo(() => {
+    return calculateTradeMetrics({
+      entryPrice: parseInput(entryPrice as string | undefined),
+      exitPrice: parseInput(exitPrice as string | undefined),
+      quantity: parseInput(quantity as string | undefined),
+      fees: parseInput(fees as string | undefined),
+      stopPrice: parseInput(stopPrice as string | undefined),
+      targetPrice: parseInput(targetPrice as string | undefined),
+      direction: 'LONG',
+    })
+  }, [entryPrice, exitPrice, quantity, fees, stopPrice, targetPrice])
+
+  const hasEntryQty = parseInput(entryPrice as string | undefined) != null && parseInput(quantity as string | undefined) != null
+  const hasExit = parseInput(exitPrice as string | undefined) != null
+  const hasStop = parseInput(stopPrice as string | undefined) != null
+  const hasTarget = parseInput(targetPrice as string | undefined) != null
+  const hasRiskReward = hasStop && hasTarget
+  const hasPnl = hasEntryQty && hasExit
 
   const onSubmit = async (data: TradeFormData) => {
     if (!submitFn) {
@@ -213,17 +262,9 @@ export function TradeEntryForm({
               error={errors.exit_price?.message}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <GlassInput
-              label="R-Multiple"
-              type="number"
-              step="0.01"
-              placeholder="Auto or manual"
-              {...register('r_multiple')}
-              error={errors.r_multiple?.message}
-            />
-            <GlassInput
-              label="Fees (₹)"
+              label="Fees & Charges (₹)"
               type="number"
               step="0.01"
               placeholder="0.00"
@@ -232,6 +273,98 @@ export function TradeEntryForm({
             />
           </div>
         </div>
+
+        {/* ── Live Calculation Preview ── */}
+        {hasEntryQty && (
+          <div className={CARD}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display text-xs text-accent flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5" />
+                Calculated Metrics (Live Preview)
+              </h3>
+              {!hasPnl && !hasRiskReward && (
+                <span className="text-[10px] text-text-muted font-data">
+                  Enter exit, stop &amp; target for more
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
+              {/* Planned Risk */}
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1 text-[9px] tracking-wider uppercase text-text-muted">
+                  <ShieldAlert className="w-3 h-3 text-loss" />
+                  Risk Amount
+                </div>
+                <span className={`text-xs font-data font-medium ${hasStop && liveMetrics.riskAmount != null ? 'text-loss' : 'text-text-faint'}`}>
+                  {hasStop ? fmt(liveMetrics.riskAmount) : 'Not enough data'}
+                </span>
+              </div>
+
+              {/* Planned Reward */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] tracking-wider uppercase text-text-muted">
+                  Planned Reward
+                </div>
+                <span className={`text-xs font-data font-medium ${hasTarget && liveMetrics.plannedRewardAmount != null ? 'text-profit' : 'text-text-faint'}`}>
+                  {hasTarget ? fmt(liveMetrics.plannedRewardAmount) : 'Not enough data'}
+                </span>
+              </div>
+
+              {/* Planned Risk:Reward */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] tracking-wider uppercase text-text-muted">
+                  Planned Risk:Reward
+                </div>
+                <span className={`text-xs font-data font-medium ${liveMetrics.isValidForRiskReward ? 'text-text-heading' : 'text-text-faint'}`}>
+                  {liveMetrics.isValidForRiskReward ? fmtRatio(liveMetrics.riskRewardRatio) : 'Not enough data'}
+                </span>
+              </div>
+
+              {/* Gross P&L (only when exit is present) */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] tracking-wider uppercase text-text-muted">
+                  Gross P&amp;L
+                </div>
+                <span className={`text-xs font-data font-medium ${hasPnl && liveMetrics.grossPnl != null ? (liveMetrics.grossPnl >= 0 ? 'text-profit' : 'text-loss') : 'text-text-faint'}`}>
+                  {hasPnl ? fmt(liveMetrics.grossPnl) : 'Not enough data'}
+                </span>
+              </div>
+
+              {/* Net P&L */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] tracking-wider uppercase text-text-muted">
+                  Net P&amp;L
+                </div>
+                <span className={`text-xs font-data font-medium ${hasPnl && liveMetrics.netPnl != null ? (liveMetrics.netPnl >= 0 ? 'text-profit' : 'text-loss') : 'text-text-faint'}`}>
+                  {hasPnl ? fmt(liveMetrics.netPnl) : 'Not enough data'}
+                </span>
+              </div>
+
+              {/* Actual R-Multiple */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[9px] tracking-wider uppercase text-text-muted">
+                  Actual R Multiple
+                </div>
+                <span className={`text-xs font-data font-medium ${liveMetrics.rMultiple != null ? (liveMetrics.rMultiple >= 0 ? 'text-profit' : 'text-loss') : 'text-text-faint'}`}>
+                  {liveMetrics.rMultiple != null ? fmtR(liveMetrics.rMultiple) : hasStop && hasPnl ? 'Stop invalid' : 'Not enough data'}
+                </span>
+              </div>
+            </div>
+
+            {/* Warnings */}
+            {liveMetrics.warnings.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {liveMetrics.warnings.map((w, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                    <Info className="w-2.5 h-2.5" />
+                    {w}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Setup & Tactic */}
         <div className="space-y-4">

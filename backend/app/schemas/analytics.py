@@ -15,6 +15,7 @@ class KpiSummaryResponse(BaseModel):
     profit_factor: Optional[float] = None
     expectancy: Optional[float] = None
     avg_r_multiple: Optional[float] = None
+    max_drawdown_amount: Optional[float] = None
     max_drawdown_pct: Optional[float] = None
     net_pnl: Optional[str] = None
     gross_profit: Optional[str] = None

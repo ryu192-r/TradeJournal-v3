@@ -1,5 +1,7 @@
 import { useMarketRegimeQuery } from '@/hooks/useMarketContextQuery'
 import { formatCurrency, formatPrice } from '@/utils/format'
+import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus, type LiveQuoteDisplayStatus } from '@/utils/liveQuotes'
+import { computeLivePnl, computeLivePnlPct } from '@/utils/calculations'
 import {
   ArrowUpRight, ArrowDownRight, Briefcase,
   Activity, Globe, BarChart3, Wallet,
@@ -20,20 +22,20 @@ interface OpenPositionLive {
   marketValue: number
 }
 
-function computeLivePositions(trades: OpenLiveTrade[], quoteMap: Map<string, LiveQuote>): OpenPositionLive[] {
-  return trades.map(t => {
+function computeLivePositions(trades: OpenLiveTrade[] | undefined, quoteMap: Map<string, LiveQuote>): OpenPositionLive[] {
+  return (trades ?? []).map(t => {
     const quote = quoteMap.get(t.symbol)
     const ltp = quote?.ltp ? parseFloat(quote.ltp) : null
     const changePct = quote?.change_pct ? parseFloat(quote.change_pct) : null
     const entry = parseFloat(t.entry_price)
     const fullQty = parseFloat(t.quantity)
     const remainingQty = t.remaining_qty ? parseFloat(t.remaining_qty) : fullQty
-    const fees = parseFloat(t.fees)
-    const feeRatio = fullQty > 0 ? remainingQty / fullQty : 1
     const investedValue = entry * remainingQty
     const marketValue = ltp != null ? ltp * remainingQty : investedValue
-    const livePnl = ltp != null ? (ltp - entry) * remainingQty - fees * feeRatio : 0
-    const livePnlPct = investedValue > 0 ? (livePnl / investedValue) * 100 : 0
+    const livePnl = ltp != null
+      ? (computeLivePnl(entry, ltp, fullQty, remainingQty, parseFloat(t.fees)) ?? 0)
+      : 0
+    const livePnlPct = computeLivePnlPct(investedValue, livePnl) ?? 0
     return { trade: t, quote, ltp, changePct, livePnl, livePnlPct, investedValue, marketValue }
   })
 }
@@ -44,6 +46,10 @@ function LivePortfolioCard({ positions }: { positions: OpenPositionLive[] }) {
   const totalLivePnl = positions.reduce((s, p) => s + p.livePnl, 0)
   const totalLivePnlPct = totalInvested > 0 ? (totalLivePnl / totalInvested) * 100 : 0
   const hasLive = positions.some(p => p.ltp != null)
+  const statuses = positions.map((p) => getLiveQuoteDisplayStatus(p.quote))
+  const hasStale = statuses.includes('STALE')
+  const isClosed = statuses.every((status) => status === 'MARKET CLOSED')
+  const hasNoData = statuses.some((status) => status === 'NO DATA')
   const isProfit = totalLivePnl >= 0
 
   if (positions.length === 0) return null
@@ -53,7 +59,12 @@ function LivePortfolioCard({ positions }: { positions: OpenPositionLive[] }) {
       <div className="flex items-center gap-2 mb-[var(--page-gap)]">
         <Wallet className="w-4 h-4 text-accent" />
         <h3 className="font-display text-[length:var(--text-sm)] text-text-heading">Live Portfolio</h3>
-        {hasLive && <span className="ml-auto flex items-center gap-1 text-[10px] text-profit font-data"><span className="w-1.5 h-1.5 rounded-full bg-profit animate-pulse" />LIVE</span>}
+        {hasLive && (
+          <span className={`ml-auto flex items-center gap-1 text-[10px] font-data ${hasNoData ? 'text-text-faint' : isClosed ? 'text-text-muted' : hasStale ? 'text-amber-400' : 'text-profit'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${hasNoData ? 'bg-text-faint' : isClosed ? 'bg-text-muted' : hasStale ? 'bg-amber-400' : 'bg-profit animate-pulse'}`} />
+            {hasNoData ? 'NO DATA' : isClosed ? 'MARKET CLOSED' : hasStale ? 'STALE' : 'LIVE'}
+          </span>
+        )}
       </div>
       <div className="space-y-[var(--cell-py)]">
         <div>
@@ -214,6 +225,7 @@ function OpenPositionsCard({ positions }: { positions: OpenPositionLive[] }) {
         {positions.map(p => {
           const isProfit = p.livePnl >= 0
           const hasLive = p.ltp != null
+          const status = getLiveQuoteDisplayStatus(p.quote)
           return (
             <div key={p.trade.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
               <div className="min-w-0">
@@ -234,6 +246,7 @@ function OpenPositionsCard({ positions }: { positions: OpenPositionLive[] }) {
                       {p.changePct >= 0 ? '+' : ''}{p.changePct.toFixed(2)}%
                     </span>
                   )}
+                  <div className={`text-[10px] font-data ${getLiveQuoteDisplayClass(status)}`}>{status}</div>
                 </div>
                 <div className="min-w-[72px]">
                   {hasLive ? (
@@ -259,7 +272,7 @@ function OpenPositionsCard({ positions }: { positions: OpenPositionLive[] }) {
 }
 
 interface LiveDashboardProps {
-  trades: OpenLiveTrade[]
+  trades: OpenLiveTrade[] | undefined
   quoteMap: Map<string, LiveQuote>
 }
 
@@ -267,16 +280,25 @@ export function LiveDashboard({ trades, quoteMap }: LiveDashboardProps) {
   const positions = useMemo(() => computeLivePositions(trades, quoteMap), [trades, quoteMap])
   const hasOpen = positions.length > 0
   const hasLiveQuotes = positions.some(p => p.ltp != null)
+  const statuses = positions.map((position) => getLiveQuoteDisplayStatus(position.quote))
+  const hasStaleQuotes = statuses.includes('STALE')
+  const hasClosedMarket = statuses.length > 0 && statuses.every((status) => status === 'MARKET CLOSED')
+  const hasNoData = statuses.some((status) => status === 'NO DATA')
+  let summaryStatus: LiveQuoteDisplayStatus | null = null
+  if (hasNoData) summaryStatus = 'NO DATA'
+  else if (hasClosedMarket) summaryStatus = 'MARKET CLOSED'
+  else if (hasStaleQuotes) summaryStatus = 'STALE'
+  else if (hasLiveQuotes) summaryStatus = 'LIVE'
 
   return (
     <div className="space-y-[var(--page-gap)]">
       <div className="flex items-center gap-2">
         <Activity className="w-[15px] h-[15px] text-accent" />
         <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Live Now</h2>
-        {hasLiveQuotes && (
-          <span className="flex items-center gap-1 text-[10px] text-profit font-data">
-            <span className="w-1.5 h-1.5 rounded-full bg-profit animate-pulse" />
-            MARKET OPEN
+        {summaryStatus && (
+          <span className={`flex items-center gap-1 text-[10px] font-data ${getLiveQuoteDisplayClass(summaryStatus)}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${summaryStatus === 'LIVE' ? 'bg-profit animate-pulse' : summaryStatus === 'STALE' ? 'bg-amber-400' : summaryStatus === 'MARKET CLOSED' ? 'bg-text-muted' : 'bg-text-faint'}`} />
+            {summaryStatus}
           </span>
         )}
       </div>

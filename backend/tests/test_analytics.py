@@ -34,6 +34,8 @@ def test_kpi_with_trades(client, auth_user_token):
     assert resp.status_code == 200
     data = resp.json()
     assert data.get("trade_count", 0) >= 1
+    assert data.get("win_rate") == 100.0
+    assert "max_drawdown_amount" in data
 
 
 def test_monthly_pnl(client, auth_user_token):
@@ -104,6 +106,7 @@ def test_dashboard(client, auth_user_token):
     assert resp.status_code == 200
     data = resp.json()
     assert "kpi" in data
+    assert "max_drawdown_amount" in data["kpi"]
 
 
 def test_export_csv(client, auth_user_token):

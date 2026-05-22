@@ -350,6 +350,10 @@ def revenge_trades(
     trade_ids = [t.id for t in all_trades]
     all_emotions = {e.trade_id: e for e in db.query(EmotionLog).filter(EmotionLog.trade_id.in_(trade_ids)).all()}
 
+    revenge_trades_list = []
+    flagged_pnls = []
+    unflagged_pnls = []
+
     loss_times_sorted = [t.entry_time for t in all_trades if t.exit_price is not None and t.pnl is not None and t.pnl < 0 and t.entry_time]
     for t in all_trades:
         revenge_emotion = False
@@ -378,6 +382,10 @@ def revenge_trades(
                                    "window" if within_window and not revenge_emotion else "both",
                 "hours_after_loss": None,
             })
+            if t.pnl is not None:
+                flagged_pnls.append(float(t.pnl))
+        elif t.pnl is not None:
+            unflagged_pnls.append(float(t.pnl))
 
     loss_times_sorted = sorted(loss_times_sorted)
     for rt in revenge_trades_list:

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta, datetime
 from typing import Optional
+import calendar
 
 from app.db.database import get_db
 from app.models.performance_os import DailyWorkflow, WeeklyReview, MonthlyReview
@@ -140,7 +141,11 @@ def get_workflow_by_date(d: date, db: Session = Depends(get_db)):
             "india_vix": str(regime.india_vix) if regime and regime.india_vix else None,
         } if regime else None,
         journal={
-            "id": journal.id, "mood_rating": journal.discipline_rating,
+            "id": journal.id,
+            "mood_rating": journal.mood_rating,
+            "discipline_rating": journal.discipline_rating,
+            "rules_followed": journal.rules_followed,
+            "rules_violated": journal.rules_violated,
         } if journal else None,
         discipline_score=_compute_discipline(db, d),
         phase_progress=_phase_progress(wf),
@@ -363,7 +368,7 @@ def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailRe
     try:
         year, mon = map(int, review.month.split("-"))
         month_start = date(year, mon, 1)
-        month_end = date(year, mon, 28)
+        month_end = date(year, mon, calendar.monthrange(year, mon)[1])
     except (ValueError, IndexError):
         month_start = date.today().replace(day=1)
         month_end = date.today()

@@ -20,6 +20,7 @@ import type {
   CoachReviewResponse, CoachReviewListResponse,
   AskCoachRequest, PatternDetectionResponse, RuleReminderResponse,
 } from '@/types/coach'
+import type { CalendarMonthPayload, DeterministicReportPayload } from '@/types'
 
 // ────────────────────────── Trades ──────────────────────────
 
@@ -128,6 +129,20 @@ export function getDashboard(fromDate?: string, toDate?: string) {
   if (toDate) params.append('to_date', toDate)
   const qs = params.toString()
   return apiClient.get<FullDashboardPayload>('/analytics/dashboard' + (qs ? `?${qs}` : '')).then(r => r.data)
+}
+
+// ────────────────────────── Calendar & Reports ──────────────────────────
+
+export function getCalendarMonth(month: string) {
+  return apiClient.get<CalendarMonthPayload>('/calendar/month', { params: { month } }).then(r => r.data)
+}
+
+export function getWeeklyReport(weekStart: string) {
+  return apiClient.get<DeterministicReportPayload>('/reports/weekly', { params: { week_start: weekStart } }).then(r => r.data)
+}
+
+export function getMonthlyReport(month: string) {
+  return apiClient.get<DeterministicReportPayload>('/reports/monthly', { params: { month } }).then(r => r.data)
 }
 
 // ────────────────────────── Setups ──────────────────────────
@@ -301,28 +316,30 @@ export function exportTradesXlsx(from_date?: string, to_date?: string, trade_sta
 
 // ───────────────────────── AI Coach ─────────────────────────
 
+const COACH_TIMEOUT_MS = 120_000
+
 export function generateDailyReview(period_start?: string, period_end?: string) {
-  return apiClient.post<CoachReviewResponse>('/coach/review/daily', { period_start, period_end }).then(r => r.data)
+  return apiClient.post<CoachReviewResponse>('/coach/review/daily', { period_start, period_end }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function generateWeeklyReview(period_start?: string, period_end?: string) {
-  return apiClient.post<CoachReviewResponse>('/coach/review/weekly', { period_start, period_end }).then(r => r.data)
+  return apiClient.post<CoachReviewResponse>('/coach/review/weekly', { period_start, period_end }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function generateTradeInsight(trade_ids: number[], context?: string) {
-  return apiClient.post<CoachReviewResponse>('/coach/insight', { trade_ids, context }).then(r => r.data)
+  return apiClient.post<CoachReviewResponse>('/coach/insight', { trade_ids, context }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function askCoach(payload: AskCoachRequest) {
-  return apiClient.post<CoachReviewResponse>('/coach/ask', payload).then(r => r.data)
+  return apiClient.post<CoachReviewResponse>('/coach/ask', payload, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function detectPatterns(lookback_days?: number) {
-  return apiClient.post<PatternDetectionResponse>('/coach/patterns', { lookback_days }).then(r => r.data)
+  return apiClient.post<PatternDetectionResponse>('/coach/patterns', { lookback_days }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function checkRuleReminders(lookback_days?: number, rules?: string[]) {
-  return apiClient.post<RuleReminderResponse>('/coach/rule-reminders', { lookback_days, rules }).then(r => r.data)
+  return apiClient.post<RuleReminderResponse>('/coach/rule-reminders', { lookback_days, rules }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 export function listCoachReviews(review_type?: string, skip?: number, limit?: number) {
@@ -465,6 +482,7 @@ export function getDisciplineScore(fromDate?: string, toDate?: string) {
 
 export function getBehavioralScore(lookbackDays?: number) {
   return apiClient.post<import('@/types').BehavioralScoreResponse>('/coach/behavioral-score', null, {
+    timeout: COACH_TIMEOUT_MS,
     params: lookbackDays ? { lookback_days: lookbackDays } : undefined,
   }).then(r => r.data)
 }
@@ -472,7 +490,7 @@ export function getBehavioralScore(lookbackDays?: number) {
 // ───────────────────────── Trade Review Engine ─────────────────────────
 
 export function generateTradeReview(tradeId: number) {
-  return apiClient.post<import('@/types/coach').TradeReviewResponse>('/coach/trade-review', { trade_id: tradeId }).then(r => r.data)
+  return apiClient.post<import('@/types/coach').TradeReviewResponse>('/coach/trade-review', { trade_id: tradeId }, { timeout: COACH_TIMEOUT_MS }).then(r => r.data)
 }
 
 // ───────────────────────── Playbook Intelligence ─────────────────────────
@@ -536,7 +554,7 @@ export function getMySymbols() {
 }
 
 export function upsertLiveQuotes(quotes: Record<string, unknown>[]) {
-  return apiClient.post<{ upserted: number; errors: string[]; total: number }>('/market/live-quotes', { quotes }).then(r => r.data)
+  return apiClient.post<{ upserted: number; errors: string[]; total: number; provider_status?: string; stale_after_seconds?: number }>('/market/live-quotes', { quotes }).then(r => r.data)
 }
 
 export function getLiveQuotes() {
@@ -544,7 +562,7 @@ export function getLiveQuotes() {
 }
 
 export function syncLiveQuotes() {
-  return apiClient.post<{ symbols: string[]; count: number; fetched?: number; upserted?: number; errors?: string[]; message?: string }>('/market/sync-quotes').then(r => r.data)
+  return apiClient.post<{ symbols: string[]; count: number; fetched?: number; upserted?: number; errors?: string[]; message?: string; provider_status?: string; stale_after_seconds?: number }>('/market/sync-quotes').then(r => r.data)
 }
 
 // ────────────────────────── Performance OS ──────────────────────────

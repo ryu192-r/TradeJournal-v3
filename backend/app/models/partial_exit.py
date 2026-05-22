@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Index
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from app.models.base import Base
 
 
@@ -15,7 +16,7 @@ class PartialExit(Base):
     r_captured = Column(Numeric(precision=10, scale=4))
     exit_reason = Column(String(30))
     note = Column(String(500))
-    created_at = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
 
     trade = relationship("Trade", back_populates="partial_exits")
 

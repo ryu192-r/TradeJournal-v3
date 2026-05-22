@@ -43,8 +43,9 @@ Indian retail equity traders who:
 ### View System
 - Zustand `appStore.activeView` controls pages (not URL router)
 - Sub-views via `tradeFormMode` (`list|create|edit`)
-- Active views: `dashboard`, `analytics`, `trades`, `journal`, `playbook`, `review`, `ideas`, `capital`, `settings`, `ai-coach`
-- Major views are code-split with `React.lazy`/`Suspense`; analytics/recharts, trades, capital, coach, and other heavy pages load on demand instead of in the initial bundle
+- Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `ideas`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`
+- Navigation supports persisted Simple / Advanced modes. Simple mode focuses the daily loop; Advanced mode exposes analytics, AI Coach, SA Notes, and idea/research surfaces.
+- Major views are code-split with `React.lazy`/`Suspense`; analytics/recharts, trades, capital, coach loaded on demand
 
 ### Route Registration
 - Register in `backend/app/routers/base.py`, prefix `/api/v1`
@@ -55,8 +56,9 @@ Indian retail equity traders who:
 - Frontend formats via `formatCurrency()` (PnL), `formatPrice()` (prices), `formatQuantity()` (quantities)
 - All in `frontend/src/utils/format.ts`
 - React Query refetches on mount/window focus/reconnect
-- Trade-impacting mutations use `invalidateTradeDomain()` to refresh trades, trade detail, capital dashboard/events, analytics, journal weekly stats, and setup playbook stats
-- Capital-event mutations use `invalidateCapitalDomain()` to refresh capital, trade, and analytics data
+- `placeholderData: (previousData) => previousData` on ALL hooks prevents blank states during refetch
+- Trade-impacting mutations use `invalidateTradeDomain()`
+- Capital-event mutations use `invalidateCapitalDomain()`
 
 ### Theme
 - CSS variables via `data-theme="dark"|"light"` on root
@@ -74,6 +76,7 @@ Indian retail equity traders who:
 - CRUD for trades (all LONG only)
 - Auto-merge by `(symbol, date)`: weighted-average prices, summed qty/fees/PnL
 - Pyramid: add shares to open positions (weighted-average entry, optional stop update)
+- Partial exits: record partial closes on open positions with realized PnL
 - Soft delete (status = `"deleted"`)
 - Open/Closed is derived from `exit_price` (no exit = open, has exit = closed)
 - Date range filter, bulk select/delete
@@ -84,6 +87,8 @@ Indian retail equity traders who:
 - Trades table includes inline SL editing, Max Risk, P&L %, and Cap % columns
 - Setup dropdown is fetched from Playbook active setups and playbook stats sync after trade mutations
 - Chart image upload/delete/gallery (multipart, disk storage, served via `/uploads/`)
+- Execution grades (A–F per dimension) via trade detail modal
+- Trade detail page with hero P&L card, stat grid, lifecycle timeline
 
 ### Broker Import
 - Zerodha Console P&L CSV parser
@@ -94,10 +99,13 @@ Indian retail equity traders who:
 - Import skips existing trades instead of merging
 
 ### Dashboard
-- KPI cards (total PnL, win rate, avg R, etc.)
-- Equity curve (includes trade PnL + capital events)
+- Primary data source: `GET /dashboard/operational`
+- KPI cards (Net P&L, Win Rate, Profit Factor, Avg R, Expectancy, Max DD)
+- **Equity section** — two cards: Realized Equity (net_equity) and Total Equity (including unrealized P&L from live quotes), plus equity curve chart
+- Live positions with real-time market data
+- Risk Command Center (portfolio heat, deployed capital, open risk, warnings)
 - Win/loss streaks
-- Monthly PnL bar chart
+- Collapsible intelligence sections (lifecycle, behavioral, playbook, market context)
 
 ### Analytics
 - Daily PnL heatmap
@@ -115,10 +123,13 @@ Indian retail equity traders who:
 
 ### AI Coach
 - 6 tabs: Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Builder, History
+- Trade Review engine with A–F scoring
+- Behavioral Score (composite discipline + AI assessment)
 - 8 providers: Ollama (local + cloud), OpenAI, DeepSeek, Anthropic, Google, Custom, OpenCode Zen
 - Ollama uses native `/api/chat` format; others use OpenAI-compatible format
 - Configured via Settings page or `ai_config.json`
 - **Personality blending**: 5 mentor profiles (Minervini, Manas Arora, Chartitude, QuallaMagie, Pradeep Bonde) each weighted 0-100% via sliders in Settings page
+- **Timeout chain**: Frontend 120s → nginx 180s → backend 60-300s (configurable)
 
 ### Capital Management
 - Set initial balance, edit anytime
@@ -132,21 +143,47 @@ Indian retail equity traders who:
   - Manual reconcile button with toast feedback
 - Breakeven threshold (±₹ amount, configurable via Edit Account modal)
 - Dynamic tiers (editable via TierEditor)
+- **Net equity**: initial + deposits - withdrawals + realized PnL + partial exit PnL
+- **Total equity**: net equity + unrealized P&L (live quotes × open positions)
+- **Equity curve**: daily running total of realized equity
 
-### TradesPage
-- Horizontal scroll table (`overflow-x-auto` + `min-w-[700px]`) for mobile
-- Click symbol → trade detail modal
-- Pyramid button on open positions
-- Status column: "Open" / "Closed" based on `exit_price`
-- Stacked pagination on mobile
+### Performance OS / Daily SA Notes
+- Performance OS is the primary daily workflow shell: pre-market checklist, execution notes, review, behavior state, weekly review, and monthly review.
+- Textareas autosave with local draft state, debounce, blur flush, and queued latest-write behavior.
+- Daily SA Notes remain available as a deeper note surface, but the default daily loop starts in Performance OS.
+
+### Market Context / Live Quotes
+- `POST /market/sync-quotes` syncs cached live quotes for open positions.
+- `GET /market/live-quotes` returns cached quotes with freshness states: `fresh`, `stale`, `failed`, `not_synced`.
+- Dashboard live positions, Trades LTP cells, and Market watchlist surface stale and failed quote states.
+- Market performance correlation breaks down PnL by NIFTY trend/regime, VIX bucket, breadth, and earnings context.
+
+### Lifecycle Analytics
+- Deterministic endpoints under `/lifecycle`: emotion summary, grade summary, behavioral analytics, revenge trades, overtrading, early exits, and composite discipline score.
+- AI Coach can consume these signals, but deterministic calculations remain the source of truth.
 
 ## Testing
-- **Backend**: 130+ tests, pytest + httpx ASGI client, SQLite per test
+- **Backend**: pytest, SQLite per test. New router regressions use direct router-function tests where `TestClient` lifespan is unreliable in the sandbox.
 - **Frontend**: Vitest + jsdom, setup in `src/test/setup.ts`
 - Run: `cd backend && python3 -m pytest tests/ -v`
+
+## Architecture Decisions
+- ADR-016: Performance OS daily review domain
+- ADR-017: Operational dashboard aggregate endpoint
+- ADR-018: Lifecycle analytics model
+- ADR-019: Partial exits and remaining quantity
+- ADR-020: Live quote cache and market data provider
 
 ## Deployment
 - Docker Compose with 4 services
 - External Traefik handles HTTPS + DuckDNS
 - Frontend build arg `VITE_API_URL=/api/v1`
 - Health check at `/health`
+- nginx proxies `/api/v1/coach/` with 180s timeout (AI LLM calls)
+- Service worker cache version `tj-v3-v4`
+
+## Known Gotchas
+- **SetupPlaybook.is_active**: VARCHAR "active"/"archived", NOT boolean
+- **patchTradeInLists**: Must use `setQueryData` function updater form
+- **profit_factor Infinity**: Returns `None` instead of `float('inf')`
+- **removeTradeFromLists total**: Only decrements if tradewas present in list

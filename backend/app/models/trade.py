@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
 from app.utils.decimal_utils import TagsList
+from app.utils.calculations import calculate_trade_metrics
 from decimal import Decimal
 
 
@@ -55,10 +56,19 @@ class Trade(Base):
     execution_grade = relationship("ExecutionGrade", back_populates="trade", uselist=False)
 
     def compute_pnl(self):
-        """Auto-compute PnL. All trades are LONG (Indian equities — shorting not applicable)."""
-        if self.exit_price and self.entry_price and self.quantity:
-            raw_pnl = (self.exit_price - self.entry_price) * self.quantity
-            self.pnl = raw_pnl - (self.fees or Decimal('0'))
+        """Auto-compute PnL and R-multiple using shared calculation module."""
+        calc = calculate_trade_metrics(
+            entry_price=self.entry_price,
+            exit_price=self.exit_price,
+            quantity=self.quantity,
+            fees=self.fees or Decimal('0'),
+            stop_price=self.stop_price,
+            target_price=self.target_price,
+            direction=self.direction,
+        )
+        self.pnl = calc.net_pnl
+        if calc.r_multiple is not None:
+            self.r_multiple = calc.r_multiple
         return self.pnl
 
 
