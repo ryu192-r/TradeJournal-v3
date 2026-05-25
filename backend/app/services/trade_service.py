@@ -24,19 +24,32 @@ class TradeService:
             q = q.filter(Trade.exit_time == exit_time)
         return q.first()
 
-    def get_by_symbol_date(self, symbol: str, entry_date: datetime) -> Optional[Trade]:
-        """Find existing trade for same symbol on the same calendar date."""
-        return (
-            self.db.query(Trade)
-            .filter(
-                Trade.symbol == symbol,
-                func.date(Trade.entry_time) == entry_date.date(),
-            )
-            .first()
+    def get_by_symbol_date(self, symbol: str, entry_date: datetime, is_open: Optional[bool] = None) -> Optional[Trade]:
+        """Find existing trade for same symbol on the same calendar date.
+
+        If is_open is specified, only match trades with matching open/closed state:
+          is_open=True  → match trades with no exit_price (open)
+          is_open=False → match trades with exit_price set (closed)
+        This prevents merging an open re-entry into a closed trade or vice versa.
+        """
+        q = self.db.query(Trade).filter(
+            Trade.symbol == symbol,
+            func.date(Trade.entry_time) == entry_date.date(),
+            Trade.status != "deleted",
         )
+        if is_open is True:
+            q = q.filter(Trade.exit_price.is_(None))
+        elif is_open is False:
+            q = q.filter(Trade.exit_price.isnot(None))
+        return q.first()
 
     def merge_or_create(self, trade_data: dict) -> Tuple[Trade, str]:
         """Merge with existing trade for same (symbol, date) or create new.
+
+        Only merges trades in the same open/closed state:
+        - Open + Open  → merge (pyramiding)
+        - Closed + Closed → merge (same-day round-trip averaging)
+        - Open + Closed or Closed + Open → create new separate trade
 
         Returns (trade, action) where action is 'merged' or 'created'.
         """
@@ -49,7 +62,9 @@ class TradeService:
             self.db.refresh(trade)
             return trade, "created"
 
-        existing = self.get_by_symbol_date(trade_data["symbol"], entry_time)
+        incoming_is_open = trade_data.get("exit_price") is None
+
+        existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open)
         if existing:
             self._merge_trade(existing, trade_data)
             return existing, "merged"
@@ -147,13 +162,14 @@ class TradeService:
         return trade
 
     def merge_duplicates(self) -> int:
-        """Find and merge trades with same (symbol, date). Returns count of merged duplicates."""
+        """Find and merge trades with same (symbol, date, open/closed state). Returns count of merged duplicates."""
         from collections import defaultdict
 
         trades = self.db.query(Trade).filter(Trade.status != 'deleted').all()
         groups = defaultdict(list)
         for t in trades:
-            key = (t.symbol, t.entry_time.date())
+            state = "open" if t.exit_price is None else "closed"
+            key = (t.symbol, t.entry_time.date(), state)
             groups[key].append(t)
 
         merged_count = 0

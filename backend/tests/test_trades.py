@@ -176,3 +176,81 @@ def test_list_trades_filter_by_symbol(client, auth_user_token):
     resp = _list(client, auth_user_token, symbol="UNIQUE_SYM")
     items = resp.json()["items"]
     assert all(t["symbol"] == "UNIQUE_SYM" for t in items)
+
+
+def test_reentry_after_close_creates_separate_trade(client, auth_user_token):
+    trade1 = _create(client, auth_user_token, symbol="RELIANCE", quantity=10,
+                     entry_price=2500, exit_price=2550,
+                     entry_time="2025-01-15T09:30:00", exit_time="2025-01-15T10:00:00")
+    body1 = trade1.json()
+    t1 = body1.get("data", body1)
+    assert t1["status"] == "closed"
+    assert float(t1["quantity"]) == 10
+
+    trade2 = _create(client, auth_user_token, symbol="RELIANCE", quantity=5,
+                     entry_price=2520, exit_price=None,
+                     entry_time="2025-01-15T11:00:00")
+    body2 = trade2.json()
+    t2 = body2.get("data", body2)
+    assert t2["status"] == "open", "Re-entry should be a new open trade, not merged into closed"
+    assert float(t2["quantity"]) == 5, "Re-entry quantity should be 5, not merged 15"
+    assert t2["id"] != t1["id"], "Re-entry should be a separate trade record"
+
+    resp = _list(client, auth_user_token, symbol="RELIANCE")
+    items = resp.json()["items"]
+    assert len(items) == 2, "Should have 2 separate trades for same-day re-entry"
+    closed_trades = [t for t in items if t["status"] == "closed"]
+    open_trades = [t for t in items if t["status"] == "open"]
+    assert len(closed_trades) == 1
+    assert len(open_trades) == 1
+    assert float(closed_trades[0]["quantity"]) == 10
+    assert float(open_trades[0]["quantity"]) == 5
+
+
+def test_open_then_closed_same_day_creates_separate(client, auth_user_token):
+    trade1 = _create(client, auth_user_token, symbol="TCS", quantity=10,
+                     entry_price=3800, exit_price=None,
+                     entry_time="2025-02-10T09:30:00")
+    body1 = trade1.json()
+    t1 = body1.get("data", body1)
+    assert t1["status"] == "open"
+
+    trade2 = _create(client, auth_user_token, symbol="TCS", quantity=10,
+                     entry_price=3800, exit_price=3850,
+                     entry_time="2025-02-10T09:45:00", exit_time="2025-02-10T11:00:00")
+    body2 = trade2.json()
+    t2 = body2.get("data", body2)
+    assert t2["status"] == "closed", "Closing entry should be separate, not merged into open"
+    assert t2["id"] != t1["id"], "Closing entry should be a separate trade record"
+
+
+def test_two_open_trades_same_day_merge(client, auth_user_token):
+    trade1 = _create(client, auth_user_token, symbol="INFY", quantity=10,
+                     entry_price=1500, exit_price=None,
+                     entry_time="2025-03-01T09:30:00")
+    body1 = trade1.json()
+    t1_id = body1.get("data", body1)["id"]
+
+    trade2 = _create(client, auth_user_token, symbol="INFY", quantity=5,
+                     entry_price=1510, exit_price=None,
+                     entry_time="2025-03-01T10:00:00")
+    body2 = trade2.json()
+    t2 = body2.get("data", body2)
+    assert t2["id"] == t1_id, "Two open entries same day should merge (pyramid)"
+    assert float(t2["quantity"]) == 15
+
+
+def test_two_closed_trades_same_day_merge(client, auth_user_token):
+    trade1 = _create(client, auth_user_token, symbol="HDFCBANK", quantity=10,
+                     entry_price=1600, exit_price=1650,
+                     entry_time="2025-04-01T09:30:00", exit_time="2025-04-01T10:00:00")
+    body1 = trade1.json()
+    t1_id = body1.get("data", body1)["id"]
+
+    trade2 = _create(client, auth_user_token, symbol="HDFCBANK", quantity=5,
+                     entry_price=1610, exit_price=1670,
+                     entry_time="2025-04-01T09:45:00", exit_time="2025-04-01T10:30:00")
+    body2 = trade2.json()
+    t2 = body2.get("data", body2)
+    assert t2["id"] == t1_id, "Two closed entries same day should merge"
+    assert float(t2["quantity"]) == 15
