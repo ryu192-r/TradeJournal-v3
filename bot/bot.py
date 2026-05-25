@@ -8,7 +8,20 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from config import BOT_TOKEN, POST_MARKET_TIME, REMINDER_INTERVAL_MINUTES
-from handlers import cmd_help, cmd_journal, cmd_pnl, cmd_setup, cmd_start, handle_text_message
+from handlers import (
+    cmd_help,
+    cmd_journal,
+    cmd_pnl,
+    cmd_setup,
+    cmd_start,
+    cmd_positions,
+    cmd_dashboard,
+    cmd_risk,
+    cmd_streaks,
+    cmd_close,
+    cmd_closeid,
+    handle_text_message,
+)
 from middleware import error_handler, require_auth
 from utils import send_daily_pnl_summary, send_stop_reminders
 
@@ -50,9 +63,15 @@ def build_application() -> Application:
 
     app.add_handler(CommandHandler("start", _auth_wrapper(cmd_start)))
     app.add_handler(CommandHandler("help", _auth_wrapper(cmd_help)))
+    app.add_handler(CommandHandler("positions", _auth_wrapper(cmd_positions)))
+    app.add_handler(CommandHandler("dashboard", _auth_wrapper(cmd_dashboard)))
     app.add_handler(CommandHandler("pnl", _auth_wrapper(cmd_pnl)))
-    app.add_handler(CommandHandler("journal", _auth_wrapper(cmd_journal)))
     app.add_handler(CommandHandler("setup", _auth_wrapper(cmd_setup)))
+    app.add_handler(CommandHandler("risk", _auth_wrapper(cmd_risk)))
+    app.add_handler(CommandHandler("streaks", _auth_wrapper(cmd_streaks)))
+    app.add_handler(CommandHandler("close", _auth_wrapper(cmd_close)))
+    app.add_handler(CommandHandler("closeid", _auth_wrapper(cmd_closeid)))
+    app.add_handler(CommandHandler("journal", _auth_wrapper(cmd_journal)))
 
     async def _auth_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not require_auth(update, context):
