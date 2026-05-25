@@ -17,7 +17,7 @@ PRE_MARKET_REMINDER: str = os.getenv("PRE_MARKET_REMINDER", "03:00")  # 30 min b
 WEEKLY_REVIEW_DAY: str = os.getenv("WEEKLY_REVIEW_DAY", "6")    # 0=Mon..6=Sun
 WEEKLY_REVIEW_TIME: str = os.getenv("WEEKLY_REVIEW_TIME", "14:30")  # 20:00 IST
 
-REMINDER_INTERVAL_MINUTES: int = int(os.getenv("REMINDER_INTERVAL_MINUTES", "120"))
+REMINDER_INTERVAL_MINUTES: int = int(os.getenv("REMINDER_INTERVAL_MINUTES", "0"))
 
 # Alert thresholds
 DRAWDOWN_ALERT_PCT: float = float(os.getenv("DRAWDOWN_ALERT_PCT", "5.0"))

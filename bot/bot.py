@@ -100,16 +100,19 @@ def schedule_jobs(application: Application) -> None:
         logger.error("daily_pnl_schedule_failed", error=str(exc))
 
     interval_secs = REMINDER_INTERVAL_MINUTES * 60
-    try:
-        application.job_queue.run_repeating(
-            _job_stop_reminder,
-            interval=interval_secs,
-            first=interval_secs,
-            name="stop_reminder",
-        )
-        logger.info("scheduled_stop_reminder", interval_minutes=REMINDER_INTERVAL_MINUTES)
-    except Exception as exc:
-        logger.error("stop_reminder_schedule_failed", error=str(exc))
+    if interval_secs > 0:
+        try:
+            application.job_queue.run_repeating(
+                _job_stop_reminder,
+                interval=interval_secs,
+                first=interval_secs,
+                name="stop_reminder",
+            )
+            logger.info("scheduled_stop_reminder", interval_minutes=REMINDER_INTERVAL_MINUTES)
+        except Exception as exc:
+            logger.error("stop_reminder_schedule_failed", error=str(exc))
+    else:
+        logger.info("stop_reminder_disabled")
 
 
 def main() -> None:
