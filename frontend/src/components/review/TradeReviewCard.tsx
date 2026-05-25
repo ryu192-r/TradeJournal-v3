@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { ChartGallery } from './ChartGallery'
 import { TagSelector } from './TagSelector'
 import type { ApiTrade, ApiTradeUpdatePayload } from '@/types'
-import { formatCurrency, formatPrice, formatDate, formatRMultiple } from '@/utils/format'
+import { formatCurrency, formatPrice, formatDateTime, formatRMultiple } from '@/utils/format'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 
 interface TradeReviewCardProps {
@@ -87,7 +87,7 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
         <div>
           <div className="text-[11px] text-text-muted uppercase tracking-wide">Entry</div>
           <div className="font-data text-sm font-medium text-text-heading mt-1">{formatPrice(Number(trade.entry_price))}</div>
-          <div className="text-[11px] text-text-muted mt-1">{formatDate(trade.entry_time)}</div>
+          <div className="text-[11px] text-text-muted mt-1">{formatDateTime(trade.entry_time)}</div>
         </div>
         <div>
           <div className="text-[11px] text-text-muted uppercase tracking-wide">Exit</div>
@@ -95,7 +95,7 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
             {trade.exit_price ? formatPrice(Number(trade.exit_price)) : '—'}
           </div>
           <div className="text-[11px] text-text-muted mt-1">
-            {trade.exit_time ? formatDate(trade.exit_time) : 'Open'}
+            {trade.exit_time ? formatDateTime(trade.exit_time) : 'Open'}
           </div>
         </div>
         <div>

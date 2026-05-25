@@ -5,10 +5,27 @@
  */
 export function formatDate(date: Date | string | number): string {
   const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
+  const ist = toISTInternal(d)
+  const day = String(ist.getDate()).padStart(2, '0')
+  const month = String(ist.getMonth() + 1).padStart(2, '0')
+  const year = ist.getFullYear()
   return `${day}-${month}-${year}`
+}
+
+export function formatDateTime(date: Date | string | number): string {
+  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
+  const ist = toISTInternal(d)
+  const day = String(ist.getDate()).padStart(2, '0')
+  const month = String(ist.getMonth() + 1).padStart(2, '0')
+  const year = ist.getFullYear()
+  const hours = String(ist.getHours()).padStart(2, '0')
+  const mins = String(ist.getMinutes()).padStart(2, '0')
+  return `${day}-${month}-${year} ${hours}:${mins}`
+}
+
+function toISTInternal(d: Date): Date {
+  const utcMs = d.getTime() + d.getTimezoneOffset() * 60000
+  return new Date(utcMs + 5.5 * 3600000)
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' }

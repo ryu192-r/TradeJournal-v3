@@ -6,6 +6,7 @@ import {
   tradeFormSchema,
   type TradeFormData,
   isoToDatetimeLocal,
+  nowIST,
   formDataToApiPayload,
 } from '@/schemas/tradeForm'
 import { useToastStore } from '@/store/toastStore'
@@ -115,7 +116,7 @@ export function TradeEntryForm({
         entry_price: '',
         exit_price: undefined,
         quantity: '',
-        entry_time: isoToDatetimeLocal(new Date().toISOString()),
+        entry_time: isoToDatetimeLocal(nowIST().toISOString()),
         exit_time: undefined,
         fees: '0',
         setup: undefined,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { usePartialExitsQuery, useCreatePartialExitMutation, useDeletePartialExitMutation } from '@/hooks/usePartialExitQuery'
-import { formatPrice, formatCurrency, formatDate } from '@/utils/format'
+import { formatPrice, formatCurrency, formatDateTime } from '@/utils/format'
 import { Loader2, Trash2 } from 'lucide-react'
 import { useToastStore } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
@@ -96,7 +96,7 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-text-faint mt-0.5">
-                    <span>{formatDate(pe.exit_time)}</span>
+                    <span>{formatDateTime(pe.exit_time)}</span>
                     {pe.exit_reason && <span className="capitalize">{pe.exit_reason.replace(/_/g, ' ')}</span>}
                   </div>
                 </div>

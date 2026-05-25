@@ -7,7 +7,7 @@ import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarket
 import { useToastStore } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
-import { formatCurrency, formatPrice, formatQuantity, formatDate } from '@/utils/format'
+import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
 import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liveQuotes'
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
@@ -952,7 +952,7 @@ function TradeCard({
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
-            <span>{formatDate(trade.entry_time)}</span>
+            <span>{formatDateTime(trade.entry_time)}</span>
             {trade.setup && <span className="px-1 py-px rounded bg-accent-faint text-accent font-medium">{trade.setup}</span>}
           </div>
         </div>
@@ -1128,7 +1128,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
       return (
         <td key={column} className={cellClass}>
           <div className="text-text-heading text-xs">{formatPrice(Number(trade.entry_price))}</div>
-          <div className="text-[10px] text-text-muted mt-0.5">{formatDate(trade.entry_time)}</div>
+          <div className="text-[10px] text-text-muted mt-0.5">{formatDateTime(trade.entry_time)}</div>
         </td>
       )
     }
@@ -1138,7 +1138,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
           {trade.exit_price ? (
             <>
               <div className="text-text-heading text-xs">{formatPrice(Number(trade.exit_price))}</div>
-              <div className="text-[10px] text-text-muted mt-0.5">{trade.exit_time ? formatDate(trade.exit_time) : '—'}</div>
+              <div className="text-[10px] text-text-muted mt-0.5">{trade.exit_time ? formatDateTime(trade.exit_time) : '—'}</div>
             </>
           ) : (
             <span className="text-text-muted text-xs">Open</span>

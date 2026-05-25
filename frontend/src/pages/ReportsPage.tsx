@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Download, FileText, NotebookPen, PieChart, TrendingUp } from 'lucide-react'
 import { getMonthlyReport, getWeeklyReport } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
-import { formatCurrency, formatDate, formatMetricPercent, parseDecimal } from '@/utils/format'
+import { formatCurrency, formatDate, formatDateTime, formatMetricPercent, parseDecimal } from '@/utils/format'
 import { ErrorState, SectionSkeleton } from '@/components/ui/StateComponents'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { DeterministicReportPayload } from '@/types'
@@ -143,7 +143,7 @@ export function ReportsPage() {
                       <tr key={trade.id} className="border-b border-border/60">
                         <td className="py-3 font-semibold text-text-heading">{trade.symbol}</td>
                         <td className="py-3 text-text-muted">{trade.setup}</td>
-                        <td className="py-3 text-text-muted">{trade.entry_time ? formatDate(trade.entry_time) : '-'}</td>
+                        <td className="py-3 text-text-muted">{trade.entry_time ? formatDateTime(trade.entry_time) : '-'}</td>
                         <td className="py-3 text-right font-data text-text-muted">{trade.quantity}</td>
                         <td className={cn('py-3 text-right font-data', parseDecimal(trade.pnl) >= 0 ? 'text-profit' : 'text-loss')}>{formatCurrency(trade.pnl ?? '0')}</td>
                         <td className="py-3 text-right font-data text-text-muted">{trade.r_multiple ?? '-'}</td>
