@@ -18,7 +18,6 @@ def require_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     If CHAT_ID is not configured, allows all (dev mode).
     """
     if not CHAT_ID:
-        # Dev mode: no chat ID restriction
         return True
 
     # Normalize incoming chat ID
