@@ -28,16 +28,14 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
   }
   const timingKey = `api:${config.method?.toUpperCase() ?? 'GET'} ${config.url ?? 'unknown'}`
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(config as any)._timingKey = timingKey
+  ;(config as unknown as Record<string, unknown>)._timingKey = timingKey
   mark(`${timingKey}:start`)
   return config
 })
 
 apiClient.interceptors.response.use(
   (response) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const timingKey = (response.config as any)._timingKey as string | undefined
+    const timingKey = (response.config as unknown as Record<string, unknown>)._timingKey as string | undefined
     if (timingKey) {
       mark(`${timingKey}:end`)
       measure(timingKey, `${timingKey}:start`, `${timingKey}:end`)
@@ -45,8 +43,7 @@ apiClient.interceptors.response.use(
     return response
   },
   async (error) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const timingKey = (error.config as any)._timingKey as string | undefined
+    const timingKey = (error.config as unknown as Record<string, unknown> | undefined)?._timingKey as string | undefined
     if (timingKey) {
       mark(`${timingKey}:end`)
       measure(timingKey, `${timingKey}:start`, `${timingKey}:end`)

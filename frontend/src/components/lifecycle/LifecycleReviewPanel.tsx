@@ -16,11 +16,11 @@ type ActivePanel = 'emotion' | 'grade' | 'partial_exit' | null
 function GradeBadge({ grade }: { grade: string | null }) {
   if (!grade) return null
   const colors: Record<string, string> = {
-    A: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/30',
-    B: 'bg-emerald-300/20 text-emerald-300 border-emerald-300/30',
-    C: 'bg-amber-400/20 text-amber-400 border-amber-400/30',
-    D: 'bg-orange-400/20 text-orange-400 border-orange-400/30',
-    F: 'bg-red-400/20 text-red-400 border-red-400/30',
+    A: 'bg-[var(--profit)]/20 text-[var(--profit)] border-[var(--profit)]/30',
+    B: 'bg-[var(--profit)]/15 text-[var(--profit)] border-[var(--profit)]/25',
+    C: 'bg-[var(--gold)]/15 text-[var(--gold)] border-[var(--gold)]/25',
+    D: 'bg-[var(--loss)]/15 text-[var(--loss)]/20 border-[var(--loss)]/25',
+    F: 'bg-[var(--loss)]/20 text-[var(--loss)] border-[var(--loss)]/30',
   }
   return (
     <span className={`text-[9px] font-bold px-1 py-px rounded border ${colors[grade] || 'bg-border text-text-muted border-border'}`}>

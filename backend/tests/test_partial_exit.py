@@ -120,3 +120,21 @@ def test_delete_partial_exit_restores_remaining_quantity(db_session):
     assert result is None
     assert list_partial_exits(trade.id, db_session)["items"] == []
     assert _remaining_qty(trade, db_session) == Decimal("10.00000000")
+
+
+def test_full_close_after_partial_exit_uses_remaining_quantity(db_session):
+    trade = _trade()
+    trade.fees = Decimal("10.00")
+    trade.stop_price = Decimal("95.00")
+    db_session.add(trade)
+    db_session.commit()
+    db_session.refresh(trade)
+
+    create_partial_exit(trade.id, _payload("4"), db_session)
+    trade.exit_price = Decimal("120.00")
+    trade.exit_time = datetime.fromisoformat("2025-01-13T11:00:00")
+    db_session.commit()
+    db_session.refresh(trade)
+
+    assert trade.pnl == Decimal("150.0000000000000000")
+    assert trade.r_multiple == Decimal("3.0000000000000000")

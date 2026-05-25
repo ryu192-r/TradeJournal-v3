@@ -1,23 +1,23 @@
-# Trading Journal v3 — Project Documentation
+# Trading Journal v3 — Project Overview
 
 > **Personal trading journal with AI coaching, capital management, and live market data.**
-> Last updated: May 2026
+> Last updated: May 2026 — v2 overhaul complete (calculations, design system, mobile nav, trade detail polish)
 
 ---
 
 ## Current Status — Production Live
 
-The app is deployed at `https://tjv3.duckdns.org` with full functionality. All core features are complete and working.
+The app is deployed at `https://tjv3.duckdns.org` with full functionality. All core features are complete and working. The v2 overhaul has centralized all trade calculations, established a design system, polished the trade detail page, and improved mobile navigation.
 
 ### Production Health
 | Check | Result |
 |-------|--------|
-| Backend | Healthy, pytest regression suite |
-| Frontend | Production build + typecheck |
+| Backend | Healthy — 200 tests passing |
+| Frontend | Production build + typecheck — 0 errors, 43 tests passing |
 | PostgreSQL | Healthy |
-| Core API endpoints | Authenticated routes covered by smoke/regression tests |
+| Core API endpoints | Authenticated routes covered by regression tests |
 | Service Worker | v4 (auto-updates) |
-| Test account | `test@test.com` / `test123456` (initial balance ₹285,052) |
+| Test account | `test@test.com` / `test123456` |
 
 ---
 
@@ -31,11 +31,35 @@ Browser → Traefik (HTTPS/DuckDNS, priority=100 for /api/v1)
         → Bot (Telegram, optional)
 ```
 
-- **Frontend**: React 19 SPA with lazy-loaded views
-- **Backend**: FastAPI with sync SQLAlchemy
-- **DB**: PostgreSQL with Alembic migrations
-- **Auth**: JWT (access + refresh tokens)
-- **AI**: Multi-provider (Ollama, OpenAI, DeepSeek, Anthropic, Google, Custom)
+- **Frontend**: React 19 SPA — 20 pages, code-split with `React.lazy`
+- **Backend**: FastAPI with 28 routers, sync SQLAlchemy, Pydantic v2
+- **DB**: PostgreSQL with Alembic migrations (SQLite for tests)
+- **Auth**: JWT (access + refresh tokens in localStorage)
+- **AI**: 8 providers via configurable routing
+
+---
+
+## Tech Stack
+
+### Frontend
+- React 19, Vite 8, TypeScript 6
+- Tailwind 3 with CSS custom properties (dark/light themes)
+- Zustand v5 (UI state), TanStack React Query v5 (server state)
+- recharts (charts), framer-motion (animations), lucide-react (icons)
+- react-hook-form + zod (form validation)
+- PWA support (manifest + service worker)
+- Sentry (conditional via `SENTRY_DSN` env var)
+
+### Backend
+- Python 3.12, FastAPI 0.115, Pydantic v2
+- SQLAlchemy 2.0 sync, PostgreSQL (psycopg2-binary)
+- JWT auth (python-jose + bcrypt)
+- APScheduler (live quote sync, conditional import)
+
+### Infrastructure
+- Docker Compose: 4 services (postgres, backend, frontend, bot)
+- External Traefik for HTTPS/DuckDNS
+- nginx in frontend container proxies `/api/v1/`
 
 ---
 
@@ -43,23 +67,30 @@ Browser → Traefik (HTTPS/DuckDNS, priority=100 for /api/v1)
 
 ### Dashboard (`GET /dashboard/operational`)
 Single-call payload returning:
-- **KPI cards**: Net P&L, Win Rate, Profit Factor, Avg R, Expectancy, Max DD
-- **Equity section**: Realized Equity card + Total Equity (with unrealized) card + equity curve chart
-- **Open trades** with live NSE quotes
-- **Risk Command Center**: portfolio heat, deployed capital, available capital, warnings
-- **Capital summary**: net_equity, unrealized_pnl, total_equity_unrealized, deposits, withdrawals
-- **Streaks**: current win/loss streak, longest win, longest loss
-- **Equity curve**: daily running total (initial + capital events + closed PnL + partial exits)
+- KPI cards: Net P&L, Win Rate, Profit Factor, Avg R, Expectancy, Max DD
+- Equity section: Realized Equity card + Total Equity (with unrealized) card + equity curve chart
+- Open trades with live NSE quotes
+- Risk Command Center: portfolio heat, deployed capital, available capital, warnings
+- Capital summary: net_equity, unrealized_pnl, total_equity_unrealized
+- Streaks: current win/loss streak, longest win/loss
+- Equity curve: daily running total
 
-### Intelligence Dashboard (`GET /dashboard/intelligence`)
-Single-call payload returning lifecycle, behavioral, playbook, and market highlights.
+### Trade Management
+- CRUD with auto-merge by `(symbol, date)`
+- Pyramid (weighted-average entry, sum qty)
+- Partial exits (record scaled exits, remaining_qty tracking)
+- Chart image upload/gallery (multipart, disk storage)
+- Trade detail page: PnL hero, 8 metric cards, stat grid, lifecycle timeline, AI review
+- Trade form: 6 clear sections with live calculation preview
+- Trade list: responsive table/card view with manual toggle
+- Broker import: Zerodha, Dhan, Generic CSV with preview
 
-### AI Coach (8 providers, 11+ endpoints)
+### AI Coach (8 providers, 12 endpoints)
 - Daily/weekly reviews, trade insight, free-form Q&A, pattern detection, rule reminders
 - Trade Review engine with A–F scoring across 6 dimensions
 - Behavioral Score (programmatic + AI composite)
-- Coach personality blending (5 mentors, 0-100% weights)
-- Timeout chain: Frontend 120s → nginx 180s → backend 60-300s
+- 5 mentor personalities with 0-100% blending
+- Timeout chain: 120s frontend → 180s nginx → 60-300s backend
 
 ### Capital System
 - Net equity = initial + capital events + realized PnL + partial exit PnL
@@ -68,25 +99,39 @@ Single-call payload returning lifecycle, behavioral, playbook, and market highli
 - Dynamic tier system with editable thresholds
 - Equity curve in both Dashboard and Capital pages
 
-### Performance OS / Daily SA Notes
-- Weekly and monthly review workflows in `PerformanceOSPage`
-- Dedicated Daily SA Notes page for pre-market and post-market journaling
-- Post-market flow captures discipline rating separately from mood
-- Daily workflow shell keeps current trading-day notes separate from longer reviews
-
 ### Lifecycle Analytics
-- Emotion logs, execution grades, stop history, partial exits, and timeline events are attached to trade detail
-- Discipline score combines journal discipline, execution grades, emotion logs, and rule adherence signals
-- Trade review engine loads lifecycle context before producing structured AI feedback
+- Emotion logs, execution grades (A–F), stop history, partial exits
+- Discipline score: journal discipline + execution grades + emotion logs + rule adherence
+- Overtrading detection, revenge trade detection, early exit analysis
+- Behavioral patterns: emotion × grade matrix, discipline insights
 
 ### Market Context / Live Quotes
-- `LiveQuote` caches NSE stock quotes used by live dashboard cards and unrealized P&L
-- `POST /market/sync-quotes` syncs currently open trade symbols
-- Quote status is exposed as `fresh`, `stale`, `failed`, or `not_synced` so the frontend can avoid silent stale-price displays
+- `LiveQuote` caches NSE stock prices used for unrealized P&L
+- Quote status: `fresh`, `stale`, `failed`, `not_synced`
+- Market performance correlation (PnL by NIFTY trend/regime/VIX/breadth)
+- Market regime summary
+
+### Performance OS
+- Daily workflow: pre-market → execution → review → behavior phases
+- Weekly/monthly review workflows with guided templates
+- Daily SA Notes for deep pre-market and post-market journaling
+
+### Design System
+- 17 shared UI components in `frontend/src/components/ui/`
+- Design tokens: CSS variables for all colors, spacing, typography
+- Fluid responsive layout via `clamp()` CSS functions
+- Mobile bottom nav with raised FAB for quick trade creation
+
+### Centralized Calculations
+- Backend: `backend/app/utils/calculations.py` — `calculate_trade_metrics()`, KPIs, streaks
+- Frontend: `frontend/src/utils/calculations.ts` — matching client-side module
+- Planned metrics (Risk:Reward, Risk Amount) from stop/target
+- Actual metrics (Net P&L, R-Multiple) from exit price
+- `r_multiple` auto-computed — no longer user-editable
 
 ---
 
-## API Endpoints (47+)
+## API Endpoints (40+)
 
 ### Core
 | Method | Endpoint | Description |
@@ -112,44 +157,78 @@ Single-call payload returning lifecycle, behavioral, playbook, and market highli
 | POST | `/coach/trade-review` | Structured post-trade review |
 | GET/DELETE | `/coach/reviews/{id}` | Review CRUD |
 
-### Broker Import
+### Market & Analytics
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/trades/brokers` | List supported brokers |
-| GET | `/trades/import/template/{broker}` | Download CSV template |
-| POST | `/trades/import?broker={broker}` | Upload CSV (dry_run optional) |
-
-### TradingOS Foundation
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/dashboard/operational` | Realized KPIs, open positions, live quotes, risk, capital, equity curve |
-| GET | `/dashboard/intelligence` | Lifecycle, behavioral, playbook, and market highlights |
-| GET/POST/DELETE | `/trades/{id}/partial-exits` | Scale-out records and remaining quantity |
-| GET/POST | `/trades/{id}/timeline` | Trade lifecycle events |
-| GET/POST | `/trades/{id}/stop-history` | Stop adjustment history and current SL sync |
-| POST | `/market/sync-quotes` | Sync live quotes for open symbols |
+| GET | `/analytics/dashboard` | Full analytics payload |
+| POST | `/market/sync-quotes` | Sync live NSE prices |
+| GET | `/market/live-quotes` | Cached quotes with freshness |
+| GET | `/lifecycle/emotion-summary` | Emotion analysis |
+| GET | `/lifecycle/behavioral` | Behavioral analytics |
+| GET | `/lifecycle/revenge-trades` | Revenge trade detection |
 
 ---
 
-## Database Models (17+)
+## Database Models (19)
 
 | Model | Table | Key Fields |
 |-------|-------|-----------|
-| Trade | `trades` | symbol, entry/exit price, qty, pnl, fees, setup, exit_reason, r_multiple |
-| Account | `accounts` | name, initial_balance, current_balance, breakeven_threshold |
-| CapitalEvent | `capital_events` | type (deposit/withdrawal/adjustment/etc), amount, timestamp |
-| PartialExit | `partial_exits` | trade_id, qty, exit_price, realized_pnl, exit_time, exit_reason |
-| ExecutionGrade | `execution_grades` | trade_id, 6 dimension grades (A–F), overall_grade |
-| EmotionLog | `emotion_logs` | trade_id, emotion, confidence, stress, conviction, focus |
-| TradeTimeline | `trade_timelines` | trade_id, event_type, timestamp, old/new values |
+| Trade | `trades` | symbol, entry/exit price, qty, pnl, r_multiple, stop/target, fees, setup, exit_reason, chart_images(JSON) |
+| PartialExit | `partial_exits` | trade_id, qty, exit_price, realized_pnl, r_captured |
 | StopHistory | `stop_history` | trade_id, stop_type, price, timestamp |
-| SetupPlaybook | `setup_playbook` | name, tactics, ideal_conditions, risk_profile, rules, is_active |
-| DailyJournal | `daily_journals` | date (unique), pre/post notes, mood, discipline_rating |
-| TradeIdea | `trade_ideas` | symbol, thesis, confidence, status, traded_trade_id |
-| CoachReview | `coach_reviews` | review_type, content, period, trade_ids, summary_stats |
-| LiveQuote | `live_quotes` | symbol, ltp, change, change_pct, volume, market_cap |
-| MarketSnapshot | `market_snapshots` | nifty_close, india_vix, breadth, regime |
-| Milestone | `milestones` | name, target_amount, achieved |
+| TradeTimeline | `trade_timelines` | trade_id, event_type, old/new values |
+| EmotionLog | `emotion_logs` | trade_id, emotion, confidence, stress, conviction, focus |
+| ExecutionGrade | `execution_grades` | trade_id, 6 dimension grades (A–F) |
+| Account | `accounts` | name, initial_balance, current_balance, breakeven_threshold |
+| CapitalEvent | `capital_events` | type(deposit/withdrawal/etc), amount, trade_id |
+| SetupPlaybook | `setup_playbook` | name, is_active(VARCHAR), trade_count, win_rate, avg_r |
+| LiveQuote | `live_quotes` | symbol, ltp, change_pct, volume |
+| DailyJournal | `daily_journals` | date, pre/post notes, mood, discipline_rating |
+| Others | — | TradeIdea, CoachReview, MarketSnapshot, Milestone, TierConfig, User, DailyWorkflow, WeeklyReview, MonthlyReview |
+
+---
+
+## Architecture Decisions (20 ADRs)
+
+| ADR | Decision |
+|-----|----------|
+| 001 | Trade merge by (symbol, date) |
+| 002 | Capital auto-reconciliation |
+| 003 | AI provider routing (8 providers) |
+| 004 | LONG-only trades (Indian equities) |
+| 005 | Fluid responsive layout (clamp) |
+| 006 | Zustand view switching (no URL router) |
+| 007 | Decimal string serialization |
+| 008 | JWT in localStorage |
+| 009 | Router ordering (broker_import before trades) |
+| 010 | Sync SQLAlchemy engine |
+| 011 | Dual state (Zustand + React Query) |
+| 012 | Trade status lifecycle (auto-computed) |
+| 013 | nginx + Traefik proxy |
+| 015 | Alembic migrations |
+| 016 | Performance OS domain model |
+| 017 | Operational dashboard aggregate endpoint |
+| 018 | Lifecycle analytics model |
+| 019 | Partial exits and remaining quantity |
+| 020 | Live quote cache and market data provider |
+
+---
+
+## Testing
+
+| Layer | Framework | Location | Count |
+|-------|-----------|----------|-------|
+| Backend | pytest + SQLite | `backend/tests/` | 200 tests |
+| Frontend | Vitest + jsdom | `frontend/src/test/` | 43 tests |
+| TypeScript | `tsc --noEmit` | — | 0 errors |
+
+```bash
+# Run all tests
+cd backend && python3 -m pytest tests/ -v
+cd frontend && npx vitest run
+cd frontend && npx tsc --noEmit
+cd frontend && npm run build
+```
 
 ---
 
@@ -158,19 +237,9 @@ Single-call payload returning lifecycle, behavioral, playbook, and market highli
 ```bash
 docker compose up -d --build          # full stack
 docker compose logs -f backend        # backend logs
-cd backend && python3 -m pytest tests/ -v   # tests (SQLite, no Docker needed)
+cd backend && python3 -m pytest tests/ -v   # tests
 cd frontend && npm run dev             # dev server
-cd frontend && npx tsc --noEmit       # typecheck
-cd frontend && npm run build           # production build
 ```
-
-## Architecture Decisions
-
-- ADR-016: Performance OS domain model
-- ADR-017: Operational dashboard aggregate endpoint
-- ADR-018: Lifecycle analytics model
-- ADR-019: Partial exits and remaining quantity
-- ADR-020: Live quote cache and market data provider
 
 ### Environment Variables
 | Variable | Default | Description |
@@ -179,26 +248,30 @@ cd frontend && npm run build           # production build
 | `SECRET_KEY` | — | Auth secret |
 | `JWT_SECRET_KEY` | — | JWT signing key |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | Token expiry |
-| `RATE_LIMIT_OFF` | false | Disable rate limiting (Docker/tests: true) |
+| `RATE_LIMIT_OFF` | false | Disable rate limiting |
 | `VITE_API_URL` | `/api/v1` | API base URL (build-time) |
-| `SENTRY_DSN` | — | Optional, enables Sentry |
-| `DUCK_DOMAIN` | — | DuckDNS domain for Traefik HTTPS |
-| `UPLOAD_DIR` | `uploads/charts` | Chart image directory |
-| `MAX_UPLOAD_SIZE_MB` | 10 | Max upload size |
+| `SENTRY_DSN` | — | Optional Sentry |
+| `UPLOAD_DIR` | `uploads/charts` | Chart image storage |
 
 ### Service Ports
-| Service | Port | Notes |
-|---------|------|-------|
-| Postgres | 5432 | user: `trading_journal` |
-| Backend | 8000 | uvicorn, health at `/health` |
-| Frontend | 3000 | nginx, proxies `/api/v1` to backend |
-| Bot | — | Telegram bot, depends on postgres |
+| Service | Port |
+|---------|------|
+| Postgres | 5432 |
+| Backend | 8000 |
+| Frontend | 3000 |
 
 ---
+
+## Key Documentation
+
+- `docs/ARCHITECTURE.md` — complete file map, every endpoint, every component
+- `CONTEXT.md` — domain glossary, trade lifecycle, formulas
+- `docs/FEATURE_ROADMAP.md` — completed and planned features
+- `docs/adr/` — 20 Architecture Decision Records
+- `AGENTS.md` — agent guide with stack, commands, conventions
 
 ## Test User & Sample Data
 
 - Email: `test@test.com`, Password: `test123456`
 - Account initial_balance: ~₹285,000
 - 21 trades (17 closed, 4 open), 26 capital events, 1 partial exit
-- 5 active playbook setups, 3 overtrading days, 13 revenge trades flagged

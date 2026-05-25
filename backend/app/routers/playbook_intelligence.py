@@ -26,6 +26,7 @@ from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
+from app.utils.calculations import compute_aggregate_kpis
 
 router = APIRouter(prefix="/playbook", tags=["playbook-intelligence"])
 
@@ -68,34 +69,19 @@ def _compute_performance(trades: list[Trade]) -> dict:
             "r_std": None,
         }
 
-    pnls = [float(t.pnl) for t in closed]
-    wins = [p for p in pnls if p > 0]
-    losses = [p for p in pnls if p < 0]
-    win_rate = round(len(wins) / len(pnls) * 100, 1) if pnls else None
-
-    total_pnl = round(sum(pnls), 2)
-    avg_pnl = round(sum(pnls) / len(pnls), 2) if pnls else None
-
-    gross_profit = sum(wins) if wins else 0
-    gross_loss = abs(sum(losses)) if losses else 0
-    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else None
-
-    avg_win = round(sum(wins) / len(wins), 2) if wins else 0
-    avg_loss = round(sum(losses) / len(losses), 2) if losses else 0
-    wr = (win_rate or 0) / 100
-    expectancy = round(wr * avg_win + (1 - wr) * avg_loss, 2)
-
+    kpis = compute_aggregate_kpis(closed)
+    closed_count = kpis["trade_count"]
     r_vals = [float(t.r_multiple) for t in closed if t.r_multiple is not None]
 
     return {
         "trade_count": len(trades),
-        "closed_count": len(closed),
-        "win_rate": win_rate,
-        "total_pnl": total_pnl,
-        "avg_pnl": avg_pnl,
-        "profit_factor": profit_factor,
-        "expectancy": expectancy,
-        "avg_r": round(sum(r_vals) / len(r_vals), 2) if r_vals else None,
+        "closed_count": closed_count,
+        "win_rate": kpis["win_rate"],
+        "total_pnl": kpis["net_pnl"],
+        "avg_pnl": round(kpis["net_pnl"] / closed_count, 2) if closed_count > 0 else None,
+        "profit_factor": kpis["profit_factor"],
+        "expectancy": kpis["expectancy"],
+        "avg_r": kpis["avg_r"],
         "max_r": round(max(r_vals), 2) if r_vals else None,
         "min_r": round(min(r_vals), 2) if r_vals else None,
         "r_std": round(

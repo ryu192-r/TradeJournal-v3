@@ -23,7 +23,14 @@
 | **Partial Exit** | Records a partial close of an open position. Captures qty, exit_price, realized PnL, exit_time. Full remaining-quantity exits are rejected here; use the main trade close flow for full exits. Enables tracking of scaled exits. |
 | **Execution Grade** | A–F letter grades for entry quality, sizing, stop management, patience, rule adherence, exit quality, and overall. Stored per trade. |
 | **Tier** | A capital bracket with a minimum balance threshold. Serves two purposes: (1) determines position sizing / risk limits, (2) tracks progress toward financial goals. User can edit tier thresholds via TierEditor on Capital page. |
-| **R-Multiple** | Risk-adjusted return: `pnl / (abs(entry_price - stop_price) * quantity)`. Computed automatically when a trade is closed. NULL if no stop_price exists. |
+| **Risk per Unit** | `entry_price - stop_price` (for LONG). Per-share risk amount. Used as denominator for R-multiple. |
+| **Risk Amount** | `risk_per_unit * quantity`. Total planned risk on the trade. |
+| **Planned Reward** | `(target_price - entry_price) * quantity`. Total planned reward if target is hit. |
+| **Risk:Reward Ratio** | **Planned** metric: `reward_per_unit / risk_per_unit`. Requires both stop and target. |
+| **Gross P&L** | `(exit_price - entry_price) * quantity`. Before fees. |
+| **Net P&L** | `gross_pnl - fees`. The actual monetary result. |
+| **R-Multiple** | **Actual** metric: `net_pnl / risk_amount`. How many times the planned risk was made or lost. Auto-computed when both exit and stop exist. NULL if no stop_price. NOT a user-editable field. |
+| **Capture Ratio** | `actual_r / max_r`. How much of the planned reward was captured. Used in early exit analysis. |
 | **Setup** | A predefined trading strategy in the Playbook (e.g., "Episodic Pivot", "Pullback"). Has rules, ideal conditions, risk profile, and auto-computed performance stats (`trade_count`, `win_rate`, `avg_r`). Trades reference setups by name (free-text string, not FK). Setup stored as `is_active` VARCHAR ("active"/"archived"), not boolean. |
 | **Tactic** | A free-form entry technique tag on a trade (e.g., "ORB", "PDH"). Distinct from Setup. |
 | **Stop History** | Audit trail of every stop loss adjustment on a trade. Records timestamp, old stop, new stop, stop type (initial, manual, breakeven, trailing, target). |
@@ -42,8 +49,9 @@
 | **Cap %** | PnL as percentage of current net equity: `pnl / net_equity * 100`. |
 | **SL Inline Edit** | Click the SL cell in trades table to open a compact form with price + type dropdown. Saves to both `trade.stop_price` and `stop_history`. |
 | **Playbook Stats Sync** | `_update_setup_stats(db, setup_name)` recomputes `trade_count`, `win_rate`, `avg_r` after every trade create/update/delete/pyramid. |
-| **Nsetools** | Python library for fetching live NSE data. Used by the market data service for quote sync. |
 | **Navigation Mode** | Simple/Advanced sidebar preference. Simple mode hides lower-frequency views, while `activeView` still supports all registered app views. |
+| **Calculation Module** | Single-source-of-truth for all trade math. Backend: `backend/app/utils/calculations.py`. Frontend: `frontend/src/utils/calculations.ts`. Both are direction-aware (LONG/SHORT) and handle all edge cases gracefully. |
+| **Trade Card View** | Responsive mobile trade list: auto-switches to cards below 768px with manual toggle. Each card shows symbol, status, P&L, R-multiple, entry/exit/qty. |
 
 ## Capital Flow
 

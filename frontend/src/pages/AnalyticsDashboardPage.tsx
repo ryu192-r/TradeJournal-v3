@@ -163,8 +163,6 @@ function OverviewMetrics({
 
 // ───────────────────────── Equity Curve ─────────────────────────
 
-// @ts-ignore - kept for reference
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function EquityCurveChart({ data }: { data: DailyPnlEntry[] }) {
   const chartData = useMemo(() => {
     return data.map((d) => ({
@@ -256,9 +254,9 @@ function getHeatmapCellColor(value: number, maxAbs: number, hasTrade: boolean) {
 }
 
 function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
-  if (!data || data.length === 0) return null
-
-  const [activeDate, setActiveDate] = useState<string | null>(data[data.length - 1]?.date ?? null)
+  const safeData = data && data.length > 0 ? data : []
+  const defaultDate = safeData.length > 0 ? safeData[safeData.length - 1]?.date ?? null : null
+  const [activeDate, setActiveDate] = useState<string | null>(defaultDate)
 
   const {
     maxAbs,
@@ -274,17 +272,7 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
     bestDay,
     worstDay,
   } = useMemo(() => {
-    const pnlByDate = new Map<string, { value: number; tradeCount: number }>()
-    let nextMaxAbs = 1
-
-    for (const entry of data) {
-      const value = pnlNum(entry.net_pnl)
-      pnlByDate.set(entry.date, { value, tradeCount: entry.trade_count })
-      nextMaxAbs = Math.max(nextMaxAbs, Math.abs(value))
-    }
-
-    const orderedDates = data.map((entry) => entry.date).sort()
-    if (orderedDates.length === 0) {
+    if (safeData.length === 0) {
       return {
         maxAbs: 1,
         months: [],
@@ -300,7 +288,16 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
         worstDay: null as HeatmapCell | null,
       }
     }
+    const pnlByDate = new Map<string, { value: number; tradeCount: number }>()
+    let nextMaxAbs = 1
 
+    for (const entry of safeData) {
+      const value = pnlNum(entry.net_pnl)
+      pnlByDate.set(entry.date, { value, tradeCount: entry.trade_count })
+      nextMaxAbs = Math.max(nextMaxAbs, Math.abs(value))
+    }
+
+    const orderedDates = safeData.map((entry) => entry.date).sort()
     const first = new Date(orderedDates[0])
     const last = new Date(orderedDates[orderedDates.length - 1])
     const cursor = new Date(first)
@@ -555,8 +552,6 @@ function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
 
 // ───────────────────────── Monthly P\u0026L Bars ─────────────────────────
 
-// @ts-ignore - kept for reference
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MonthlyPnlChart({ data, framed = true }: { data: MonthlyPnlEntry[]; framed?: boolean }) {
   const chartData = data.map((d) => ({
     month: d.month,
@@ -904,8 +899,6 @@ function DrawdownChart({ data }: { data: DailyPnlEntry[] }) {
 
 // ───────────────────────── Streaks Mini Card ─────────────────────────
 
-// @ts-ignore - kept for reference
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StreakMiniCard({ data }: { data: AnalyticsStreaks }) {
   const currentType = data.current_streak.type ?? 'none'
   const currentCount = data.current_streak.count
@@ -1064,7 +1057,7 @@ export function AnalyticsDashboardPage() {
     )
   }
 
-  const netPnl = pnlNum(data.kpi.net_pnl)
+  const netPnl = data.kpi.net_pnl != null ? pnlNum(data.kpi.net_pnl) : 0
   const tradeCount = data.kpi.trade_count
   const winRate = data.kpi.win_rate
   const monthlyNetPnl = data.monthly_pnl.map((entry) => pnlNum(entry.net_pnl))

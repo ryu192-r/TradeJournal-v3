@@ -11,7 +11,7 @@ import { formatCurrency, formatPrice, formatQuantity, formatDate } from '@/utils
 import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liveQuotes'
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
-import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit } from '@/lib/endpoints'
+import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit, updateTrade } from '@/lib/endpoints'
 import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList } from 'lucide-react'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
@@ -229,12 +229,13 @@ export function TradesPage() {
   const [pyramidFees, setPyramidFees] = useState('0')
   const [pyramidStopPrice, setPyramidStopPrice] = useState('')
   const [pyramidSubmitting, setPyramidSubmitting] = useState(false)
-  const [partialExitTradeId, setPartialExitTradeId] = useState<number | null>(null)
-  const [peQty, setPeQty] = useState('')
-  const [pePrice, setPePrice] = useState('')
-  const [peReason, setPeReason] = useState('')
-  const [peNote, setPeNote] = useState('')
-  const [peSubmitting, setPeSubmitting] = useState(false)
+  const [sellTradeId, setSellTradeId] = useState<number | null>(null)
+  const [sellQty, setSellQty] = useState('')
+  const [sellPrice, setSellPrice] = useState('')
+  const [sellReason, setSellReason] = useState('')
+  const [sellFees, setSellFees] = useState('')
+  const [sellNote, setSellNote] = useState('')
+  const [sellSubmitting, setSellSubmitting] = useState(false)
   const [listingMode, setListingMode] = useState<ListingMode>('auto')
 
   const advancedFilterCount = Object.entries(researchFilters).filter(([, value]) => value !== '' && value !== false).length
@@ -280,38 +281,64 @@ export function TradesPage() {
     }
   }, [pyramidEntryPrice, pyramidQty, pyramidFees, pyramidStopPrice, addToast, queryClient, closePyramid])
 
-  const closePartialExit = useCallback(() => {
-    setPartialExitTradeId(null)
-    setPeQty('')
-    setPePrice('')
-    setPeReason('')
-    setPeNote('')
+  const openSellTrade = useCallback((trade: ApiTrade) => {
+    const qty = trade.remaining_qty ?? trade.quantity
+    setSellTradeId(trade.id)
+    setSellQty(String(qty))
+    setSellPrice('')
+    setSellReason('')
+    setSellFees(trade.fees ?? '')
+    setSellNote('')
   }, [])
 
-  const handlePartialExit = useCallback(async (tradeId: number) => {
-    if (!peQty || !pePrice) return
-    setPeSubmitting(true)
+  const closeSellTrade = useCallback(() => {
+    setSellTradeId(null)
+    setSellQty('')
+    setSellPrice('')
+    setSellReason('')
+    setSellFees('')
+    setSellNote('')
+  }, [])
+
+  const handleSellTrade = useCallback(async (tradeId: number, maxQty: number | null) => {
+    const qty = Number(sellQty)
+    if (!sellPrice || !qty || qty <= 0 || (maxQty != null && qty > maxQty)) return
+    setSellSubmitting(true)
     try {
-      await createPartialExit(tradeId, {
-        qty: peQty,
-        exit_price: pePrice,
-        exit_time: new Date().toISOString(),
-        exit_reason: peReason || null,
-        note: peNote || null,
-      })
-      addToast({ title: 'Partial exit recorded', message: `${peQty} shares exited.`, variant: 'success' })
+      if (maxQty != null && qty < maxQty) {
+        await createPartialExit(tradeId, {
+          qty: sellQty,
+          exit_price: sellPrice,
+          exit_time: new Date().toISOString(),
+          exit_reason: sellReason || null,
+          note: sellNote || null,
+        })
+        addToast({ title: 'Partial sell recorded', message: `${sellQty} shares sold.`, variant: 'success' })
+      } else {
+        const trade = await updateTrade(tradeId, {
+          exit_price: sellPrice,
+          exit_time: new Date().toISOString(),
+          exit_reason: sellReason || null,
+          exit_notes: sellNote || null,
+          ...(sellFees ? { fees: sellFees } : {}),
+        })
+        addToast({ title: 'Trade closed', message: `${trade.symbol} fully sold at ${formatPrice(Number(trade.exit_price))}.`, variant: 'success' })
+        setTradeCache(queryClient, trade)
+        patchTradeInLists(queryClient, trade)
+      }
       void invalidateLifecycle(queryClient, tradeId)
       void invalidateTradeDetail(queryClient, tradeId)
       void invalidateRisk(queryClient)
       void invalidateAnalytics(queryClient)
+      void invalidatePlaybook(queryClient)
       void invalidateTradeList(queryClient)
-      closePartialExit()
+      closeSellTrade()
     } catch {
-      addToast({ title: 'Error', message: 'Failed to record partial exit.', variant: 'error' })
+      addToast({ title: 'Error', message: 'Failed to record sell.', variant: 'error' })
     } finally {
-      setPeSubmitting(false)
+      setSellSubmitting(false)
     }
-  }, [peQty, pePrice, peReason, peNote, addToast, queryClient, closePartialExit])
+  }, [sellQty, sellPrice, sellReason, sellFees, sellNote, addToast, queryClient, closeSellTrade])
 
   const skip = (page - 1) * 100
   const { data, isLoading, error } = useTradesQuery({
@@ -386,8 +413,15 @@ export function TradesPage() {
   })
   const netEquity = capitalData?.net_equity ?? null
 
-  const { data: peExitsData } = usePartialExitsQuery(partialExitTradeId)
-  const peMaxQty = peExitsData ? Number(peExitsData.remaining_qty) : null
+  const { data: sellExitsData } = usePartialExitsQuery(sellTradeId)
+  const sellTrade = useMemo(() => {
+    if (sellTradeId == null) return null
+    return data?.items.find((trade) => trade.id === sellTradeId) ?? null
+  }, [sellTradeId, data?.items])
+  const sellMaxQty = sellExitsData ? Number(sellExitsData.remaining_qty) : sellTrade ? Number(sellTrade.remaining_qty ?? sellTrade.quantity) : null
+  const sellQtyNum = Number(sellQty)
+  const isFullSell = sellMaxQty != null && sellQtyNum === sellMaxQty
+  const isInvalidSellQty = sellQty !== '' && (!sellQtyNum || sellQtyNum <= 0 || (sellMaxQty != null && sellQtyNum > sellMaxQty))
 
   const { data: liveQuotesData } = useLiveQuotesQuery(60_000)
   const syncQuotes = useSyncLiveQuotesMutation()
@@ -679,6 +713,7 @@ export function TradesPage() {
                   onTap={() => openDetailTrade(trade.id)}
                   isSelected={selectedIds.has(trade.id)}
                   onToggleSelect={() => toggleSelect(trade.id)}
+                  onSellTrade={() => openSellTrade(trade)}
                 />
               ))}
             </div>
@@ -731,7 +766,7 @@ export function TradesPage() {
                         openEditTrade={openEditTrade}
                         openDetailTrade={openDetailTrade}
                         setPyramidingTradeId={setPyramidingTradeId}
-                       setPartialExitTradeId={setPartialExitTradeId}
+                       openSellTrade={openSellTrade}
                        netEquity={netEquity}
                        quoteMap={quoteMap}
                        activeColumns={activeColumns}
@@ -796,50 +831,85 @@ export function TradesPage() {
         </div>
       </BottomSheet>
 
-      {/* Partial exit bottom sheet */}
-      <BottomSheet open={partialExitTradeId !== null} onClose={closePartialExit} title="Partial Exit">
-        <p className="text-sm text-text-muted mb-4">Sell a portion of your open position.</p>
-        <div className="space-y-3 mb-[var(--page-gap)]">
-          {peMaxQty != null && (
-            <div className="flex items-center justify-between text-xs font-data">
-              <span className="text-text-muted">Remaining shares</span>
-              <span className={peMaxQty > 0 ? 'text-profit' : 'text-loss'}>{peMaxQty}</span>
+      {sellTradeId !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card shadow-2xl animate-card-in">
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-text-heading font-display">Sell Position</h3>
+                <p className="mt-0.5 text-xs text-text-muted">{sellTrade?.symbol ?? 'Open trade'} · {isFullSell ? 'Full sell' : 'Partial sell'}</p>
+              </div>
+              <button onClick={closeSellTrade} className="rounded-lg p-1 text-text-muted hover:bg-bg-elevated hover:text-text-heading transition-colors cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          )}
-          <div>
-            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Qty</label>
-            <input type="number" step="1" value={peQty} onChange={(e) => setPeQty(e.target.value)} max={peMaxQty ?? undefined}
-              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder={peMaxQty != null ? `max ${peMaxQty}` : '0'} />
-          </div>
-          <div>
-            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Exit Price (₹)</label>
-            <input type="number" step="0.01" value={pePrice} onChange={(e) => setPePrice(e.target.value)}
-              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
-          </div>
-          <div>
-            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Reason</label>
-            <select value={peReason} onChange={(e) => setPeReason(e.target.value)}
-              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer">
-              <option value="">Select reason...</option>
-              {['target_hit', 'stop_hit', 'trailing_stop', 'manual_rules', 'gut_feeling', 'risk_management', 'partial_profit', 'time_based'].map(r => (
-                <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Note (optional)</label>
-            <textarea value={peNote} onChange={(e) => setPeNote(e.target.value)} rows={2}
-              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all resize-none" placeholder="Optional note..." />
+            <div className="space-y-3 px-5 py-4">
+              {sellTrade && (
+                <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-bg-elevated/30 p-3 text-xs">
+                  <div>
+                    <div className="text-text-faint">Entry</div>
+                    <div className="font-data text-text-heading">{formatPrice(Number(sellTrade.entry_price))}</div>
+                  </div>
+                  <div>
+                    <div className="text-text-faint">Remaining</div>
+                    <div className="font-data text-text-heading">{sellMaxQty != null ? formatQuantity(String(sellMaxQty)) : '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-text-faint">Mode</div>
+                    <div className={isFullSell ? 'font-data text-loss' : 'font-data text-accent'}>{isFullSell ? 'Full' : 'Partial'}</div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Qty to sell</label>
+                  <input type="number" step="1" value={sellQty} onChange={(e) => setSellQty(e.target.value)} max={sellMaxQty ?? undefined}
+                    className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder={sellMaxQty != null ? `max ${sellMaxQty}` : '0'} />
+                </div>
+                <div>
+                  <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Sell Price (₹)</label>
+                  <input type="number" step="0.01" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)}
+                    className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
+                </div>
+              </div>
+              {isInvalidSellQty && (
+                <div className="rounded-lg border border-loss/30 bg-loss-muted/15 px-3 py-2 text-xs text-loss">
+                  Qty must be between 1 and remaining shares.
+                </div>
+              )}
+              <div>
+                <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Reason</label>
+                <select value={sellReason} onChange={(e) => setSellReason(e.target.value)}
+                  className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer">
+                  <option value="">Auto-detect / manual</option>
+                  {['target', 'stop_loss', 'manual', 'trailing', 'system'].map(r => (
+                    <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                  ))}
+                </select>
+              </div>
+              {isFullSell && (
+                <div>
+                  <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Fees & Charges (optional)</label>
+                  <input type="number" step="0.01" value={sellFees} onChange={(e) => setSellFees(e.target.value)}
+                    className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
+                </div>
+              )}
+              <div>
+                <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Note (optional)</label>
+                <textarea value={sellNote} onChange={(e) => setSellNote(e.target.value)} rows={2}
+                  className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all resize-none" placeholder="Why sell here?" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 border-t border-border px-5 py-4">
+              <button onClick={closeSellTrade} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+              <button onClick={() => handleSellTrade(sellTradeId, sellMaxQty)} disabled={sellSubmitting || !sellQty || !sellPrice || isInvalidSellQty}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+                {sellSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Selling...</> : <><ArrowDownToLine className="w-4 h-4" /> {isFullSell ? 'Sell Full' : 'Sell Partial'}</>}
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={closePartialExit} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
-          <button onClick={() => handlePartialExit(partialExitTradeId!)} disabled={peSubmitting || !peQty || !pePrice || (peMaxQty != null && Number(peQty) > peMaxQty)}
-            className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
-            {peSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><ArrowDownToLine className="w-4 h-4" /> Record Exit</>}
-          </button>
-        </div>
-       </BottomSheet>
+      )}
 
       <BrokerImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => {
         void invalidateRisk(queryClient)
@@ -852,7 +922,19 @@ export function TradesPage() {
   )
 }
 
-function TradeCard({ trade, onTap, isSelected, onToggleSelect }: { trade: ApiTrade; onTap: () => void; isSelected: boolean; onToggleSelect: () => void }) {
+function TradeCard({
+  trade,
+  onTap,
+  isSelected,
+  onToggleSelect,
+  onSellTrade,
+}: {
+  trade: ApiTrade
+  onTap: () => void
+  isSelected: boolean
+  onToggleSelect: () => void
+  onSellTrade: () => void
+}) {
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const isProfitable = pnlNum >= 0
   const isOpen = !trade.exit_price
@@ -903,6 +985,12 @@ function TradeCard({ trade, onTap, isSelected, onToggleSelect }: { trade: ApiTra
         <button onClick={(e) => { e.stopPropagation(); onToggleSelect() }} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`}>
           {isSelected ? 'Selected' : 'Select'}
         </button>
+        {isOpen && (
+          <button onClick={(e) => { e.stopPropagation(); onSellTrade() }} className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded text-profit bg-profit-muted hover:text-profit transition-colors">
+            <ArrowDownToLine className="w-3 h-3" />
+            Sell
+          </button>
+        )}
       </div>
     </button>
   )
@@ -958,7 +1046,7 @@ interface TradeRowProps {
   openEditTrade: (id: number) => void
   openDetailTrade: (id: number) => void
   setPyramidingTradeId: (id: number | null) => void
-  setPartialExitTradeId: (id: number | null) => void
+  openSellTrade: (trade: ApiTrade) => void
   netEquity: string | null
   quoteMap: Map<string, LiveQuote>
   activeColumns: TradeColumnId[]
@@ -971,7 +1059,7 @@ const STOP_TYPE_OPTIONS = [
   { value: 'breakeven', label: 'Breakeven' },
 ]
 
-function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, setPartialExitTradeId, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
+function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, openSellTrade, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
   const entryCost = Number(trade.entry_price) * Number(trade.quantity)
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const capPct = computeCapPct(pnlNum, Number(netEquity))
@@ -1157,9 +1245,9 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
           {!trade.exit_price && (
             <>
               <button
-                onClick={() => { setPartialExitTradeId(trade.id) }}
-                className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
-                title="Partial Exit"
+                onClick={() => { openSellTrade(trade) }}
+                className="p-1.5 rounded-md text-text-muted hover:text-profit hover:bg-profit-muted transition-colors cursor-pointer"
+                title="Sell"
               >
                 <ArrowDownToLine className="w-4 h-4" />
               </button>

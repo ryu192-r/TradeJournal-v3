@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useUploadChartImageMutation, useDeleteChartImageMutation } from '@/hooks/useChartImagesMutation'
 import { useToastStore } from '@/store/toastStore'
-import { Upload, Trash2, ChevronLeft, ChevronRight, Loader2, BarChart3 } from 'lucide-react'
+import { Upload, Trash2, ChevronLeft, ChevronRight, Loader2, BarChart3, Expand } from 'lucide-react'
+import { Lightbox } from '@/components/ui/Lightbox'
 
 interface ChartImageGalleryProps {
   tradeId: number
@@ -14,6 +16,7 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
   const deleteMutation = useDeleteChartImageMutation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const slides = images.length > 0 ? images : ['']
   const current = activeIndex >= slides.length ? 0 : activeIndex
@@ -83,12 +86,22 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
 
       <div className="relative aspect-video rounded-lg overflow-hidden bg-bg-elevated/50 border border-border">
         {slides[current] ? (
-          <img
-            src={slides[current]}
-            alt="Trade chart"
-            className="w-full h-full object-contain"
-            loading="lazy"
-          />
+          <button
+            onClick={() => setLightboxOpen(true)}
+            className="absolute inset-0 cursor-zoom-in group"
+            aria-label="View full screen"
+          >
+            <img
+              src={slides[current]}
+              alt="Trade chart"
+              className="w-full h-full object-contain"
+              loading="lazy"
+              draggable={false}
+            />
+            <div className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <Expand className="w-3.5 h-3.5 text-white" />
+            </div>
+          </button>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-text-muted">
             <div className="w-10 h-10 rounded-full bg-accent-muted flex items-center justify-center">
@@ -129,6 +142,20 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {lightboxOpen && (
+          <Lightbox
+            open={lightboxOpen}
+            images={images}
+            activeIndex={current}
+            onClose={() => setLightboxOpen(false)}
+            onPrev={goPrev}
+            onNext={goNext}
+            onSelect={setActiveIndex}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

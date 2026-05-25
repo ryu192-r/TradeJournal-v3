@@ -14,6 +14,10 @@ Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
 
+### Architecture reference
+
+`docs/ARCHITECTURE.md` — complete file map, all endpoints, models, services, components, design tokens.
+
 ## Stack
 - **Frontend**: React 19, Vite 8, TypeScript 6, Tailwind 3, Zustand v5 (UI state), TanStack React Query v5 (server state), axios, react-hook-form + zod, recharts, framer-motion, lucide-react
 - **Backend**: Python 3.12, FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0 **sync**, PostgreSQL (psycopg2-binary), uvicorn
@@ -32,10 +36,12 @@ cd frontend && npm run build           # production build
 ```
 
 ## Key architecture
+- **Architecture doc**: `docs/ARCHITECTURE.md` — full file map, every endpoint, every component
 - **Auth gate**: `App.tsx` checks `isAuthenticated` — all pages require login
-- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `ideas`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`. Navigation supports Simple/Advanced mode; Simple hides lower-frequency views from the sidebar, not from the code.
+- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `ideas`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`, `journal`, `calendar`, `reports`, `lifecycle`, `risk`, `market`. Navigation supports Simple/Advanced mode; Simple hides lower-frequency views from the sidebar, not from the code.
 - **View code-splitting**: `App.tsx` lazy-loads all major views with `React.lazy`/`Suspense`; keep heavy pages (analytics/recharts, coach, trades) out of the initial bundle.
-- **Data refresh**: React Query refetches on mount/window focus/reconnect. `placeholderData: (previousData) => previousData` on ALL hooks prevents blank states during refetch. Trade-domain mutations call `invalidateTradeDomain()`. Capital-event mutations call `invalidateCapitalDomain()`.
+- **Mobile bottom nav**: Dashboard | Trades | **+** (FAB, create trade) | Analytics | Review. Replaces old grid layout. `frontend/src/components/layout/Sidebar.tsx:162-215`.
+- **Data refresh**: React Query refetches on mount/window focus/reconnect. `placeholderData: (previousData) => previousData` on ALL hooks prevents blank states during refetch.
 - **Routes**: Register in `backend/app/routers/base.py`, prefix `/api/v1`. **Order matters**: `broker_import` router must come before `trades` router or `/{trade_id}` shadows `/brokers`
 - **Models**: Define in `backend/app/models/`, import in `__init__.py` so `Base.metadata.create_all` picks them up
 - **Schemas**: Pydantic v2 in `backend/app/schemas/`
@@ -44,6 +50,7 @@ cd frontend && npm run build           # production build
 - **DB**: Tables created via alembic on startup (`main.py:19-28`). Falls back to `create_all` if migration fails. Prod = PostgreSQL, tests override to SQLite (`conftest.py:6-9`). Engine uses `pool_pre_ping=True`.
 - **Theme**: CSS variables via `data-theme="dark"|"light"` attr on root. Fonts: Newsreader (display), Inter (body), JetBrains Mono (data/mono)
 - **Fluid layout**: Page containers use `clamp()` CSS variables (`--page-px`, `--page-py`, `--page-gap`, `--heading-size`, `--cell-px`, `--cell-py`, `--text-sm`, `--text-xs`) defined in `index.css`. Use `text-[length:var(--x)]` not `text-[var(--x)]` (Tailwind treats `var()` as color by default).
+- **Standard card**: `const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
 - **Dynamic tiers**: `tier_configs` table, editable via TierEditor on Capital page
 - **Direction**: All trades are LONG (Indian equities — no shorting). DB column defaults to `"LONG"`, removed from UI. PnL = `(exit - entry) * qty - fees`
 - **Status auto-computed**: Derived from `exit_price` everywhere — no exit = open, has exit = closed. `_auto_set_status()` in `trades.py`. Old `draft`/`reviewed`/`analytics` values backfilled via `_backfill_trade_statuses()` on startup. Frontend `getStatus()`/`getStatusLabel()` use `exit_price` as source of truth. List filter uses `exit_price IS NULL/NOT NULL`.
@@ -52,23 +59,104 @@ cd frontend && npm run build           # production build
 - **Pyramid**: Open positions (no exit) have a pyramid button → `POST /trades/{id}/pyramid`. Adds more shares: weighted-average entry, sum qty, earliest entry, optional stop_price. Only allowed on open trades.
 - **Partial exits**: Open positions can have partial exits → `POST /trades/{id}/partial-exits`. Records qty, exit_price, realized_pnl, exit_time, exit_reason. `remaining_qty` computed from `quantity - SUM(partial_exit.qty)`. Full remaining-quantity exits are rejected here; close the trade through the main close flow. Used in dashboard deployed capital calculation.
 - **Merge by date**: Trades for same `(symbol, date)` are automatically merged on create/import: weighted-average entry/exit prices, summed quantity/fees/PnL, earliest entry time. Different dates = separate trades. Backfill existing duplicates via `POST /trades/merge-duplicates`.
-- **Rate limiter**: `RateLimiter` middleware in `main.py`. Disabled in Docker via `RATE_LIMIT_OFF=true` env var. Tests also set this.
-- **Sentry**: Frontend has `@sentry/vite-plugin` + `@sentry/react`. Conditionally loaded if `SENTRY_DSN` env var is set.
-- **PWA**: manifest.json + service worker registered in `main.tsx`. Installable on phone home screen. SW cache version bumped on deploy (`tj-v3-v4`).
-- **Exit reason**: Auto-detected when trade is closed: `stop_loss` (exit ≈ stop_price), `target` (exit ≈ target_price), `manual`. User can override. Triggered in `_auto_detect_exit_reason()` in `trades.py`.
-- **Breakeven threshold**: Configurable ±₹ amount on Account model (`breakeven_threshold`). Default ₹500. Editable in Capital page → Edit Account modal.
-- **Stop history**: `GET|POST /trades/{id}/stop-history`. Records every stop adjustment. Timeline component in trade detail modal.
+
+## Centralized Calculations
+
+### Backend: `backend/app/utils/calculations.py`
+- `calculate_trade_metrics()` — returns all metrics in one call (P&L, R-multiple, risk:reward)
+- `compute_pnl_value()` — simple PnL
+- `compute_r_multiple()` — actual / risk
+- `compute_live_pnl()` — LTP-based unrealized
+- `compute_aggregate_kpis()` — win_rate, profit_factor, expectancy, avg_r
+- `compute_streaks()` — win/loss streak analysis
+
+### Frontend: `frontend/src/utils/calculations.ts`
+- `calculateTradeMetrics()` — matches backend
+- `computeLivePnl()`, `computeLivePnlPct()`, `computeMaxRisk()`, `computeCapPct()` — UI helpers
+
+### Key principle
+- **Planned metrics** (Risk:Reward, Risk Amount) — from stop/target, no exit needed
+- **Actual metrics** (Net P&L, R-Multiple) — from exit price
+- `Trade.compute_pnl()` now auto-computes BOTH `pnl` AND `r_multiple` using shared module
+- `r_multiple` is NO longer a user-editable field in the trade form
+
+## Design System (Shared UI Components)
+- `SharedUI.tsx`: SyncBadge, LastUpdated, SectionHeader, SectionTitle, MetricCard, KpiCard, CollapsibleSection, PageHeader, StatusBadge, InlineBadge, Tabs, AlertRow, SafeAreaPadding
+- `StateComponents.tsx`: EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton
+- `GlassButton.tsx`: Primary/accent/danger/ghost variants
+- `GlassInput.tsx`, `GlassSelect.tsx`, `GlassTextarea.tsx`: Form inputs
+- `GlassCard.tsx`: Standard card (uses CSS vars, not dead `.glass` class)
+- `GlassBadge.tsx`: Inline badge chips
+- `BottomSheet.tsx`: Slide-up mobile modal
+- `PullToRefresh.tsx`: Mobile pull-to-refresh
+- **Always use these** instead of creating ad-hoc styles.
+
+## Rate limiter
+- `RateLimiter` middleware in `main.py`. Disabled in Docker via `RATE_LIMIT_OFF=true` env var. Tests also set this.
+
+## Sentry
+- Frontend has `@sentry/vite-plugin` + `@sentry/react`. Conditionally loaded if `SENTRY_DSN` env var is set.
+
+## PWA
+- manifest.json + service worker registered in `main.tsx`. Installable on phone home screen. SW cache version bumped on deploy (`tj-v3-v4`).
+
+## Exit reason
+- Auto-detected when trade is closed: `stop_loss` (exit ≈ stop_price), `target` (exit ≈ target_price), `manual`. User can override. Triggered in `_auto_detect_exit_reason()` in `trades.py`.
+
+## Breakeven threshold
+- Configurable ±₹ amount on Account model (`breakeven_threshold`). Default ₹500. Editable in Capital page → Edit Account modal.
+
+## Stop history
+- `GET|POST /trades/{id}/stop-history`. Records every stop adjustment. Timeline component in trade detail modal.
 - **Stop history updates stop_price**: `POST /trades/{id}/stop-history` also sets `trade.stop_price = payload.price`, so the trade's current SL stays in sync.
-- **SL inline edit**: Click the SL cell in the trades table to open a compact inline form — enter price + type (Manual/Trailing/Breakeven) → creates stop history entry + updates displayed SL.
-- **Trades table columns**: Symbol, Entry, Exit, **SL** (inline-editable), **Max Risk** (`(entry - stop) * qty`), Qty, Setup, Status, **P&L %** (`pnl / (entry × qty) × 100`), **Cap %** (`pnl / net_equity × 100`), P&L, Actions.
-- **Setup from playbook**: Trade form's setup dropdown fetches active setups via `useSetupsQuery('active')` instead of hardcoded values. Setup stored as playbook name string on trade. `is_active` is VARCHAR "active"/"archived", not boolean.
-- **Playbook stats sync**: `_update_setup_stats(db, setup_name)` in `trades.py` recomputes `trade_count`, `win_rate`, `avg_r` on a playbook entry after every trade create/update/delete. Called from create, update (both old + new setup), delete, and pyramid endpoints.
-- **Chart images**: `POST|DELETE /trades/{id}/images`. Multipart upload, disk storage (`UPLOAD_DIR` env var), served via `/uploads/`. Gallery with nav + delete in trade detail modal.
-- **Discipline rating**: 1-5 field in daily journal post-market step (separate from mood). Stored in `DailyJournal.discipline_rating`.
-- **Review stream**: `TradeReviewStream` supports back navigation, re-review filter (Unreviewed/All Trades), bulk mode (batch notes/tags on selected trades).
-- **Execution grades**: A–F per dimension (entry_quality, sizing_quality, stop_quality, patience, rule_adherence, exit_quality, overall_grade). Stored in `execution_grades` table. Logged via trade detail modal lifecycle section.
-- **Trade detail**: Full detail page with P&L hero card, stat grid (entry/exit/qty/fees), chart image gallery, lifecycle timeline (emotion logs, execution grades, stop history, partial exits), AI trade review button.
-- **Live quotes**: NSE stock prices cached in `live_quotes` table. Updated via `POST /market/sync-quotes` through `backend/app/services/market_data_service.py`. Quote status is exposed as `fresh`, `stale`, `failed`, or `not_synced`. Used for live dashboard position cards and unrealized P&L computation.
+
+## SL inline edit
+- Click the SL cell in the trades table to open a compact inline form — enter price + type (Manual/Trailing/Breakeven) → creates stop history entry + updates displayed SL.
+
+## Trades table columns
+- Symbol, Entry, Exit, **SL** (inline-editable), **Max Risk** (`(entry - stop) * qty`), Qty, Setup, Status, **P&L %** (`pnl / (entry × qty) × 100`), **Cap %** (`pnl / net_equity × 100`), P&L, Actions.
+
+## Trade list card view
+- Responsive: auto-switches to card layout on mobile (<768px)
+- Manual toggle with LayoutGrid/LayoutList button in filter bar
+- Each card shows: symbol, status, P&L, R-multiple, entry/exit/qty
+- Tap card → opens trade detail
+
+## Trade detail page
+- Sections: SummaryHeader, PnLHero, MetricGrid, StatCards (8 data points), ChartImageGallery, Notes, Review Notes, Tags, AI Review, LifecyclePanel
+- Delete requires confirmation (two clicks)
+- Duration display (e.g. "2 days 4h")
+- Uses `calculateTradeMetrics()` for all computed values
+
+## Trade form
+- 6 clear sections: Trade Basics → Risk Plan → Result → Calculated Metrics → Classification → Notes
+- Live preview of all calculated metrics as you type
+- Tags input (comma-separated, converted to array on submit)
+- `r_multiple` auto-computed by backend — no manual input field
+
+## Setup from playbook
+- Trade form's setup dropdown fetches active setups via `useSetupsQuery('active')` instead of hardcoded values. Setup stored as playbook name string on trade. `is_active` is VARCHAR "active"/"archived", not boolean.
+
+## Playbook stats sync
+- `_update_setup_stats(db, setup_name)` in `trades.py` recomputes `trade_count`, `win_rate`, `avg_r` on a playbook entry after every trade create/update/delete. Called from create, update (both old + new setup), delete, and pyramid endpoints.
+
+## Chart images
+- `POST|DELETE /trades/{id}/images`. Multipart upload, disk storage (`UPLOAD_DIR` env var), served via `/uploads/`. Gallery with nav + delete in trade detail modal.
+
+## Discipline rating
+- 1-5 field in daily journal post-market step (separate from mood). Stored in `DailyJournal.discipline_rating`.
+
+## Review stream
+- `TradeReviewStream` supports back navigation, re-review filter (Unreviewed/All Trades), bulk mode (batch notes/tags on selected trades).
+
+## Execution grades
+- A–F per dimension (entry_quality, sizing_quality, stop_quality, patience, rule_adherence, exit_quality, overall_grade). Stored in `execution_grades` table. Logged via trade detail modal lifecycle section.
+
+## Trade detail
+- Full detail page with P&L hero card, stat grid (entry/exit/qty/fees), chart image gallery, lifecycle timeline (emotion logs, execution grades, stop history, partial exits), AI trade review button.
+
+## Live quotes
+- NSE stock prices cached in `live_quotes` table. Updated via `POST /market/sync-quotes` through `backend/app/services/market_data_service.py`. Quote status is exposed as `fresh`, `stale`, `failed`, or `not_synced`. Used for live dashboard position cards and unrealized P&L computation.
 
 ## Dashboard architecture
 - **Operational dashboard** (`GET /dashboard/operational`): Single endpoint returning KPIs, open trades with live quotes, risk summary (deployed/available/heat/warnings), capital summary (net_equity, deposits, withdrawals, realized PnL, **unrealized PnL**, **total equity with unrealized**), streaks, and **equity curve**.
@@ -96,12 +184,19 @@ cd frontend && npm run build           # production build
 - Frontend: Vitest with jsdom, setup in `src/test/setup.ts`
 
 ## Repo conventions
-- **Git**: conventional commits (`feat:`, `fix:`, `docs:`)
+- **Git**: conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`)
 - **CSS**: Tailwind utility classes + CSS variables (`var(--accent)`, `var(--bg-card)`, etc.) — **never** use hardcoded hex/rgba colors
 - **Don't**: create new files unless necessary
 - **Design**: `rounded-2xl` = 14px, `.animate-card-in` for card entrance
 - **Component pattern**: Shared UI components in `frontend/src/components/ui/` (SharedUI.tsx, StateComponents.tsx, GlassBadge.tsx, PullToRefresh.tsx). Use these instead of creating new ones.
 - **Card class**: `CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
+
+## Key Documentation Files
+- `docs/ARCHITECTURE.md` — complete file map, all models, routers, services, components
+- `CONTEXT.md` — domain glossary, trade lifecycle, formulas
+- `docs/PROJECT_OVERVIEW.md` — user-facing overview, features, deployment
+- `docs/FEATURE_ROADMAP.md` — completed and planned features
+- `docs/adr/` — 20 Architecture Decision Records
 
 ## Environment variables (key ones)
 - `DATABASE_URL` — PostgreSQL connection string (or SQLite for tests)
@@ -123,7 +218,7 @@ cd frontend && npm run build           # production build
 | Bot | — | Telegram bot, depends on postgres |
 
 ## AI Coach
-- **Page**: `frontend/src/components/coach/AICoachPage.tsx` — 6 tabs (Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Builder, History)
+- **Page**: `frontend/src/components/coach/AICoachPage.tsx` — 7 tabs (Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Check, Trade Review, History)
 - **Types**: `frontend/src/types/coach.ts`
 - **Providers** (8 total in `backend/app/core/ai_config.py`):
   - Ollama Local (`FORMAT_OLLAMA` — native `/api/chat` endpoint)
@@ -173,7 +268,7 @@ cd frontend && npm run build           # production build
 - **Daily SA Notes** (`frontend/src/pages/DailySANotesPage.tsx`): Pre-market and post-market guided journaling with discipline rating
 
 ## Shared UI components
-- `frontend/src/components/ui/SharedUI.tsx` — SyncBadge, LastUpdated, SectionHeader, SectionTitle, MetricCard, CollapsibleSection, PageHeader, StatusBadge, AlertRow, SafeAreaPadding
+- `frontend/src/components/ui/SharedUI.tsx` — SyncBadge, LastUpdated, SectionHeader, SectionTitle, MetricCard, KpiCard, CollapsibleSection, PageHeader, StatusBadge, InlineBadge, Tabs, AlertRow, SafeAreaPadding
 - `frontend/src/components/ui/StateComponents.tsx` — EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton
 - `frontend/src/components/ui/GlassBadge.tsx` — GlassBadge (accent/profit/loss/neutral variants)
 - `frontend/src/components/ui/PullToRefresh.tsx` — mobile pull-to-refresh wrapper
@@ -190,3 +285,4 @@ cd frontend && npm run build           # production build
 - **patchTradeInLists / removeTradeFromLists / addTradeToLists**: Must use `setQueryData` function updater form to prevent race conditions. Never use value-based updater with stale data.
 - **profit_factor Infinity**: Returns `None` instead of `float('inf')` when gross_loss is 0. Two `float('inf')` sentinel values remain in `operational_dashboard.py:401` and `market_context.py:451` but are internal-only (never serialized).
 - **removeTradeFromLists total**: Only decrements `total` if the trade was actually present in that filtered list variant.
+- **apscheduler**: Imported conditionally in `main.py:90-92` inside `lifespan()`. Tests skip scheduler via `"pytest" not in sys.modules` in `_should_start_live_quote_scheduler()`.

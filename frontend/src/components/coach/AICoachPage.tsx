@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   generateDailyReview, generateWeeklyReview,
@@ -10,16 +10,17 @@ import { Loader2, Sparkles, MessageSquare, AlertTriangle, CheckCircle2, History,
 import type { PatternResult, CoachReviewListItem, TradeReviewResponse } from '@/types/coach'
 import { formatCurrency } from '@/utils/format'
 
+
 type Tab = 'daily' | 'weekly' | 'ask' | 'patterns' | 'rules' | 'review' | 'history'
 
-const TABS: { id: Tab; label: string; icon: typeof Sparkles }[] = [
-  { id: 'daily', label: 'Daily Review', icon: Calendar },
-  { id: 'weekly', label: 'Weekly Review', icon: Clock },
-  { id: 'ask', label: 'Ask Coach', icon: MessageSquare },
-  { id: 'patterns', label: 'Patterns', icon: Brain },
-  { id: 'rules', label: 'Rule Check', icon: CheckCircle2 },
-  { id: 'review', label: 'Trade Review', icon: Target },
-  { id: 'history', label: 'History', icon: History },
+const TAB_ITEMS = [
+  { id: 'daily' as Tab, label: 'Daily Review', icon: Calendar },
+  { id: 'weekly' as Tab, label: 'Weekly Review', icon: Clock },
+  { id: 'ask' as Tab, label: 'Ask Coach', icon: MessageSquare },
+  { id: 'patterns' as Tab, label: 'Patterns', icon: Brain },
+  { id: 'rules' as Tab, label: 'Rule Check', icon: CheckCircle2 },
+  { id: 'review' as Tab, label: 'Trade Review', icon: Target },
+  { id: 'history' as Tab, label: 'History', icon: History },
 ]
 
 function Markdown({ text }: { text: string }) {
@@ -300,7 +301,7 @@ export function AICoachPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
-        {TABS.map((t) => {
+        {TAB_ITEMS.map((t: { id: Tab; label: string; icon: ComponentType<{ className?: string }> }) => {
           const Icon = t.icon
           return (
             <button

@@ -622,7 +622,16 @@ export interface ExecutionGradeCreatePayload {
   notes?: string | null
 }
 
-export interface ExecutionGradeUpdatePayload extends ExecutionGradeCreatePayload {}
+export interface ExecutionGradeUpdatePayload {
+  entry_quality?: GradeLetter | null
+  sizing_quality?: GradeLetter | null
+  stop_quality?: GradeLetter | null
+  patience?: GradeLetter | null
+  rule_adherence?: GradeLetter | null
+  exit_quality?: GradeLetter | null
+  overall_grade?: GradeLetter | null
+  notes?: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle Analytics types

@@ -18,7 +18,7 @@ export function setPerfActive(v: boolean) {
 export function mark(name: string) {
   if (!isDev) return
   if (typeof performance !== 'undefined' && performance.mark) {
-    try { performance.mark(name) } catch {}
+    try { performance.mark(name) } catch { /* noop — performance API may not be available */ }
   }
   if (active && typeof console !== 'undefined') {
     console.log(`[perf] mark  ${name} @ ${Date.now()}`)
@@ -37,7 +37,7 @@ export function measure(name: string, startMark: string, endMark?: string) {
         entries.push({ name, duration: m.duration })
         console.log(`[perf] measure ${name} = ${m.duration.toFixed(1)}ms`)
       }
-    } catch {}
+    } catch { /* noop — performance API may not be available */ }
   }
 }
 
@@ -71,7 +71,7 @@ export function logMeasures(limit = 20) {
 export function clearPerf() {
   if (!isDev) return
   if (typeof performance !== 'undefined') {
-    try { performance.clearMarks(); performance.clearMeasures() } catch {}
+    try { performance.clearMarks(); performance.clearMeasures() } catch { /* noop */ }
   }
   entries.length = 0
 }

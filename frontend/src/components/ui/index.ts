@@ -5,9 +5,12 @@ export {
   SectionHeader,
   SectionTitle,
   MetricCard,
+  KpiCard,
   CollapsibleSection,
   PageHeader,
   StatusBadge,
+  InlineBadge,
+  Tabs,
   AlertRow,
   SafeAreaPadding,
 } from './SharedUI'

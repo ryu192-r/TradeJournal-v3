@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Boolean, Text, Index, event, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, object_session
 from sqlalchemy.sql import func
 from app.models.base import Base
 from app.utils.decimal_utils import TagsList
@@ -57,6 +57,30 @@ class Trade(Base):
 
     def compute_pnl(self):
         """Auto-compute PnL and R-multiple using shared calculation module."""
+        partials = []
+        if self.exit_price is not None:
+            session = object_session(self)
+            if session is not None and self.id is not None:
+                from app.models.partial_exit import PartialExit
+                partials = session.query(PartialExit).filter(PartialExit.trade_id == self.id).all()
+            else:
+                partials = list(self.partial_exits or [])
+
+        if self.exit_price is not None and partials:
+            total_exited_qty = sum(p.qty for p in partials)
+            remaining_qty = self.quantity - total_exited_qty
+            partial_realized = sum(p.realized_pnl or Decimal('0') for p in partials)
+            fee_share = Decimal('0')
+            if self.fees and self.quantity and remaining_qty > 0:
+                fee_share = Decimal(str(self.fees)) * (remaining_qty / self.quantity)
+
+            self.pnl = partial_realized + ((self.exit_price - self.entry_price) * remaining_qty) - fee_share
+            if self.stop_price and self.entry_price:
+                risk = (self.entry_price - self.stop_price) * self.quantity
+                if risk and risk > 0:
+                    self.r_multiple = self.pnl / risk
+            return self.pnl
+
         calc = calculate_trade_metrics(
             entry_price=self.entry_price,
             exit_price=self.exit_price,

@@ -2,146 +2,248 @@
 
 > Source: v2 features + v1 ideas + new brainstorm
 > Format: Vertical slices — each item is independent
-> Last updated: May 2026
+> Last updated: May 2026 — v2 overhaul in progress
 
 ---
 
-## ✅ COMPLETED (Built in v3)
+## ✅ COMPLETED
 
-### Phase 0 Stabilization ✅
-- Closed the current P0/P1/P2/P3 bug backlog from `docs/Ideas/Chatgpt/Bugs-Fixes.md`
-- Added focused backend regression tests for operational dashboard, lifecycle analytics, market context, partial exits, timeline, chart images, and Performance OS
-- Added frontend smoke coverage for Dashboard, Trade Detail, Performance OS, and Partial Exit flows
-- Documented the TradingOS foundation decisions in ADR-016 through ADR-020
-- Refreshed canonical docs so roadmap, project overview, context, and agent guidance match the implemented behavior
+### Phase 0: Stabilization ✅
+- Closed P0/P1/P2/P3 bug backlog
+- Backend regression tests: operational dashboard, lifecycle analytics, market context, partial exits, timeline, chart images, Performance OS
+- Frontend smoke tests: Dashboard, Trade Detail, Performance OS, Partial Exit flows
+- ADRs 016–020 documented
 
-### ~~1. Light/Dark Theme Toggle~~ ✅
-- CSS variables via `data-theme="dark"|"light"` attr on root
-- Fonts: Newsreader (display), Inter (body), JetBrains Mono (data)
-- Toggle in Settings page
+### Phase 1: Core Trading ✅
+- [x] Trade CRUD (all LONG — Indian equities)
+- [x] Open/Closed derived from `exit_price`
+- [x] Auto-merge by `(symbol, date)` on create/import
+- [x] Pyramid: add shares to open positions
+- [x] Soft delete (status = `"deleted"`)
+- [x] Date range filter, bulk select + delete
+- [x] Keyboard shortcuts (N, J/K)
+- [x] Excel export
+- [x] Setup dropdown fetched from Playbook active setups
+- [x] Playbook stats sync after trade mutations
+- [x] Exit reason auto-detection (stop_loss / target / manual)
+- [x] Stop history (audit trail with timeline)
+- [x] SL inline edit in trades table
+- [x] Trades table: Max Risk, P&L %, Cap % columns
+- [x] Chart image attachments (upload, gallery, delete)
+- [x] Trade detail page: PnL hero, metric grid, stat cards, charts, lifecycle
 
-### ~~2. WebSocket Live Price Broadcast~~ ✅ (Implemented differently)
-- Live NSE prices via cached quote sync (`POST /market/sync-quotes`)
-- Cached in `live_quotes` table, refreshed on demand
-- Frontend polls every 60s, used for live position cards and unrealized P&L
-- Quote freshness status is surfaced as `fresh`, `stale`, `failed`, or `not_synced`
+### Phase 2: Broker Import ✅
+- [x] Zerodha Console P&L CSV parser
+- [x] Dhan tradebook CSV parser (aggregates BUY/SELL)
+- [x] Generic CSV parser
+- [x] Import preview with dry-run
+- [x] Skip existing trades for same `(symbol, date)`
 
-### ~~3. Capital/Account Dashboard~~ ✅
-- Net equity card with edit starting capital
-- Deposit/Withdraw modals, delete events, reconcile button
-- Dynamic tier system with TierEditor
-- Equity curve (daily realized equity)
-- **Dashboard** now shows both Realized Equity and Total Equity (with unrealized P&L)
+### Phase 3: Capital System ✅
+- [x] Set/edit initial balance
+- [x] Deposit / Withdraw modals
+- [x] Delete capital events
+- [x] Deployed vs Available capital display
+- [x] Auto-reconciliation on all trade mutations
+- [x] Manual reconcile button with toast feedback
+- [x] Dynamic tiers (TierEditor)
+- [x] Breakeven threshold (editable)
+- [x] Equity curve (daily realized equity)
+- [x] Total Equity with Unrealized P&L display
 
-### ~~4. Psychology Dashboard~~ ✅ (as Intelligence Dashboard)
-- Lifecycle analytics: emotion logs, execution grades, discipline score
-- Behavioral analytics: overtrading days, revenge trades, early exits, capture ratio
-- Playbook intelligence: setup performance, win rate, avg R
-- Market context: NIFTY regime, VIX, breadth
+### Phase 4: Dashboards ✅
+- [x] Operational dashboard (single-call aggregate endpoint)
+- [x] Intelligence dashboard (lifecycle, behavioral, playbook, market)
+- [x] KPI cards: Net P&L, Win Rate, Profit Factor, Avg R, Expectancy, Max DD
+- [x] Live positions with NSE quotes
+- [x] Risk Command Center (heat, deployed, warnings)
+- [x] Equity section (Realized + Total Equity cards + chart)
+- [x] Win/loss streaks
 
-### ~~5. Partial Exits~~ ✅
-- `POST /trades/{id}/partial-exits` — record partial closes
-- `remaining_qty` computed from `quantity - SUM(partial_exit.qty)`
-- Full remaining-quantity exits are rejected here; close the trade through the main trade close flow
-- Dashboard uses partial exits for deployed capital calculation
-- Trade detail modal shows partial exit timeline
+### Phase 5: Analytics ✅
+- [x] Full analytics dashboard
+- [x] Setup performance breakdown
+- [x] R-multiple distribution
+- [x] Drawdown chart
+- [x] Day-of-week / time-of-day patterns
+- [x] Holding period analysis
+- [x] Monthly PnL bar chart
 
-### ~~6. Execution Grades~~ ✅
-- A–F per dimension: entry_quality, sizing_quality, stop_quality, patience, rule_adherence, exit_quality, overall_grade
-- Logged via trade detail modal lifecycle section
-- Used in AI trade reviews
+### Phase 6: AI Coach ✅
+- [x] 7 tabs: Daily, Weekly, Ask, Patterns, Rules, Trade Review, History
+- [x] 8 providers (Ollama, OpenAI, DeepSeek, Anthropic, Google, Custom, OpenCode Zen)
+- [x] Trade Review engine with A–F scoring
+- [x] Behavioral Score (programmatic + AI composite)
+- [x] 5 mentor personalities with 0-100% blending
+- [x] ISO 8601 datetime format
+- [x] Timeout chain: 120s → 180s → 60-300s
 
-### ~~7. Trade Review Engine~~ ✅
-- `POST /coach/trade-review/{trade_id}` — loads playbook, emotions, grades, partial exits
-- Produces structured review with scores, strengths, weaknesses, rule violations, coaching notes
-- Trade detail modal shows AI review button
+### Phase 7: Journal & Review ✅
+- [x] Daily journal with structured prompts
+- [x] Discipline rating (1-5, separate from mood)
+- [x] Weekly stats (trade count, PnL, win rate, avg R)
+- [x] Review stream with back navigation, re-review, bulk mode
+- [x] Execution grades (A–F per dimension)
 
-### ~~8. Broker Trade Import~~ ✅
-- Zerodha Console P&L CSV parser
-- Dhan tradebook CSV parser (aggregates BUY/SELL legs)
-- Generic CSV parser
-- BrokerImportModal with preview, dry-run, skip indicators
+### Phase 8: Performance OS ✅
+- [x] Daily workflow shell (pre-market → execution → review → behavior)
+- [x] Weekly review workflow with guided template
+- [x] Monthly reviews
+- [x] Daily SA Notes (pre-market + post-market journaling)
+- [x] Textarea autosave with debounce
 
-### ~~9. Live Quotes~~ ✅
-- `LiveQuote` model caches NSE prices
-- Market data provider sync via `backend/app/services/market_data_service.py`
-- Quote freshness metadata prevents stale prices from looking live
-- Used for live dashboard position cards and unrealized P&L
+### Phase 9: Market Data ✅
+- [x] Live NSE quote cache (`live_quotes` table)
+- [x] Quote sync service (`POST /market/sync-quotes`)
+- [x] Quote freshness status (fresh/stale/failed/not_synced)
+- [x] Market performance correlation (PnL by trend/regime/VIX)
+- [x] Market regime summary
 
-### ~~10. Performance OS~~ ✅
-- Weekly review workflow with guided template
-- Monthly reviews
-- Daily SA (Super Analyzer) notes: pre-market and post-market guided journaling
+### Phase 10: Lifecycle Analytics ✅
+- [x] Emotion summary by trade
+- [x] Grade summary across dimensions
+- [x] Behavioral analytics (emotion × grade matrix)
+- [x] Revenge trade detection
+- [x] Overtrading detection
+- [x] Early exit analysis with capture ratio
+- [x] Composite discipline score
+
+### Phase 11: Calendar & Reports ✅
+- [x] Monthly calendar with daily P&L
+- [x] Trade count, wins, discipline per calendar day
+- [x] Weekly/monthly deterministic reports
+- [x] Setup breakdown in reports
+
+### Phase 12: UI/UX ✅
+- [x] Light/dark theme (CSS variables)
+- [x] Fluid responsive layout (`clamp()`)
+- [x] Code-split views (`React.lazy`/`Suspense`)
+- [x] Indian Rupee formatting (₹1.2k / ₹1.50L / ₹1.25Cr)
+- [x] PWA support (manifest + service worker)
+- [x] Auto-refresh on mutation/mount/focus/reconnect
+
+---
+
+## ✅ V2 OVERHAUL (In Progress)
+
+### 🟢 Completed
+
+#### Calculation Centralization
+- [x] Centralized trade math: `backend/app/utils/calculations.py`
+- [x] Centralized frontend math: `frontend/src/utils/calculations.ts`
+- [x] `r_multiple` auto-computed by backend — no longer user-editable
+- [x] Risk:Reward (planned) separated from R-Multiple (actual)
+- [x] ALL edge cases handled: missing stop, missing target, zero risk, zero qty
+- [x] Live PnL formula centralized via `computeLivePnl()`
+- [x] Max Risk, Cap % formulas centralized
+- [x] Duplicated PnL/KPI/streak logic removed from trades router and operational dashboard
+- [x] 35 backend + 29 frontend calculation tests
+
+#### Trade Detail Polish
+- [x] Sub-components: TradeSummaryHeader, PnLHero, MetricGrid, StatCards, NotesCard
+- [x] Delete with confirmation (two clicks)
+- [x] Duration display ("1 day 3h")
+- [x] Review notes section
+- [x] AI Review card with generate button (closed trades only)
+- [x] 8 computed metrics: Gross P&L, Net P&L, Risk Amount, Planned Reward, Risk:Reward, R Multiple, P&L/Unit, Risk/Unit
+- [x] "Not enough data" for missing values, warnings for invalid
+- [x] Mobile-first responsive grid
+
+#### Trade Form Redesign
+- [x] 6 clear sections: Basics → Risk Plan → Result → Metrics → Classification → Notes
+- [x] Live metrics preview with helpful hints ("Enter stop", "Need exit + stop")
+- [x] Tags input (comma-separated → array on submit)
+- [x] `r_multiple` removed from form — auto-computed
+- [x] Section subtitles explain purpose
+
+#### Mobile Navigation
+- [x] Bottom nav: Dashboard | Trades | **+** (FAB) | Analytics | Review
+- [x] Raised FAB for "Create Trade" action
+- [x] Removed old grid-cols-5 with "More" button
+
+#### Trade List
+- [x] Responsive card view (auto on mobile, toggleable)
+- [x] Card shows: symbol, status, P&L, R-multiple, entry/exit/qty
+- [x] Tap card → trade detail
+- [x] LayoutGrid/LayoutList toggle button
+
+#### Design System
+- [x] `KpiCard` component (applied to Dashboard)
+- [x] `InlineBadge` component
+- [x] `Tabs` component (reusable tab bar)
+- [x] `GlassCard` fixed — no longer references dead `.glass` CSS class
+- [x] Dashboard KPI cards use shared `KpiCard`
+
+### 🟡 In Progress / Planned
+
+- [ ] Analytics `analytics_service.py` — use shared `compute_aggregate_kpis()`
+- [ ] `playbook_intelligence.py` — use shared KPI computation
+- [ ] `GlassCard` applied to more pages (currently only EditTrade loading state)
+- [ ] AICoach inline tabs → use shared `Tabs` component
+- [ ] URL routing (React Router with deep-linkable views) — major architectural change
+- [ ] Trade table action buttons → use shared `GlassButton` consistently
+- [ ] Chart lightbox/fullscreen viewer
+- [ ] Thumbnail generation for chart uploads
 
 ---
 
 ## 🔴 HIGH PRIORITY (Next Up)
 
-### 11. WebSocket Live Price Broadcast (upgrade from polling)
-- **Files:** `backend/app/services/ws_manager.py`, `backend/app/routers/ws.py`, `frontend/src/hooks/useWebSocket.ts`
-- **What:** Push live prices every 30s during market hours instead of polling
-- **Why:** Polling uses more bandwidth and has latency. WebSocket gives instant updates.
+### 1. WebSocket Live Price Broadcast
+- Push live prices every 30s during market hours instead of polling
+- **Files:** `backend/app/services/ws_manager.py`, `backend/app/routers/ws.py`
 
-### 12. APScheduler Background Jobs
-- **Files:** `backend/app/scheduler.py`, `backend/app/main.py` (register on startup)
-- **Jobs:**
-  - Risk check every 60s (P&L breaches, position limits, stop proximity)
-  - Price broadcast trigger every 30s (drives WebSocket)
-  - Pre-market readiness check at 9:00 IST
-  - EOD summary at 3:35 IST
-  - Nightly DB backup at 2:00 IST
+### 2. APScheduler Background Jobs
+- Risk check every 60s, price broadcast trigger, pre-market check, EOD summary
+- Already partially implemented with conditional import in `main.py`
 
-### 13. Rule Compliance Heatmap
-- **Files:** `backend/app/services/compliance_service.py`, frontend compliance page
-- **Auto-detected violations:** IMPULSE_ENTRY, LATE_ENTRY, NO_ORB, TRADE_AFTER_2PM, TIGHT_STOP, FOMO, REVENGE, COPY_TRADE
-- **Cross-analysis:** violations × emotion × setup
+### 3. Rule Compliance Heatmap
+- Auto-detected violations: IMPULSE_ENTRY, LATE_ENTRY, NO_ORB, FOMO, REVENGE
+- Cross-analysis: violations × emotion × setup
 
-### 14. Behavioral Pattern Detection (Local Engine)
-- **Files:** `backend/app/services/behavioral_service.py` (current AI coach is external — add local rule-based engine)
-- **Detectors:** Revenge cluster (3+ trades/45min after loss), EOD revenge (2+ post-3PM), Monday spike, overtrading, fear/greed, FOMO, overconfidence (3-win streak → 2× risk)
+### 4. Behavioral Pattern Detection (Local Engine)
+- Rule-based detectors: revenge cluster, EOD revenge, Monday spike, overtrading, FOMO
+- Current AI coach is external — add local engine for performance
 
 ---
 
 ## 🟡 MEDIUM PRIORITY
 
-### 15. Telegram Bot Re-activation
-- **What:** Bot container restarts without token. Add token + chat ID to activate.
-- **Features:** Free-form trade parsing, daily PnL summary, stop reminders
+### 5. Telegram Bot Activation
+- Bot container exists but needs `TELEGRAM_BOT_TOKEN`
+- Features: trade parsing, daily PnL, stop reminders
 
-### 16. Alert & Notification System
-- **Channels:** WebSocket (in-app), Telegram (via bot)
-- **Triggers:** P&L breach, position limit hit, stop proximity, behavioral pattern detected
+### 6. Alert & Notification System
+- Channels: WebSocket (in-app), Telegram
+- Triggers: PnL breach, stop proximity, behavioral patterns
 
-### 17. Calendar P&L View
-- **What:** Month calendar with daily P&L, trade count, wins per calendar day
+### 7. Analytics `analytics_service.py` Consolidation
+- Use shared `compute_aggregate_kpis()` from calculations module
+- Remove duplicate KPI logic in pandas
 
-### 18. Drawdown Series & Underwater Chart
-- **What:** Day-by-day underwater chart, recovery factor, payoff ratio
+### 8. Drawdown Series & Underwater Chart
+- Day-by-day underwater chart, recovery factor
 
-### 19. Expectancy by Emotion & Time Block
-- **What:** Breakdown expectancy across emotions, time-of-day windows
+### 9. Expectancy by Emotion & Time Block
+- Breakdown expectancy across emotions, time-of-day windows
 
 ---
 
 ## 🔵 LOWER PRIORITY
 
-### 20. Anti-Journal (Missed Opportunity Tracker)
-- Log, list, resolve missed trades. Track "ghost P&L".
+### 10. Anti-Journal (Missed Opportunity Tracker)
+- Log, list, resolve missed trades. Track "ghost P&L"
 
-### 21. MAE/MFE Calculation
+### 11. MAE/MFE Calculation
 - Per-trade MAE/MFE, batch backfill, summary by setup
 
-### 22. Position Size & Risk Calculator
-- Risk-based share calculation: `size ENTRY SL CAPITAL RISK%`
+### 12. Position Size & Risk Calculator
+- Risk-based share calculation: `size = (capital * risk%) / (entry - stop)`
 
-### 23. Dhan Token Renewal OAuth Flow
-- OAuth flow for Dhan API token renewal (12-month validity)
+### 13. Import from More Brokers
+- Upstox, Angel One, Fyers
 
-### 24. Nightly Local DB Backup
-- WAL checkpoint, 7-day rotation
-
-### 25. Multi-currency Support
-- Currently INR-only. Add currency configuration.
+### 14. Multiple Account Support / Multi-Currency
 
 ---
 
@@ -149,11 +251,12 @@
 
 | Category | Count |
 |----------|-------|
-| ✅ Completed | 10 |
-| 🔴 High Priority | 4 |
-| 🟡 Medium | 5 |
-| 🔵 Lower | 5 |
-| **Total** | **24** |
+| ✅ Completed (v3) | 12 phases |
+| ✅ v2 Overhaul completed | 9 sections |
+| 🟡 v2 Overhaul in progress | 6 items |
+| 🔴 High Priority | 4 items |
+| 🟡 Medium Priority | 5 items |
+| 🔵 Lower Priority | 5 items |
 
 ---
 

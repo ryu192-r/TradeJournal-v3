@@ -17,11 +17,11 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        'glass rounded-2xl shadow-card',
-        hover && 'hover-lift cursor-pointer',
+        'bg-card rounded-2xl border border-border animate-card-in',
+        hover && 'hover:border-text-muted/30 transition-colors cursor-pointer',
         padding === 'sm' && 'p-3',
-        padding === 'md' && 'p-5',
-        padding === 'lg' && 'p-7',
+        padding === 'md' && 'p-[var(--page-px)]',
+        padding === 'lg' && 'p-6',
         className
       )}
     >

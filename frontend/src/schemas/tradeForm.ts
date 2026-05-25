@@ -16,6 +16,7 @@ export const tradeFormSchema = z.object({
   tactic: z.string().optional(),
   stop_price: z.string().optional(),
   target_price: z.string().optional(),
+  tags: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -32,6 +33,8 @@ export function datetimeLocalToIso(local: string | undefined): string | undefine
 }
 
 export function formDataToApiPayload(data: TradeFormData): Record<string, unknown> {
+  const tagsStr = (data.tags ?? '').trim()
+  const tagsList = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : null
   return {
     symbol: data.symbol,
     direction: 'LONG',
@@ -45,6 +48,7 @@ export function formDataToApiPayload(data: TradeFormData): Record<string, unknow
     tactic: data.tactic || null,
     stop_price: data.stop_price || null,
     target_price: data.target_price || null,
+    tags: tagsList,
     notes: data.notes || null,
   }
 }

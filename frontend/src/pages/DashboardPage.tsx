@@ -12,7 +12,7 @@ import {
   ArrowDown, PanelTopClose, PanelTopOpen, X,
 } from 'lucide-react'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
-import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection } from '@/components/ui/SharedUI'
+import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -121,7 +121,7 @@ function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
   const cards = useMemo(() => [
     { label: 'Net P&L', desc: 'Total realized profit/loss across all closed trades', value: kpi.net_pnl != null ? formatCurrency(Number(kpi.net_pnl)) : '—', sub: `${kpi.trade_count} trades`, icon: TrendingUp, color: Number(kpi.net_pnl) >= 0 ? 'profit' : 'loss' },
     { label: 'Win Rate', desc: 'Percentage of trades that closed in profit', value: kpi.win_rate != null ? `${kpi.win_rate.toFixed(1)}%` : '—', sub: `${kpi.trade_count} trades`, icon: Target, color: kpi.win_rate != null && kpi.win_rate >= 50 ? 'profit' : 'loss' },
-    { label: 'Profit Factor', desc: 'Gross profit divided by gross loss. >1.5 is good, <1 is losing', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : '—', sub: 'ratio', icon: Activity, color: kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'text-heading' : 'loss' },
+    { label: 'Profit Factor', desc: 'Gross profit divided by gross loss. >1.5 is good, <1 is losing', value: kpi.profit_factor != null ? kpi.profit_factor.toFixed(2) : '—', sub: 'ratio', icon: Activity, color: (kpi.profit_factor != null && kpi.profit_factor >= 1.5 ? 'profit' : kpi.profit_factor != null && kpi.profit_factor >= 1 ? 'neutral' : 'loss') as 'profit' | 'loss' | 'neutral' },
     { label: 'Avg R', desc: 'Average R-multiple per trade. Positive = edge exists', value: kpi.avg_r_multiple != null ? `${kpi.avg_r_multiple.toFixed(2)}R` : '—', sub: 'per trade', icon: Wallet, color: kpi.avg_r_multiple != null && kpi.avg_r_multiple >= 0 ? 'profit' : 'loss' },
     { label: 'Expectancy', desc: 'Average profit per trade. Positive edge over time', value: kpi.expectancy != null ? formatCurrency(kpi.expectancy) : '—', sub: 'per trade', icon: TrendingUp, color: kpi.expectancy != null && kpi.expectancy >= 0 ? 'profit' : 'loss' },
     { label: 'Max DD', desc: 'Largest peak-to-trough drawdown in account value', value: (() => {
@@ -135,28 +135,17 @@ function KpiCards({ kpi }: { kpi: OperationalDashboardPayload['kpi'] }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--page-gap)]">
-      {cards.map((card) => {
-        const Icon = card.icon
-        const isLoss = card.color === 'loss'
-        const isHeading = card.color === 'text-heading'
-        const textClass = isLoss ? 'text-loss' : isHeading ? 'text-text-heading' : 'text-profit'
-        return (
-          <div
-            key={card.label}
-            className={`${CARD} group relative cursor-help`}
-            title={card.desc}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLoss ? 'bg-loss-muted' : isHeading ? 'bg-border' : 'bg-profit-muted'}`}>
-                <Icon className={`w-4 h-4 ${textClass}`} />
-              </div>
-              <span className="text-[10px] font-data uppercase tracking-wider text-text-muted" title={card.desc}>{card.label}</span>
-            </div>
-            <div className={`text-lg font-bold font-data ${textClass}`}>{card.value}</div>
-            <div className="text-[10px] text-text-muted font-data mt-0.5">{card.sub}</div>
-          </div>
-        )
-      })}
+      {cards.map((card) => (
+        <KpiCard
+          key={card.label}
+          label={card.label}
+          value={card.value}
+          sub={card.sub}
+          icon={card.icon}
+          color={card.color as 'profit' | 'loss' | 'neutral'}
+          desc={card.desc}
+        />
+      ))}
     </div>
   )
 }
@@ -204,7 +193,7 @@ function EquitySection({ capital, equityCurve }: { capital: OperationalDashboard
   const realizedDelta = netEquity - initialBalance
   const totalDelta = totalEquityUnrealized - initialBalance
 
-  const curveData = equityCurve ?? []
+  const curveData = useMemo(() => equityCurve ?? [], [equityCurve])
   const chartData = useMemo(() =>
     curveData.map(p => ({ date: p.date, equity: parseDecimal(p.equity, 0) })),
   [curveData])
@@ -770,9 +759,9 @@ export function DashboardPage() {
   }, [liveQuotes])
 
   const operationalData = data as OperationalDashboardPayload | undefined
-  const openTrades = operationalData?.open_trades ?? []
-  const equityCurve = operationalData?.equity_curve ?? []
-  const riskWarnings = operationalData?.risk?.warnings ?? []
+  const openTrades = useMemo(() => operationalData?.open_trades ?? [], [operationalData?.open_trades])
+  const equityCurve = useMemo(() => operationalData?.equity_curve ?? [], [operationalData?.equity_curve])
+  const riskWarnings = useMemo(() => operationalData?.risk?.warnings ?? [], [operationalData?.risk?.warnings])
   const dashboardAlerts = useMemo(() => buildDashboardAlerts({
     warnings: riskWarnings,
     openTrades,

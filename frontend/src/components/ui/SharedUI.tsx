@@ -152,6 +152,39 @@ export function MetricCard({
   )
 }
 
+/* ─── KpiCard (compact variant of MetricCard) ─────────────── */
+
+export function KpiCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  color = 'neutral',
+  desc,
+}: {
+  label: string
+  value: string
+  sub: string
+  icon: LucideIcon
+  color: 'profit' | 'loss' | 'neutral'
+  desc: string
+}) {
+  const isLoss = color === 'loss'
+  const textClass = isLoss ? 'text-loss' : color === 'profit' ? 'text-profit' : 'text-text-heading'
+  return (
+    <div className={`${CARD} group relative cursor-help`} title={desc}>
+      <div className="flex items-center justify-between mb-2">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLoss ? 'bg-loss-muted' : color === 'profit' ? 'bg-profit-muted' : 'bg-border'}`}>
+          <Icon className={`w-4 h-4 ${textClass}`} />
+        </div>
+        <span className="text-[10px] font-data uppercase tracking-wider text-text-muted">{label}</span>
+      </div>
+      <div className={`text-lg font-bold font-data ${textClass}`}>{value}</div>
+      <div className="text-[10px] text-text-muted font-data mt-0.5">{sub}</div>
+    </div>
+  )
+}
+
 /* ─── CollapsibleSection ───────────────────────────────────── */
 
 import { useState } from 'react'
@@ -255,6 +288,75 @@ export function StatusBadge({
     <span className={cn('shrink-0 text-[length:var(--text-xs)] font-medium px-2.5 py-1 rounded-full', map[tone])}>
       {status}
     </span>
+  )
+}
+
+/* ─── InlineBadge ──────────────────────────────────────────── */
+
+export function InlineBadge({
+  children,
+  tone = 'neutral',
+}: {
+  children: React.ReactNode
+  tone?: 'profit' | 'loss' | 'neutral' | 'accent' | 'warning'
+}) {
+  const map: Record<string, string> = {
+    profit:  'bg-profit-muted text-profit',
+    loss:    'bg-loss-muted text-loss',
+    neutral: 'bg-border text-text-muted',
+    accent:  'bg-accent-muted text-accent',
+    warning: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+  }
+  return (
+    <span className={cn('inline-flex items-center px-1.5 py-px rounded text-[9px] font-medium border border-transparent', map[tone])}>
+      {children}
+    </span>
+  )
+}
+
+/* ─── Tabs ─────────────────────────────────────────────────── */
+
+interface TabItem {
+  id: string
+  label: string
+  icon?: LucideIcon
+  badge?: number
+}
+
+export function Tabs({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: TabItem[]
+  active: string
+  onChange: (id: string) => void
+}) {
+  return (
+    <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
+      {tabs.map((tab) => {
+        const isActive = tab.id === active
+        const Icon = tab.icon
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium border transition-all cursor-pointer',
+              isActive
+                ? 'border-accent/30 bg-accent-muted text-accent'
+                : 'border-transparent text-text-muted hover:text-text-heading hover:bg-accent-faint'
+            )}
+          >
+            {Icon && <Icon className="w-3.5 h-3.5" />}
+            {tab.label}
+            {tab.badge != null && tab.badge > 0 && (
+              <span className="ml-0.5 text-[9px] font-bold bg-accent text-white rounded-full px-1.5 py-px">{tab.badge}</span>
+            )}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

@@ -12,6 +12,7 @@ from app.models.trade_timeline import TradeTimeline, VALID_EVENT_TYPES
 from app.routers.trades import soft_delete_trade, update_trade
 from app.schemas.trade import TradeUpdate
 from app.schemas.trade_timeline import TimelineEventCreate
+from app.services.trade_service import TradeService
 
 
 @pytest.fixture
@@ -81,3 +82,24 @@ def test_update_trade_timeline_preserves_previous_stop_and_target(db_session):
     assert events["stop_updated"].new_value == "97.50"
     assert events["target_updated"].old_value == "120.00000000"
     assert events["target_updated"].new_value == "130.00"
+
+
+def test_create_same_symbol_date_ignores_deleted_trade(db_session):
+    deleted = _trade(status="deleted")
+    db_session.add(deleted)
+    db_session.commit()
+    db_session.refresh(deleted)
+
+    trade, action = TradeService(db_session).merge_or_create({
+        "symbol": deleted.symbol,
+        "direction": "LONG",
+        "entry_price": Decimal("101.00"),
+        "quantity": Decimal("5"),
+        "entry_time": deleted.entry_time,
+        "status": "open",
+    })
+
+    assert action == "created"
+    assert trade.id != deleted.id
+    assert trade.status == "open"
+    assert db_session.query(Trade).count() == 2

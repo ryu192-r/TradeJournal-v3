@@ -28,7 +28,7 @@ from app.models.setup_playbook import SetupPlaybook
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.decimal_utils import ensure_decimal
-from app.utils.calculations import calculate_trade_metrics, compute_aggregate_kpis, compute_streaks
+from app.utils.calculations import calculate_trade_metrics
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

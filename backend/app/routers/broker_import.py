@@ -179,7 +179,7 @@ async def import_broker_csv(
             if symbol and entry_time:
                 existing = (
                     db.query(Trade)
-                    .filter(Trade.symbol == symbol, func.date(Trade.entry_time) == entry_time.date())
+                    .filter(Trade.symbol == symbol, func.date(Trade.entry_time) == entry_time.date(), Trade.status != "deleted")
                     .first()
                 )
                 if existing:
