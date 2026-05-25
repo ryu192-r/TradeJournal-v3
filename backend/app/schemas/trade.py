@@ -1,9 +1,21 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
 
 from app.utils.decimal_utils import ensure_decimal
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    """Ensure datetime is naive IST.
+    If timezone-aware, convert to IST and strip tzinfo.
+    If naive, assume it is already IST and return as-is.
+    """
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 class TradeBase(BaseModel):
@@ -12,8 +24,8 @@ class TradeBase(BaseModel):
     entry_price: Decimal = Field(..., description="Entry price per unit")
     exit_price: Optional[Decimal] = Field(None, description="Exit price per unit")
     quantity: Decimal = Field(..., description="Quantity of shares/contracts")
-    entry_time: datetime = Field(..., description="Timestamp of entry")
-    exit_time: Optional[datetime] = Field(None, description="Timestamp of exit")
+    entry_time: datetime = Field(..., description="Timestamp of entry (IST)")
+    exit_time: Optional[datetime] = Field(None, description="Timestamp of exit (IST)")
     fees: Decimal = Field(default=Decimal('0'), description="Total fees for the trade")
     notes: Optional[str] = Field(None, description="Additional notes")
     tags: Optional[List[str]] = Field(None, description="List of tags")
@@ -31,10 +43,17 @@ class TradeBase(BaseModel):
             raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
+    @field_validator("entry_time", "exit_time")
+    @classmethod
+    def strip_to_ist(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
+
     # Keep as strings to avoid precision loss
     @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
     @classmethod
-    def ensure_decimal(cls, v):
+    def validate_decimal(cls, v):
         return ensure_decimal(v)
 
 
@@ -72,6 +91,13 @@ class TradeUpdate(BaseModel):
         if v != "LONG":
             raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
+
+    @field_validator("entry_time", "exit_time")
+    @classmethod
+    def strip_to_ist_update(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
     @classmethod
@@ -111,6 +137,28 @@ class TradeResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_serializer("entry_time", "exit_time")
+    def serialize_ist_datetime(self, v):
+        """Serialize naive IST datetimes without timezone suffix."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            if v.tzinfo is not None:
+                v = v.astimezone(IST).replace(tzinfo=None)
+            return v.isoformat()
+        return str(v)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_system_datetime(self, v):
+        """System timestamps — convert to IST and strip tz for consistent display."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            if v.tzinfo is not None:
+                v = v.astimezone(IST).replace(tzinfo=None)
+            return v.isoformat()
+        return str(v)
+
     @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl")
     def serialize_decimal(self, v):
         if v is None:
@@ -145,9 +193,16 @@ class OpenLiveTradeResponse(BaseModel):
 class PyramidTradeRequest(BaseModel):
     entry_price: Decimal = Field(..., description="Entry price of the pyramid lot")
     quantity: Decimal = Field(..., description="Quantity to add")
-    entry_time: Optional[datetime] = Field(None, description="Entry time for this lot")
+    entry_time: Optional[datetime] = Field(None, description="Entry time for this lot (IST)")
     fees: Optional[Decimal] = Field(Decimal('0'), description="Fees for this lot")
     stop_price: Optional[Decimal] = Field(None, description="Updated stop loss for the position")
+
+    @field_validator("entry_time")
+    @classmethod
+    def strip_pyramid_time(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("entry_price", "quantity", "fees", "stop_price")
     @classmethod

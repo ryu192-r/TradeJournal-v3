@@ -291,7 +291,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     createMutation.mutate({
       event_type: modalType,
       amount: String(finalAmount),
-      timestamp: new Date(dateStr).toISOString(),
+      timestamp: dateStr + 'T00:00:00',
       description: description || undefined,
       account_id: data.account_id,
     })

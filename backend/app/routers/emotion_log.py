@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
-from app.schemas.emotion_log import EmotionLogCreate, EmotionLogResponse, EmotionLogListResponse
+from app.schemas.emotion_log import EmotionLogCreate, EmotionLogResponse, EmotionLogListResponse, IST as EL_IST
 from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.trade_timeline import TradeTimeline
@@ -39,7 +39,7 @@ def create_emotion_log(trade_id: int, payload: EmotionLogCreate, db: Session = D
         patience=payload.patience,
         focus=payload.focus,
         note=payload.note,
-        timestamp=payload.timestamp or datetime.utcnow(),
+        timestamp=payload.timestamp or datetime.now(EL_IST).replace(tzinfo=None),
     )
     db.add(entry)
 

@@ -1,10 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 from app.utils.decimal_utils import ensure_decimal as _ensure_decimal
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 class TradeIdeaBase(BaseModel):
@@ -19,6 +27,13 @@ class TradeIdeaBase(BaseModel):
     tags: Optional[str] = Field(None, description="Comma-separated tags")
     revisit_date: Optional[datetime] = Field(None, description="Remind date to revisit the idea")
     status: str = Field(default="draft", description="Status: draft, active, traded, archived")
+
+    @field_validator("revisit_date")
+    @classmethod
+    def strip_ist_base(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("direction")
     @classmethod
@@ -66,6 +81,13 @@ class TradeIdeaUpdate(BaseModel):
     tags: Optional[str] = None
     revisit_date: Optional[datetime] = None
     status: Optional[str] = None
+
+    @field_validator("revisit_date")
+    @classmethod
+    def strip_ist_update(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("direction")
     @classmethod
@@ -141,8 +163,15 @@ class ConvertToTradeRequest(BaseModel):
     quantity: Optional[Decimal] = Field(None, description="Trade quantity")
     fees: Optional[Decimal] = Field(default=Decimal("0"), description="Trading fees")
     notes: Optional[str] = Field(None, description="Notes appended to idea thesis")
-    entry_time: Optional[datetime] = Field(None, description="Entry time (defaults to now)")
-    exit_time: Optional[datetime] = Field(None, description="Exit time if already closed")
+    entry_time: Optional[datetime] = Field(None, description="Entry time (IST, defaults to now)")
+    exit_time: Optional[datetime] = Field(None, description="Exit time if already closed (IST)")
+
+    @field_validator("entry_time", "exit_time")
+    @classmethod
+    def strip_ist_convert(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("entry_price", "exit_price", "quantity", "fees", mode="plain")
     @classmethod

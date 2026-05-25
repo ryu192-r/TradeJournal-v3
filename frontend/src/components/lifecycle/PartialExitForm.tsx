@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { usePartialExitsQuery, useCreatePartialExitMutation, useDeletePartialExitMutation } from '@/hooks/usePartialExitQuery'
 import { formatPrice, formatCurrency, formatDateTime } from '@/utils/format'
+import { nowIST } from '@/schemas/tradeForm'
 import { Loader2, Trash2 } from 'lucide-react'
 import { useToastStore } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
@@ -40,7 +41,7 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
       payload: {
         qty,
         exit_price: exitPrice,
-        exit_time: new Date().toISOString(),
+        exit_time: nowIST() + ':00',
         exit_reason: exitReason || null,
         note: note || null,
       },

@@ -116,7 +116,7 @@ export function TradeEntryForm({
         entry_price: '',
         exit_price: undefined,
         quantity: '',
-        entry_time: isoToDatetimeLocal(nowIST().toISOString()),
+        entry_time: nowIST(),
         exit_time: undefined,
         fees: '0',
         setup: undefined,

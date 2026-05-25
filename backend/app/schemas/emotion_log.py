@@ -1,8 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from pydantic import Field, field_validator
 
 from app.schemas.base import BaseSchema
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 VALID_EMOTIONS = {'calm', 'fearful', 'euphoric', 'revenge', 'fomo', 'hesitant', 'disciplined'}
@@ -24,6 +32,13 @@ class EmotionLogCreate(BaseSchema):
         if v not in VALID_EMOTIONS:
             raise ValueError(f"emotion must be one of: {', '.join(sorted(VALID_EMOTIONS))}")
         return v
+
+    @field_validator("timestamp")
+    @classmethod
+    def strip_ist(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
 
 class EmotionLogResponse(BaseSchema):

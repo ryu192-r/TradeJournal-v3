@@ -8,6 +8,7 @@ import { useToastStore } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
+import { nowIST } from '@/schemas/tradeForm'
 import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liveQuotes'
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
@@ -309,7 +310,7 @@ export function TradesPage() {
         await createPartialExit(tradeId, {
           qty: sellQty,
           exit_price: sellPrice,
-          exit_time: new Date().toISOString(),
+          exit_time: nowIST() + ':00',
           exit_reason: sellReason || null,
           note: sellNote || null,
         })
@@ -317,7 +318,7 @@ export function TradesPage() {
       } else {
         const trade = await updateTrade(tradeId, {
           exit_price: sellPrice,
-          exit_time: new Date().toISOString(),
+          exit_time: nowIST() + ':00',
           exit_reason: sellReason || null,
           exit_notes: sellNote || null,
           ...(sellFees ? { fees: sellFees } : {}),
@@ -1093,7 +1094,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
         payload: {
           stop_type: slType,
           price: slPrice,
-          timestamp: new Date().toISOString(),
+          timestamp: nowIST() + ':00',
         },
       })
       setSlEditing(false)

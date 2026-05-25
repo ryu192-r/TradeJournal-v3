@@ -1,7 +1,5 @@
 import { z } from 'zod'
 
-const IST_OFFSET = '+05:30'
-
 export const tradeFormSchema = z.object({
   symbol: z
     .string()
@@ -24,42 +22,44 @@ export const tradeFormSchema = z.object({
 
 export type TradeFormData = z.infer<typeof tradeFormSchema>
 
-function toIST(date: Date): Date {
-  const utcMs = date.getTime() + date.getTimezoneOffset() * 60000
-  return new Date(utcMs + 5.5 * 3600000)
+/**
+ * Returns current IST time formatted for datetime-local input (YYYY-MM-DDTHH:mm).
+ * Uses Intl.DateTimeFormat with Asia/Kolkata for correct IST regardless of browser timezone.
+ */
+export function nowIST(): string {
+  const d = new Date()
+  const ist = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  const year = ist.getFullYear()
+  const month = String(ist.getMonth() + 1).padStart(2, '0')
+  const day = String(ist.getDate()).padStart(2, '0')
+  const hours = String(ist.getHours()).padStart(2, '0')
+  const mins = String(ist.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${mins}`
 }
 
-function fromIST(istDate: Date): Date {
-  const istMs = istDate.getTime() - 5.5 * 3600000
-  return new Date(istMs - istDate.getTimezoneOffset() * 60000)
-}
-
-export function nowIST(): Date {
-  return toIST(new Date())
-}
-
+/**
+ * Convert a backend naive IST datetime string to a datetime-local input value.
+ * Backend stores naive IST (e.g. "2025-05-21T09:16:00").
+ * We strip any timezone suffix and keep only YYYY-MM-DDTHH:mm for the input.
+ * No conversion — naive IST in, naive IST out.
+ */
 export function isoToDatetimeLocal(iso: string | null | undefined): string {
   if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return iso.slice(0, 16)
-    const ist = toIST(d)
-    const year = ist.getFullYear()
-    const month = String(ist.getMonth() + 1).padStart(2, '0')
-    const day = String(ist.getDate()).padStart(2, '0')
-    const hours = String(ist.getHours()).padStart(2, '0')
-    const mins = String(ist.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${mins}`
-  } catch {
-    return iso.slice(0, 16)
-  }
+  // Strip timezone suffix (Z, +05:30, etc.) — backend returns naive IST strings
+  const stripped = iso.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '')
+  // Keep only YYYY-MM-DDTHH:mm for datetime-local input
+  return stripped.slice(0, 16)
 }
 
+/**
+ * Convert a datetime-local input value (YYYY-MM-DDTHH:mm) to a backend naive IST string.
+ * No timezone conversion — we store and send exactly what the user entered.
+ * Append seconds (:00) since datetime-local doesn't include them.
+ */
 export function datetimeLocalToIso(local: string | undefined): string | undefined {
   if (!local) return undefined
-  const ist = new Date(local)
-  const utc = fromIST(ist)
-  return utc.toISOString().replace('Z', IST_OFFSET)
+  // Ensure seconds are present: YYYY-MM-DDTHH:mm → YYYY-MM-DDTHH:mm:00
+  return local.length === 16 ? local + ':00' : local
 }
 
 export function formDataToApiPayload(data: TradeFormData): Record<string, unknown> {

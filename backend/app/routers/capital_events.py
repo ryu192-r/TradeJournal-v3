@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -11,6 +11,7 @@ from app.schemas.capital_event import (
     CapitalEventResponse,
     CapitalEventListResponse,
     CapitalSummaryResponse,
+    IST as CE_IST,
 )
 from app.models.capital_event import CapitalEvent
 from app.models.account import Account
@@ -59,12 +60,12 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
             account_id=account_id,
             event_type="adjustment",
             amount=delta,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(CE_IST).replace(tzinfo=None),
             description="Balance reconciliation",
         )
         db.add(db_event)
         account.current_balance = target
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(CE_IST).replace(tzinfo=None)
         db.commit()
         logger.info("account_reconciled", account_id=account_id, delta=str(delta))
 
@@ -95,7 +96,7 @@ def create_capital_event(event: CapitalEventCreate, db: Session = Depends(get_db
     # Update account current_balance atomically in same transaction
     old_balance = account.current_balance or Decimal("0")
     account.current_balance = old_balance + event.amount
-    account.updated_at = datetime.utcnow()
+    account.updated_at = datetime.now(CE_IST).replace(tzinfo=None)
 
     db.commit()
     db.refresh(db_event)
@@ -240,7 +241,7 @@ def update_capital_event(
         account = db.query(Account).filter(Account.id == db_event.account_id).first()
         if account:
             account.current_balance = (account.current_balance or Decimal("0")) + delta
-            account.updated_at = datetime.utcnow()
+            account.updated_at = datetime.now(CE_IST).replace(tzinfo=None)
 
     db.commit()
     db.refresh(db_event)
@@ -264,7 +265,7 @@ def delete_capital_event(event_id: int, db: Session = Depends(get_db)):
     if account:
         old_balance = account.current_balance or Decimal("0")
         account.current_balance = old_balance - db_event.amount
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(CE_IST).replace(tzinfo=None)
 
     db.delete(db_event)
     db.commit()

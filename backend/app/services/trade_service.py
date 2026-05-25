@@ -3,9 +3,18 @@ from typing import Optional, Tuple
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from app.models.trade import Trade
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _to_ist_naive(dt: datetime) -> datetime:
+    """Convert any datetime to naive IST (strip timezone after converting)."""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(IST)
+    return dt.replace(tzinfo=None)
 
 
 class TradeService:
@@ -212,10 +221,10 @@ class TradeService:
         exit_time = None
         if is_open:
             entry_price = Decimal(str(leg.price))
-            entry_time = datetime.fromisoformat(leg.order_timestamp.replace("Z", "+00:00"))
+            entry_time = _to_ist_naive(datetime.fromisoformat(leg.order_timestamp.replace("Z", "+00:00")))
         else:
             exit_price = Decimal(str(leg.price))
-            exit_time = datetime.fromisoformat(leg.order_timestamp.replace("Z", "+00:00"))
+            exit_time = _to_ist_naive(datetime.fromisoformat(leg.order_timestamp.replace("Z", "+00:00")))
 
         trade_data = {
             "symbol": leg.trading_symbol,
@@ -233,8 +242,8 @@ class TradeService:
 
     def find_or_create_pair(self, open_leg, close_leg, direction: str = "LONG") -> Trade:
         """Match OPEN and CLOSE legs into a single trade, merging by (symbol, date)."""
-        entry_time = datetime.fromisoformat(open_leg.order_timestamp.replace("Z", "+00:00"))
-        exit_time = datetime.fromisoformat(close_leg.order_timestamp.replace("Z", "+00:00")) if close_leg else None
+        entry_time = _to_ist_naive(datetime.fromisoformat(open_leg.order_timestamp.replace("Z", "+00:00")))
+        exit_time = _to_ist_naive(datetime.fromisoformat(close_leg.order_timestamp.replace("Z", "+00:00"))) if close_leg else None
 
         trade_data = {
             "symbol": open_leg.trading_symbol,

@@ -1,10 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional
 from pydantic import Field, field_validator, field_serializer
 
 from app.schemas.base import BaseSchema
 from app.utils.decimal_utils import ensure_decimal
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 class CapitalEventCreate(BaseSchema):
@@ -14,6 +22,11 @@ class CapitalEventCreate(BaseSchema):
     description: Optional[str] = Field(None, max_length=200, description="Optional description")
     trade_id: Optional[int] = Field(None, description="Optional reference to an associated trade")
     account_id: Optional[int] = Field(None, description="The account this event belongs to")
+
+    @field_validator("timestamp")
+    @classmethod
+    def strip_ist(cls, v):
+        return _strip_to_ist(v)
 
     @field_validator("amount", mode="before")
     @classmethod
@@ -34,8 +47,15 @@ class CapitalEventUpdate(BaseSchema):
     amount: Optional[Decimal] = Field(None, description="Updated amount")
     timestamp: Optional[datetime] = Field(None, description="Updated timestamp")
     description: Optional[str] = Field(None, max_length=200)
-    trade_id: Optional[int] = Field(None)
+    trade_id: Optional[int] = None
     account_id: Optional[int] = Field(None, description="The account this event belongs to")
+
+    @field_validator("timestamp")
+    @classmethod
+    def strip_ist(cls, v):
+        if v is None:
+            return v
+        return _strip_to_ist(v)
 
     @field_validator("amount", mode="before")
     @classmethod

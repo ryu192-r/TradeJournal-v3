@@ -1,31 +1,68 @@
 // Centralized format utilities for the trading journal
+// All datetimes are naive IST — no timezone conversion anywhere.
 
 /**
- * Format a Date to DD-MM-YYYY string
+ * Parse a date/datetime input (string, Date, or number) into year/month/day/hour/minute components.
+ * For naive IST strings (e.g. "2025-05-21T09:16:00"), extracts components directly — no timezone shift.
+ * For Date objects or timestamps, uses local time (works correctly when browser is in IST).
+ */
+function extractComponents(input: Date | string | number): { year: number; month: number; day: number; hour: number; minute: number } {
+  if (input instanceof Date) {
+    return {
+      year: input.getFullYear(),
+      month: input.getMonth() + 1,
+      day: input.getDate(),
+      hour: input.getHours(),
+      minute: input.getMinutes(),
+    }
+  }
+  if (typeof input === 'number') {
+    const d = new Date(input)
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+      hour: d.getHours(),
+      minute: d.getMinutes(),
+    }
+  }
+  // String: strip any timezone suffix and extract components directly
+  const s = String(input).replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '')
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{1,2}))?/)
+  if (m) {
+    return {
+      year: parseInt(m[1], 10),
+      month: parseInt(m[2], 10),
+      day: parseInt(m[3], 10),
+      hour: m[4] ? parseInt(m[4], 10) : 0,
+      minute: m[5] ? parseInt(m[5], 10) : 0,
+    }
+  }
+  // Fallback: let JS Date parse it (local timezone)
+  const d = new Date(s)
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+  }
+}
+
+/**
+ * Format a date to DD-MM-YYYY string (naive IST — no conversion).
  */
 export function formatDate(date: Date | string | number): string {
-  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
-  const ist = toISTInternal(d)
-  const day = String(ist.getDate()).padStart(2, '0')
-  const month = String(ist.getMonth() + 1).padStart(2, '0')
-  const year = ist.getFullYear()
-  return `${day}-${month}-${year}`
+  const { day, month, year } = extractComponents(date)
+  return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`
 }
 
+/**
+ * Format a datetime to DD-MM-YYYY HH:mm string (naive IST — no conversion).
+ */
 export function formatDateTime(date: Date | string | number): string {
-  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
-  const ist = toISTInternal(d)
-  const day = String(ist.getDate()).padStart(2, '0')
-  const month = String(ist.getMonth() + 1).padStart(2, '0')
-  const year = ist.getFullYear()
-  const hours = String(ist.getHours()).padStart(2, '0')
-  const mins = String(ist.getMinutes()).padStart(2, '0')
-  return `${day}-${month}-${year} ${hours}:${mins}`
-}
-
-function toISTInternal(d: Date): Date {
-  const utcMs = d.getTime() + d.getTimezoneOffset() * 60000
-  return new Date(utcMs + 5.5 * 3600000)
+  const { day, month, year, hour, minute } = extractComponents(date)
+  return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' }

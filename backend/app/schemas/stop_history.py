@@ -1,11 +1,19 @@
 """Stop history schemas for tracking stop loss adjustments."""
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import Field, field_validator, field_serializer
 
 from app.schemas.base import BaseSchema
 from app.utils.decimal_utils import ensure_decimal
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 STOP_TYPES = {"initial", "manual", "breakeven", "trailing", "target"}
@@ -15,6 +23,11 @@ class StopHistoryCreate(BaseSchema):
     stop_type: str = Field(..., description="Type: initial, manual, breakeven, trailing, target")
     price: Decimal = Field(..., description="Stop price at this point")
     timestamp: datetime = Field(..., description="When the stop was set")
+
+    @field_validator("timestamp")
+    @classmethod
+    def strip_ist(cls, v):
+        return _strip_to_ist(v)
 
     @field_validator("price", mode="before")
     @classmethod

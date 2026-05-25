@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
-from app.schemas.trade_timeline import TimelineEventCreate, TimelineEventResponse, TimelineListResponse
+from app.schemas.trade_timeline import TimelineEventCreate, TimelineEventResponse, TimelineListResponse, IST as TL_IST
 from app.models.trade import Trade
 from app.models.trade_timeline import TradeTimeline
 from app.db.database import get_db
@@ -32,7 +32,7 @@ def create_timeline_event(trade_id: int, payload: TimelineEventCreate, db: Sessi
     entry = TradeTimeline(
         trade_id=trade_id,
         event_type=payload.event_type,
-        timestamp=payload.timestamp or datetime.utcnow(),
+        timestamp=payload.timestamp or datetime.now(TL_IST).replace(tzinfo=None),
         old_value=payload.old_value,
         new_value=payload.new_value,
         note=payload.note,

@@ -1,10 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import Field, field_validator, field_serializer
 
 from app.schemas.base import BaseSchema
 from app.utils.decimal_utils import ensure_decimal
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _strip_to_ist(v: datetime) -> datetime:
+    if v.tzinfo is not None:
+        v = v.astimezone(IST).replace(tzinfo=None)
+    return v
 
 
 class PartialExitCreate(BaseSchema):
@@ -15,6 +23,11 @@ class PartialExitCreate(BaseSchema):
     r_captured: Optional[Decimal] = None
     exit_reason: Optional[str] = None
     note: Optional[str] = None
+
+    @field_validator("exit_time")
+    @classmethod
+    def strip_ist(cls, v):
+        return _strip_to_ist(v)
 
     @field_validator("qty", "exit_price", mode="before")
     @classmethod

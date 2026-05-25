@@ -7,6 +7,8 @@ import os
 import uuid
 import shutil
 
+from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse, IST as TRADE_IST
+
 from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
 from app.models.trade import Trade
@@ -439,7 +441,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         deletion_event = CapitalEvent(
             event_type="trade_deletion",
             amount=trade.pnl,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(TRADE_IST).replace(tzinfo=None),
             description=f"Soft-deleted trade: {trade.symbol} (PnL removed)",
             trade_id=trade.id,
         )
