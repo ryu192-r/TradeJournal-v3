@@ -169,6 +169,18 @@ function EquityCurveSection({ data }: { data: CapitalDashboardPayload }) {
     }))
   }, [data.equity_curve])
 
+  const yAxisDomain = useMemo((): readonly [number, number] => {
+    if (chartData.length === 0) return [0, 100000]
+    const minVal = Math.min(...chartData.map(d => d.equity))
+    const initialBal = pnlNum(data.initial_balance)
+    const floor = Math.min(minVal, initialBal)
+    const padding = floor * 0.05 || 1000
+    const yMin = Math.max(0, Math.floor((floor - padding) / 1000) * 1000)
+    const maxVal = Math.max(...chartData.map(d => d.equity))
+    const yMax = Math.ceil((maxVal * 1.005) / 1000) * 1000
+    return [yMin, yMax]
+  }, [chartData, data.initial_balance])
+
   return (
     <div className={`${CARD_STATIC} space-y-3`}>
       <div className="flex items-center gap-2">
@@ -197,6 +209,7 @@ function EquityCurveSection({ data }: { data: CapitalDashboardPayload }) {
             <YAxis
               tick={{ fill: COLORS.text, fontSize: 11 }}
               tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}k`}
+              domain={yAxisDomain}
             />
             <Tooltip content={<GlassTooltip />} />
             <Area
