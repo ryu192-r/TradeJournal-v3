@@ -92,7 +92,7 @@ def test_live_quotes_include_freshness_status(db_session):
         "STALE": "stale",
     }
     assert data["status_counts"] == {"failed": 1, "fresh": 1, "stale": 1}
-    assert data["stale_after_seconds"] == 900
+    assert data["stale_after_seconds"] == 1200
 
 
 def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
@@ -127,7 +127,7 @@ def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
 
     assert data["symbols"] == ["RELIANCE"]
     assert data["provider_status"] == "fresh"
-    assert data["stale_after_seconds"] == 900
+    assert data["stale_after_seconds"] == 1200
     assert data["upserted"] == 1
 
     quote = db_session.query(LiveQuote).filter(LiveQuote.symbol == "RELIANCE").one()
@@ -199,8 +199,8 @@ def test_is_market_open_uses_india_hours():
     assert is_market_open(datetime.fromisoformat("2025-01-11T10:00:00+05:30")) is False
 
 
-def test_fetch_live_quotes_uses_yfinance_only_for_missing_symbols(monkeypatch):
-    def fake_nsetools(symbols):
+def test_fetch_live_quotes_uses_yfinance_primary_nsetools_fallback(monkeypatch):
+    def fake_yfinance_batch(symbols):
         assert symbols == ["RELIANCE", "TCS"]
         return {
             "RELIANCE": {
@@ -210,10 +210,10 @@ def test_fetch_live_quotes_uses_yfinance_only_for_missing_symbols(monkeypatch):
                 "change": Decimal("1.00"),
                 "change_pct": Decimal("1.01"),
                 "volume": Decimal("1000"),
-            }
-        }, {"TCS": "nsetools unavailable"}
+            },
+        }, {"TCS": "yfinance unavailable"}
 
-    def fake_yfinance(symbols):
+    def fake_nsetools(symbols):
         assert symbols == ["TCS"]
         return {
             "TCS": {
@@ -223,11 +223,11 @@ def test_fetch_live_quotes_uses_yfinance_only_for_missing_symbols(monkeypatch):
                 "change": Decimal("2.00"),
                 "change_pct": Decimal("1.01"),
                 "volume": Decimal("2000"),
-            }
+            },
         }, {}
 
+    monkeypatch.setattr(market_data_service, "_fetch_yfinance_batch", fake_yfinance_batch)
     monkeypatch.setattr(market_data_service, "_fetch_nsetools_quotes", fake_nsetools)
-    monkeypatch.setattr(market_data_service, "_fetch_yfinance_quotes", fake_yfinance)
 
     quotes, errors = market_data_service.fetch_live_quotes(["RELIANCE", "TCS"])
 

@@ -14,7 +14,7 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 IST = ZoneInfo("Asia/Kolkata")
-LIVE_QUOTE_STALE_AFTER_SECONDS = 15 * 60
+LIVE_QUOTE_STALE_AFTER_SECONDS = 20 * 60
 
 
 def is_market_open(now: datetime | None = None) -> bool:
@@ -65,11 +65,14 @@ def _upsert_live_quote(db: Session, quote: dict) -> None:
         existing = LiveQuote(symbol=symbol)
         db.add(existing)
 
-    for field in ("company_name", "ltp", "change", "change_pct", "volume"):
+    for field in (
+        "company_name", "ltp", "change", "change_pct", "volume",
+        "high_52w", "low_52w", "pe", "market_cap_cr", "sector",
+    ):
         if field not in quote or quote[field] is None:
             continue
         value = quote[field]
-        if field != "company_name":
+        if field not in ("company_name", "sector"):
             value = _to_decimal(value)
         setattr(existing, field, value)
 

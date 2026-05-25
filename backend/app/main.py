@@ -95,14 +95,14 @@ async def lifespan(_: FastAPI):
         scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
         scheduler.add_job(
             _run_live_quote_sync_job,
-            trigger=IntervalTrigger(seconds=60),
+            trigger=IntervalTrigger(seconds=180),
             id="live-quote-sync",
             max_instances=1,
             coalesce=True,
             replace_existing=True,
         )
         scheduler.start()
-        logger.info("live_quote_scheduler_started", interval_seconds=60)
+        logger.info("live_quote_scheduler_started", interval_seconds=180)
 
     try:
         yield
