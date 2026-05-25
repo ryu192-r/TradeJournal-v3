@@ -36,6 +36,7 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
     events = db.query(CapitalEvent).filter(CapitalEvent.account_id == account_id).all()
     deposits = sum(ensure_decimal(e.amount) for e in events if e.event_type == "deposit")
     withdrawals = sum(abs(ensure_decimal(e.amount)) for e in events if e.event_type == "withdrawal")
+    fees = sum(abs(ensure_decimal(e.amount)) for e in events if e.event_type == "fee")
 
     # Realized PnL (non-deleted, closed trades)
     realized_pnl = Decimal("0")
@@ -49,8 +50,8 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
     for t in open_trades:
         deployed += ensure_decimal(t.entry_price) * ensure_decimal(t.quantity) - ensure_decimal(t.fees)
 
-    # Target = initial + deposits - withdrawals + realized_pnl - deployed
-    target = initial + deposits - withdrawals + realized_pnl - deployed
+    # Target = initial + deposits - withdrawals - fees + realized_pnl - deployed
+    target = initial + deposits - withdrawals - fees + realized_pnl - deployed
     delta = target - current
 
     if delta != 0:

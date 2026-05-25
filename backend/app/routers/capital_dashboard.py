@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from collections import defaultdict
 from typing import Optional, List
@@ -188,6 +188,7 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
 
     total_deposits = Decimal("0")
     total_withdrawals = Decimal("0")
+    total_fees = Decimal("0")
     capital_events_out = []
 
     for evt in events_q:
@@ -196,6 +197,8 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
             total_deposits += amt
         elif evt.event_type == "withdrawal":
             total_withdrawals += abs(amt)
+        elif evt.event_type == "fee":
+            total_fees += abs(amt)
 
         capital_events_out.append(CapitalEventOut(
             id=evt.id,
@@ -278,7 +281,7 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
     profit_factor = round(float(total_wins / abs(total_losses)), 2) if total_losses != 0 else None
 
     # Net equity = initial_balance + capital events net + all realized PnL
-    capital_net = total_deposits - total_withdrawals
+    capital_net = total_deposits - total_withdrawals - total_fees
     net_equity = initial_balance + capital_net + total_realized_pnl
 
     # ── Equity curve ──
@@ -296,18 +299,26 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
             pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
             daily_balance[day] += pe_pnl
 
-    # Capital events (only deposits and withdrawals for equity curve — adjustments are reconciliation artifacts)
+    # Capital events (deposits, withdrawals, fees for equity curve — adjustments are reconciliation artifacts)
     events_asc = sorted(events_q, key=lambda e: e.timestamp)
     for evt in events_asc:
-        if evt.event_type in ("deposit", "withdrawal"):
+        if evt.event_type in ("deposit", "withdrawal", "fee"):
             day = evt.timestamp.date()
             amt = ensure_decimal(evt.amount)
             if evt.event_type == "withdrawal":
                 amt = -abs(amt)
+            elif evt.event_type == "fee":
+                amt = -abs(amt)
             daily_balance[day] += amt
 
-    # Build running curve
+    # Build running curve — always include initial balance as the first point
     curve_points: list[EquityCurvePointOut] = []
+    earliest_event_date = min(daily_balance.keys()) if daily_balance else None
+    if earliest_event_date:
+        start_date = min(earliest_event_date, account.created_at.date() if account.created_at else earliest_event_date) - timedelta(days=1)
+    else:
+        start_date = account.created_at.date() if account.created_at else date.today()
+    curve_points.append(EquityCurvePointOut(date=str(start_date), equity=initial_balance))
     running = initial_balance
     for day_val in sorted(daily_balance.keys()):
         running += daily_balance[day_val]

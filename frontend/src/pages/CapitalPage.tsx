@@ -224,7 +224,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
   const [showModal, setShowModal] = useState(false)
-  const [modalType, setModalType] = useState<'deposit' | 'withdrawal'>('deposit')
+  const [modalType, setModalType] = useState<'deposit' | 'withdrawal' | 'fee'>('deposit')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [dateStr, setDateStr] = useState(new Date().toISOString().split('T')[0])
@@ -266,7 +266,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
     onError: (err) => addToast({ title: 'Failed', message: err.message, variant: 'error' }),
   })
 
-  const openModal = (type: 'deposit' | 'withdrawal') => {
+  const openModal = (type: 'deposit' | 'withdrawal' | 'fee') => {
     setModalType(type)
     setShowModal(true)
   }
@@ -274,7 +274,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
   const handleSubmit = () => {
     const amountNum = parseFloat(amount)
     if (isNaN(amountNum) || amountNum <= 0) return
-    const finalAmount = modalType === 'withdrawal' ? -amountNum : amountNum
+    const finalAmount = modalType === 'withdrawal' || modalType === 'fee' ? -amountNum : amountNum
     createMutation.mutate({
       event_type: modalType,
       amount: String(finalAmount),
@@ -314,6 +314,12 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
             >
               <Plus className="w-3 h-3" />Withdraw
             </button>
+            <button
+              onClick={() => openModal('fee')}
+              className="inline-flex items-center gap-1 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-[var(--cell-py)] text-xs font-medium text-loss hover:bg-loss/20 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />Fee
+            </button>
           </div>
         </div>
         {events.length > 0 ? (
@@ -333,7 +339,8 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                   const amt = pnlNum(evt.amount)
                   const isDeposit = evt.type === 'deposit'
                   const isWithdrawal = evt.type === 'withdrawal'
-                  const badgeVariant = isDeposit ? 'profit' : isWithdrawal ? 'loss' : 'muted'
+                  const isFee = evt.type === 'fee'
+                  const badgeVariant = isDeposit ? 'profit' : (isWithdrawal || isFee) ? 'loss' : 'muted'
                   return (
                     <tr key={i} className="border-b border-border/50 hover:bg-bg-elevated/30 transition-colors">
                       <td className="px-[var(--cell-px)] py-[var(--cell-py)] text-text-heading font-data">{evt.date}</td>
@@ -376,6 +383,8 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
               <h2 className="text-sm font-medium text-text-heading font-display flex items-center gap-2">
                 {modalType === 'deposit' ? (
                   <><ArrowUpRight className="w-4 h-4 text-profit" /> Add Deposit</>
+                ) : modalType === 'fee' ? (
+                  <><Plus className="w-4 h-4 text-loss" /> Add Fee</>
                 ) : (
                   <><ArrowUpRight className="w-4 h-4 text-loss rotate-90" /> Add Withdrawal</>
                 )}
@@ -400,7 +409,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="e.g. 50000"
+                  placeholder={modalType === 'fee' ? 'e.g. 500' : 'e.g. 50000'}
                   min="1"
                   className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all"
                   autoFocus
@@ -429,7 +438,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                 >
                   {createMutation.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
-                  ) : modalType === 'deposit' ? 'Add Deposit' : 'Add Withdrawal'}
+                  ) : modalType === 'deposit' ? 'Add Deposit' : modalType === 'fee' ? 'Add Fee' : 'Add Withdrawal'}
                 </button>
                 <button onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
               </div>
