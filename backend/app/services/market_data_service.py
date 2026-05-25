@@ -73,10 +73,10 @@ def _fetch_yfinance_batch(symbols: list[str]) -> tuple[dict[str, dict[str, Any]]
     for sym, nse_ticker in zip(symbols, nse_tickers):
         try:
             if len(nse_tickers) > 1:
-                close_col = (nse_ticker, "Close")
-                volume_col = (nse_ticker, "Volume")
-                high_col = (nse_ticker, "High")
-                low_col = (nse_ticker, "Low")
+                close_col = ("Close", nse_ticker)
+                volume_col = ("Volume", nse_ticker)
+                high_col = ("High", nse_ticker)
+                low_col = ("Low", nse_ticker)
 
             close_series = hist[close_col].dropna() if close_col in hist else None
             volume_series = hist[volume_col].dropna() if volume_col in hist else None
