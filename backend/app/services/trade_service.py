@@ -60,6 +60,9 @@ class TradeService:
         - Closed + Closed → merge (same-day round-trip averaging)
         - Open + Closed or Closed + Open → create new separate trade
 
+        Uses retry to handle race conditions: if two concurrent requests both
+        find no existing trade, the second will find the first's on retry.
+
         Returns (trade, action) where action is 'merged' or 'created'.
         """
         entry_time = trade_data.get("entry_time")
@@ -73,17 +76,24 @@ class TradeService:
 
         incoming_is_open = trade_data.get("exit_price") is None
 
-        existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open)
-        if existing:
-            self._merge_trade(existing, trade_data)
-            return existing, "merged"
+        for attempt in range(2):
+            existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open)
+            if existing:
+                self._merge_trade(existing, trade_data)
+                return existing, "merged"
 
-        trade = Trade(**trade_data)
-        trade.compute_pnl()
-        self.db.add(trade)
-        self.db.commit()
-        self.db.refresh(trade)
-        return trade, "created"
+            trade = Trade(**trade_data)
+            trade.compute_pnl()
+            self.db.add(trade)
+            try:
+                self.db.commit()
+                self.db.refresh(trade)
+                return trade, "created"
+            except Exception:
+                self.db.rollback()
+                if attempt == 0:
+                    continue
+                raise
 
     def _merge_trade(self, existing: Trade, incoming: dict) -> Trade:
         """Merge incoming trade data into existing trade (same symbol+date).
@@ -100,7 +110,7 @@ class TradeService:
                 Decimal(str(existing.entry_price)) * old_qty
                 + Decimal(str(incoming["entry_price"])) * new_qty
             ) / total_qty
-        elif incoming.get("entry_price") and not existing.entry_price:
+        elif incoming.get("entry_price") and existing.entry_price is None:
             existing.entry_price = Decimal(str(incoming["entry_price"]))
 
         existing.quantity = total_qty
@@ -111,7 +121,7 @@ class TradeService:
 
         existing_exit = existing.exit_price
         incoming_exit = incoming.get("exit_price")
-        if existing_exit and incoming_exit:
+        if existing_exit is not None and incoming_exit is not None:
             existing.exit_price = (
                 Decimal(str(existing_exit)) * old_qty
                 + Decimal(str(incoming_exit)) * new_qty
@@ -120,15 +130,15 @@ class TradeService:
             in_exit_time = incoming.get("exit_time")
             if in_exit_time and (not exist_exit_time or in_exit_time > exist_exit_time):
                 existing.exit_time = in_exit_time
-        elif incoming_exit:
+        elif incoming_exit is not None and existing_exit is None:
             existing.exit_price = Decimal(str(incoming_exit))
             existing.exit_time = incoming.get("exit_time")
 
         existing.fees = (existing.fees or Decimal("0")) + Decimal(str(incoming.get("fees", "0")))
 
-        if existing.pnl and incoming.get("pnl"):
+        if existing.pnl is not None and incoming.get("pnl") is not None:
             existing.pnl = existing.pnl + Decimal(str(incoming["pnl"]))
-        elif incoming.get("pnl") and not existing.pnl:
+        elif incoming.get("pnl") is not None and existing.pnl is None:
             existing.pnl = Decimal(str(incoming["pnl"]))
         else:
             existing.compute_pnl()
@@ -194,17 +204,23 @@ class TradeService:
                     "entry_price": str(dup.entry_price),
                     "quantity": str(dup.quantity),
                     "entry_time": dup.entry_time,
-                    "exit_price": str(dup.exit_price) if dup.exit_price else None,
+                    "exit_price": str(dup.exit_price) if dup.exit_price is not None else None,
                     "exit_time": dup.exit_time,
                     "fees": str(dup.fees or "0"),
                     "setup": dup.setup,
                     "tactic": dup.tactic,
-                    "stop_price": str(dup.stop_price) if dup.stop_price else None,
-                    "target_price": str(dup.target_price) if dup.target_price else None,
-                    "r_multiple": str(dup.r_multiple) if dup.r_multiple else None,
+                    "stop_price": str(dup.stop_price) if dup.stop_price is not None else None,
+                    "target_price": str(dup.target_price) if dup.target_price is not None else None,
                     "status": dup.status,
                     "notes": dup.notes,
                 }
+                if dup.tags:
+                    if keep.tags:
+                        existing_tags = keep.tags if isinstance(keep.tags, list) else [keep.tags]
+                        dup_tags = dup.tags if isinstance(dup.tags, list) else [dup.tags]
+                        keep.tags = list(set(existing_tags + dup_tags))
+                    else:
+                        keep.tags = dup.tags
                 self._merge_trade(keep, dup_data)
                 self.db.delete(dup)
                 merged_count += 1
