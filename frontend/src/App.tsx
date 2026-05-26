@@ -144,7 +144,7 @@ function App() {
                 {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
-                {activeView === 'trades' && tradeFormMode === 'detail' && <ErrorBoundary name="TradeDetail"><TradeDetailPage tradeId={selectedTradeId ?? 0} /></ErrorBoundary>}
+                {activeView === 'trades' && tradeFormMode === 'detail' && selectedTradeId != null && <ErrorBoundary name="TradeDetail"><TradeDetailPage tradeId={selectedTradeId} /></ErrorBoundary>}
                 {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
                 {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
                 {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}

@@ -75,7 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   activeView: 'dashboard',
-  setActiveView: (view) => set({ activeView: view }),
+  setActiveView: (view) => set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null }),
 
   tradeFormMode: 'list',
   selectedTradeId: null,
