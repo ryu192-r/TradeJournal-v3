@@ -29,7 +29,6 @@ export function useCreateTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
-      void invalidateTradeList(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -67,7 +66,6 @@ export function useUpdateTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
-      void invalidateTradeList(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -79,6 +77,7 @@ export function useUpdateTradeMutation() {
         patchOperationalDashboardTrade(qc, context.previousTrade)
       } else {
         void invalidateTradeDetail(qc, variables.id)
+        void invalidateTradeList(qc)
       }
       endSpanRef.current?.()
       endSpanRef.current = null
@@ -103,7 +102,6 @@ export function useDeleteTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
-      void invalidateTradeList(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
