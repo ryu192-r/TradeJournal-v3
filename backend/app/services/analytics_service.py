@@ -95,7 +95,7 @@ def _calc_max_drawdown(df: pd.DataFrame) -> tuple[Optional[float], Optional[floa
         return None, None
 
     cumulative = daily["pnl"].cumsum()
-    running_peak = cumulative.cummax().clip(lower=0)
+    running_peak = cumulative.cummax()
     drawdown_amount = running_peak - cumulative
     max_drawdown_amount = float(drawdown_amount.max()) if len(drawdown_amount) > 0 else None
 

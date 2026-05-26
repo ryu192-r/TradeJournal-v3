@@ -308,21 +308,38 @@ def operational_dashboard(db: Session = Depends(get_db)):
         net_pnl, win_rate, profit_factor, expectancy, avg_r = None, None, None, None, None
         gross_profit_val, gross_loss_val = 0.0, 0.0
 
-    # ── Max drawdown ──
-    daily_rows = (
+    # ── Max drawdown (includes capital events for correct peak tracking) ──
+    daily_pnl_rows = (
         db.query(func.date(Trade.entry_time).label("dt"), func.coalesce(func.sum(Trade.pnl), 0))
         .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
         .group_by(func.date(Trade.entry_time))
         .order_by("dt")
         .all()
     )
+    capital_event_rows_dd = (
+        db.query(CapitalEvent)
+        .filter(CapitalEvent.account_id == account.id, CapitalEvent.event_type.in_(("deposit", "withdrawal")))
+        .order_by(CapitalEvent.timestamp.asc())
+        .all()
+    )
+    daily_changes_dd: dict = defaultdict(float)
+    for dt_val, day_pnl in daily_pnl_rows:
+        dt_key = dt_val.date() if hasattr(dt_val, 'date') else dt_val
+        daily_changes_dd[dt_key] += float(day_pnl)
+    for evt in capital_event_rows_dd:
+        dt_key = evt.timestamp.date() if hasattr(evt.timestamp, 'date') else evt.timestamp
+        amt = float(evt.amount)
+        if evt.event_type == "withdrawal":
+            amt = -abs(amt)
+        daily_changes_dd[dt_key] += amt
+
     initial = float(account.initial_balance or 0)
     peak = initial
     max_dd_amount = 0.0
     max_dd_pct = 0.0
     cum = initial
-    for _, day_pnl in daily_rows:
-        cum += float(day_pnl)
+    for day in sorted(daily_changes_dd.keys()):
+        cum += daily_changes_dd[day]
         if cum > peak:
             peak = cum
         dd = peak - cum
@@ -380,7 +397,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
         .all()
     ) if open_trade_ids else []
     for pe in open_for_pe:
-        day = pe.exit_time.date() if pe.exit_time else date.today()
+        day = pe.exit_time.date() if pe.exit_time else pe.created_at.date() if hasattr(pe, 'created_at') and pe.created_at else date.today()
         pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
         daily_balance[day] += pe_pnl
 
@@ -582,7 +599,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
         market_highlight = _MarketContextHighlight(
             date=str(latest_snap.date) if latest_snap.date else None,
             nifty_close=float(latest_snap.nifty_close) if latest_snap.nifty_close else None,
-            nifty_change_pct=float(latest_snap.nifty_change_pct) if latest_snap.nifty_change_pct else None,
+            nifty_change_pct=float(latest_snap.nifty_change_pct) if latest_snap.nifty_change_pct is not None else None,
             india_vix=float(latest_snap.india_vix) if latest_snap.india_vix else None,
             fii_flow_cr=str(latest_snap.fii_flow_cr) if latest_snap.fii_flow_cr is not None else None,
             dii_flow_cr=str(latest_snap.dii_flow_cr) if latest_snap.dii_flow_cr is not None else None,
@@ -591,7 +608,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
         )
 
     # Compute regime from change
-    if latest_snap and latest_snap.nifty_change_pct:
+    if latest_snap and latest_snap.nifty_change_pct is not None:
         chg = float(latest_snap.nifty_change_pct)
         vix = float(latest_snap.india_vix or 0)
         if vix > 25:
