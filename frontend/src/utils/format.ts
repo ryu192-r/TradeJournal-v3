@@ -40,6 +40,9 @@ function extractComponents(input: Date | string | number): { year: number; month
   }
   // Fallback: let JS Date parse it (local timezone)
   const d = new Date(s)
+  if (isNaN(d.getTime())) {
+    return { year: 1970, month: 1, day: 1, hour: 0, minute: 0 }
+  }
   return {
     year: d.getFullYear(),
     month: d.getMonth() + 1,
@@ -71,8 +74,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = { INR: '₹', USD: '$', EUR: '�
  * Format a number in Indian style: ₹ 1,50,000 or ₹ 1.5L or ₹ 1.2Cr
  */
 export function formatCurrency(v: string | number, currency = 'INR') {
-  const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '')) || 0);
-  if (isNaN(n)) return `${CURRENCY_SYMBOLS[currency] || ''}0`;
+  const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '').replace(/(k|L|Cr)$/, '')) || 0);
+  if (Number.isNaN(n)) return `${CURRENCY_SYMBOLS[currency] || ''}0`;
   const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
   if (currency !== 'INR') {
     return `${symbol}${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -97,7 +100,7 @@ export function formatCurrency(v: string | number, currency = 'INR') {
  */
 export function formatPrice(v: string | number, currency = 'INR'): string {
   const n = typeof v === 'number' ? v : (parseFloat(String(v).replace(/[₹$€£¥,]/g, '')) || 0);
-  if (isNaN(n)) return '₹0.00';
+  if (Number.isNaN(n)) return '₹0.00';
   const symbol = CURRENCY_SYMBOLS[currency] || currency + ' ';
   return `${symbol}${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -107,7 +110,7 @@ export function formatPrice(v: string | number, currency = 'INR'): string {
  */
 export function formatQuantity(v: string | number): string {
   const n = typeof v === 'number' ? v : Number(v);
-  if (isNaN(n)) return '0';
+  if (Number.isNaN(n)) return '0';
   return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 }
 

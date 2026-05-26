@@ -137,7 +137,8 @@ export function computeMaxRisk(entryPrice: number, stopPrice: number, remainingQ
   const stop = toNum(stopPrice)
   const qty = toNum(remainingQty)
   if (entry == null || stop == null || qty == null) return null
-  return (entry - stop) * qty
+  const risk = (entry - stop) * qty
+  return risk < 0 ? 0 : risk
 }
 
 export function computeCapPct(pnlValue: number, netEquity: number): number | null {
