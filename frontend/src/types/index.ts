@@ -75,6 +75,7 @@ export interface ApiTrade {
   remaining_qty?: string | null
   partial_realized_pnl?: string | null
   unrealized_pnl?: string | null
+  weighted_avg_exit_price?: string | null
 }
 
 export interface ApiTradeListResponse {

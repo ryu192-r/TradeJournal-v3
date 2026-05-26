@@ -234,7 +234,7 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-[var(--page-gap)]">
       <StatCard label="Entry" value={formatPrice(Number(trade.entry_price))} detail={formatDateTime(trade.entry_time)} />
-      <StatCard label="Exit" value={trade.exit_price ? formatPrice(Number(trade.exit_price)) : 'Open'} detail={isOpen ? '—' : (trade.exit_time ? formatDateTime(trade.exit_time) : '—')} />
+      <StatCard label="Exit" value={trade.exit_price ? formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price)) : 'Open'} detail={isOpen ? '—' : (trade.exit_time ? formatDateTime(trade.exit_time) : '—')} />
       <StatCard
         label={`Quantity${showPartialInfo ? ' (rem.)' : ''}`}
         value={

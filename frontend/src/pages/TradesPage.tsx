@@ -229,6 +229,7 @@ export function TradesPage() {
   const [pyramidQty, setPyramidQty] = useState('')
   const [pyramidFees, setPyramidFees] = useState('0')
   const [pyramidStopPrice, setPyramidStopPrice] = useState('')
+  const [pyramidDate, setPyramidDate] = useState('')
   const [pyramidSubmitting, setPyramidSubmitting] = useState(false)
   const [sellTradeId, setSellTradeId] = useState<number | null>(null)
   const [sellQty, setSellQty] = useState('')
@@ -236,6 +237,7 @@ export function TradesPage() {
   const [sellReason, setSellReason] = useState('')
   const [sellFees, setSellFees] = useState('')
   const [sellNote, setSellNote] = useState('')
+  const [sellDate, setSellDate] = useState('')
   const [sellSubmitting, setSellSubmitting] = useState(false)
   const [listingMode, setListingMode] = useState<ListingMode>('auto')
 
@@ -255,6 +257,7 @@ export function TradesPage() {
     setPyramidQty('')
     setPyramidFees('0')
     setPyramidStopPrice('')
+    setPyramidDate('')
   }, [])
 
   const handlePyramid = useCallback(async (tradeId: number) => {
@@ -266,6 +269,7 @@ export function TradesPage() {
         quantity: Number(pyramidQty),
         fees: Number(pyramidFees) || 0,
         stop_price: pyramidStopPrice ? Number(pyramidStopPrice) : undefined,
+        entry_time: pyramidDate ? pyramidDate + ':00' : undefined,
       })
       addToast({ title: 'Pyramided', message: 'Shares added to position.', variant: 'success' })
       setTradeCache(queryClient, trade)
@@ -280,7 +284,7 @@ export function TradesPage() {
     } finally {
       setPyramidSubmitting(false)
     }
-  }, [pyramidEntryPrice, pyramidQty, pyramidFees, pyramidStopPrice, addToast, queryClient, closePyramid])
+  }, [pyramidEntryPrice, pyramidQty, pyramidFees, pyramidStopPrice, pyramidDate, addToast, queryClient, closePyramid])
 
   const openSellTrade = useCallback((trade: ApiTrade) => {
     const qty = trade.remaining_qty ?? trade.quantity
@@ -290,6 +294,7 @@ export function TradesPage() {
     setSellReason('')
     setSellFees(trade.fees ?? '')
     setSellNote('')
+    setSellDate(nowIST())
   }, [])
 
   const closeSellTrade = useCallback(() => {
@@ -299,6 +304,7 @@ export function TradesPage() {
     setSellReason('')
     setSellFees('')
     setSellNote('')
+    setSellDate('')
   }, [])
 
   const handleSellTrade = useCallback(async (tradeId: number, maxQty: number | null) => {
@@ -310,7 +316,7 @@ export function TradesPage() {
         await createPartialExit(tradeId, {
           qty: sellQty,
           exit_price: sellPrice,
-          exit_time: nowIST() + ':00',
+          exit_time: (sellDate || nowIST()) + ':00',
           exit_reason: sellReason || null,
           note: sellNote || null,
         })
@@ -318,7 +324,7 @@ export function TradesPage() {
       } else {
         const trade = await updateTrade(tradeId, {
           exit_price: sellPrice,
-          exit_time: nowIST() + ':00',
+          exit_time: (sellDate || nowIST()) + ':00',
           exit_reason: sellReason || null,
           exit_notes: sellNote || null,
           ...(sellFees ? { fees: sellFees } : {}),
@@ -339,7 +345,7 @@ export function TradesPage() {
     } finally {
       setSellSubmitting(false)
     }
-  }, [sellQty, sellPrice, sellReason, sellFees, sellNote, addToast, queryClient, closeSellTrade])
+  }, [sellQty, sellPrice, sellReason, sellFees, sellNote, sellDate, addToast, queryClient, closeSellTrade])
 
   const skip = (page - 1) * 100
   const { data, isLoading, error } = useTradesQuery({
@@ -767,6 +773,7 @@ export function TradesPage() {
                         openEditTrade={openEditTrade}
                         openDetailTrade={openDetailTrade}
                         setPyramidingTradeId={setPyramidingTradeId}
+                        onPyramidOpen={() => setPyramidDate(nowIST())}
                        openSellTrade={openSellTrade}
                        netEquity={netEquity}
                        quoteMap={quoteMap}
@@ -811,6 +818,11 @@ export function TradesPage() {
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Quantity</label>
             <input type="number" step="1" value={pyramidQty} onChange={(e) => setPyramidQty(e.target.value)}
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
+          </div>
+          <div>
+            <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Entry Date & Time</label>
+            <input type="datetime-local" value={pyramidDate} onChange={(e) => setPyramidDate(e.target.value)}
+              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" />
           </div>
           <div>
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Fees (optional)</label>
@@ -887,6 +899,11 @@ export function TradesPage() {
                     <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Exit Date & Time</label>
+                <input type="datetime-local" value={sellDate} onChange={(e) => setSellDate(e.target.value)}
+                  className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" />
               </div>
               {isFullSell && (
                 <div>
@@ -975,7 +992,7 @@ function TradeCard({
         </div>
         <div className="flex items-center gap-1">
           <span className="text-text-faint">{isOpen ? 'LTP' : 'Exit'}</span>
-          <span className="text-text-heading font-data font-medium">{trade.exit_price ? formatPrice(Number(trade.exit_price)) : '—'}</span>
+          <span className="text-text-heading font-data font-medium">{trade.exit_price ? formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price)) : '—'}</span>
         </div>
         <div className="flex items-center gap-1">
           <span className="text-text-faint">Qty</span>
@@ -1046,7 +1063,8 @@ interface TradeRowProps {
   toggleSelect: (id: number) => void
   openEditTrade: (id: number) => void
   openDetailTrade: (id: number) => void
-  setPyramidingTradeId: (id: number | null) => void
+   setPyramidingTradeId: (id: number | null) => void
+   onPyramidOpen: () => void
   openSellTrade: (trade: ApiTrade) => void
   netEquity: string | null
   quoteMap: Map<string, LiveQuote>
@@ -1060,7 +1078,7 @@ const STOP_TYPE_OPTIONS = [
   { value: 'breakeven', label: 'Breakeven' },
 ]
 
-function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, openSellTrade, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
+function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, onPyramidOpen, openSellTrade, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
   const entryCost = Number(trade.entry_price) * Number(trade.quantity)
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const capPct = computeCapPct(pnlNum, Number(netEquity))
@@ -1138,7 +1156,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
         <td key={column} className={cellClass}>
           {trade.exit_price ? (
             <>
-              <div className="text-text-heading text-xs">{formatPrice(Number(trade.exit_price))}</div>
+              <div className="text-text-heading text-xs">{formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price))}</div>
               <div className="text-[10px] text-text-muted mt-0.5">{trade.exit_time ? formatDateTime(trade.exit_time) : '—'}</div>
             </>
           ) : (
@@ -1253,7 +1271,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
                 <ArrowDownToLine className="w-4 h-4" />
               </button>
               <button
-                onClick={() => { setPyramidingTradeId(trade.id) }}
+                onClick={() => { setPyramidingTradeId(trade.id); onPyramidOpen() }}
                 className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
                 title="Pyramid"
               >

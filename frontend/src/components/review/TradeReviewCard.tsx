@@ -92,7 +92,7 @@ export function TradeReviewCard({ trade, onReview, onNext, isLast }: TradeReview
         <div>
           <div className="text-[11px] text-text-muted uppercase tracking-wide">Exit</div>
           <div className="font-data text-sm font-medium text-text-heading mt-1">
-            {trade.exit_price ? formatPrice(Number(trade.exit_price)) : '—'}
+            {trade.exit_price ? formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price)) : '—'}
           </div>
           <div className="text-[11px] text-text-muted mt-1">
             {trade.exit_time ? formatDateTime(trade.exit_time) : 'Open'}
