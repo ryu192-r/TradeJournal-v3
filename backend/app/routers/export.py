@@ -135,7 +135,7 @@ async def trigger_telegram_backup(
         return {
             "status": "success",
             "message": "Backup sent to Telegram successfully",
-            "trades_exported": len(csv_content.split('\n')) - 2  # header + data rows
+            "trades_exported": max(0, len(csv_content.strip().split('\n')) - 1)
         }
     else:
         raise HTTPException(

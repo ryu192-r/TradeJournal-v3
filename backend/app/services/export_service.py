@@ -83,7 +83,7 @@ class ExportService:
             query = query.filter(Trade.entry_time >= from_datetime)
         
         if to_date:
-            to_datetime = datetime.strptime(to_date, "%Y-%m-%d")
+            to_datetime = datetime.strptime(to_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
             query = query.filter(Trade.entry_time <= to_datetime)
         
         # Exclude deleted trades by default

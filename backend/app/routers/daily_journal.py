@@ -138,7 +138,7 @@ def get_weekly_stats(
 
     trade_count = len(trades)
     winning = [t for t in trades if t.pnl is not None and t.pnl > 0]
-    losing = [t for t in trades if t.pnl is not None and t.pnl <= 0]
+    losing = [t for t in trades if t.pnl is not None and t.pnl < 0]
     total_pnl = sum((t.pnl or Decimal("0") for t in trades), Decimal("0"))
     win_rate = Decimal(str(round((len(winning) / trade_count * 100), 1))) if trade_count > 0 else Decimal("0")
     r_values = [Decimal(str(t.r_multiple)) for t in trades if t.r_multiple is not None]
