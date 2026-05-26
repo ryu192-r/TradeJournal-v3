@@ -10,9 +10,12 @@ to our Trade model fields.
 """
 import csv
 import io
+import logging
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def _to_decimal(s: str) -> Optional[Decimal]:
@@ -132,7 +135,7 @@ def _detect_zerodha_columns(headers: List[str]) -> Optional[Dict[str, str]]:
     for canon, aliases in candidates.items():
         for h in headers:
             for alias in aliases:
-                if h == alias or h.startswith(alias):
+                if h == alias:
                     mapping[canon] = h
                     break
             if canon in mapping:
@@ -384,8 +387,6 @@ def _pair_dhan_legs(legs: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 "tactic": "",
                 "stop_price": "",
                 "target_price": "",
-                "r_multiple": "",
-                "status": "open",
                 "notes": "",
             })
 
@@ -404,10 +405,19 @@ def _pair_dhan_legs(legs: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 "tactic": "",
                 "stop_price": "",
                 "target_price": "",
-                "r_multiple": "",
-                "status": "open",
                 "notes": "",
             })
+
+        if len(sells) > len(buys):
+            for i in range(len(buys), len(sells)):
+                sell = sells[i]
+                logger.warning(
+                    "dhan_unmatched_sell",
+                    symbol=sell["symbol"],
+                    date=sell["date"][:10],
+                    price=sell["price"],
+                    qty=sell["quantity"],
+                )
 
     return trades
 

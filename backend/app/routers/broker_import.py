@@ -240,10 +240,8 @@ async def import_broker_csv(
             "fees": fees,
             "stop_price": _parse_decimal(row.get("stop_price", "")),
             "target_price": _parse_decimal(row.get("target_price", "")),
-            "r_multiple": _parse_decimal(row.get("r_multiple", "")),
             "setup": row.get("setup") or None,
             "tactic": row.get("tactic") or None,
-            "status": row.get("status", "draft").lower() or "draft",
             "notes": row.get("notes") or None,
         }
 
