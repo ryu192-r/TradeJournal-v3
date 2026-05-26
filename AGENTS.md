@@ -21,7 +21,7 @@ Single-context: `CONTEXT.md` (glossary + lifecycle + formulas) + `docs/adr/` (20
 ## Stack
 - **Frontend**: React 19, Vite 8, TypeScript 6, Tailwind 3, Zustand v5 (UI state), TanStack React Query v5 (server state), axios, react-hook-form + zod, recharts, framer-motion, lucide-react
 - **Backend**: Python 3.12, FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0 **sync**, PostgreSQL (psycopg2-binary), uvicorn
-- **Auth**: JWT (python-jose + bcrypt). Access + refresh tokens in localStorage (`auth_token`, `refresh_token`). 401 → force-logout via page reload.
+- **Auth**: JWT (python-jose + bcrypt). Access + refresh tokens in localStorage (`auth_token`, `refresh_token`). 401 → force-logout via page reload. **All API routers except `/auth`, `/health`, `/webhooks/dhan` have `dependencies=[Depends(get_current_user)]` at router level** for authentication. Auth routes use `Depends(get_current_user)` on individual endpoints (login/register are public; change_password/update_me require auth).
 - **Infra**: Docker Compose (postgres + backend + frontend + bot). External Traefik for HTTPS/DuckDNS. nginx inside frontend container proxies `/api/v1/` to `http://backend:8000`. Build arg `VITE_API_URL=/api/v1`.
 
 ## Quick commands
@@ -57,7 +57,7 @@ cd frontend && npm run build           # production build
 - **Standard card**: `const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
 - **Dynamic tiers**: `tier_configs` table, editable via TierEditor on Capital page
 - **Direction**: All trades are LONG (Indian equities — no shorting). DB column defaults to `"LONG"`, removed from UI. PnL = `(exit - entry) * qty - fees`
-- **Status auto-computed**: Derived from `exit_price` everywhere — no exit = open, has exit = closed. `_auto_set_status()` in `trades.py`. Old `draft`/`reviewed`/`analytics` values backfilled via `_backfill_trade_statuses()` on startup. Frontend `getStatus()`/`getStatusLabel()` use `exit_price` as source of truth. List filter uses `exit_price IS NULL/NOT NULL`.
+- **Status auto-computed**: Derived from `exit_price` everywhere — no exit = open, has exit = closed. `Trade._auto_set_status()` model method called from `compute_pnl()` (which runs on every insert/update via `before_update` hook and manually in `merge_or_create`). Preserves `"deleted"` status. Old `draft`/`reviewed`/`analytics` values backfilled via `_backfill_trade_statuses()` on startup. Frontend `getStatus()`/`getStatusLabel()` use `exit_price` as source of truth. List filter uses `exit_price IS NULL/NOT NULL`.
 - **Status badge colors**: Open → neutral grey (`bg-border text-text-muted`), Closed+profit → green (`bg-profit-muted text-profit`), Closed+loss → red (`bg-loss-muted text-loss`).
 - **Status display in detail modal**: Uses `trade.exit_price ? 'Closed' : 'Open'`.
 - **Pyramid**: Open positions (no exit) have a pyramid button → `POST /trades/{id}/pyramid`. Adds more shares: weighted-average entry, sum qty, earliest entry, optional stop_price. Only allowed on open trades.
@@ -290,3 +290,27 @@ cd frontend && npm run build           # production build
 - **profit_factor Infinity**: Returns `None` instead of `float('inf')` when gross_loss is 0. Two `float('inf')` sentinel values remain in `operational_dashboard.py:401` and `market_context.py:451` but are internal-only (never serialized).
 - **removeTradeFromLists total**: Only decrements `total` if the trade was actually present in that filtered list variant.
 - **apscheduler**: Imported conditionally in `main.py:90-92` inside `lifespan()`. Tests skip scheduler via `"pytest" not in sys.modules` in `_should_start_live_quote_scheduler()`.
+
+## Audit Tracker (2025-05-26)
+
+Full audit report: `docs/AUDIT_2025-05-26.md`. 23 issues created (#30–#52).
+
+### Fixed
+- **#30** CRITICAL: Auth added to all 26 API routers. Public: `/auth`, `/health`, `/webhooks/dhan`
+- **#31** CRITICAL: `_auto_set_status` moved to `Trade` model, called from `compute_pnl()`. Covers all creation paths.
+
+### Remaining CRITICAL
+- **#32**: `_update_setup_stats` missing after broker_import, dhan sync, idea conversion, partial exits
+- **#33**: `_auto_reconcile` missing after dhan sync, idea conversion, stop-history update
+- **#34**: `_reconcile_account` commits mid-transaction
+- **#35**: IST timestamps stored in DB instead of UTC
+- **#36**: Capital events update/delete use manual delta instead of full reconcile
+
+### Remaining HIGH
+- **#37**: KPI calculation duplicated 5x
+- **#38**: Frontend/backend calc sync
+- **#39**: 10+ routers bypass service layer
+- **#40**: float() for financial calcs
+
+### Remaining MEDIUM (13 issues)
+- **#41–#52**: GET mutations, placeholderData, appStore persist, ErrorState dedup, untyped dict, utcnow deprecation, bare status codes, hardcoded colors, stop_history R-multiple, ValueError vs HTTPException, duplicate fetch, duplicate imports
