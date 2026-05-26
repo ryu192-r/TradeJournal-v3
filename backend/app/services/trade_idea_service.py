@@ -166,7 +166,6 @@ class TradeIdeaService:
                 thesis_notes = f"{thesis_notes}\n\nAdditional: {convert.notes}" if thesis_notes else convert.notes
 
             entry_time = convert.entry_time or datetime.now(IST).replace(tzinfo=None)
-            status = "reviewed" if convert.exit_price else "draft"
             new_trade = Trade(
                 symbol=db_idea.symbol,
                 direction=db_idea.direction,
@@ -179,8 +178,12 @@ class TradeIdeaService:
                 notes=thesis_notes,
                 stop_price=db_idea.stop_price,
                 target_price=db_idea.target_price,
-                status=status,
             )
+            new_trade.compute_pnl()
+            if new_trade.exit_price is not None:
+                new_trade.status = "closed"
+            else:
+                new_trade.status = "open"
             new_trade.compute_pnl()
             db.add(new_trade)
             db.flush()  # get the ID without committing yet
@@ -194,6 +197,13 @@ class TradeIdeaService:
         if new_trade:
             db.refresh(new_trade)
         db.refresh(db_idea)
+
+        # Reconcile account and update playbook stats after trade creation
+        if new_trade:
+            from app.routers.capital_events import _reconcile_account
+            from app.routers.trades import _update_setup_stats, _auto_reconcile
+            _auto_reconcile(db)
+            _update_setup_stats(db, new_trade.setup)
 
         return db_idea, new_trade
 

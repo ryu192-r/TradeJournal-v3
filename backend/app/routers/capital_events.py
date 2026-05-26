@@ -45,11 +45,20 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
     for t in closed_trades:
         realized_pnl += ensure_decimal(t.pnl)
 
-    # Deployed capital (non-deleted, open trades)
+    # Open trades: partial exit realized PnL + deployed capital (remaining qty after partial exits)
+    from app.models.partial_exit import PartialExit
+    partial_realized = Decimal("0")
     deployed = Decimal("0")
-    open_trades = db.query(Trade).filter(Trade.pnl.is_(None), Trade.status != "deleted").all()
-    for t in open_trades:
-        deployed += ensure_decimal(t.entry_price) * ensure_decimal(t.quantity) - ensure_decimal(t.fees)
+    open_trades_list = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted").all()
+    for t in open_trades_list:
+        partials = db.query(PartialExit).filter(PartialExit.trade_id == t.id).all()
+        total_exited_qty = sum(ensure_decimal(p.qty) for p in partials)
+        for p in partials:
+            partial_realized += ensure_decimal(p.realized_pnl or "0")
+        remaining_qty = ensure_decimal(t.quantity) - total_exited_qty
+        fee_share = ensure_decimal(t.fees or "0") * (remaining_qty / ensure_decimal(t.quantity)) if ensure_decimal(t.quantity) > 0 else Decimal("0")
+        deployed += ensure_decimal(t.entry_price) * remaining_qty - fee_share
+    realized_pnl += partial_realized
 
     # Target = initial + deposits - withdrawals - fees + realized_pnl - deployed
     target = initial + deposits - withdrawals - fees + realized_pnl - deployed
@@ -75,6 +84,13 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
 @router.post("/", response_model=CapitalEventResponse, status_code=status.HTTP_201_CREATED)
 def create_capital_event(event: CapitalEventCreate, db: Session = Depends(get_db)):
     """Create a new capital event and update account balance atomically."""
+    USER_ALLOWED_TYPES = {"deposit", "withdrawal", "profit", "fee"}
+    if event.event_type not in USER_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"event_type '{event.event_type}' is reserved. Allowed: {', '.join(sorted(USER_ALLOWED_TYPES))}"
+        )
+
     # Verify account exists
     account = db.query(Account).filter(Account.id == event.account_id).first()
     if not account:
