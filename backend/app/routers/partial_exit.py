@@ -94,10 +94,9 @@ def create_partial_exit(trade_id: int, payload: PartialExitCreate, db: Session =
     )
     db.add(timeline)
 
+    _auto_reconcile(db)
     db.commit()
     db.refresh(entry)
-
-    _auto_reconcile(db)
 
     return entry
 
@@ -107,9 +106,16 @@ def delete_partial_exit(trade_id: int, exit_id: int, db: Session = Depends(get_d
     exit_entry = db.query(PartialExit).filter(PartialExit.id == exit_id, PartialExit.trade_id == trade_id).first()
     if not exit_entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partial exit not found")
-    db.delete(exit_entry)
-    db.commit()
 
+    # Clean up associated timeline entries
+    db.query(TradeTimeline).filter(
+        TradeTimeline.trade_id == trade_id,
+        TradeTimeline.event_type == "partial_exit",
+        TradeTimeline.new_value == f"qty={exit_entry.qty} @ {exit_entry.exit_price}",
+    ).delete(synchronize_session="fetch")
+
+    db.delete(exit_entry)
     _auto_reconcile(db)
+    db.commit()
 
     return None
