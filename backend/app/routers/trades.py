@@ -39,19 +39,30 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
     )
     total_exited_qty = sum(p.qty for p in partials)
     partial_realized = sum(p.realized_pnl or Decimal("0") for p in partials)
-    remaining_qty = trade.quantity - total_exited_qty
 
     if trade.exit_price is not None:
+        remaining_qty = Decimal("0")
         unrealized = Decimal("0")
-    elif partials and remaining_qty > 0:
-        unrealized = Decimal("0")
+        # Compute weighted-average exit_price for display
+        if partials and total_exited_qty > 0:
+            partial_weighted = sum(p.exit_price * p.qty for p in partials)
+            rem_qty = trade.quantity - total_exited_qty
+            if rem_qty > 0:
+                weighted_avg = (partial_weighted + trade.exit_price * rem_qty) / trade.quantity
+            else:
+                weighted_avg = partial_weighted / total_exited_qty
+        else:
+            weighted_avg = trade.exit_price
     else:
-        unrealized = None
+        remaining_qty = trade.quantity - total_exited_qty
+        unrealized = Decimal("0") if partials else None
+        weighted_avg = None
 
     d = {
         "remaining_qty": remaining_qty,
         "partial_realized_pnl": partial_realized if partials else None,
         "unrealized_pnl": unrealized,
+        "weighted_avg_exit_price": weighted_avg,
     }
     return d
 
@@ -179,6 +190,7 @@ def list_trades(
         resp.remaining_qty = extra["remaining_qty"]
         resp.partial_realized_pnl = extra["partial_realized_pnl"]
         resp.unrealized_pnl = extra["unrealized_pnl"]
+        resp.weighted_avg_exit_price = extra["weighted_avg_exit_price"]
         items.append(resp)
     return {"total": total, "items": items}
 
@@ -224,6 +236,7 @@ def read_trade(trade_id: int, db: Session = Depends(get_db)):
     resp.remaining_qty = extra["remaining_qty"]
     resp.partial_realized_pnl = extra["partial_realized_pnl"]
     resp.unrealized_pnl = extra["unrealized_pnl"]
+    resp.weighted_avg_exit_price = extra["weighted_avg_exit_price"]
     return resp
 
 

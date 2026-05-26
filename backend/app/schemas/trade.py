@@ -134,6 +134,7 @@ class TradeResponse(BaseModel):
     remaining_qty: Optional[Decimal] = None
     partial_realized_pnl: Optional[Decimal] = None
     unrealized_pnl: Optional[Decimal] = None
+    weighted_avg_exit_price: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -159,7 +160,7 @@ class TradeResponse(BaseModel):
             return v.isoformat()
         return str(v)
 
-    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl")
+    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl", "weighted_avg_exit_price")
     def serialize_decimal(self, v):
         if v is None:
             return None
