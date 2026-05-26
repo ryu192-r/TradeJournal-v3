@@ -139,13 +139,16 @@ def _fetch_yfinance_batch(symbols: list[str]) -> tuple[dict[str, dict[str, Any]]
             ticker = yf.Ticker(_to_nse_ticker(sym))
             try:
                 info = ticker.info or {}
-            except Exception:
+            except Exception as exc:
+                logger.warning("yfinance_info_failed", symbol=sym, error=str(exc))
                 info = {}
 
             company_name = info.get("shortName") or info.get("longName")
             sector = info.get("sector")
             pe = info.get("trailingPE")
             market_cap = info.get("marketCap")
+            high_52w_info = info.get("weekHigh52")
+            low_52w_info = info.get("weekLow52")
 
             if sym in quotes:
                 if company_name:
@@ -157,8 +160,12 @@ def _fetch_yfinance_batch(symbols: list[str]) -> tuple[dict[str, dict[str, Any]]
                 if market_cap is not None:
                     cr = float(market_cap) / 1e7
                     quotes[sym]["market_cap_cr"] = _to_decimal(round(cr, 2))
-        except Exception:
-            pass
+                if high_52w_info is not None:
+                    quotes[sym]["high_52w"] = _to_decimal(high_52w_info)
+                if low_52w_info is not None:
+                    quotes[sym]["low_52w"] = _to_decimal(low_52w_info)
+        except Exception as exc:
+            logger.warning("yfinance_symbol_failed", symbol=sym, error=str(exc))
 
     logger.info(
         "yfinance_batch_complete",

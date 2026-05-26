@@ -8,6 +8,7 @@ to environment variables.
 import asyncio
 import hashlib
 import json
+import re
 import structlog
 import time
 from pathlib import Path
@@ -256,7 +257,11 @@ class AICoachService:
 
         for line in raw.strip().split("\n"):
             line = line.strip()
-            if not line or not line.startswith("{"):
+            if not line:
+                continue
+            line = re.sub(r'^```(?:json)?\s*$', '', line).strip()
+            line = re.sub(r'^```\s*$', '', line).strip()
+            if not line.startswith("{"):
                 continue
             try:
                 parsed = json.loads(line)
