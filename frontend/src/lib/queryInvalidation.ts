@@ -98,7 +98,7 @@ export function patchTradeInLists(qc: QueryClient, trade: ApiTrade) {
       //          page 1; later pages will be corrected by background refetch.
       if ((filters.skip ?? 0) > 0) return old
 
-      const limit = filters.limit ?? old.items.length
+      const limit = filters.limit ?? 100
       return {
         ...old,
         total: old.total + 1,
@@ -118,7 +118,7 @@ export function addTradeToLists(qc: QueryClient, trade: ApiTrade) {
       if ((filters.skip ?? 0) > 0) return old
       if (old.items.some((t) => t.id === trade.id)) return old
 
-      const limit = filters.limit ?? old.items.length
+      const limit = filters.limit ?? 100
       return {
         ...old,
         total: old.total + 1,
