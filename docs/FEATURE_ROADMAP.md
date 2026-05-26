@@ -12,7 +12,8 @@
 - Closed P0/P1/P2/P3 bug backlog
 - Backend regression tests: operational dashboard, lifecycle analytics, market context, partial exits, timeline, chart images, Performance OS
 - Frontend smoke tests: Dashboard, Trade Detail, Performance OS, Partial Exit flows
-- ADRs 016–020 documented
+- ADRs 016–021 documented
+- Fixed naive-UTC datetime double-conversion bug (ADR-021): `formatDate()`, `formatDateTime()`, `isoToDatetimeLocal()` now append `Z` to naive timestamps before parsing
 
 ### Phase 1: Core Trading ✅
 - [x] Trade CRUD (all LONG — Indian equities)

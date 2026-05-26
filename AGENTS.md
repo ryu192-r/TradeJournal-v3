@@ -4,15 +4,15 @@
 
 ### Issue tracker
 
-GitHub Issues. See `docs/agents/issue-tracker.md`.
+GitHub Issues at `ryu192-r/TradeJournal-v3`. Uses `gh` CLI. New issues get `needs-triage` + category label. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+Five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) + two categories (`bug`, `enhancement`). Labels already exist on GitHub. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` (glossary + lifecycle + formulas) + `docs/adr/` (20+ ADRs) + `docs/ARCHITECTURE.md` (full file map). See `docs/agents/domain.md`.
 
 ### Architecture reference
 
@@ -47,6 +47,10 @@ cd frontend && npm run build           # production build
 - **Schemas**: Pydantic v2 in `backend/app/schemas/`
 - **Monetary values**: All returned as **strings** from backend (Decimal serialization)
 - **Currency display**: `formatCurrency()` — ₹1.2k, ₹1.50L, ₹1.25Cr (PnL amounts). `formatPrice()` — ₹2,650.50 (entry/exit prices, 2 decimals). `formatQuantity()` — integer without decimals. All in `frontend/src/utils/format.ts`
+- **Datetime handling**: Backend stores **naive UTC** (no timezone suffix). Frontend must append `Z` before parsing to prevent JavaScript interpreting naive strings as local time. Two conversion paths:
+  - `formatDate()` / `formatDateTime()` in `format.ts` — for display only. Both call `normalizeTimestring()` to add `Z` to naive strings, then convert UTC→IST via `toISTInternal()`.
+  - `isoToDatetimeLocal()` / `datetimeLocalToIso()` in `schemas/tradeForm.ts` — for form inputs. Display: UTC→IST. Save: IST→UTC with `+05:30` suffix. Form defaults use `nowIST()`.
+  - **Bug fix**: Without `normalizeTimestring()`, `new Date("2025-05-20T09:16:00")` treats it as local time, then `toIST()` adds +5:30 again — double-converting. Always use `normalizeTimestring()` before `new Date()` on backend timestamps.
 - **DB**: Tables created via alembic on startup (`main.py:19-28`). Falls back to `create_all` if migration fails. Prod = PostgreSQL, tests override to SQLite (`conftest.py:6-9`). Engine uses `pool_pre_ping=True`.
 - **Theme**: CSS variables via `data-theme="dark"|"light"` attr on root. Fonts: Newsreader (display), Inter (body), JetBrains Mono (data/mono)
 - **Fluid layout**: Page containers use `clamp()` CSS variables (`--page-px`, `--page-py`, `--page-gap`, `--heading-size`, `--cell-px`, `--cell-py`, `--text-sm`, `--text-xs`) defined in `index.css`. Use `text-[length:var(--x)]` not `text-[var(--x)]` (Tailwind treats `var()` as color by default).

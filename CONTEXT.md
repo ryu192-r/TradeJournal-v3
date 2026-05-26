@@ -128,4 +128,11 @@ This journal is built for **personal use only** — a single user. Auth exists f
 
 ## Timezone Policy
 
-All trade datetimes are stored in **UTC** in the database. The merge-by-date check converts to **IST (UTC+5:30)** before comparing dates, ensuring `(symbol, date)` means "same trading day in IST". Daily analytics, journal entries, and broker imports all use IST dates. Frontend displays times in IST.
+All trade datetimes are stored in **UTC** in the database as **naive datetimes** (no timezone suffix). The backend serializes them without `Z` or offset (e.g., `2025-05-20T09:16:00`). Frontend must treat these naive strings as UTC before converting to IST for display.
+
+**IST conversion flow:**
+- **Input (backend → frontend):** `isoToDatetimeLocal()` in `schemas/tradeForm.ts` and `formatDate()`/`formatDateTime()` in `utils/format.ts` detect naive strings (no `Z` or `+HH:MM`) and append `Z` before parsing, then shift +5:30 for IST display.
+- **Output (frontend → backend):** `datetimeLocalToIso()` in `schemas/tradeForm.ts` takes a `datetime-local` value (in IST), subtracts 5:30 to get UTC, and appends `+05:30` as the timezone offset.
+- **Key gotcha:** JavaScript `new Date("2025-05-20T09:16:00")` interprets naive strings as **local time**. Without the `Z` fix, `toIST()` would double-convert (local→UTC→IST instead of UTC→IST), shifting times by the browser's timezone offset.
+
+The merge-by-date check converts to **IST (UTC+5:30)** before comparing dates, ensuring `(symbol, date)` means "same trading day in IST". Daily analytics, journal entries, and broker imports all use IST dates. Frontend displays times in IST.
