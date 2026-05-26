@@ -27,8 +27,9 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
 from app.utils.calculations import compute_aggregate_kpis
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/playbook", tags=["playbook-intelligence"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/playbook", tags=["playbook-intelligence"])
 
 
 def _parse_date_range(

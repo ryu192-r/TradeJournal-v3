@@ -4,15 +4,16 @@ Endpoints for managing the AI provider configuration and testing
 connectivity.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from app.core.ai_config import AI_PROVIDERS, MENTORS, get_ai_config, save_ai_config
 from app.core.ai_provider_client import AIProviderClient
 from app.utils.logging import get_logger
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/ai", tags=["ai-settings"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/ai", tags=["ai-settings"])
 logger = get_logger(__name__)
 
 

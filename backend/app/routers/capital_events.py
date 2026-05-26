@@ -19,8 +19,9 @@ from app.models.trade import Trade
 from app.db.database import get_db
 from app.utils.logging import get_logger
 from app.utils.decimal_utils import ensure_decimal
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/capital-events", tags=["capital-events"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/capital-events", tags=["capital-events"])
 logger = get_logger(__name__)
 
 

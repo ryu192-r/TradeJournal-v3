@@ -29,8 +29,9 @@ from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.decimal_utils import ensure_decimal
 from app.utils.calculations import calculate_trade_metrics
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/dashboard", tags=["dashboard"])
 
 
 # ─────────────────────── Schemas ───────────────────────

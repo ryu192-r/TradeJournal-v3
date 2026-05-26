@@ -26,8 +26,9 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.trade_timeline import TradeTimeline
 from app.models.daily_journal import DailyJournal
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/lifecycle", tags=["lifecycle-analytics"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/lifecycle", tags=["lifecycle-analytics"])
 
 
 # ─────────────────────── helpers ───────────────────────

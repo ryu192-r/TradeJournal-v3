@@ -29,10 +29,11 @@ from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.logging import get_logger
 from app.services.live_quote_sync import LIVE_QUOTE_STALE_AFTER_SECONDS, sync_open_trade_quotes
+from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/market", tags=["market-context"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/market", tags=["market-context"])
 
 
 # ─────────────────────── helpers ───────────────────────

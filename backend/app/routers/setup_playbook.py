@@ -11,8 +11,9 @@ from app.schemas.setup_playbook import (
 )
 from app.models.setup_playbook import SetupPlaybook
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/setups", tags=["setup-playbook"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/setups", tags=["setup-playbook"])
 
 
 # ─────────────────────── create ───────────────────────

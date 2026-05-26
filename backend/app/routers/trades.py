@@ -22,6 +22,7 @@ from app.routers.capital_events import _reconcile_account
 from app.models.capital_event import CapitalEvent
 from app.models.setup_playbook import SetupPlaybook
 from app.core.config import settings
+from app.core.dependencies import get_current_user
 
 
 def _auto_reconcile(db: Session):
@@ -67,14 +68,10 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
     return d
 
 
-router = APIRouter(prefix="/trades", tags=["trades"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades", tags=["trades"])
 
 # ─────────────────────── helpers ───────────────────────
 
-
-def _auto_set_status(trade: Trade):
-    """Auto-set status based on exit_price."""
-    trade.status = "closed" if trade.exit_price is not None else "open"
 
 
 def _update_pnl(trade: Trade):
@@ -142,17 +139,7 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     svc = TradeService(db)
     trade_data = trade.model_dump()
     db_trade, action = svc.merge_or_create(trade_data)
-    _auto_set_status(db_trade)
-    db.commit()
-    db.refresh(db_trade)
-    timeline = TradeTimeline(
-        trade_id=db_trade.id,
-        event_type="trade_opened",
-        new_value=f"{db_trade.symbol} @ {db_trade.entry_price}",
-        note=f"qty={db_trade.quantity}",
-    )
-    db.add(timeline)
-    _auto_reconcile(db)
+    db_trade.compute_pnl()
     _update_setup_stats(db, db_trade.setup)
     db.commit()
     db.refresh(db_trade)
@@ -259,7 +246,7 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         _update_pnl(db_trade)
 
     if "exit_price" in update_data:
-        _auto_set_status(db_trade)
+        db_trade._auto_set_status()
         if "exit_reason" not in update_data:
             db_trade.exit_reason = _auto_detect_exit_reason(db_trade)
         if db_trade.exit_price is not None:

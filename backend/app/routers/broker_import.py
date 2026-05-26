@@ -14,9 +14,10 @@ from app.services.broker_import import BROKER_PARSERS, BROKER_DISPLAY, GENERIC_R
 from app.services.trade_service import TradeService
 from datetime import datetime
 from decimal import Decimal
+from app.core.dependencies import get_current_user
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)], )
 
 
 # ─── Supported brokers ─────────────────────────────────────

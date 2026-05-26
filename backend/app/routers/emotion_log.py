@@ -7,8 +7,9 @@ from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.trade_timeline import TradeTimeline
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/trades/{trade_id}/emotions", tags=["emotion-logs"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/{trade_id}/emotions", tags=["emotion-logs"])
 
 
 @router.get("", response_model=EmotionLogListResponse)

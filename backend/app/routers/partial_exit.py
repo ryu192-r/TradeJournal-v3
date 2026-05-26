@@ -9,8 +9,9 @@ from app.models.trade_timeline import TradeTimeline
 from app.db.database import get_db
 from app.models.account import Account
 from app.routers.capital_events import _reconcile_account
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/trades/{trade_id}/partial-exits", tags=["partial-exits"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/{trade_id}/partial-exits", tags=["partial-exits"])
 
 
 def _auto_reconcile(db: Session):

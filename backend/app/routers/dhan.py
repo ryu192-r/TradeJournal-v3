@@ -6,8 +6,9 @@ from typing import Optional
 from app.db.database import get_db
 from app.services.dhan_client import DhanSyncService
 from app.services.trade_service import TradeService
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/trades/dhan", tags=["dhan-sync"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/dhan", tags=["dhan-sync"])
 
 
 @router.post("/sync")

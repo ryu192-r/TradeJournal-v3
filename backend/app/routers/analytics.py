@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 from app.services.analytics_service import (
     get_kpi_summary,
     get_setup_performance,
@@ -44,7 +45,7 @@ from app.schemas.analytics import (
     FullDashboardResponse,
 )
 
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/analytics", tags=["analytics"])
 
 
 # ─────────────────────── helpers ───────────────────────

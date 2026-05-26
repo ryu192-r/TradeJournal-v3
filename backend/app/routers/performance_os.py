@@ -22,9 +22,10 @@ from app.schemas.performance_os import (
     ChecklistItem,
 )
 from app.utils.logging import get_logger
+from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/perf-os", tags=["performance-os"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/perf-os", tags=["performance-os"])
 
 
 DEFAULT_PRE_MARKET_CHECKLIST: list[dict] = [

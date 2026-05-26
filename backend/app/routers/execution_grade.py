@@ -7,8 +7,9 @@ from app.models.trade import Trade
 from app.models.execution_grade import ExecutionGrade
 from app.models.trade_timeline import TradeTimeline
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/trades/{trade_id}/execution-grade", tags=["execution-grades"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/{trade_id}/execution-grade", tags=["execution-grades"])
 
 
 @router.get("", response_model=ExecutionGradeResponse)

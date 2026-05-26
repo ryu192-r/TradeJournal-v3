@@ -13,9 +13,10 @@ from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
+from app.core.dependencies import get_current_user
 
 
-router = APIRouter(prefix="/calendar", tags=["calendar"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/calendar", tags=["calendar"])
 
 
 def _parse_month(month: str) -> tuple[date, date]:

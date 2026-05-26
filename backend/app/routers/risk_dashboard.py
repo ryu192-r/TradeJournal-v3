@@ -13,9 +13,10 @@ from app.models.trade import Trade
 from app.models.partial_exit import PartialExit
 from app.utils.decimal_utils import ensure_decimal
 from sqlalchemy import func
+from app.core.dependencies import get_current_user
 
 
-router = APIRouter(prefix="/risk-dashboard", tags=["risk-dashboard"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/risk-dashboard", tags=["risk-dashboard"])
 
 
 class RiskBucketOut(BaseModel):

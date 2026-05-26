@@ -12,9 +12,10 @@ from app.db.database import get_db
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.trade import Trade
+from app.core.dependencies import get_current_user
 
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/reports", tags=["reports"])
 
 
 def _money(value: Decimal | int | float | None) -> str:

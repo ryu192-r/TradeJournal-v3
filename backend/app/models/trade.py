@@ -55,8 +55,15 @@ class Trade(Base):
     emotion_logs = relationship("EmotionLog", back_populates="trade", order_by="EmotionLog.timestamp")
     execution_grade = relationship("ExecutionGrade", back_populates="trade", uselist=False)
 
+    def _auto_set_status(self):
+        """Auto-set status based on exit_price. Preserves 'deleted' status."""
+        if self.status == "deleted":
+            return
+        self.status = "closed" if self.exit_price is not None else "open"
+
     def compute_pnl(self):
         """Auto-compute PnL and R-multiple using shared calculation module."""
+        self._auto_set_status()
         partials = []
         if self.exit_price is not None:
             session = object_session(self)

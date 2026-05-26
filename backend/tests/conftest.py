@@ -2,7 +2,6 @@
 
 import os
 
-# Override DB to SQLite for all tests — prevents dependency on Docker Postgres
 os.environ.setdefault("RATE_LIMIT_OFF", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("SECRET_KEY", "test-secret")
@@ -21,6 +20,7 @@ def __get_db_test():
         yield db
     finally:
         db.close()
+
 
 _real_app.dependency_overrides[get_db] = __get_db_test
 

@@ -5,8 +5,9 @@ from app.models.tier_config import TierConfig
 from app.schemas.tier_config import TierConfigListResponse, TierConfigItem
 from app.utils.logging import get_logger
 from decimal import Decimal
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/tier-config", tags=["tier-config"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/tier-config", tags=["tier-config"])
 logger = get_logger(__name__)
 
 

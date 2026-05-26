@@ -14,10 +14,11 @@ from app.schemas.trade_idea import (
 from app.services.trade_idea_service import TradeIdeaService
 from app.db.database import get_db
 from app.utils.logging import get_logger
+from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/ideas", tags=["trade-ideas"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/ideas", tags=["trade-ideas"])
 
 
 @router.post("/", response_model=TradeIdeaResponse, status_code=201)

@@ -16,6 +16,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.daily_journal import DailyJournal
 from app.models.trade import Trade
 from app.schemas.daily_journal import (
@@ -27,7 +28,7 @@ from app.schemas.daily_journal import (
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/journal", tags=["daily-journal"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/journal", tags=["daily-journal"])
 
 
 @router.post(

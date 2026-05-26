@@ -9,8 +9,9 @@ import io
 from app.services.export_service import ExportService
 from app.db.database import get_db
 from app.core.config import settings
+from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/export", tags=["export"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/export", tags=["export"])
 
 
 @router.get("/csv")

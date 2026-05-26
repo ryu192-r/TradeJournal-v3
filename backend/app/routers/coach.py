@@ -39,12 +39,13 @@ from app.models.partial_exit import PartialExit
 from app.models.setup_playbook import SetupPlaybook
 from app.models.trade import Trade
 from app.utils.logging import get_logger
+from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
 
 _now = lambda: datetime.now(timezone.utc)
 
-router = APIRouter(prefix="/coach", tags=["ai-coach"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/coach", tags=["ai-coach"])
 
 # ──────────────────────── helpers ────────────────────────
 
