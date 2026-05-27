@@ -9,6 +9,7 @@ from app.models.trade_timeline import TradeTimeline
 from app.db.database import get_db
 from app.models.account import Account
 from app.routers.capital_events import _reconcile_account
+from app.routers.trades import _update_setup_stats
 from app.core.dependencies import get_current_user
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/{trade_id}/partial-exits", tags=["partial-exits"])
@@ -96,6 +97,7 @@ def create_partial_exit(trade_id: int, payload: PartialExitCreate, db: Session =
     db.add(timeline)
 
     _auto_reconcile(db)
+    _update_setup_stats(db, trade.setup)
     db.commit()
     db.refresh(entry)
 
@@ -108,7 +110,9 @@ def delete_partial_exit(trade_id: int, exit_id: int, db: Session = Depends(get_d
     if not exit_entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partial exit not found")
 
-    # Clean up associated timeline entries
+    trade = db.query(Trade).filter(Trade.id == trade_id).first()
+    setup_name = trade.setup if trade else None
+
     db.query(TradeTimeline).filter(
         TradeTimeline.trade_id == trade_id,
         TradeTimeline.event_type == "partial_exit",
@@ -117,6 +121,8 @@ def delete_partial_exit(trade_id: int, exit_id: int, db: Session = Depends(get_d
 
     db.delete(exit_entry)
     _auto_reconcile(db)
+    if setup_name:
+        _update_setup_stats(db, setup_name)
     db.commit()
 
     return None

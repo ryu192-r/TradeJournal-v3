@@ -7,6 +7,7 @@ from app.db.database import get_db
 from app.services.dhan_client import DhanSyncService
 from app.services.trade_service import TradeService
 from app.core.dependencies import get_current_user
+from app.routers.trades import _update_setup_stats, _auto_reconcile
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/dhan", tags=["dhan-sync"])
 
@@ -31,6 +32,7 @@ def sync_dhan_trades(
 
     added = 0
     skipped = 0
+    setups_seen = set()
     for day in day_trades:
         # Pair OPEN/CLOSE legs
         opens = {t.exchange_order_id: t for t in day.trades if t.leg_type == "OPEN"}
@@ -46,8 +48,10 @@ def sync_dhan_trades(
             if existing:
                 skipped += 1
                 continue
-            trade_svc.find_or_create_pair(open_leg, close_leg)
+            trade = trade_svc.find_or_create_pair(open_leg, close_leg)
             added += 1
+            if trade.setup:
+                setups_seen.add(trade.setup)
 
         # Unmatched CLOSE legs (single-leg close without open)
         for oid, close_leg in closes.items():
@@ -60,8 +64,15 @@ def sync_dhan_trades(
                 if existing:
                     skipped += 1
                     continue
-                trade_svc.create_from_dhan_leg(close_leg, is_open=False)
+                trade = trade_svc.create_from_dhan_leg(close_leg, is_open=False)
                 added += 1
+                if trade.setup:
+                    setups_seen.add(trade.setup)
+
+    for setup_name in setups_seen:
+        _update_setup_stats(db, setup_name)
+    _auto_reconcile(db)
+    db.commit()
 
     return {
         "days_fetched": len(day_trades),

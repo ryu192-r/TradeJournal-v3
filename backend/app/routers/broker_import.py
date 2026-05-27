@@ -10,6 +10,7 @@ from app.db.database import get_db
 from app.models.trade import Trade
 from app.models.account import Account
 from app.routers.capital_events import _reconcile_account
+from app.routers.trades import _update_setup_stats
 from app.services.broker_import import BROKER_PARSERS, BROKER_DISPLAY, GENERIC_REQUIRED
 from app.services.trade_service import TradeService
 from datetime import datetime
@@ -202,9 +203,9 @@ async def import_broker_csv(
         }
 
     # Actual import
-    preview = rows[:5]
     added = 0
     merged = 0
+    setups_seen = set()
     for row in rows:
         symbol = row.get("symbol", "").upper()[:20]
         if not symbol:
@@ -246,11 +247,16 @@ async def import_broker_csv(
             "notes": row.get("notes") or None,
         }
 
-        _, action = svc.merge_or_create(trade_data)
+        trade, action = svc.merge_or_create(trade_data)
         if action == "merged":
             merged += 1
         else:
             added += 1
+        if trade.setup:
+            setups_seen.add(trade.setup)
+
+    for setup_name in setups_seen:
+        _update_setup_stats(db, setup_name)
 
     db.commit()
     account = db.query(Account).first()
