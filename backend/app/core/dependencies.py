@@ -8,6 +8,8 @@ from typing import Optional
 
 from app.db.database import get_db
 from app.models.user import User
+from app.models.trade import Trade
+from app.models.account import Account
 from app.core.security import decode_token
 
 
@@ -89,3 +91,38 @@ def get_optional_current_user(
         return None
 
     return user
+
+
+# ── Scoped query helpers ──
+
+
+def get_user_trade(db: Session, trade_id: int, user_id: int) -> Optional[Trade]:
+    return db.query(Trade).filter(Trade.id == trade_id, Trade.user_id == user_id).first()
+
+
+def get_user_trade_or_404(db: Session, trade_id: int, user_id: int) -> Trade:
+    trade = get_user_trade(db, trade_id, user_id)
+    if not trade:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+    return trade
+
+
+def get_user_account(db: Session, account_id: int, user_id: int) -> Optional[Account]:
+    return db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
+
+
+def get_user_account_or_404(db: Session, account_id: int, user_id: int) -> Account:
+    account = get_user_account(db, account_id, user_id)
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    return account
+
+
+def scoped_trade_query(db: Session, user_id: int):
+    """Return a scoped base query for trades belonging to user_id."""
+    return db.query(Trade).filter(Trade.user_id == user_id)
+
+
+def scoped_account_query(db: Session, user_id: int):
+    """Return a scoped base query for accounts belonging to user_id."""
+    return db.query(Account).filter(Account.user_id == user_id)

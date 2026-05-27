@@ -9,6 +9,7 @@ import calendar
 from app.db.database import get_db
 from app.models.performance_os import DailyWorkflow, WeeklyReview, MonthlyReview
 from app.models.trade import Trade
+from app.models.user import User
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
@@ -42,10 +43,11 @@ DEFAULT_PRE_MARKET_CHECKLIST: list[dict] = [
 ]
 
 
-def _get_or_create_workflow(db: Session, d: date) -> DailyWorkflow:
-    wf = db.query(DailyWorkflow).filter(DailyWorkflow.date == d).first()
+def _get_or_create_workflow(db: Session, d: date, user_id: int) -> DailyWorkflow:
+    wf = db.query(DailyWorkflow).filter(DailyWorkflow.date == d, DailyWorkflow.user_id == user_id).first()
     if wf is None:
         wf = DailyWorkflow(
+            user_id=user_id,
             date=d,
             phase="pre_market",
             checklist_items=[ChecklistItem(**c).model_dump() for c in DEFAULT_PRE_MARKET_CHECKLIST],
@@ -57,10 +59,11 @@ def _get_or_create_workflow(db: Session, d: date) -> DailyWorkflow:
     return wf
 
 
-def _today_trades_summary(db: Session, d: date) -> list[dict]:
+def _today_trades_summary(db: Session, d: date, user_id: int) -> list[dict]:
     day_start = datetime.combine(d, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     trades = db.query(Trade).filter(
+        Trade.user_id == user_id,
         Trade.status != "deleted",
         Trade.entry_time >= day_start,
         Trade.entry_time < day_end,
@@ -73,8 +76,8 @@ def _today_trades_summary(db: Session, d: date) -> list[dict]:
     } for t in trades]
 
 
-def _open_positions(db: Session) -> list[dict]:
-    trades = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted").all()
+def _open_positions(db: Session, user_id: int) -> list[dict]:
+    trades = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted", Trade.user_id == user_id).all()
     return [{
         "id": t.id, "symbol": t.symbol, "entry_price": str(t.entry_price),
         "quantity": str(t.quantity), "stop_price": str(t.stop_price) if t.stop_price else None,
@@ -98,16 +101,16 @@ def _phase_progress(wf: DailyWorkflow) -> dict:
 # ────────────────────────── Daily Workflow ──────────────────────────
 
 @router.get("/workflow/today", response_model=DailyWorkflowDashboardResponse)
-def get_today_dashboard(db: Session = Depends(get_db)):
+def get_today_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     today = date.today()
-    wf = _get_or_create_workflow(db, today)
-    journal = db.query(DailyJournal).filter(DailyJournal.date == today).first()
-    regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == today).first()
+    wf = _get_or_create_workflow(db, today, current_user.id)
+    journal = db.query(DailyJournal).filter(DailyJournal.date == today, DailyJournal.user_id == current_user.id).first()
+    regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == today, MarketSnapshot.user_id == current_user.id).first()
 
     return DailyWorkflowDashboardResponse(
         workflow=DailyWorkflowResponse.model_validate(wf),
-        today_trades=_today_trades_summary(db, today),
-        open_positions=_open_positions(db),
+        today_trades=_today_trades_summary(db, today, current_user.id),
+        open_positions=_open_positions(db, current_user.id),
         market_regime={
             "nifty_close": str(regime.nifty_close) if regime and regime.nifty_close else None,
             "nifty_trend": regime.nifty_trend if regime else None,
@@ -122,21 +125,21 @@ def get_today_dashboard(db: Session = Depends(get_db)):
             "rules_followed": journal.rules_followed,
             "rules_violated": journal.rules_violated,
         } if journal else None,
-        discipline_score=_compute_discipline(db, today),
+        discipline_score=_compute_discipline(db, today, current_user.id),
         phase_progress=_phase_progress(wf),
     )
 
 
 @router.get("/workflow/{d}", response_model=DailyWorkflowDashboardResponse)
-def get_workflow_by_date(d: date, db: Session = Depends(get_db)):
-    wf = _get_or_create_workflow(db, d)
-    journal = db.query(DailyJournal).filter(DailyJournal.date == d).first()
-    regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == d).first()
+def get_workflow_by_date(d: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wf = _get_or_create_workflow(db, d, current_user.id)
+    journal = db.query(DailyJournal).filter(DailyJournal.date == d, DailyJournal.user_id == current_user.id).first()
+    regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == d, MarketSnapshot.user_id == current_user.id).first()
 
     return DailyWorkflowDashboardResponse(
         workflow=DailyWorkflowResponse.model_validate(wf),
-        today_trades=_today_trades_summary(db, d),
-        open_positions=_open_positions(db),
+        today_trades=_today_trades_summary(db, d, current_user.id),
+        open_positions=_open_positions(db, current_user.id),
         market_regime={
             "nifty_close": str(regime.nifty_close) if regime and regime.nifty_close else None,
             "nifty_trend": regime.nifty_trend if regime else None,
@@ -150,14 +153,14 @@ def get_workflow_by_date(d: date, db: Session = Depends(get_db)):
             "rules_followed": journal.rules_followed,
             "rules_violated": journal.rules_violated,
         } if journal else None,
-        discipline_score=_compute_discipline(db, d),
+        discipline_score=_compute_discipline(db, d, current_user.id),
         phase_progress=_phase_progress(wf),
     )
 
 
 @router.put("/workflow/{d}", response_model=DailyWorkflowResponse)
-def update_workflow(d: date, payload: DailyWorkflowUpdate, db: Session = Depends(get_db)):
-    wf = _get_or_create_workflow(db, d)
+def update_workflow(d: date, payload: DailyWorkflowUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wf = _get_or_create_workflow(db, d, current_user.id)
     update_data = payload.model_dump(exclude_unset=True)
     if "checklist_items" in update_data and update_data["checklist_items"] is not None:
         update_data["checklist_items"] = [
@@ -171,8 +174,8 @@ def update_workflow(d: date, payload: DailyWorkflowUpdate, db: Session = Depends
 
 
 @router.post("/workflow/{d}/advance", response_model=DailyWorkflowResponse)
-def advance_phase(d: date, db: Session = Depends(get_db)):
-    wf = _get_or_create_workflow(db, d)
+def advance_phase(d: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wf = _get_or_create_workflow(db, d, current_user.id)
     phases = ["pre_market", "execution", "review", "behavior"]
     phase_done_map = {
         "pre_market": "pre_market_done",
@@ -192,8 +195,8 @@ def advance_phase(d: date, db: Session = Depends(get_db)):
 
 
 @router.post("/workflow/{d}/reset", response_model=DailyWorkflowResponse)
-def reset_workflow(d: date, db: Session = Depends(get_db)):
-    wf = _get_or_create_workflow(db, d)
+def reset_workflow(d: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wf = _get_or_create_workflow(db, d, current_user.id)
     wf.phase = "pre_market"
     wf.pre_market_done = False
     wf.execution_done = False
@@ -205,10 +208,11 @@ def reset_workflow(d: date, db: Session = Depends(get_db)):
     return DailyWorkflowResponse.model_validate(wf)
 
 
-def _compute_discipline(db: Session, d: date) -> Optional[dict]:
+def _compute_discipline(db: Session, d: date, user_id: int) -> Optional[dict]:
     from datetime import timedelta
     lookback = d - timedelta(days=30)
     grade_rows = db.query(ExecutionGrade).join(Trade).filter(
+        Trade.user_id == user_id,
         Trade.status != "deleted",
         Trade.entry_time >= lookback,
     ).all()
@@ -231,33 +235,33 @@ def _week_range(d: date) -> tuple[date, date]:
 
 
 @router.get("/weekly/current", response_model=WeeklyReviewDetailResponse)
-def get_current_weekly_review(db: Session = Depends(get_db)):
+def get_current_weekly_review(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     today = date.today()
     week_start, week_end = _week_range(today)
-    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start).first()
+    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start, WeeklyReview.user_id == current_user.id).first()
     if review is None:
-        review = WeeklyReview(week_start=week_start, week_end=week_end)
+        review = WeeklyReview(week_start=week_start, week_end=week_end, user_id=current_user.id)
         db.add(review)
         db.commit()
         db.refresh(review)
-    return _enrich_weekly(db, review)
+    return _enrich_weekly(db, review, current_user.id)
 
 
 @router.get("/weekly/{week_start}", response_model=WeeklyReviewDetailResponse)
-def get_weekly_review(week_start: date, db: Session = Depends(get_db)):
-    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start).first()
+def get_weekly_review(week_start: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start, WeeklyReview.user_id == current_user.id).first()
     if review is None:
         week_end = week_start + timedelta(days=4)
-        review = WeeklyReview(week_start=week_start, week_end=week_end)
+        review = WeeklyReview(week_start=week_start, week_end=week_end, user_id=current_user.id)
         db.add(review)
         db.commit()
         db.refresh(review)
-    return _enrich_weekly(db, review)
+    return _enrich_weekly(db, review, current_user.id)
 
 
 @router.put("/weekly/{week_start}", response_model=WeeklyReviewResponse)
-def update_weekly_review(week_start: date, payload: WeeklyReviewUpdate, db: Session = Depends(get_db)):
-    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start).first()
+def update_weekly_review(week_start: date, payload: WeeklyReviewUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start, WeeklyReview.user_id == current_user.id).first()
     if review is None:
         raise HTTPException(404, "Weekly review not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
@@ -270,10 +274,11 @@ def update_weekly_review(week_start: date, payload: WeeklyReviewUpdate, db: Sess
 
 from decimal import Decimal
 
-def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailResponse:
+def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyReviewDetailResponse:
     week_end_dt = datetime.combine(review.week_end, datetime.max.time())
     week_start_dt = datetime.combine(review.week_start, datetime.min.time())
     trades = db.query(Trade).filter(
+        Trade.user_id == user_id,
         Trade.status != "deleted",
         Trade.entry_time >= week_start_dt,
         Trade.entry_time <= week_end_dt,
@@ -334,31 +339,31 @@ def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailRespo
 # ────────────────────────── Monthly Review ──────────────────────────
 
 @router.get("/monthly/current", response_model=MonthlyReviewDetailResponse)
-def get_current_monthly_review(db: Session = Depends(get_db)):
+def get_current_monthly_review(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     month = date.today().strftime("%Y-%m")
-    review = db.query(MonthlyReview).filter(MonthlyReview.month == month).first()
+    review = db.query(MonthlyReview).filter(MonthlyReview.month == month, MonthlyReview.user_id == current_user.id).first()
     if review is None:
-        review = MonthlyReview(month=month)
+        review = MonthlyReview(month=month, user_id=current_user.id)
         db.add(review)
         db.commit()
         db.refresh(review)
-    return _enrich_monthly(db, review)
+    return _enrich_monthly(db, review, current_user.id)
 
 
 @router.get("/monthly/{month}", response_model=MonthlyReviewDetailResponse)
-def get_monthly_review(month: str, db: Session = Depends(get_db)):
-    review = db.query(MonthlyReview).filter(MonthlyReview.month == month).first()
+def get_monthly_review(month: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    review = db.query(MonthlyReview).filter(MonthlyReview.month == month, MonthlyReview.user_id == current_user.id).first()
     if review is None:
-        review = MonthlyReview(month=month)
+        review = MonthlyReview(month=month, user_id=current_user.id)
         db.add(review)
         db.commit()
         db.refresh(review)
-    return _enrich_monthly(db, review)
+    return _enrich_monthly(db, review, current_user.id)
 
 
 @router.put("/monthly/{month}", response_model=MonthlyReviewResponse)
-def update_monthly_review(month: str, payload: MonthlyReviewUpdate, db: Session = Depends(get_db)):
-    review = db.query(MonthlyReview).filter(MonthlyReview.month == month).first()
+def update_monthly_review(month: str, payload: MonthlyReviewUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    review = db.query(MonthlyReview).filter(MonthlyReview.month == month, MonthlyReview.user_id == current_user.id).first()
     if review is None:
         raise HTTPException(404, "Monthly review not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
@@ -369,7 +374,7 @@ def update_monthly_review(month: str, payload: MonthlyReviewUpdate, db: Session 
     return MonthlyReviewResponse.model_validate(review)
 
 
-def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailResponse:
+def _enrich_monthly(db: Session, review: MonthlyReview, user_id: int) -> MonthlyReviewDetailResponse:
     try:
         year, mon = map(int, review.month.split("-"))
         month_start = date(year, mon, 1)
@@ -381,6 +386,7 @@ def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailRe
     start_dt = datetime.combine(month_start, datetime.min.time())
     end_dt = datetime.combine(month_end, datetime.max.time())
     trades = db.query(Trade).filter(
+        Trade.user_id == user_id,
         Trade.status != "deleted",
         Trade.entry_time >= start_dt,
         Trade.entry_time <= end_dt,

@@ -11,7 +11,8 @@ class Trade(Base):
     __tablename__ = 'trades'
 
     id = Column(Integer, primary_key=True, index=True)
-    
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+
     # Core trade fields
     symbol = Column(String(20), nullable=False, index=True)
     direction = Column(String(10), nullable=False, default='LONG')  # Always LONG for Indian equities
@@ -47,6 +48,7 @@ class Trade(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     # Relationships
+    user = relationship("User", back_populates="trades")
     stop_history_entries = relationship("StopHistory", back_populates="trade")
     capital_events = relationship("CapitalEvent", back_populates="trade")
     source_idea = relationship("TradeIdea", back_populates="traded_trade", uselist=False)
@@ -104,6 +106,8 @@ class Trade(Base):
 
 
 # Indexes for common query patterns
+Index('ix_trades_user_status', Trade.user_id, Trade.status)
+Index('ix_trades_user_entry_time', Trade.user_id, Trade.entry_time)
 Index('ix_trades_symbol_status', Trade.symbol, Trade.status)
 Index('ix_trades_entry_time_exit_time', Trade.entry_time, Trade.exit_time)
 Index('ix_trades_status', Trade.status)

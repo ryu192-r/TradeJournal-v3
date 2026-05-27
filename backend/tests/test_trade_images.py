@@ -2,15 +2,31 @@
 
 from datetime import datetime
 from decimal import Decimal
+from itertools import count
 
 import pytest
 from fastapi import HTTPException
 
+from app.core.security import get_password_hash
 from app.core.config import settings
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.trade import Trade
+from app.models.user import User
 from app.routers.trades import delete_chart_image
+
+_email_counter = count(1)
+
+
+def _make_user(db_session):
+    user = User(
+        email=f"test_{next(_email_counter)}@example.com",
+        full_name="Test User",
+        hashed_password=get_password_hash("test123"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
 
 
 @pytest.fixture
@@ -33,7 +49,7 @@ def upload_dir(tmp_path, monkeypatch):
     return path
 
 
-def _trade(chart_images: list[str]):
+def _trade(chart_images: list[str], user_id: int):
     return Trade(
         symbol="RELIANCE",
         direction="LONG",
@@ -42,21 +58,23 @@ def _trade(chart_images: list[str]):
         entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
         status="open",
         chart_images=chart_images,
+        user_id=user_id,
     )
 
 
 def test_delete_chart_image_removes_expected_file(db_session, upload_dir):
+    user = _make_user(db_session)
     image_dir = upload_dir / "1"
     image_dir.mkdir()
     image_path = image_dir / "1_chart.png"
     image_path.write_bytes(b"png")
 
-    trade = _trade(["/uploads/1/1_chart.png"])
+    trade = _trade(["/uploads/1/1_chart.png"], user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
 
-    result = delete_chart_image(trade.id, "/uploads/1/1_chart.png", db_session)
+    result = delete_chart_image(trade.id, "/uploads/1/1_chart.png", db_session, current_user=user)
 
     assert result == {"images": []}
     assert not image_path.exists()
@@ -66,25 +84,27 @@ def test_delete_chart_image_removes_expected_file(db_session, upload_dir):
 
 @pytest.mark.parametrize("url", ["1/1_chart.png", "/bad/1/1_chart.png"])
 def test_delete_chart_image_rejects_non_upload_urls(db_session, upload_dir, url):
-    trade = _trade([url])
+    user = _make_user(db_session)
+    trade = _trade([url], user.id)
     db_session.add(trade)
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc:
-        delete_chart_image(trade.id, url, db_session)
+        delete_chart_image(trade.id, url, db_session, current_user=user)
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "Invalid upload URL"
 
 
 def test_delete_chart_image_rejects_path_traversal(db_session, upload_dir):
+    user = _make_user(db_session)
     url = "/uploads/../outside.png"
-    trade = _trade([url])
+    trade = _trade([url], user.id)
     db_session.add(trade)
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc:
-        delete_chart_image(trade.id, url, db_session)
+        delete_chart_image(trade.id, url, db_session, current_user=user)
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "Invalid upload URL"

@@ -1,13 +1,18 @@
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, JSON, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 
 class DailyWorkflow(Base):
     __tablename__ = "daily_workflows"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='uq_daily_workflows_user_date'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
     phase = Column(String(20), nullable=False, default="pre_market")
     pre_market_done = Column(Boolean, default=False)
     execution_done = Column(Boolean, default=False)
@@ -23,12 +28,18 @@ class DailyWorkflow(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    user = relationship("User", back_populates="daily_workflows")
+
 
 class WeeklyReview(Base):
     __tablename__ = "weekly_reviews"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'week_start', name='uq_weekly_reviews_user_week'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    week_start = Column(Date, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    week_start = Column(Date, nullable=False, index=True)
     week_end = Column(Date, nullable=False)
     total_trades = Column(Integer, default=0)
     total_pnl = Column(String, default="0")
@@ -46,12 +57,18 @@ class WeeklyReview(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    user = relationship("User", back_populates="weekly_reviews")
+
 
 class MonthlyReview(Base):
     __tablename__ = "monthly_reviews"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'month', name='uq_monthly_reviews_user_month'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    month = Column(String(7), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    month = Column(String(7), nullable=False, index=True)
     total_trades = Column(Integer, default=0)
     total_pnl = Column(String, default="0")
     win_rate = Column(String, nullable=True)
@@ -71,3 +88,5 @@ class MonthlyReview(Base):
     completed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="monthly_reviews")

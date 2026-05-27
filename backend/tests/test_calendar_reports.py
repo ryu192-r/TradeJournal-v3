@@ -1,16 +1,32 @@
 from datetime import date, datetime
 from decimal import Decimal
+from itertools import count
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
+from app.models.user import User
 from app.routers.calendar import get_calendar_month
 from app.routers.reports import get_weekly_report
+
+_email_counter = count(1)
+
+
+def _make_user(db_session):
+    user = User(
+        email=f"test_{next(_email_counter)}@example.com",
+        full_name="Test User",
+        hashed_password=get_password_hash("test123"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
 
 
 @pytest.fixture
@@ -26,6 +42,7 @@ def db_session():
 
 
 def test_calendar_month_returns_day_rollups(db_session):
+    user = _make_user(db_session)
     trade = Trade(
         symbol="TCS",
         entry_price=Decimal("100"),
@@ -36,15 +53,16 @@ def test_calendar_month_returns_day_rollups(db_session):
         pnl=Decimal("100"),
         status="closed",
         setup="EP",
+        user_id=user.id,
     )
     db_session.add(trade)
     db_session.flush()
     db_session.add(EmotionLog(trade_id=trade.id, emotion="revenge", timestamp=datetime(2026, 5, 4, 10, 0)))
-    db_session.add(DailyJournal(date=date(2026, 5, 4), post_trade_notes="Reviewed", discipline_rating=3, rules_violated="Chased"))
-    db_session.add(DailyWorkflow(date=date(2026, 5, 4), phase="review", pre_market_done=True, execution_done=True))
+    db_session.add(DailyJournal(date=date(2026, 5, 4), post_trade_notes="Reviewed", discipline_rating=3, rules_violated="Chased", user_id=user.id))
+    db_session.add(DailyWorkflow(date=date(2026, 5, 4), phase="review", pre_market_done=True, execution_done=True, user_id=user.id))
     db_session.commit()
 
-    payload = get_calendar_month(month="2026-05", db=db_session)
+    payload = get_calendar_month(month="2026-05", db=db_session, current_user=user)
 
     assert payload["summary"]["trade_count"] == 1
     day = next(d for d in payload["days"] if d["date"] == "2026-05-04")
@@ -55,6 +73,7 @@ def test_calendar_month_returns_day_rollups(db_session):
 
 
 def test_reports_weekly_returns_deterministic_sections(db_session):
+    user = _make_user(db_session)
     db_session.add(
         Trade(
             symbol="INFY",
@@ -66,12 +85,13 @@ def test_reports_weekly_returns_deterministic_sections(db_session):
             pnl=Decimal("-50"),
             status="closed",
             setup="Pullback",
+            user_id=user.id,
         )
     )
-    db_session.add(DailyJournal(date=date(2026, 5, 5), discipline_rating=4))
+    db_session.add(DailyJournal(date=date(2026, 5, 5), discipline_rating=4, user_id=user.id))
     db_session.commit()
 
-    payload = get_weekly_report(week_start=date(2026, 5, 4), db=db_session)
+    payload = get_weekly_report(week_start=date(2026, 5, 4), db=db_session, current_user=user)
 
     assert payload["period"] == "weekly"
     assert payload["summary"]["net_pnl"] == "-50.00"

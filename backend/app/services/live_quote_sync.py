@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, time, timezone
 from decimal import Decimal
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -31,18 +32,18 @@ def is_market_open(now: datetime | None = None) -> bool:
     return time(9, 15) <= current_time <= time(15, 30)
 
 
-def get_open_trade_symbols(db: Session) -> list[str]:
-    rows = (
+def get_open_trade_symbols(db: Session, user_id: Optional[int] = None) -> list[str]:
+    q = (
         db.query(Trade.symbol)
         .filter(
             Trade.status != "deleted",
             Trade.exit_price.is_(None),
             Trade.symbol.isnot(None),
         )
-        .distinct()
-        .order_by(Trade.symbol)
-        .all()
     )
+    if user_id is not None:
+        q = q.filter(Trade.user_id == user_id)
+    rows = q.distinct().order_by(Trade.symbol).all()
     return [symbol for (symbol,) in rows if symbol]
 
 

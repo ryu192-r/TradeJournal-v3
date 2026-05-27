@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Numeric, CheckConstraint, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Numeric, CheckConstraint, ForeignKey, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base
@@ -10,7 +10,7 @@ class DailyJournal(Base):
     __tablename__ = 'daily_journals'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    date = Column(Date, unique=True, index=True, nullable=False)
+    date = Column(Date, index=True, nullable=False)
 
     # Pre/post market notes
     pre_trade_notes = Column(Text, nullable=True)
@@ -35,12 +35,13 @@ class DailyJournal(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
 
     # Relationships
     user = relationship('User', back_populates='daily_journals')
 
     __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='uq_daily_journals_user_date'),
         CheckConstraint(
             'mood_rating IS NULL OR (mood_rating >= 1 AND mood_rating <= 5)',
             name='ck_daily_journals_mood_rating',

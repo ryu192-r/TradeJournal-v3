@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { mark, measure } from '@/utils/performance'
+import { queryClient } from '@/lib/queryClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
@@ -54,6 +55,7 @@ apiClient.interceptors.response.use(
       if (!refreshToken) {
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
+        queryClient.clear()
         window.location.href = '/'
         return Promise.reject(error)
       }
@@ -86,6 +88,7 @@ apiClient.interceptors.response.use(
         processQueue(refreshError, null)
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
+        queryClient.clear()
         window.location.href = '/'
         return Promise.reject(refreshError)
       } finally {

@@ -10,6 +10,7 @@ from app.schemas.setup_playbook import (
     SetupPlaybookListResponse,
 )
 from app.models.setup_playbook import SetupPlaybook
+from app.models.user import User
 from app.db.database import get_db
 from app.core.dependencies import get_current_user
 
@@ -30,6 +31,7 @@ router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/setups", t
 def create_setup(
     setup: SetupPlaybookCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SetupPlaybookResponse:
     """Create a new setup playbook entry."""
     existing = db.execute(
@@ -64,6 +66,7 @@ def list_setups(
     limit: int = 100,
     is_active: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SetupPlaybookListResponse:
     """List setup playbooks with optional active filter."""
     query = select(SetupPlaybook)
@@ -93,6 +96,7 @@ def list_setups(
 def get_setup(
     setup_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SetupPlaybookResponse:
     """Get a single setup playbook by ID."""
     db_setup = db.execute(
@@ -121,6 +125,7 @@ def update_setup(
     setup_id: int,
     setup_update: SetupPlaybookUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SetupPlaybookResponse:
     """Update an existing setup playbook."""
     db_setup = db.execute(
@@ -177,6 +182,7 @@ def update_setup(
 def delete_setup(
     setup_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Archive (soft-delete) a setup playbook by setting is_active=archived."""
     db_setup = db.execute(
@@ -204,6 +210,7 @@ def delete_setup(
 )
 def seed_default_setups(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> SetupPlaybookListResponse:
     """Create default setup playbooks if they don't already exist.
     

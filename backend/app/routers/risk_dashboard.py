@@ -11,6 +11,7 @@ from app.models.account import Account
 from app.models.capital_event import CapitalEvent
 from app.models.trade import Trade
 from app.models.partial_exit import PartialExit
+from app.models.user import User
 from app.utils.decimal_utils import ensure_decimal
 from sqlalchemy import func
 from app.core.dependencies import get_current_user
@@ -82,24 +83,21 @@ def _remaining_qty(trade: Trade, pe_map: dict[int, list[Decimal]]) -> Decimal:
     return trade.quantity - total_exited
 
 
-def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list[Decimal]]) -> Decimal:
+def _compute_net_equity(account: Account, db: Session, pe_map: dict[int, list[Decimal]], user_id: int) -> Decimal:
     initial_balance = ensure_decimal(account.initial_balance)
 
-    # Capital events — deposits minus withdrawals
     capital_net = (
         db.query(func.coalesce(func.sum(CapitalEvent.amount), 0))
         .filter(CapitalEvent.account_id == account.id)
         .scalar()
     ) or Decimal("0")
 
-    # Realized PnL — aggregate closed trades in SQL (pnl is already net of fees)
     realized_pnl = (
         db.query(func.coalesce(func.sum(Trade.pnl), 0))
-        .filter(Trade.pnl.isnot(None), Trade.status != "deleted")
+        .filter(Trade.pnl.isnot(None), Trade.status != "deleted", Trade.user_id == user_id)
         .scalar()
     ) or Decimal("0")
 
-    # Add partial-exit realized PnL for still-open trades
     open_trade_ids = list(pe_map.keys())
     pe_realized = (
         db.query(func.coalesce(func.sum(PartialExit.realized_pnl), 0))
@@ -156,8 +154,8 @@ def _bucket(name: str, trades: list[Trade], net_equity: Decimal, pe_map: dict[in
 
 
 @router.get("/", response_model=RiskDashboardResponse)
-def get_risk_dashboard(db: Session = Depends(get_db)):
-    account = db.query(Account).order_by(Account.id).first()
+def get_risk_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    account = db.query(Account).filter(Account.user_id == current_user.id).order_by(Account.id).first()
     if not account:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -166,7 +164,7 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
 
     open_trades = (
         db.query(Trade)
-        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
+        .filter(Trade.status != "deleted", Trade.exit_price.is_(None), Trade.user_id == current_user.id)
         .order_by(Trade.entry_time.desc())
         .all()
     )
@@ -183,7 +181,7 @@ def get_risk_dashboard(db: Session = Depends(get_db)):
         for trade_id, qty in partial_rows:
             pe_map[trade_id].append(ensure_decimal(qty))
 
-    net_equity = _compute_net_equity(account, db, pe_map)
+    net_equity = _compute_net_equity(account, db, pe_map, current_user.id)
     deployed_capital = sum((_trade_deployed_capital(t, pe_map) for t in open_trades), Decimal("0"))
     available_capital = net_equity - deployed_capital
     open_risk = sum((_trade_open_risk(t, pe_map) for t in open_trades), Decimal("0"))

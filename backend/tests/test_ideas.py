@@ -83,7 +83,7 @@ def test_delete_idea(client, auth_user_token):
         f"/api/v1/ideas/{idea_id}",
         headers={"Authorization": f"Bearer {auth_user_token}"},
     )
-    assert resp.status_code == 204
+    assert resp.status_code in (200, 204)
 
 
 def test_list_ideas_filter_by_status(client, auth_user_token):

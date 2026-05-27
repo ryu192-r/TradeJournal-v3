@@ -10,6 +10,7 @@ from app.services.export_service import ExportService
 from app.db.database import get_db
 from app.core.config import settings
 from app.core.dependencies import get_current_user
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/export", tags=["export"])
 
@@ -19,7 +20,8 @@ async def export_csv(
     from_date: str = None,
     to_date: str = None,
     trade_status: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export trades as CSV file.
     
@@ -29,7 +31,7 @@ async def export_csv(
     - status: Filter by trade status
     """
     export_service = ExportService(db)
-    
+
     # Validate date formats if provided
     if from_date:
         try:
@@ -39,7 +41,7 @@ async def export_csv(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid from_date format. Use YYYY-MM-DD"
             )
-    
+
     if to_date:
         try:
             datetime.strptime(to_date, "%Y-%m-%d")
@@ -48,15 +50,15 @@ async def export_csv(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid to_date format. Use YYYY-MM-DD"
             )
-    
-    csv_content = export_service.export_trades_to_csv(from_date, to_date, trade_status)
-    
+
+    csv_content = export_service.export_trades_to_csv(from_date, to_date, trade_status, user_id=current_user.id)
+
     if not csv_content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No trades found matching the criteria"
         )
-    
+
     # Return as streaming response for download
     return StreamingResponse(
         iter([csv_content]),
@@ -73,11 +75,12 @@ async def export_xlsx(
     from_date: str = None,
     to_date: str = None,
     trade_status: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export trades as XLSX file."""
     export_service = ExportService(db)
-    xlsx_bytes = export_service.export_trades_to_xlsx(from_date, to_date, trade_status)
+    xlsx_bytes = export_service.export_trades_to_xlsx(from_date, to_date, trade_status, user_id=current_user.id)
     if not xlsx_bytes:
         raise HTTPException(status_code=404, detail="No trades found matching the criteria")
     return StreamingResponse(
@@ -93,7 +96,8 @@ async def export_xlsx(
 async def trigger_telegram_backup(
     chat_id: str = None,
     summary_text: str = "Manual Trading Journal Backup",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Trigger Telegram backup of all trades.
     
@@ -101,37 +105,37 @@ async def trigger_telegram_backup(
     Can override chat_id in request body.
     """
     export_service = ExportService(db)
-    
+
     # Get Telegram credentials from environment
     bot_token = settings.TELEGRAM_BOT_TOKEN
     telegram_chat_id = chat_id or settings.TELEGRAM_CHAT_ID
-    
+
     if not bot_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="TELEGRAM_BOT_TOKEN not configured"
         )
-    
+
     if not telegram_chat_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="TELEGRAM_CHAT_ID not configured and not provided"
         )
-    
+
     # Export all non-deleted trades
-    csv_content = export_service.export_trades_to_csv()
-    
+    csv_content = export_service.export_trades_to_csv(user_id=current_user.id)
+
     if not csv_content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No trades available for backup"
         )
-    
+
     # Send to Telegram
     success = await export_service.send_telegram_backup(
         csv_content, telegram_chat_id, bot_token, summary_text
     )
-    
+
     if success:
         return {
             "status": "success",

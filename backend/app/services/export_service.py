@@ -60,7 +60,8 @@ class ExportService:
         self,
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> str:
         """Export trades to CSV string.
         
@@ -73,7 +74,9 @@ class ExportService:
             CSV content as string
         """
         query = self.db.query(Trade)
-        
+        if user_id is not None:
+            query = query.filter(Trade.user_id == user_id)
+
         # Apply filters
         if status:
             query = query.filter(Trade.status == status)
@@ -115,12 +118,15 @@ class ExportService:
         self,
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> bytes:
         """Export trades to XLSX bytes."""
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment
         query = self.db.query(Trade)
+        if user_id is not None:
+            query = query.filter(Trade.user_id == user_id)
         if status:
             query = query.filter(Trade.status == status)
         if from_date:

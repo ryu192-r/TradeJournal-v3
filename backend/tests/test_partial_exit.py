@@ -2,16 +2,32 @@
 
 from datetime import datetime
 from decimal import Decimal
+from itertools import count
 
 import pytest
 from fastapi import HTTPException
 
+from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.partial_exit import PartialExit
 from app.models.trade import Trade
+from app.models.user import User
 from app.services.partial_exit_service import _remaining_qty, PartialExitService
 from app.schemas.partial_exit import PartialExitCreate
+
+_email_counter = count(1)
+
+
+def _make_user(db_session):
+    user = User(
+        email=f"test_{next(_email_counter)}@example.com",
+        full_name="Test User",
+        hashed_password=get_password_hash("test123"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
 
 
 @pytest.fixture
@@ -26,7 +42,7 @@ def db_session():
         Base.metadata.drop_all(bind=real_engine)
 
 
-def _trade(quantity: str = "10"):
+def _trade(user_id: int, quantity: str = "10"):
     return Trade(
         symbol="RELIANCE",
         direction="LONG",
@@ -34,6 +50,7 @@ def _trade(quantity: str = "10"):
         quantity=Decimal(quantity),
         entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
         status="open",
+        user_id=user_id,
     )
 
 
@@ -46,7 +63,8 @@ def _payload(qty: str):
 
 
 def test_partial_exit_allows_less_than_remaining_quantity(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
@@ -59,7 +77,8 @@ def test_partial_exit_allows_less_than_remaining_quantity(db_session):
 
 
 def test_partial_exit_rejects_full_remaining_quantity(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
@@ -73,7 +92,8 @@ def test_partial_exit_rejects_full_remaining_quantity(db_session):
 
 
 def test_partial_exit_rejects_final_remaining_after_prior_partial(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
@@ -95,7 +115,8 @@ def test_partial_exit_rejects_final_remaining_after_prior_partial(db_session):
 
 
 def test_list_partial_exits_returns_entries_and_remaining_quantity(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
@@ -109,7 +130,8 @@ def test_list_partial_exits_returns_entries_and_remaining_quantity(db_session):
 
 
 def test_delete_partial_exit_restores_remaining_quantity(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
@@ -124,7 +146,8 @@ def test_delete_partial_exit_restores_remaining_quantity(db_session):
 
 
 def test_full_close_after_partial_exit_uses_remaining_quantity(db_session):
-    trade = _trade()
+    user = _make_user(db_session)
+    trade = _trade(user.id)
     trade.fees = Decimal("10.00")
     trade.stop_price = Decimal("95.00")
     db_session.add(trade)

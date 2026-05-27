@@ -14,6 +14,7 @@ from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
+from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
 
 
@@ -81,6 +82,7 @@ def _day_warnings(trades: list[Trade], journal: DailyJournal | None, emotions: l
 def get_calendar_month(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     month_start, month_end = _parse_month(month)
     start_dt = datetime.combine(month_start, time.min)
@@ -88,7 +90,7 @@ def get_calendar_month(
 
     trades = (
         db.query(Trade)
-        .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt)
+        .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt, Trade.user_id == current_user.id)
         .order_by(Trade.entry_time.asc())
         .all()
     )
@@ -101,8 +103,8 @@ def get_calendar_month(
         if trade_ids
         else []
     )
-    journals = db.query(DailyJournal).filter(DailyJournal.date >= month_start, DailyJournal.date <= month_end).all()
-    workflows = db.query(DailyWorkflow).filter(DailyWorkflow.date >= month_start, DailyWorkflow.date <= month_end).all()
+    journals = db.query(DailyJournal).filter(DailyJournal.date >= month_start, DailyJournal.date <= month_end, DailyJournal.user_id == current_user.id).all()
+    workflows = db.query(DailyWorkflow).filter(DailyWorkflow.date >= month_start, DailyWorkflow.date <= month_end, DailyWorkflow.user_id == current_user.id).all()
 
     trades_by_day: dict[date, list[Trade]] = defaultdict(list)
     for trade in trades:

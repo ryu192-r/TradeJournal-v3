@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.dependencies import get_current_user
+from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
 from app.models.daily_journal import DailyJournal
 from app.models.trade import Trade
@@ -38,17 +39,18 @@ router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/journal", 
 def create_journal(
     entry: DailyJournalCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Create a daily journal entry."""
     existing = db.execute(
-        select(DailyJournal).where(DailyJournal.date == entry.date),
+        select(DailyJournal).where(DailyJournal.date == entry.date, DailyJournal.user_id == current_user.id),
     ).scalar_one_or_none()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Journal entry for {entry.date} already exists",
         )
-    db_entry = DailyJournal(**entry.model_dump())
+    db_entry = DailyJournal(**entry.model_dump(), user_id=current_user.id)
     db.add(db_entry)
     db.commit()
     db.refresh(db_entry)
@@ -63,9 +65,10 @@ def list_journals(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List journal entries with optional date range filter."""
-    query = select(DailyJournal)
+    query = select(DailyJournal).where(DailyJournal.user_id == current_user.id)
     if from_date:
         try:
             start = date.fromisoformat(from_date)
@@ -87,6 +90,7 @@ def list_journals(
 def list_weekly_journals(
     week_start: str = Query(..., description="Week start date ISO (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List journal entries for a given week (week_start + 6 days)."""
     try:
@@ -100,7 +104,7 @@ def list_weekly_journals(
     results = (
         db.execute(
             select(DailyJournal)
-            .where(DailyJournal.date >= start, DailyJournal.date <= end)
+            .where(DailyJournal.user_id == current_user.id, DailyJournal.date >= start, DailyJournal.date <= end)
             .order_by(DailyJournal.date.asc()),
         )
         .scalars()
@@ -113,6 +117,7 @@ def list_weekly_journals(
 def get_weekly_stats(
     week_start: str = Query(..., description="Week start date ISO (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Compute aggregate trading stats for a given week from the trades table."""
     try:
@@ -128,6 +133,7 @@ def get_weekly_stats(
         db.execute(
             select(Trade)
             .where(
+                Trade.user_id == current_user.id,
                 Trade.status != "deleted",
                 Trade.entry_time >= start,
                 Trade.entry_time < end + timedelta(days=1),
@@ -158,6 +164,7 @@ def get_weekly_stats(
 def get_journal(
     date_str: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get a single journal entry by date."""
     try:
@@ -168,7 +175,7 @@ def get_journal(
             detail=f"Invalid date format: {date_str}. Use ISO format (YYYY-MM-DD).",
         )
     entry = db.execute(
-        select(DailyJournal).where(DailyJournal.date == target_date),
+        select(DailyJournal).where(DailyJournal.date == target_date, DailyJournal.user_id == current_user.id),
     ).scalar_one_or_none()
     if not entry:
         raise HTTPException(
@@ -183,6 +190,7 @@ def update_journal(
     date_str: str,
     entry_update: DailyJournalUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Update a journal entry for a given date."""
     try:
@@ -193,7 +201,7 @@ def update_journal(
             detail=f"Invalid date format: {date_str}. Use ISO format (YYYY-MM-DD).",
         )
     db_entry = db.execute(
-        select(DailyJournal).where(DailyJournal.date == target_date),
+        select(DailyJournal).where(DailyJournal.date == target_date, DailyJournal.user_id == current_user.id),
     ).scalar_one_or_none()
     if not db_entry:
         raise HTTPException(

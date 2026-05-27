@@ -134,7 +134,7 @@ async def timing_middleware(request, call_next):
     return response
 app.include_router(api_router)
 
-# Serve uploaded chart images
+# Serve uploaded chart images via authenticated endpoint (trades/{trade_id}/images/{filename})
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 

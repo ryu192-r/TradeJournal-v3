@@ -7,6 +7,7 @@ class TradeIdea(Base):
     __tablename__ = 'trade_ideas'
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     symbol = Column(String(20), nullable=False)
     direction = Column(String(10), nullable=False)  # LONG or SHORT
     entry_price_target = Column(Numeric(precision=18, scale=8))
@@ -28,6 +29,7 @@ class TradeIdea(Base):
 
     # Optional FK to Trade (populated when idea is converted to trade)
     traded_trade = relationship('Trade', back_populates='source_idea')
+    user = relationship("User", back_populates="trade_ideas")
 
     __table_args__ = (
         Index('ix_trade_ideas_status', 'status'),

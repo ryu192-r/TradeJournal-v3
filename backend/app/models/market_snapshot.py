@@ -1,14 +1,19 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Date, JSON, Text
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, Date, JSON, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 
 class MarketSnapshot(Base):
     """Daily market environment snapshot — NIFTY regime, sector strength, breadth, volatility."""
     __tablename__ = 'market_snapshots'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='uq_market_snapshots_user_date'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
 
     nifty_close = Column(Numeric(precision=18, scale=4))
     nifty_change_pct = Column(Numeric(precision=10, scale=4))
@@ -37,3 +42,5 @@ class MarketSnapshot(Base):
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="market_snapshots")

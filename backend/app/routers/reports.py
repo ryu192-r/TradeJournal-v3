@@ -14,6 +14,7 @@ from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.trade import Trade
 from app.utils.calculations import compute_aggregate_kpis
+from app.models.user import User
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/reports", tags=["reports"])
@@ -52,11 +53,11 @@ def _serialise_trade(trade: Trade) -> dict:
     }
 
 
-def _report_payload(db: Session, period: str, start: date, end: date) -> dict:
+def _report_payload(db: Session, period: str, start: date, end: date, user_id: int) -> dict:
     start_dt, end_dt = _date_window(start, end)
     trades = (
         db.query(Trade)
-        .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt)
+        .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt, Trade.user_id == user_id)
         .order_by(Trade.entry_time.asc())
         .all()
     )
@@ -82,7 +83,7 @@ def _report_payload(db: Session, period: str, start: date, end: date) -> dict:
         if trade.exit_price is not None:
             days[day_key]["net_pnl"] += Decimal(trade.pnl or 0)
 
-    journals = db.query(DailyJournal).filter(DailyJournal.date >= start, DailyJournal.date <= end).all()
+    journals = db.query(DailyJournal).filter(DailyJournal.date >= start, DailyJournal.date <= end, DailyJournal.user_id == user_id).all()
     journal_days = [j for j in journals if any([j.pre_trade_notes, j.post_trade_notes, j.discipline_rating])]
     avg_discipline = None
     discipline_values = [j.discipline_rating for j in journals if j.discipline_rating is not None]
@@ -146,14 +147,16 @@ def _report_payload(db: Session, period: str, start: date, end: date) -> dict:
 def get_weekly_report(
     week_start: date = Query(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return _report_payload(db, "weekly", week_start, week_start + timedelta(days=6))
+    return _report_payload(db, "weekly", week_start, week_start + timedelta(days=6), current_user.id)
 
 
 @router.get("/monthly")
 def get_monthly_report(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_month(month)
-    return _report_payload(db, "monthly", start, end)
+    return _report_payload(db, "monthly", start, end, current_user.id)

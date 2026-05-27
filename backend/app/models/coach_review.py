@@ -1,6 +1,7 @@
 """Coach review model for storing AI-generated trading insights."""
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Index
+from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, ForeignKey, Index
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 
@@ -10,8 +11,9 @@ class CoachReview(Base):
         Index('ix_coach_reviews_type_created', 'review_type', 'created_at'),
         Index('ix_coach_reviews_period', 'period_start', 'period_end'),
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     
     # Review metadata
     review_type = Column(String(50), nullable=False)  # daily, weekly, insight, answer, trade_review
@@ -42,3 +44,5 @@ class CoachReview(Base):
         server_default=func.timezone('UTC', func.now()),
         onupdate=func.timezone('UTC', func.now())
     )
+
+    user = relationship("User", back_populates="coach_reviews")

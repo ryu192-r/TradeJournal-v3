@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import apiClient from '@/lib/api'
+import { queryClient } from '@/lib/queryClient'
 
 export interface AuthUser {
   id: number
@@ -71,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
+        queryClient.clear()
         set({ user: null, isAuthenticated: false, token: null })
       },
 

@@ -6,6 +6,7 @@ from app.schemas.tier_config import TierConfigListResponse, TierConfigItem
 from app.utils.logging import get_logger
 from decimal import Decimal
 from app.core.dependencies import get_current_user
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/tier-config", tags=["tier-config"])
 logger = get_logger(__name__)
@@ -30,7 +31,10 @@ def _ensure_default_tiers(db: Session) -> list[TierConfig]:
 
 
 @router.get("", response_model=TierConfigListResponse)
-def list_tiers(db: Session = Depends(get_db)):
+def list_tiers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     tiers = _ensure_default_tiers(db)
     return TierConfigListResponse(items=[
         {"id": t.id, "name": t.name, "min_amount": t.min_amount, "max_amount": t.max_amount, "sort_order": t.sort_order}
@@ -39,7 +43,11 @@ def list_tiers(db: Session = Depends(get_db)):
 
 
 @router.put("", response_model=TierConfigListResponse)
-def update_tiers(payload: list[TierConfigItem], db: Session = Depends(get_db)):
+def update_tiers(
+    payload: list[TierConfigItem],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if not payload:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tier list cannot be empty")
     # Validate: no gaps, non-negative, ascending order

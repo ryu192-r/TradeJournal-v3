@@ -21,7 +21,7 @@ class TradeService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_by_symbol_time(self, symbol: str, entry_time, exit_time=None) -> Optional[Trade]:
+    def get_by_symbol_time(self, symbol: str, entry_time, exit_time=None, user_id: Optional[int] = None) -> Optional[Trade]:
         """Check if a trade with same symbol+times already exists."""
         q = self.db.query(Trade).filter(
             and_(
@@ -29,11 +29,13 @@ class TradeService:
                 Trade.entry_time == entry_time,
             )
         )
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
         if exit_time:
             q = q.filter(Trade.exit_time == exit_time)
         return q.first()
 
-    def get_by_symbol_date(self, symbol: str, entry_date: datetime, is_open: Optional[bool] = None) -> Optional[Trade]:
+    def get_by_symbol_date(self, symbol: str, entry_date: datetime, is_open: Optional[bool] = None, user_id: Optional[int] = None) -> Optional[Trade]:
         """Find existing trade for same symbol on the same calendar date.
 
         If is_open is specified, only match trades with matching open/closed state:
@@ -46,6 +48,8 @@ class TradeService:
             func.date(Trade.entry_time) == entry_date.date(),
             Trade.status != "deleted",
         )
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
         if is_open is True:
             q = q.filter(Trade.exit_price.is_(None))
         elif is_open is False:
@@ -77,7 +81,7 @@ class TradeService:
         incoming_is_open = trade_data.get("exit_price") is None
 
         for attempt in range(2):
-            existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open)
+            existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open, user_id=trade_data.get("user_id"))
             if existing:
                 self._merge_trade(existing, trade_data)
                 return existing, "merged"
@@ -150,14 +154,18 @@ class TradeService:
     def pyramid_trade(self, trade_id: int, entry_price: Decimal, quantity: Decimal,
                       entry_time: Optional[datetime] = None,
                       fees: Optional[Decimal] = None,
-                      stop_price: Optional[Decimal] = None) -> Trade:
+                      stop_price: Optional[Decimal] = None,
+                      user_id: Optional[int] = None) -> Trade:
         """Pyramid — add more shares to an open position.
 
         Updates entry price (weighted average), sums quantity, keeps earliest
         entry time, sums fees, optionally updates stop loss.
         Only allowed on OPEN trades (no exit).
         """
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         if not trade:
             raise ValueError("Trade not found")
         if trade.exit_price is not None:
@@ -180,11 +188,14 @@ class TradeService:
         self.db.refresh(trade)
         return trade
 
-    def merge_duplicates(self) -> int:
+    def merge_duplicates(self, user_id: Optional[int] = None) -> int:
         """Find and merge trades with same (symbol, date, open/closed state). Returns count of merged duplicates."""
         from collections import defaultdict
 
-        trades = self.db.query(Trade).filter(Trade.status != 'deleted').all()
+        q = self.db.query(Trade).filter(Trade.status != 'deleted')
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trades = q.all()
         groups = defaultdict(list)
         for t in trades:
             state = "open" if t.exit_price is None else "closed"
@@ -229,7 +240,7 @@ class TradeService:
             self.db.commit()
         return merged_count
 
-    def create_from_dhan_leg(self, leg, direction: str = "LONG", is_open: bool = True) -> Trade:
+    def create_from_dhan_leg(self, leg, direction: str = "LONG", is_open: bool = True, user_id: Optional[int] = None) -> Trade:
         """Map a Dhan trade leg to our Trade model."""
         entry_price = None
         exit_price = None
@@ -256,7 +267,7 @@ class TradeService:
         trade, _ = self.merge_or_create(trade_data)
         return trade
 
-    def find_or_create_pair(self, open_leg, close_leg, direction: str = "LONG") -> Trade:
+    def find_or_create_pair(self, open_leg, close_leg, direction: str = "LONG", user_id: Optional[int] = None) -> Trade:
         """Match OPEN and CLOSE legs into a single trade, merging by (symbol, date)."""
         entry_time = _to_ist_naive(datetime.fromisoformat(open_leg.order_timestamp.replace("Z", "+00:00")))
         exit_time = _to_ist_naive(datetime.fromisoformat(close_leg.order_timestamp.replace("Z", "+00:00"))) if close_leg else None

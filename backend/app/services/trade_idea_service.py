@@ -25,7 +25,7 @@ class TradeIdeaService:
     # ─────────────────────── CRUD ───────────────────────
 
     @staticmethod
-    def create(db: Session, idea: TradeIdeaCreate) -> TradeIdea:
+    def create(db: Session, idea: TradeIdeaCreate, user_id: Optional[int] = None) -> TradeIdea:
         """Create a new trade idea."""
         db_idea = TradeIdea(
             symbol=idea.symbol,
@@ -40,15 +40,20 @@ class TradeIdeaService:
             revisit_date=idea.revisit_date,
             status=idea.status,
         )
+        if user_id is not None:
+            db_idea.user_id = user_id
         db.add(db_idea)
         db.commit()
         db.refresh(db_idea)
         return db_idea
 
     @staticmethod
-    def get_by_id(db: Session, idea_id: int) -> Optional[TradeIdea]:
+    def get_by_id(db: Session, idea_id: int, user_id: Optional[int] = None) -> Optional[TradeIdea]:
         """Fetch a single trade idea by ID."""
-        return db.query(TradeIdea).filter(TradeIdea.id == idea_id).first()
+        q = db.query(TradeIdea).filter(TradeIdea.id == idea_id)
+        if user_id is not None:
+            q = q.filter(TradeIdea.user_id == user_id)
+        return q.first()
 
     @staticmethod
     def list_ideas(
@@ -59,9 +64,12 @@ class TradeIdeaService:
         symbol: Optional[str] = None,
         direction: Optional[str] = None,
         confidence: Optional[str] = None,
+        user_id: Optional[int] = None,
     ):
         """List trade ideas with optional filters."""
         query = db.query(TradeIdea)
+        if user_id is not None:
+            query = query.filter(TradeIdea.user_id == user_id)
         if status:
             query = query.filter(TradeIdea.status == status)
         if symbol:
@@ -102,9 +110,9 @@ class TradeIdeaService:
         return db_idea
 
     @staticmethod
-    def delete(db: Session, idea_id: int) -> bool:
+    def delete(db: Session, idea_id: int, user_id: Optional[int] = None) -> bool:
         """Soft delete by setting status to archived."""
-        db_idea = TradeIdeaService.get_by_id(db, idea_id)
+        db_idea = TradeIdeaService.get_by_id(db, idea_id, user_id=user_id)
         if not db_idea:
             return False
 
@@ -134,6 +142,7 @@ class TradeIdeaService:
         db: Session,
         idea_id: int,
         convert: ConvertToTradeRequest,
+        user_id: int,
     ) -> tuple[TradeIdea, Optional[Trade]]:
         """Convert a trade idea into an actual trade.
 
@@ -142,7 +151,7 @@ class TradeIdeaService:
         the idea can be marked 'traded' without creating a journal entry if
         the trade was executed outside the journal.
         """
-        db_idea = TradeIdeaService.get_by_id(db, idea_id)
+        db_idea = TradeIdeaService.get_by_id(db, idea_id, user_id=user_id)
         if not db_idea:
             raise ValueError("Trade idea not found")
 
@@ -176,6 +185,7 @@ class TradeIdeaService:
                 notes=thesis_notes,
                 stop_price=db_idea.stop_price,
                 target_price=db_idea.target_price,
+                user_id=user_id,
             )
             new_trade.compute_pnl()
             if new_trade.exit_price is not None:
@@ -201,7 +211,7 @@ class TradeIdeaService:
             from app.services.capital_service import _auto_reconcile
             from app.services.setup_playbook_service import _update_setup_stats
             _auto_reconcile(db)
-            _update_setup_stats(db, new_trade.setup)
+            _update_setup_stats(db, new_trade.setup, user_id=user_id)
 
         return db_idea, new_trade
 

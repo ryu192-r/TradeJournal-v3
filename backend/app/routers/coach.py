@@ -40,6 +40,7 @@ from app.models.setup_playbook import SetupPlaybook
 from app.models.trade import Trade
 from app.utils.logging import get_logger
 from app.core.dependencies import get_current_user
+from app.models.user import User
 
 logger = get_logger(__name__)
 
@@ -50,11 +51,12 @@ router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/coach", ta
 # ──────────────────────── helpers ────────────────────────
 
 
-def _get_trades_for_period(db: Session, start: datetime, end: datetime) -> List[Trade]:
-    """Fetch non-deleted trades within a date range."""
+def _get_trades_for_period(db: Session, start: datetime, end: datetime, user_id: int) -> List[Trade]:
+    """Fetch non-deleted trades within a date range for a specific user."""
     stmt = (
         select(Trade)
         .where(
+            Trade.user_id == user_id,
             Trade.entry_time >= start,
             Trade.entry_time <= end,
             Trade.status != "deleted",
@@ -102,6 +104,7 @@ def _enrich_trades_with_lifecycle(trades: list[Trade], db: Session) -> list[dict
 async def generate_daily_review(
     request: CoachReviewRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewResponse:
     """Generate an AI-powered daily review for a period."""
     now = _now()
@@ -131,7 +134,7 @@ async def generate_daily_review(
         )
 
     # Fetch trades
-    trades = _get_trades_for_period(db, period_start, period_end)
+    trades = _get_trades_for_period(db, period_start, period_end, current_user.id)
     if not trades:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,6 +168,7 @@ async def generate_daily_review(
 
     # Persist in DB
     db_review = CoachReview(
+        user_id=current_user.id,
         review_type="daily",
         content=insight,
         period_start=period_start,
@@ -205,13 +209,14 @@ async def generate_daily_review(
 async def generate_weekly_review(
     request: WeeklyReviewRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewResponse:
     """Generate a weekly performance review."""
     now = _now()
     period_end = request.period_end or now
     period_start = request.period_start or (period_end - timedelta(days=7))
 
-    trades = _get_trades_for_period(db, period_start, period_end)
+    trades = _get_trades_for_period(db, period_start, period_end, current_user.id)
     if not trades:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -252,6 +257,7 @@ async def generate_weekly_review(
     review_cache.set(cache_key, insight, trades_analyzed=len(trades))
 
     db_review = CoachReview(
+        user_id=current_user.id,
         review_type="weekly",
         content=insight,
         period_start=period_start,
@@ -291,11 +297,13 @@ async def generate_weekly_review(
 async def generate_trade_insight(
     request: TradeInsightRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewResponse:
     """Generate one-off analysis for specific trades."""
     stmt = (
         select(Trade)
         .where(
+            Trade.user_id == current_user.id,
             Trade.id.in_(request.trade_ids),
             Trade.status != "deleted",
         )
@@ -322,6 +330,7 @@ async def generate_trade_insight(
         )
 
     db_review = CoachReview(
+        user_id=current_user.id,
         review_type="insight",
         content=insight,
         trade_ids=request.trade_ids,
@@ -356,18 +365,19 @@ async def generate_trade_insight(
 async def ask_coach(
     request: AskCoachRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewResponse:
     """Free-form question to the AI coach — 'Ask the Coach' tab."""
     trade_data: list[dict] = []
     summary_stats: dict = {}
 
     if request.trade_ids:
-        stmt = select(Trade).where(Trade.id.in_(request.trade_ids), Trade.status != "deleted")
+        stmt = select(Trade).where(Trade.user_id == current_user.id, Trade.id.in_(request.trade_ids), Trade.status != "deleted")
         trades = list(db.scalars(stmt).all())
         trade_data = _enrich_trades_with_lifecycle(trades, db)
         summary_stats = compute_summary_stats(trades)
     elif request.period_start and request.period_end:
-        trades = _get_trades_for_period(db, request.period_start, request.period_end)
+        trades = _get_trades_for_period(db, request.period_start, request.period_end, current_user.id)
         trade_data = _enrich_trades_with_lifecycle(trades, db)
         summary_stats = compute_summary_stats(trades)
 
@@ -385,6 +395,7 @@ async def ask_coach(
         )
 
     db_review = CoachReview(
+        user_id=current_user.id,
         review_type="answer",
         content=answer,
         trade_ids=request.trade_ids or [t["id"] for t in trade_data],
@@ -420,13 +431,14 @@ async def ask_coach(
 async def detect_patterns(
     request: PatternDetectionRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> PatternDetectionResponse:
     """Detect recurring behavioral patterns in recent trades."""
     now = _now()
     period_end = now
     period_start = now - timedelta(days=request.lookback_days)
 
-    trades = _get_trades_for_period(db, period_start, period_end)
+    trades = _get_trades_for_period(db, period_start, period_end, current_user.id)
     if not trades:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -486,13 +498,14 @@ async def detect_patterns(
 async def check_rule_reminders(
     request: RuleReminderRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> RuleReminderResponse:
     """Check recent trades against trading rules and generate reminders."""
     now = _now()
     period_end = now
     period_start = now - timedelta(days=request.lookback_days)
 
-    trades = _get_trades_for_period(db, period_start, period_end)
+    trades = _get_trades_for_period(db, period_start, period_end, current_user.id)
     if not trades:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -530,9 +543,10 @@ async def list_reviews(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewListResponse:
     """List past AI-generated reviews with optional filtering."""
-    query = db.query(CoachReview)
+    query = db.query(CoachReview).filter(CoachReview.user_id == current_user.id)
     if review_type:
         query = query.filter(CoachReview.review_type == review_type)
 
@@ -561,9 +575,13 @@ async def list_reviews(
 def get_review(
     review_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CoachReviewResponse:
     """Get a specific review by ID."""
-    review = db.get(CoachReview, review_id)
+    review = db.query(CoachReview).filter(
+        CoachReview.id == review_id,
+        CoachReview.user_id == current_user.id,
+    ).first()
     if not review:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -593,9 +611,13 @@ def get_review(
 def delete_review(
     review_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
     """Delete a specific review by ID."""
-    review = db.get(CoachReview, review_id)
+    review = db.query(CoachReview).filter(
+        CoachReview.id == review_id,
+        CoachReview.user_id == current_user.id,
+    ).first()
     if not review:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -618,6 +640,7 @@ def delete_review(
 async def behavioral_score(
     lookback_days: int = 30,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """Generate an AI-powered behavioral score with personalized recommendations.
 
@@ -634,9 +657,10 @@ async def behavioral_score(
         from_date=start.isoformat(),
         to_date=end.isoformat() if end else None,
         db=db,
+        user_id=current_user.id,
     )
 
-    trades = _get_trades_for_period(db, start, end or _now())
+    trades = _get_trades_for_period(db, start, end or _now(), current_user.id)
     if not trades:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -753,6 +777,7 @@ def _load_playbook_for_trade(db: Session, trade: Trade) -> dict | None:
 async def generate_trade_review(
     request: TradeReviewRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> TradeReviewResponse:
     """Generate a structured post-trade review with coaching, discipline analysis,
     execution critique, missed opportunity assessment, and setup-quality scoring.
@@ -761,7 +786,7 @@ async def generate_trade_review(
     your playbook rules, emotions, execution grades, partial exits, and timeline events
     to produce an honest, actionable review.
     """
-    trade = db.query(Trade).filter(Trade.id == request.trade_id, Trade.status != "deleted").first()
+    trade = db.query(Trade).filter(Trade.id == request.trade_id, Trade.status != "deleted", Trade.user_id == current_user.id).first()
     if not trade:
         raise HTTPException(status_code=404, detail=f"Trade {request.trade_id} not found")
 
@@ -812,6 +837,7 @@ async def generate_trade_review(
         )
 
     review = CoachReview(
+        user_id=current_user.id,
         review_type="trade_review",
         content=json.dumps(result),
         period_start=trade.entry_time,

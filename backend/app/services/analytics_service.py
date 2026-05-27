@@ -480,9 +480,10 @@ def get_kpi_summary(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Return top-level KPI cards."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_kpi(df)
 
 
@@ -490,9 +491,10 @@ def get_setup_performance(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return per-setup performance metrics."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_setup_performance(df)
 
 
@@ -500,9 +502,10 @@ def get_streak_analysis(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Analyze consecutive win/loss streaks."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_streaks(df)
 
 
@@ -511,9 +514,10 @@ def get_r_distribution(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     bin_count: int = 10,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Return R-multiple histogram buckets."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_r_distribution(df, bin_count)
 
 
@@ -521,9 +525,10 @@ def get_monthly_pnl(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return monthly aggregated P&L."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_monthly_pnl(df)
 
 
@@ -531,9 +536,10 @@ def get_daily_pnl(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return daily aggregated P&L for equity curve rendering."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_daily_pnl(df)
 
 
@@ -541,9 +547,10 @@ def get_day_of_week_performance(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return P&L grouped by day of week."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_day_of_week(df)
 
 
@@ -551,9 +558,10 @@ def get_time_of_day_performance(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return P&L grouped by hour of entry."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_time_of_day(df)
 
 
@@ -561,9 +569,10 @@ def get_holding_period_analysis(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Return each trade's holding period and R-multiple."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_holding_period(df)
 
 
@@ -571,7 +580,8 @@ def get_full_dashboard(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Return the complete analytics dashboard in one call."""
-    df = fetch_trades(db, start_date, end_date)
+    df = fetch_trades(db, start_date, end_date, user_id)
     return _calc_full_dashboard(df)

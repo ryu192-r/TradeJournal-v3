@@ -11,14 +11,20 @@ from app.schemas.capital_event import (
 )
 from app.db.database import get_db
 from app.services.capital_event_service import CapitalEventService
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_user_account_or_404
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/capital-events", tags=["capital-events"])
 
 
 @router.post("/", response_model=CapitalEventResponse, status_code=status.HTTP_201_CREATED)
-def create_capital_event(event: CapitalEventCreate, db: Session = Depends(get_db)):
+def create_capital_event(
+    event: CapitalEventCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Create a new capital event and update account balance atomically."""
+    get_user_account_or_404(db, event.account_id, current_user.id)
     svc = CapitalEventService(db)
     return svc.create_event(event)
 
@@ -33,8 +39,10 @@ def list_capital_events(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List capital events for a specific account with optional filters."""
+    get_user_account_or_404(db, account_id, current_user.id)
     svc = CapitalEventService(db)
     total, events = svc.list_events(account_id, skip, limit, event_type, trade_id, start_date, end_date)
     return {"total": total, "items": events}
@@ -46,17 +54,25 @@ def get_capital_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get aggregate capital summary using single SQL aggregation query."""
+    get_user_account_or_404(db, account_id, current_user.id)
     svc = CapitalEventService(db)
     return svc.get_summary(account_id, start_date, end_date)
 
 
 @router.get("/{event_id}", response_model=CapitalEventResponse)
-def get_capital_event(event_id: int, db: Session = Depends(get_db)):
+def get_capital_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get a single capital event by ID."""
     svc = CapitalEventService(db)
-    return svc.get_by_id(event_id)
+    event_obj = svc.get_by_id(event_id)
+    get_user_account_or_404(db, event_obj.account_id, current_user.id)
+    return event_obj
 
 
 @router.put("/{event_id}", response_model=CapitalEventResponse)
@@ -64,22 +80,36 @@ def update_capital_event(
     event_id: int,
     event_update: CapitalEventUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Update an existing capital event, recalculating account balance if amount changes."""
     svc = CapitalEventService(db)
+    event_obj = svc.get_by_id(event_id)
+    get_user_account_or_404(db, event_obj.account_id, current_user.id)
     return svc.update_event(event_id, event_update)
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_capital_event(event_id: int, db: Session = Depends(get_db)):
+def delete_capital_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Delete a capital event and reverse its impact on account balance."""
     svc = CapitalEventService(db)
+    event_obj = svc.get_by_id(event_id)
+    get_user_account_or_404(db, event_obj.account_id, current_user.id)
     svc.delete_event(event_id)
     return None
 
 
 @router.post("/accounts/{account_id}/reconcile")
-def reconcile_account(account_id: int, db: Session = Depends(get_db)):
+def reconcile_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Manually trigger balance reconciliation."""
+    get_user_account_or_404(db, account_id, current_user.id)
     svc = CapitalEventService(db)
     return svc.reconcile_account(account_id)

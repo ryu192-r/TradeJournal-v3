@@ -27,6 +27,7 @@ from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
+from app.models.user import User
 from app.utils.decimal_utils import ensure_decimal
 from app.utils.calculations import calculate_trade_metrics, compute_aggregate_kpis
 from app.core.dependencies import get_current_user
@@ -151,17 +152,20 @@ class IntelligenceDashboardResponse(BaseModel):
 # ─────────────────────── Operational ───────────────────────
 
 @router.get("/operational", response_model=OperationalDashboardResponse)
-def operational_dashboard(db: Session = Depends(get_db)):
+def operational_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Single-call payload for the critical dashboard zone."""
     # ── Account ──
-    account = db.query(Account).order_by(Account.id).first()
+    account = db.query(Account).filter(Account.user_id == current_user.id).order_by(Account.id).first()
     if not account:
         raise HTTPException(status_code=404, detail="No account found")
 
     # ── Open trades ──
     open_trades = (
         db.query(Trade)
-        .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
+        .filter(Trade.user_id == current_user.id, Trade.status != "deleted", Trade.exit_price.is_(None))
         .order_by(Trade.entry_time.desc())
         .all()
     )
@@ -206,7 +210,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
 
     realized_pnl = (
         db.query(func.coalesce(func.sum(Trade.pnl), 0))
-        .filter(Trade.pnl.isnot(None), Trade.status != "deleted")
+        .filter(Trade.user_id == current_user.id, Trade.pnl.isnot(None), Trade.status != "deleted")
         .scalar()
     ) or Decimal("0")
 
@@ -280,6 +284,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
 
     # ── KPI (all closed trades) ──
     closed_trades_for_kpi = db.query(Trade).filter(
+        Trade.user_id == current_user.id,
         Trade.status != "deleted",
         Trade.pnl.isnot(None),
     ).all()
@@ -296,7 +301,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
     # ── Max drawdown (includes capital events for correct peak tracking) ──
     daily_pnl_rows = (
         db.query(func.date(Trade.entry_time).label("dt"), func.coalesce(func.sum(Trade.pnl), 0))
-        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .filter(Trade.user_id == current_user.id, Trade.status != "deleted", Trade.pnl.isnot(None))
         .group_by(func.date(Trade.entry_time))
         .order_by("dt")
         .all()
@@ -338,7 +343,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
     # ── Streaks (minimal ordered closed-trade query) ──
     sorted_closed = (
         db.query(Trade.pnl, Trade.entry_time)
-        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .filter(Trade.user_id == current_user.id, Trade.status != "deleted", Trade.pnl.isnot(None))
         .order_by(Trade.entry_time.asc())
         .all()
     )
@@ -369,7 +374,7 @@ def operational_dashboard(db: Session = Depends(get_db)):
 
     closed_for_curve = (
         db.query(Trade)
-        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .filter(Trade.user_id == current_user.id, Trade.status != "deleted", Trade.pnl.isnot(None))
         .all()
     )
     for t in closed_for_curve:
@@ -457,14 +462,20 @@ def operational_dashboard(db: Session = Depends(get_db)):
 # ─────────────────────── Intelligence ───────────────────────
 
 @router.get("/intelligence", response_model=IntelligenceDashboardResponse)
-def intelligence_dashboard(db: Session = Depends(get_db)):
+def intelligence_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Single-call payload for the intelligence zone."""
+    user_id = current_user.id
     # ── Lifecycle highlights ──
+    user_trade_ids_subq = db.query(Trade.id).filter(Trade.user_id == user_id, Trade.status != "deleted").subquery()
     emotion_rows = (
         db.query(
             EmotionLog.emotion,
             func.count(EmotionLog.id).label("count"),
         )
+        .filter(EmotionLog.trade_id.in_(user_trade_ids_subq))
         .group_by(EmotionLog.emotion)
         .all()
     )
@@ -474,7 +485,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     closed_with_emotion = (
         db.query(Trade, EmotionLog)
         .join(EmotionLog, Trade.id == EmotionLog.trade_id)
-        .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
+        .filter(Trade.user_id == user_id, Trade.status != "deleted", Trade.pnl.isnot(None))
         .all()
     )
     emotion_pnl: dict[str, Decimal] = defaultdict(Decimal)
@@ -490,7 +501,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
             worst_emotion = emo
 
     # Grade summary
-    all_grades = db.query(ExecutionGrade).all()
+    all_grades = db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(user_trade_ids_subq)).all()
     graded_count = sum(1 for g in all_grades if g.overall_grade)
     grade_map = {"A": 5, "B": 4, "C": 3, "D": 2, "F": 1}
     numeric = [grade_map.get(g.overall_grade, 0) for g in all_grades if g.overall_grade in grade_map]
@@ -505,7 +516,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     # ── Behavioral highlights ──
     overtrading_days = 0
     overtrading_weeks = 0
-    all_trades = db.query(Trade).filter(Trade.status != "deleted").all()
+    all_trades = db.query(Trade).filter(Trade.user_id == user_id, Trade.status != "deleted").all()
     daily: dict[str, list] = defaultdict(list)
     weekly: dict[str, list] = defaultdict(list)
     for t in all_trades:
@@ -576,6 +587,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     # ── Market context highlights ──
     latest_snap = (
         db.query(MarketSnapshot)
+        .filter(MarketSnapshot.user_id == user_id)
         .order_by(MarketSnapshot.date.desc())
         .first()
     )

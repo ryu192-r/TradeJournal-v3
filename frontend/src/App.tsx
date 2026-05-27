@@ -3,7 +3,8 @@ import { ToastContainer } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/lib/queryClient'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
 import { InstallPrompt } from '@/components/ui/InstallPrompt'
 import { EdgeSwipe } from '@/components/ui/EdgeSwipe'
@@ -35,21 +36,8 @@ const LifecyclePage = lazy(() => import('@/pages/LifecyclePage').then((m) => ({ 
 const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m.RiskPage })))
 const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })))
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      retry: 1,
-    },
-    mutations: {
-      networkMode: 'online',
-    },
-  },
-})
+// queryClient is shared from src/lib/queryClient.ts — imported by App.tsx and authStore.ts
+// so logout() can clear the cache to prevent stale user data leaks.
 
 function ViewFallback() {
   return (

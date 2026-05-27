@@ -9,6 +9,7 @@ from app.services.trade_service import TradeService
 from app.core.dependencies import get_current_user
 from app.services.capital_service import _auto_reconcile
 from app.services.setup_playbook_service import _update_setup_stats
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/dhan", tags=["dhan-sync"])
 
@@ -18,6 +19,7 @@ def sync_dhan_trades(
     from_date: date,
     to_date: date,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Sync trades from Dhan for a date range."""
     if from_date > to_date:
@@ -45,11 +47,12 @@ def sync_dhan_trades(
                 open_leg.trading_symbol,
                 open_leg.order_timestamp,
                 close_leg.order_timestamp if close_leg else None,
+                user_id=current_user.id,
             )
             if existing:
                 skipped += 1
                 continue
-            trade = trade_svc.find_or_create_pair(open_leg, close_leg)
+            trade = trade_svc.find_or_create_pair(open_leg, close_leg, user_id=current_user.id)
             added += 1
             if trade.setup:
                 setups_seen.add(trade.setup)
@@ -61,17 +64,18 @@ def sync_dhan_trades(
                     close_leg.trading_symbol,
                     close_leg.order_timestamp,
                     None,
+                    user_id=current_user.id,
                 )
                 if existing:
                     skipped += 1
                     continue
-                trade = trade_svc.create_from_dhan_leg(close_leg, is_open=False)
+                trade = trade_svc.create_from_dhan_leg(close_leg, is_open=False, user_id=current_user.id)
                 added += 1
                 if trade.setup:
                     setups_seen.add(trade.setup)
 
     for setup_name in setups_seen:
-        _update_setup_stats(db, setup_name)
+        _update_setup_stats(db, setup_name, user_id=current_user.id)
     _auto_reconcile(db)
     db.commit()
 

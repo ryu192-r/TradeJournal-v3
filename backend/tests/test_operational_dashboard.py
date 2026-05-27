@@ -2,14 +2,30 @@
 
 from datetime import datetime
 from decimal import Decimal
+from itertools import count
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.account import Account
 from app.models.trade import Trade
+from app.models.user import User
 from app.routers.operational_dashboard import operational_dashboard
+
+_email_counter = count(1)
+
+
+def _make_user(db_session):
+    user = User(
+        email=f"test_{next(_email_counter)}@example.com",
+        full_name="Test User",
+        hashed_password=get_password_hash("test123"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
 
 
 @pytest.fixture
@@ -24,15 +40,16 @@ def db_session():
         Base.metadata.drop_all(bind=real_engine)
 
 
-def _account():
+def _account(user_id: int):
     return Account(
         name="Primary",
         initial_balance=Decimal("100000.00"),
         current_balance=Decimal("100000.00"),
+        user_id=user_id,
     )
 
 
-def _trade(symbol: str, pnl: str):
+def _trade(symbol: str, pnl: str, user_id: int):
     return Trade(
         symbol=symbol,
         direction="LONG",
@@ -43,16 +60,18 @@ def _trade(symbol: str, pnl: str):
         exit_time=datetime.fromisoformat("2025-01-13T10:00:00"),
         status="closed",
         pnl=Decimal(pnl),
+        user_id=user_id,
     )
 
 
 def _dashboard_for_pnls(db_session, pnls: list[str]):
-    db_session.add(_account())
+    user = _make_user(db_session)
+    db_session.add(_account(user.id))
     for idx, pnl in enumerate(pnls):
-        db_session.add(_trade(f"T{idx}", pnl))
+        db_session.add(_trade(f"T{idx}", pnl, user.id))
     db_session.commit()
 
-    return operational_dashboard(db_session)
+    return operational_dashboard(db_session, current_user=user)
 
 
 def test_operational_dashboard_expectancy_mixed_trades(db_session):

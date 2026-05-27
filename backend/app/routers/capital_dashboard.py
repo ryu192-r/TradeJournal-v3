@@ -16,7 +16,8 @@ from app.db.database import get_db
 from app.utils.logging import get_logger
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.decimal_utils import ensure_decimal
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, scoped_trade_query, scoped_account_query
+from app.models.user import User
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/accounts", tags=["capital-dashboard"])
@@ -169,10 +170,10 @@ def _remaining_qty_for_trade(trade: Trade, partials: list[PartialExit]) -> Decim
 
 
 @router.get("/capital-dashboard", response_model=CapitalDashboardResponse)
-def get_capital_dashboard(db: Session = Depends(get_db)):
-    accounts = db.query(Account).order_by(Account.id).limit(1).all()
+def get_capital_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    accounts = db.query(Account).filter(Account.user_id == current_user.id).order_by(Account.id).limit(1).all()
     if not accounts:
-        account = Account(name="Default", initial_balance=0, current_balance=0)
+        account = Account(name="Default", initial_balance=0, current_balance=0, user_id=current_user.id)
         db.add(account)
         db.commit()
         db.refresh(account)
@@ -216,13 +217,13 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
     # ── Realized PnL: closed trade pnl + partial exit realized_pnl from open trades ──
     closed_trades = (
         db.query(Trade)
-        .filter(Trade.exit_price.isnot(None), Trade.status != "deleted")
+        .filter(Trade.exit_price.isnot(None), Trade.status != "deleted", Trade.user_id == current_user.id)
         .all()
     )
 
     open_trades = (
         db.query(Trade)
-        .filter(Trade.exit_price.is_(None), Trade.status != "deleted")
+        .filter(Trade.exit_price.is_(None), Trade.status != "deleted", Trade.user_id == current_user.id)
         .all()
     )
 

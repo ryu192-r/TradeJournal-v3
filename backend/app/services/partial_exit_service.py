@@ -38,8 +38,11 @@ class PartialExitService:
         total_exited = sum(r[0] for r in exited)
         return trade.quantity - total_exited
 
-    def list_partial_exits(self, trade_id: int) -> Tuple[list, Decimal]:
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+    def list_partial_exits(self, trade_id: int, user_id: Optional[int] = None) -> Tuple[list, Decimal]:
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         if not trade:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found"
@@ -53,8 +56,11 @@ class PartialExitService:
         remaining = self._remaining_qty(trade)
         return exits, remaining
 
-    def create_partial_exit(self, trade_id: int, payload: PartialExitCreate) -> PartialExit:
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+    def create_partial_exit(self, trade_id: int, payload: PartialExitCreate, user_id: Optional[int] = None) -> PartialExit:
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         if not trade:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found"
@@ -107,13 +113,13 @@ class PartialExitService:
         self.db.add(timeline)
 
         _auto_reconcile(self.db)
-        _update_setup_stats(self.db, trade.setup)
+        _update_setup_stats(self.db, trade.setup, user_id=trade.user_id)
         self.db.commit()
         self.db.refresh(entry)
 
         return entry
 
-    def delete_partial_exit(self, trade_id: int, exit_id: int) -> None:
+    def delete_partial_exit(self, trade_id: int, exit_id: int, user_id: Optional[int] = None) -> None:
         exit_entry = self.db.query(PartialExit).filter(
             PartialExit.id == exit_id, PartialExit.trade_id == trade_id
         ).first()
@@ -122,7 +128,10 @@ class PartialExitService:
                 status_code=status.HTTP_404_NOT_FOUND, detail="Partial exit not found"
             )
 
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         setup_name = trade.setup if trade else None
 
         self.db.query(TradeTimeline).filter(
@@ -134,7 +143,7 @@ class PartialExitService:
         self.db.delete(exit_entry)
         _auto_reconcile(self.db)
         if setup_name:
-            _update_setup_stats(self.db, setup_name)
+            _update_setup_stats(self.db, setup_name, user_id=trade.user_id if trade else None)
         self.db.commit()
 
         return None

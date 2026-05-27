@@ -47,6 +47,7 @@ from app.schemas.analytics import (
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/analytics", tags=["analytics"])
 
+from app.models.user import User
 
 # ─────────────────────── helpers ───────────────────────
 
@@ -87,10 +88,11 @@ def endpoint_kpi(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Return top-level KPI metrics."""
     start, end = _parse_date_range(from_date, to_date)
-    return get_kpi_summary(db, start, end)
+    return get_kpi_summary(db, start, end, current_user.id)
 
 
 @router.get("/setup-performance", response_model=list[SetupPerformanceItem])
@@ -98,9 +100,10 @@ def endpoint_setup_performance(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_setup_performance(db, start, end)
+    return get_setup_performance(db, start, end, current_user.id)
 
 
 @router.get("/streaks", response_model=StreakAnalysisResponse)
@@ -108,9 +111,10 @@ def endpoint_streaks(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_streak_analysis(db, start, end)
+    return get_streak_analysis(db, start, end, current_user.id)
 
 
 @router.get("/r-distribution", response_model=RDistributionResponse)
@@ -119,9 +123,10 @@ def endpoint_r_distribution(
     to_date: Optional[str] = Query(None, description="End date ISO"),
     bins: int = Query(10, ge=5, le=50, description="Number of histogram bins"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_r_distribution(db, start, end, bin_count=bins)
+    return get_r_distribution(db, start, end, user_id=current_user.id, bin_count=bins)
 
 
 @router.get("/monthly-pnl", response_model=list[MonthlyPnlEntry])
@@ -129,9 +134,10 @@ def endpoint_monthly_pnl(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_monthly_pnl(db, start, end)
+    return get_monthly_pnl(db, start, end, current_user.id)
 
 
 @router.get("/daily-pnl", response_model=list[DailyPnlEntry])
@@ -139,9 +145,10 @@ def endpoint_daily_pnl(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_daily_pnl(db, start, end)
+    return get_daily_pnl(db, start, end, current_user.id)
 
 
 @router.get("/day-of-week", response_model=list[DayOfWeekEntry])
@@ -149,9 +156,10 @@ def endpoint_day_of_week(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_day_of_week_performance(db, start, end)
+    return get_day_of_week_performance(db, start, end, current_user.id)
 
 
 @router.get("/time-of-day", response_model=list[TimeOfDayEntry])
@@ -159,9 +167,10 @@ def endpoint_time_of_day(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_time_of_day_performance(db, start, end)
+    return get_time_of_day_performance(db, start, end, current_user.id)
 
 
 @router.get("/holding-period", response_model=list[HoldingPeriodEntry])
@@ -169,9 +178,10 @@ def endpoint_holding_period(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     start, end = _parse_date_range(from_date, to_date)
-    return get_holding_period_analysis(db, start, end)
+    return get_holding_period_analysis(db, start, end, current_user.id)
 
 
 @router.get("/dashboard", response_model=FullDashboardResponse)
@@ -179,7 +189,8 @@ def endpoint_dashboard(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Return the full analytics dashboard payload."""
     start, end = _parse_date_range(from_date, to_date)
-    return get_full_dashboard(db, start, end)
+    return get_full_dashboard(db, start, end, current_user.id)

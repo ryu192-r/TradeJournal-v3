@@ -28,6 +28,7 @@ from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
 from app.utils.calculations import compute_aggregate_kpis
 from app.core.dependencies import get_current_user
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/playbook", tags=["playbook-intelligence"])
 
@@ -51,8 +52,8 @@ def _parse_date_range(
     return start, end
 
 
-def _get_setup_trades(db: Session, setup_name: str, start: Optional[datetime], end: Optional[datetime]) -> list[Trade]:
-    q = db.query(Trade).filter(Trade.setup == setup_name, Trade.status != "deleted")
+def _get_setup_trades(db: Session, setup_name: str, start: Optional[datetime], end: Optional[datetime], user_id: int) -> list[Trade]:
+    q = db.query(Trade).filter(Trade.setup == setup_name, Trade.status != "deleted", Trade.user_id == user_id)
     if start:
         q = q.filter(Trade.entry_time >= start)
     if end:
@@ -395,6 +396,7 @@ def playbook_intelligence_overview(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Across-all-setups comparison dashboard. Ranks setups by expectancy, win rate, and PnL."""
     start, end = _parse_date_range(from_date, to_date)
@@ -405,7 +407,7 @@ def playbook_intelligence_overview(
 
     results = []
     for sp in setups:
-        trades = _get_setup_trades(db, sp.name, start, end)
+        trades = _get_setup_trades(db, sp.name, start, end, current_user.id)
         if not trades:
             results.append({
                 "setup_id": sp.id,
@@ -454,6 +456,7 @@ def setup_intelligence(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Deep per-setup intelligence: performance, hold time, market conditions,
     failure patterns, behavior crossover, and tactic breakdown."""
@@ -463,7 +466,7 @@ def setup_intelligence(
     if not playbook:
         raise HTTPException(status_code=404, detail=f"Setup '{setup_name}' not found")
 
-    trades = _get_setup_trades(db, setup_name, start, end)
+    trades = _get_setup_trades(db, setup_name, start, end, current_user.id)
 
     if not trades:
         return {

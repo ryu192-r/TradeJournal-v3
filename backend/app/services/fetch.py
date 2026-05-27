@@ -21,6 +21,7 @@ def fetch_trades(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    user_id: Optional[int] = None,
 ) -> pd.DataFrame:
     """Fetch realized trade results as a DataFrame.
 
@@ -48,6 +49,10 @@ def fetch_trades(
     ]
 
     params: Dict[str, Any] = {}
+    if user_id is not None:
+        conditions_closed.append("t.user_id = :user_id")
+        conditions_pe.append("t.user_id = :user_id")
+        params["user_id"] = user_id
     if start_date:
         conditions_closed.append("t.entry_time >= :start_date")
         conditions_pe.append("t.entry_time >= :start_date")

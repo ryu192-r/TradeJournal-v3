@@ -27,6 +27,7 @@ from app.db.database import get_db
 from app.models.trade import Trade
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
+from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.logging import get_logger
 
@@ -96,9 +97,12 @@ def _live_quote_status(q: LiveQuote, now: datetime) -> tuple[str, Optional[int]]
 def list_snapshots(
     days: int = Query(30, description="Number of recent days"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List recent market snapshots."""
-    snaps = db.query(MarketSnapshot).order_by(
+    snaps = db.query(MarketSnapshot).filter(
+        MarketSnapshot.user_id == current_user.id
+    ).order_by(
         desc(MarketSnapshot.date)
     ).limit(days).all()
 
@@ -131,6 +135,7 @@ def list_snapshots(
 def get_snapshot(
     snapshot_date: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific day's market snapshot."""
     try:
@@ -138,7 +143,10 @@ def get_snapshot(
     except ValueError:
         raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD.")
 
-    snap = db.query(MarketSnapshot).filter(MarketSnapshot.date == d).first()
+    snap = db.query(MarketSnapshot).filter(
+        MarketSnapshot.date == d,
+        MarketSnapshot.user_id == current_user.id,
+    ).first()
     if not snap:
         raise HTTPException(404, f"No market snapshot for {snapshot_date}")
 
@@ -166,28 +174,22 @@ def get_snapshot(
     }
 
 
-@router.post("/snapshot", response_model=MarketSnapshotResponse)
-def create_or_update_snapshot(
-    payload: MarketSnapshotCreate,
-    db: Session = Depends(get_db),
-):
-    """Create or update a market snapshot. If date exists, updates fields."""
-    snap_date_str = payload.date
-    if not snap_date_str:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date is required (YYYY-MM-DD)")
-
-    try:
-        d = date.fromisoformat(snap_date_str)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
-
-    snap = db.query(MarketSnapshot).filter(MarketSnapshot.date == d).first()
+def _save_snapshot(
+    d: date,
+    data: dict,
+    db: Session,
+    user_id: int,
+) -> dict:
+    """Create or update a market snapshot for a given user and date."""
+    snap = db.query(MarketSnapshot).filter(
+        MarketSnapshot.date == d,
+        MarketSnapshot.user_id == user_id,
+    ).first()
 
     if not snap:
-        snap = MarketSnapshot(date=d)
+        snap = MarketSnapshot(date=d, user_id=user_id)
         db.add(snap)
 
-    data = payload.model_dump(exclude={"date"}, exclude_none=True)
     for field, val in data.items():
         setattr(snap, field, val)
 
@@ -208,6 +210,26 @@ def create_or_update_snapshot(
         "nifty_regime": snap.nifty_regime,
         "message": "Snapshot saved",
     }
+
+
+@router.post("/snapshot", response_model=MarketSnapshotResponse)
+def create_or_update_snapshot(
+    payload: MarketSnapshotCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create or update a market snapshot. If date exists, updates fields."""
+    snap_date_str = payload.date
+    if not snap_date_str:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date is required (YYYY-MM-DD)")
+
+    try:
+        d = date.fromisoformat(snap_date_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    data = payload.model_dump(exclude={"date"}, exclude_none=True)
+    return _save_snapshot(d, data, db, current_user.id)
 
 
 # ─────────────────────── fetch from Tapetide ───────────────────────
@@ -284,6 +306,7 @@ def _parse_tapetide_payload(payload: dict) -> dict:
 def fetch_market_data(
     payload: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Save a market snapshot from Tapetide API data."""
     snap_date_str = payload.get("date")
@@ -296,16 +319,14 @@ def fetch_market_data(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
 
     snap_data = _parse_tapetide_payload(payload)
-    snap_data["date"] = str(d)
-
-    saved = create_or_update_snapshot(MarketSnapshotCreate(**snap_data), db)
-    return saved
+    return _save_snapshot(d, snap_data, db, current_user.id)
 
 
 @router.post("/seed")
 def seed_snapshots(
     payload: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Bulk-seed market snapshots from Tapetide historical data."""
     snapshots = payload.get("snapshots") or []
@@ -323,14 +344,16 @@ def seed_snapshots(
                 errors.append(f"row {i}: missing date")
                 continue
             d = date.fromisoformat(d_str)
-            existing = db.query(MarketSnapshot).filter(MarketSnapshot.date == d).first()
+            existing = db.query(MarketSnapshot).filter(
+                MarketSnapshot.date == d,
+                MarketSnapshot.user_id == current_user.id,
+            ).first()
             if existing:
                 skipped += 1
                 continue
 
             parsed = _parse_tapetide_payload(snap_payload)
-            parsed["date"] = d_str
-            create_or_update_snapshot(MarketSnapshotCreate(**parsed), db)
+            _save_snapshot(d, parsed, db, current_user.id)
             added += 1
         except Exception as e:
             errors.append(f"row {i}: {str(e)}")
@@ -350,6 +373,7 @@ def performance_correlation(
     from_date: Optional[str] = Query(None),
     to_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Correlate user's trade performance against market environment.
 
@@ -363,7 +387,7 @@ def performance_correlation(
     start = date.fromisoformat(from_date) if from_date else None
     end_dt = date.fromisoformat(to_date) if to_date else None
 
-    snap_q = db.query(MarketSnapshot)
+    snap_q = db.query(MarketSnapshot).filter(MarketSnapshot.user_id == current_user.id)
     if start:
         snap_q = snap_q.filter(MarketSnapshot.date >= start)
     if end_dt:
@@ -383,7 +407,11 @@ def performance_correlation(
 
     snap_map: dict[date, MarketSnapshot] = {s.date: s for s in snapshots}
 
-    trade_q = db.query(Trade).filter(Trade.status != "deleted", Trade.exit_price.isnot(None))
+    trade_q = db.query(Trade).filter(
+        Trade.user_id == current_user.id,
+        Trade.status != "deleted",
+        Trade.exit_price.isnot(None),
+    )
     if start:
         trade_q = trade_q.filter(Trade.entry_time >= datetime.combine(start, datetime.min.time()))
     if end_dt:
@@ -490,10 +518,14 @@ def performance_correlation(
 def regime_summary(
     days: int = Query(90, description="Lookback days"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Summarize NIFTY regime distribution and current state."""
     cutoff = date.today() - timedelta(days=days)
-    snaps = db.query(MarketSnapshot).filter(MarketSnapshot.date >= cutoff).order_by(desc(MarketSnapshot.date)).all()
+    snaps = db.query(MarketSnapshot).filter(
+        MarketSnapshot.user_id == current_user.id,
+        MarketSnapshot.date >= cutoff,
+    ).order_by(desc(MarketSnapshot.date)).all()
 
     if not snaps:
         return {
@@ -544,11 +576,12 @@ def regime_summary(
 @router.get("/my-symbols")
 def my_symbols(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get distinct symbols from user's trades (open + closed, not deleted)."""
     symbols = (
         db.query(Trade.symbol)
-        .filter(Trade.status != "deleted")
+        .filter(Trade.user_id == current_user.id, Trade.status != "deleted")
         .distinct()
         .order_by(Trade.symbol)
         .all()
@@ -601,6 +634,7 @@ def upsert_live_quotes(
 @router.post("/sync-quotes")
 def sync_live_quotes(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Fetch fresh live quotes for all tracked open symbols and cache them."""
     return sync_open_trade_quotes(db)

@@ -2,17 +2,33 @@
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from itertools import count
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.models.trade import Trade
+from app.models.user import User
 from app.routers.market_context import get_live_quotes, performance_correlation, sync_live_quotes
 from app.services import market_data_service
 from app.services.live_quote_sync import get_open_trade_symbols, is_market_open
+
+_email_counter = count(1)
+
+
+def _make_user(db_session):
+    user = User(
+        email=f"test_{next(_email_counter)}@example.com",
+        full_name="Test User",
+        hashed_password=get_password_hash("test123"),
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
 
 
 @pytest.fixture
@@ -27,7 +43,7 @@ def db_session():
         Base.metadata.drop_all(bind=real_engine)
 
 
-def _trade(symbol: str, entry_time: str, pnl: str):
+def _trade(symbol: str, entry_time: str, pnl: str, user_id: int):
     return Trade(
         symbol=symbol,
         direction="LONG",
@@ -38,21 +54,23 @@ def _trade(symbol: str, entry_time: str, pnl: str):
         exit_time=datetime.fromisoformat(entry_time),
         status="closed",
         pnl=Decimal(pnl),
+        user_id=user_id,
     )
 
 
 def test_performance_correlation_regime_insight_uses_avg_pnl(db_session):
+    user = _make_user(db_session)
     db_session.add_all(
         [
-            MarketSnapshot(date=date(2025, 1, 13), nifty_trend="uptrend", nifty_regime="bullish"),
-            MarketSnapshot(date=date(2025, 1, 14), nifty_trend="downtrend", nifty_regime="bearish"),
-            _trade("WINNER", "2025-01-13T09:30:00", "1234.56"),
-            _trade("LOSER", "2025-01-14T09:30:00", "-100.00"),
+            MarketSnapshot(date=date(2025, 1, 13), nifty_trend="uptrend", nifty_regime="bullish", user_id=user.id),
+            MarketSnapshot(date=date(2025, 1, 14), nifty_trend="downtrend", nifty_regime="bearish", user_id=user.id),
+            _trade("WINNER", "2025-01-13T09:30:00", "1234.56", user.id),
+            _trade("LOSER", "2025-01-14T09:30:00", "-100.00", user.id),
         ]
     )
     db_session.commit()
 
-    data = performance_correlation(None, None, db_session)
+    data = performance_correlation(None, None, db_session, current_user=user)
 
     assert data["by_regime"]["bullish"]["avg_pnl"] == 1234.56
     assert any(
@@ -96,6 +114,7 @@ def test_live_quotes_include_freshness_status(db_session):
 
 
 def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
+    user = _make_user(db_session)
     db_session.add(
         Trade(
             symbol="RELIANCE",
@@ -104,6 +123,7 @@ def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
             quantity=Decimal("10"),
             entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
             status="open",
+            user_id=user.id,
         )
     )
     db_session.commit()
@@ -123,7 +143,7 @@ def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
 
     monkeypatch.setattr("app.services.live_quote_sync.fetch_live_quotes", fake_fetch)
 
-    data = sync_live_quotes(db_session)
+    data = sync_live_quotes(db_session, current_user=user)
 
     assert data["symbols"] == ["RELIANCE"]
     assert data["provider_status"] == "fresh"
@@ -135,6 +155,7 @@ def test_sync_live_quotes_reports_provider_status(monkeypatch, db_session):
 
 
 def test_sync_live_quotes_reports_failed_provider(monkeypatch, db_session):
+    user = _make_user(db_session)
     db_session.add(
         Trade(
             symbol="RELIANCE",
@@ -143,13 +164,14 @@ def test_sync_live_quotes_reports_failed_provider(monkeypatch, db_session):
             quantity=Decimal("10"),
             entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
             status="open",
+            user_id=user.id,
         )
     )
     db_session.commit()
 
     monkeypatch.setattr("app.services.live_quote_sync.fetch_live_quotes", lambda symbols: ([], ["provider unavailable"]))
 
-    data = sync_live_quotes(db_session)
+    data = sync_live_quotes(db_session, current_user=user)
 
     assert data["provider_status"] == "failed"
     assert data["upserted"] == 0
@@ -157,6 +179,7 @@ def test_sync_live_quotes_reports_failed_provider(monkeypatch, db_session):
 
 
 def test_get_open_trade_symbols_excludes_closed_and_deleted(db_session):
+    user = _make_user(db_session)
     db_session.add_all(
         [
             Trade(
@@ -166,6 +189,7 @@ def test_get_open_trade_symbols_excludes_closed_and_deleted(db_session):
                 quantity=Decimal("10"),
                 entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
                 status="open",
+                user_id=user.id,
             ),
             Trade(
                 symbol="TCS",
@@ -175,6 +199,7 @@ def test_get_open_trade_symbols_excludes_closed_and_deleted(db_session):
                 quantity=Decimal("10"),
                 entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
                 status="closed",
+                user_id=user.id,
             ),
             Trade(
                 symbol="INFY",
@@ -183,6 +208,7 @@ def test_get_open_trade_symbols_excludes_closed_and_deleted(db_session):
                 quantity=Decimal("10"),
                 entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
                 status="deleted",
+                user_id=user.id,
             ),
         ]
     )

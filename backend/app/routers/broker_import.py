@@ -16,6 +16,7 @@ from app.services.trade_service import TradeService
 from datetime import datetime
 from decimal import Decimal
 from app.core.dependencies import get_current_user
+from app.models.user import User
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], )
@@ -121,6 +122,7 @@ async def import_broker_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(False, description="If true, preview which rows would be skipped without importing"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Upload a broker CSV and import trades.
 
@@ -180,7 +182,7 @@ async def import_broker_csv(
             if symbol and entry_time:
                 existing = (
                     db.query(Trade)
-                    .filter(Trade.symbol == symbol, func.date(Trade.entry_time) == entry_time.date(), Trade.status != "deleted")
+                    .filter(Trade.symbol == symbol, func.date(Trade.entry_time) == entry_time.date(), Trade.status != "deleted", Trade.user_id == current_user.id)
                     .first()
                 )
                 if existing:
@@ -231,6 +233,7 @@ async def import_broker_csv(
         fees = _parse_decimal(row.get("fees", "")) or Decimal("0")
 
         trade_data = {
+            "user_id": current_user.id,
             "symbol": symbol,
             "direction": direction,
             "entry_price": entry_price,
@@ -255,10 +258,10 @@ async def import_broker_csv(
             setups_seen.add(trade.setup)
 
     for setup_name in setups_seen:
-        _update_setup_stats(db, setup_name)
+        _update_setup_stats(db, setup_name, user_id=current_user.id)
 
     db.commit()
-    account = db.query(Account).first()
+    account = db.query(Account).filter(Account.user_id == current_user.id).first()
     if account:
         _reconcile_account(account.id, db)
 

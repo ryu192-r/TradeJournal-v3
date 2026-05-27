@@ -15,8 +15,11 @@ class EmotionLogService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_logs(self, trade_id: int) -> list:
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+    def list_logs(self, trade_id: int, user_id: Optional[int] = None) -> list:
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         if not trade:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found"
@@ -29,8 +32,11 @@ class EmotionLogService:
         )
         return logs
 
-    def create_log(self, trade_id: int, payload: EmotionLogCreate) -> EmotionLog:
-        trade = self.db.query(Trade).filter(Trade.id == trade_id).first()
+    def create_log(self, trade_id: int, payload: EmotionLogCreate, user_id: Optional[int] = None) -> EmotionLog:
+        q = self.db.query(Trade).filter(Trade.id == trade_id)
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        trade = q.first()
         if not trade:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found"
@@ -63,7 +69,7 @@ class EmotionLogService:
         self.db.refresh(entry)
         return entry
 
-    def delete_log(self, trade_id: int, log_id: int) -> None:
+    def delete_log(self, trade_id: int, log_id: int, user_id: Optional[int] = None) -> None:
         log = self.db.query(EmotionLog).filter(
             EmotionLog.id == log_id, EmotionLog.trade_id == trade_id
         ).first()

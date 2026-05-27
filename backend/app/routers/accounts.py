@@ -20,7 +20,8 @@ from app.models.capital_event import CapitalEvent
 from app.db.database import get_db
 from app.utils.logging import get_logger
 from app.utils.decimal_utils import ensure_decimal
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_user_account_or_404
+from app.models.user import User
 
 
 class RebalanceBody(BaseModel):
@@ -54,7 +55,7 @@ logger = get_logger(__name__)
 
 
 @router.post("/", response_model=AccountResponse, status_code=status.HTTP_201_CREATED)
-def create_account(acc: AccountCreate, db: Session = Depends(get_db)):
+def create_account(acc: AccountCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Create a new trading account."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     db_account = Account(
@@ -64,6 +65,7 @@ def create_account(acc: AccountCreate, db: Session = Depends(get_db)):
         initial_balance=acc.initial_balance,
         current_balance=acc.initial_balance,
         currency=acc.currency,
+        user_id=current_user.id,
         created_at=now,
         updated_at=now,
     )
@@ -80,26 +82,27 @@ def list_accounts(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List all accounts."""
-    total = db.query(func.count(Account.id)).scalar() or 0
-    accounts = db.query(Account).order_by(Account.id).offset(skip).limit(limit).all()
+    total = db.query(func.count(Account.id)).filter(Account.user_id == current_user.id).scalar() or 0
+    accounts = db.query(Account).filter(Account.user_id == current_user.id).order_by(Account.id).offset(skip).limit(limit).all()
     return {"total": total, "items": accounts}
 
 
 @router.get("/{account_id}", response_model=AccountResponse)
-def get_account(account_id: int, db: Session = Depends(get_db)):
+def get_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get a single account by ID."""
-    account = db.query(Account).filter(Account.id == account_id).first()
+    account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return account
 
 
 @router.put("/{account_id}", response_model=AccountResponse)
-def update_account(account_id: int, acc_update: AccountUpdate, db: Session = Depends(get_db)):
+def update_account(account_id: int, acc_update: AccountUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Update an account."""
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+    db_account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not db_account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
@@ -117,9 +120,9 @@ def update_account(account_id: int, acc_update: AccountUpdate, db: Session = Dep
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_account(account_id: int, db: Session = Depends(get_db)):
+def delete_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Delete an account."""
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+    db_account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not db_account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
@@ -141,9 +144,9 @@ def delete_account(account_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{account_id}/rebalance", response_model=RebalanceResponse)
-def rebalance_account_balance(account_id: int, body: RebalanceBody, db: Session = Depends(get_db)):
+def rebalance_account_balance(account_id: int, body: RebalanceBody, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Manually set the current balance (e.g. after a sync adjustment)."""
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+    db_account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not db_account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
@@ -166,9 +169,10 @@ def get_equity_curve(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Build an equity curve for an account from capital events filtered by account_id."""
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+    db_account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not db_account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 

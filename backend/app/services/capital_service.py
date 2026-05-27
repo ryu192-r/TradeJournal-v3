@@ -15,9 +15,12 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def _reconcile_account(account_id: int, db: Session) -> Decimal:
+def _reconcile_account(account_id: int, db: Session, user_id: Optional[int] = None) -> Decimal:
     """Reconcile account balance. Returns delta applied (0 if no change)."""
-    account = db.query(Account).filter(Account.id == account_id).first()
+    q = db.query(Account).filter(Account.id == account_id)
+    if user_id is not None:
+        q = q.filter(Account.user_id == user_id)
+    account = q.first()
     if not account:
         return Decimal("0")
 
@@ -30,16 +33,22 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
     withdrawals = sum(abs(ensure_decimal(e.amount)) for e in events if e.event_type == "withdrawal")
     fees = sum(abs(ensure_decimal(e.amount)) for e in events if e.event_type == "fee")
 
-    # Realized PnL (non-deleted, closed trades)
+    # Realized PnL (non-deleted, closed trades) — scoped to user
     realized_pnl = Decimal("0")
-    closed_trades = db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted").all()
+    closed_query = db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted")
+    if user_id is not None:
+        closed_query = closed_query.filter(Trade.user_id == user_id)
+    closed_trades = closed_query.all()
     for t in closed_trades:
         realized_pnl += ensure_decimal(t.pnl)
 
     # Open trades: partial exit realized PnL + deployed capital (remaining qty after partial exits)
     partial_realized = Decimal("0")
     deployed = Decimal("0")
-    open_trades_list = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted").all()
+    open_query = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted")
+    if user_id is not None:
+        open_query = open_query.filter(Trade.user_id == user_id)
+    open_trades_list = open_query.all()
     for t in open_trades_list:
         partials = db.query(PartialExit).filter(PartialExit.trade_id == t.id).all()
         total_exited_qty = sum(ensure_decimal(p.qty) for p in partials)
@@ -70,7 +79,10 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
     return delta
 
 
-def _auto_reconcile(db: Session):
-    account = db.query(Account).first()
+def _auto_reconcile(db: Session, user_id: Optional[int] = None):
+    q = db.query(Account)
+    if user_id is not None:
+        q = q.filter(Account.user_id == user_id)
+    account = q.first()
     if account:
-        _reconcile_account(account.id, db)
+        _reconcile_account(account.id, db, user_id)

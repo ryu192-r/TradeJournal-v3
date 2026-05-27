@@ -22,6 +22,7 @@ from sqlalchemy import func, and_
 
 from app.db.database import get_db
 from app.core.dependencies import get_current_user
+from app.models.user import User
 from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
@@ -53,8 +54,8 @@ def _parse_date_range(
     return start, end
 
 
-def _base_trade_query(db: Session, start: Optional[datetime], end: Optional[datetime]):
-    q = db.query(Trade).filter(Trade.status != "deleted")
+def _base_trade_query(db: Session, start: Optional[datetime], end: Optional[datetime], user_id: int):
+    q = db.query(Trade).filter(Trade.status != "deleted", Trade.user_id == user_id)
     if start:
         q = q.filter(Trade.entry_time >= start)
     if end:
@@ -69,11 +70,12 @@ def emotion_summary(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Aggregate emotion frequency, average PnL, and win rate by emotion type."""
     start, end = _parse_date_range(from_date, to_date)
 
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     trades = trades_q.all()
     trade_ids = [t.id for t in trades]
     trades_map = {t.id: t for t in trades}
@@ -156,10 +158,11 @@ def grade_summary(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Aggregate execution grade distribution + PnL by overall grade."""
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     trades = trades_q.all()
     trade_ids = [t.id for t in trades]
 
@@ -241,10 +244,11 @@ def behavioral_analytics(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Cross-reference emotions with execution grades + PnL to reveal behavioral patterns."""
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     closed_trades = [t for t in trades_q.all() if t.exit_price is not None]
 
     if not closed_trades:
@@ -332,6 +336,7 @@ def revenge_trades(
     to_date: Optional[str] = Query(None, description="End date ISO"),
     hours_window: int = Query(4, description="Hours after a loss to consider revenge window"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Detect trades opened shortly after a losing trade — programmatic revenge trade detection.
 
@@ -341,7 +346,7 @@ def revenge_trades(
     3. The entry came within the revenge window regardless of emotion data
     """
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     all_trades = trades_q.order_by(Trade.entry_time.asc()).all()
     trades_map = {t.id: t for t in all_trades}
 
@@ -417,6 +422,7 @@ def overtrading_detection(
     daily_threshold: int = Query(3, description="Max trades per day before flagging"),
     weekly_threshold: int = Query(10, description="Max trades per week before flagging"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Detect overtrading patterns by analyzing trade frequency per day/week.
 
@@ -424,7 +430,7 @@ def overtrading_detection(
     and identifies emotional state during overtrading sessions.
     """
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     all_trades = trades_q.order_by(Trade.entry_time.asc()).all()
 
     if not all_trades:
@@ -530,6 +536,7 @@ def early_exit_analysis(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Analyze trades closed before reaching target or stop — early exit patterns.
 
@@ -537,7 +544,7 @@ def early_exit_analysis(
     breakdown, and identifies systematic early exit tendencies.
     """
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, current_user.id)
     closed_trades = [t for t in trades_q.all() if t.exit_price is not None and t.pnl is not None]
 
     if not closed_trades:
@@ -670,6 +677,8 @@ def composite_discipline_score(
     from_date: Optional[str] = Query(None, description="Start date ISO"),
     to_date: Optional[str] = Query(None, description="End date ISO"),
     db: Session = Depends(get_db),
+    user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
 ):
     """Compute a composite discipline score from multiple behavioral signals.
 
@@ -681,8 +690,9 @@ def composite_discipline_score(
     - revenge_resistance: inverse of revenge trade rate (0-100)
     Overall is a weighted average of all components.
     """
+    effective_user_id = user_id or current_user.id
     start, end = _parse_date_range(from_date, to_date)
-    trades_q = _base_trade_query(db, start, end)
+    trades_q = _base_trade_query(db, start, end, effective_user_id)
     all_trades = trades_q.order_by(Trade.entry_time.asc()).all()
 
     if not all_trades:
@@ -739,7 +749,10 @@ def composite_discipline_score(
         if t.entry_time:
             trade_dates.add(t.entry_time.strftime("%Y-%m-%d"))
 
-    journal_dates_q = db.query(DailyJournal.date).filter(DailyJournal.date != None)
+    journal_dates_q = db.query(DailyJournal.date).filter(
+        DailyJournal.date != None,
+        DailyJournal.user_id == effective_user_id,
+    )
     if start:
         journal_dates_q = journal_dates_q.filter(DailyJournal.date >= start.date())
     if end:

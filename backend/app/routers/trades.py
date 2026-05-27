@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -14,12 +15,13 @@ from app.models.stop_history import StopHistory
 from app.models.trade_timeline import TradeTimeline
 from app.models.partial_exit import PartialExit
 from app.models.capital_event import CapitalEvent
+from app.models.user import User
 from app.services.trade_service import TradeService
 from app.services.capital_service import _auto_reconcile
 from app.services.setup_playbook_service import _update_setup_stats
 from app.db.database import get_db
 from app.core.config import settings
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_user_trade_or_404, scoped_trade_query
 
 
 def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
@@ -35,7 +37,6 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
     if trade.exit_price is not None:
         remaining_qty = Decimal("0")
         unrealized = Decimal("0")
-        # Compute weighted-average exit_price for display
         if partials and total_exited_qty > 0:
             partial_weighted = sum(p.exit_price * p.qty for p in partials)
             rem_qty = trade.quantity - total_exited_qty
@@ -61,17 +62,12 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades", tags=["trades"])
 
-# ─────────────────────── helpers ───────────────────────
-
-
 
 def _update_pnl(trade: Trade):
-    """Delegate PnL + R-multiple to the model's compute_pnl()."""
     trade.compute_pnl()
 
 
 def _auto_detect_exit_reason(trade: Trade) -> str:
-    """Auto-detect exit reason based on price proximity."""
     if trade.exit_price is None:
         return "system"
 
@@ -100,16 +96,19 @@ def _resolve_upload_path(url: str) -> str:
     return filepath
 
 
-# ─────────────────────── endpoints ───────────────────────
-
 @router.post("/", response_model=TradeResponse, status_code=status.HTTP_201_CREATED)
-def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
-    """Create a new trade — merges with existing trade for same (symbol, date) if one exists."""
+def create_trade(
+    trade: TradeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     svc = TradeService(db)
     trade_data = trade.model_dump()
+    trade_data["user_id"] = current_user.id
     db_trade, action = svc.merge_or_create(trade_data)
     db_trade.compute_pnl()
-    _update_setup_stats(db, db_trade.setup)
+    _update_setup_stats(db, db_trade.setup, user_id=current_user.id)
+    _auto_reconcile(db, user_id=current_user.id)
     db.commit()
     db.refresh(db_trade)
     return db_trade
@@ -117,16 +116,17 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=TradeListResponse)
 def list_trades(
-    skip: int = 0,
-    limit: int = 100,
-    status: Optional[str] = None,
-    symbol: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    status: Optional[str] = Query(None, pattern="^(open|closed)$"),
+    symbol: Optional[str] = Query(None),
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """List trades with optional filters."""
-    query = db.query(Trade).filter(Trade.status != "deleted")
+    """List trades with filtering and pagination."""
+    query = scoped_trade_query(db, current_user.id).filter(Trade.status != "deleted")
     if status == "closed":
         query = query.filter(Trade.exit_price.isnot(None))
     elif status == "open":
@@ -151,11 +151,28 @@ def list_trades(
     return {"total": total, "items": items}
 
 
+@router.get("/brokers")
+def list_brokers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return list of supported brokers for import."""
+    from app.services.broker_import import BROKER_DISPLAY
+    return {
+        "brokers": [
+            {"id": k, "name": v}
+            for k, v in BROKER_DISPLAY.items()
+        ]
+    }
+
+
 @router.get("/open-live", response_model=List[OpenLiveTradeResponse])
-def list_open_live_trades(db: Session = Depends(get_db)):
-    """Return only open trades with the minimal fields needed by the live dashboard."""
+def list_open_live_trades(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     trades = (
-        db.query(Trade)
+        scoped_trade_query(db, current_user.id)
         .filter(Trade.status != "deleted", Trade.exit_price.is_(None))
         .order_by(Trade.entry_time.desc())
         .all()
@@ -182,11 +199,12 @@ def list_open_live_trades(db: Session = Depends(get_db)):
 
 
 @router.get("/{trade_id}", response_model=TradeResponse)
-def read_trade(trade_id: int, db: Session = Depends(get_db)):
-    """Get a single trade by ID."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def read_trade(
+    trade_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
     resp = TradeResponse.model_validate(trade)
     extra = _enrich_trade_with_partials(trade, db)
     resp.remaining_qty = extra["remaining_qty"]
@@ -197,11 +215,13 @@ def read_trade(trade_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{trade_id}", response_model=TradeResponse)
-def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends(get_db)):
-    """Update an existing trade. Status is auto-computed from exit_price."""
-    db_trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not db_trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def update_trade(
+    trade_id: int,
+    trade_update: TradeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_trade = get_user_trade_or_404(db, trade_id, current_user.id)
 
     update_data = trade_update.model_dump(exclude_unset=True)
     old_setup = db_trade.setup
@@ -251,31 +271,38 @@ def update_trade(trade_id: int, trade_update: TradeUpdate, db: Session = Depends
         )
         db.add(timeline)
 
-    _auto_reconcile(db)
-    _update_setup_stats(db, db_trade.setup)
+    _auto_reconcile(db, user_id=current_user.id)
+    _update_setup_stats(db, db_trade.setup, user_id=current_user.id)
     if "setup" in update_data and old_setup != db_trade.setup:
-        _update_setup_stats(db, old_setup)
+        _update_setup_stats(db, old_setup, user_id=current_user.id)
     db.commit()
     db.refresh(db_trade)
     return db_trade
 
 
 @router.post("/merge-duplicates")
-def merge_duplicate_trades(db: Session = Depends(get_db)):
-    """Find and merge trades with same (symbol, date). One-time backfill."""
+def merge_duplicate_trades(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     svc = TradeService(db)
-    merged = svc.merge_duplicates()
-    _auto_reconcile(db)
+    merged = svc.merge_duplicates(user_id=current_user.id)
+    _auto_reconcile(db, user_id=current_user.id)
     return {"merged": merged}
 
 
 @router.post("/{trade_id}/pyramid", response_model=TradeResponse)
-def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Depends(get_db)):
-    """Pyramid — add more shares to an open position. Weighted-average entry, sum qty."""
+def pyramid_trade(
+    trade_id: int,
+    payload: PyramidTradeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     svc = TradeService(db)
     try:
         trade = svc.pyramid_trade(trade_id, payload.entry_price, payload.quantity,
-                                   payload.entry_time, payload.fees, payload.stop_price)
+                                   payload.entry_time, payload.fees, payload.stop_price,
+                                   user_id=current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     timeline = TradeTimeline(
@@ -284,8 +311,8 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
         new_value=f"+{payload.quantity} @ {payload.entry_price}",
     )
     db.add(timeline)
-    _auto_reconcile(db)
-    _update_setup_stats(db, trade.setup)
+    _auto_reconcile(db, user_id=current_user.id)
+    _update_setup_stats(db, trade.setup, user_id=current_user.id)
     db.commit()
     db.refresh(trade)
     return trade
@@ -295,11 +322,12 @@ def pyramid_trade(trade_id: int, payload: PyramidTradeRequest, db: Session = Dep
 
 
 @router.get("/{trade_id}/stop-history", response_model=StopHistoryListResponse)
-def list_stop_history(trade_id: int, db: Session = Depends(get_db)):
-    """List all stop loss adjustments for a trade."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def list_stop_history(
+    trade_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
     entries = (
         db.query(StopHistory)
         .filter(StopHistory.trade_id == trade_id)
@@ -310,11 +338,13 @@ def list_stop_history(trade_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{trade_id}/stop-history", response_model=StopHistoryResponse, status_code=status.HTTP_201_CREATED)
-def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session = Depends(get_db)):
-    """Record a new stop loss adjustment and update the trade's current stop_price."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def create_stop_history(
+    trade_id: int,
+    payload: StopHistoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
     entry = StopHistory(
         trade_id=trade_id,
         stop_type=payload.stop_type,
@@ -332,7 +362,7 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
         note=f"type={payload.stop_type}",
     )
     db.add(timeline)
-    _auto_reconcile(db)
+    _auto_reconcile(db, user_id=current_user.id)
     db.commit()
     db.refresh(entry)
     return entry
@@ -342,11 +372,13 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
 
 
 @router.post("/{trade_id}/images")
-def upload_chart_image(trade_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Upload a chart image for a trade."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def upload_chart_image(
+    trade_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image")
@@ -372,11 +404,13 @@ def upload_chart_image(trade_id: int, file: UploadFile = File(...), db: Session 
 
 
 @router.delete("/{trade_id}/images")
-def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
-    """Remove a chart image from a trade."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def delete_chart_image(
+    trade_id: int,
+    url: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
 
     filepath = _resolve_upload_path(url)
     images = [i for i in (trade.chart_images or []) if i]
@@ -393,12 +427,30 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     return {"images": images}
 
 
+@router.get("/{trade_id}/images/{filename}")
+def serve_chart_image(
+    trade_id: int,
+    filename: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
+    upload_dir = os.path.abspath(os.path.join(settings.UPLOAD_DIR, str(trade_id)))
+    filepath = os.path.abspath(os.path.join(upload_dir, filename))
+    if os.path.commonpath([upload_dir, filepath]) != upload_dir:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return FileResponse(filepath)
+
+
 @router.delete("/{trade_id}", status_code=status.HTTP_204_NO_CONTENT)
-def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
-    """Soft delete a trade (mark status as deleted)."""
-    trade = db.query(Trade).filter(Trade.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+def soft_delete_trade(
+    trade_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
     trade.status = "deleted"
     timeline = TradeTimeline(
         trade_id=trade.id,
@@ -417,7 +469,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         )
         db.add(deletion_event)
 
-    _auto_reconcile(db)
-    _update_setup_stats(db, trade.setup)
+    _auto_reconcile(db, user_id=current_user.id)
+    _update_setup_stats(db, trade.setup, user_id=current_user.id)
     db.commit()
     return None
