@@ -245,18 +245,13 @@ def update_capital_event(
             detail="Capital event not found"
         )
 
-    old_amount = db_event.amount
     update_data = event_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if value is not None:
             setattr(db_event, field, value)
 
     if "amount" in update_data:
-        delta = db_event.amount - old_amount
-        account = db.query(Account).filter(Account.id == db_event.account_id).first()
-        if account:
-            account.current_balance = (account.current_balance or Decimal("0")) + delta
-            account.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        _reconcile_account(db_event.account_id, db)
 
     db.commit()
     db.refresh(db_event)
@@ -275,14 +270,9 @@ def delete_capital_event(event_id: int, db: Session = Depends(get_db)):
             detail="Capital event not found"
         )
 
-    # Reverse balance impact before deleting
-    account = db.query(Account).filter(Account.id == db_event.account_id).first()
-    if account:
-        old_balance = account.current_balance or Decimal("0")
-        account.current_balance = old_balance - db_event.amount
-        account.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-
+    account_id = db_event.account_id
     db.delete(db_event)
+    _reconcile_account(account_id, db)
     db.commit()
 
     logger.info("capital_event_deleted", event_id=event_id)
