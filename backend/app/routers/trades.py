@@ -363,6 +363,7 @@ def create_stop_history(trade_id: int, payload: StopHistoryCreate, db: Session =
         note=f"type={payload.stop_type}",
     )
     db.add(timeline)
+    _auto_reconcile(db)
     db.commit()
     db.refresh(entry)
     return entry
