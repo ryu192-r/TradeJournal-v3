@@ -76,7 +76,6 @@ def _reconcile_account(account_id: int, db: Session) -> Decimal:
         db.add(db_event)
         account.current_balance = target
         account.updated_at = datetime.now(CE_IST).replace(tzinfo=None)
-        db.commit()
         logger.info("account_reconciled", account_id=account_id, delta=str(delta))
 
     return delta
@@ -295,6 +294,7 @@ def delete_capital_event(event_id: int, db: Session = Depends(get_db)):
 def reconcile_account(account_id: int, db: Session = Depends(get_db)):
     """Manually trigger balance reconciliation."""
     delta = _reconcile_account(account_id, db)
+    db.commit()
     account = db.query(Account).filter(Account.id == account_id).first()
     return {
         "account_id": account_id,
