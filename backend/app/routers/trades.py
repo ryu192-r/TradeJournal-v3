@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from decimal import Decimal
 import os
 import uuid
 import shutil
 
-from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse, IST as TRADE_IST
+from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 
 from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
@@ -442,7 +442,7 @@ def soft_delete_trade(trade_id: int, db: Session = Depends(get_db)):
         deletion_event = CapitalEvent(
             event_type="trade_deletion",
             amount=trade.pnl,
-            timestamp=datetime.now(TRADE_IST).replace(tzinfo=None),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             description=f"Soft-deleted trade: {trade.symbol} (PnL removed)",
             trade_id=trade.id,
         )

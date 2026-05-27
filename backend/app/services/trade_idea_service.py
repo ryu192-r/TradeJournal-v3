@@ -1,10 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
-
-IST = timezone(timedelta(hours=5, minutes=30))
 from sqlalchemy import select, func, or_
 
 from app.models.trade_idea import TradeIdea
@@ -120,7 +118,7 @@ class TradeIdeaService:
     @staticmethod
     def get_revisits_due(db: Session) -> List[TradeIdea]:
         """Get ideas that are past their revisit_date and still active/draft."""
-        now = datetime.now(IST).replace(tzinfo=None)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         return (
             db.query(TradeIdea)
             .filter(
@@ -165,7 +163,7 @@ class TradeIdeaService:
             if convert.notes:
                 thesis_notes = f"{thesis_notes}\n\nAdditional: {convert.notes}" if thesis_notes else convert.notes
 
-            entry_time = convert.entry_time or datetime.now(IST).replace(tzinfo=None)
+            entry_time = convert.entry_time or datetime.now(timezone.utc).replace(tzinfo=None)
             new_trade = Trade(
                 symbol=db_idea.symbol,
                 direction=db_idea.direction,
@@ -191,7 +189,7 @@ class TradeIdeaService:
         # Update the idea to traded
         db_idea.status = "traded"
         db_idea.traded_trade_id = new_trade.id if new_trade else None
-        db_idea.triggered_at = datetime.now(IST).replace(tzinfo=None)
+        db_idea.triggered_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         db.commit()
         if new_trade:
