@@ -7,7 +7,8 @@ from app.db.database import get_db
 from app.services.dhan_client import DhanSyncService
 from app.services.trade_service import TradeService
 from app.core.dependencies import get_current_user
-from app.routers.trades import _update_setup_stats, _auto_reconcile
+from app.services.capital_service import _auto_reconcile
+from app.services.setup_playbook_service import _update_setup_stats
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/dhan", tags=["dhan-sync"])
 

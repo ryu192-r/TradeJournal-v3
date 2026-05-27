@@ -9,8 +9,8 @@ import csv
 from app.db.database import get_db
 from app.models.trade import Trade
 from app.models.account import Account
-from app.routers.capital_events import _reconcile_account
-from app.routers.trades import _update_setup_stats
+from app.services.capital_service import _reconcile_account
+from app.services.setup_playbook_service import _update_setup_stats
 from app.services.broker_import import BROKER_PARSERS, BROKER_DISPLAY, GENERIC_REQUIRED
 from app.services.trade_service import TradeService
 from datetime import datetime

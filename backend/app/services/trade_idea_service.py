@@ -198,8 +198,8 @@ class TradeIdeaService:
 
         # Reconcile account and update playbook stats after trade creation
         if new_trade:
-            from app.routers.capital_events import _reconcile_account
-            from app.routers.trades import _update_setup_stats, _auto_reconcile
+            from app.services.capital_service import _auto_reconcile
+            from app.services.setup_playbook_service import _update_setup_stats
             _auto_reconcile(db)
             _update_setup_stats(db, new_trade.setup)
 

@@ -8,27 +8,18 @@ import uuid
 import shutil
 
 from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
-
-from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
 from app.models.trade_timeline import TradeTimeline
 from app.models.partial_exit import PartialExit
-from app.models.account import Account
-from app.services.trade_service import TradeService
-from app.db.database import get_db
-from app.routers.capital_events import _reconcile_account
 from app.models.capital_event import CapitalEvent
-from app.models.setup_playbook import SetupPlaybook
+from app.services.trade_service import TradeService
+from app.services.capital_service import _auto_reconcile
+from app.services.setup_playbook_service import _update_setup_stats
+from app.db.database import get_db
 from app.core.config import settings
 from app.core.dependencies import get_current_user
-
-
-def _auto_reconcile(db: Session):
-    account = db.query(Account).first()
-    if account:
-        _reconcile_account(account.id, db)
 
 
 def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
@@ -94,28 +85,6 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
         if abs(exit_price - target) <= max(Decimal("0.01") * target, Decimal("1")):
             return "target"
     return "manual"
-
-
-def _update_setup_stats(db: Session, setup_name: str | None):
-    """Recompute trade_count, win_rate, avg_r for a setup playbook.
-
-    This helper intentionally does not commit; callers own transaction boundaries.
-    """
-    if not setup_name:
-        return
-    playbook = db.query(SetupPlaybook).filter(SetupPlaybook.name == setup_name).first()
-    if not playbook:
-        return
-    trades = db.query(Trade).filter(
-        Trade.setup == setup_name,
-        Trade.status != "deleted",
-    ).all()
-    closed = [t for t in trades if t.pnl is not None]
-    wins = [t for t in closed if t.pnl > 0]
-    playbook.trade_count = len(trades)
-    playbook.win_rate = f"{round(len(wins) / len(closed) * 100, 1)}%" if closed else None
-    r_values = [t.r_multiple for t in closed if t.r_multiple is not None]
-    playbook.avg_r = f"{round(sum(float(r) for r in r_values) / len(r_values), 2)}" if r_values else None
 
 
 def _resolve_upload_path(url: str) -> str:

@@ -10,7 +10,7 @@ from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.partial_exit import PartialExit
 from app.models.trade import Trade
-from app.routers.partial_exit import _remaining_qty, create_partial_exit, delete_partial_exit, list_partial_exits
+from app.services.partial_exit_service import _remaining_qty, PartialExitService
 from app.schemas.partial_exit import PartialExitCreate
 
 
@@ -51,7 +51,7 @@ def test_partial_exit_allows_less_than_remaining_quantity(db_session):
     db_session.commit()
     db_session.refresh(trade)
 
-    entry = create_partial_exit(trade.id, _payload("4"), db_session)
+    entry = PartialExitService(db_session).create_partial_exit(trade.id, _payload("4"))
 
     assert entry.qty == Decimal("4")
     assert isinstance(entry.created_at, datetime)
@@ -65,7 +65,7 @@ def test_partial_exit_rejects_full_remaining_quantity(db_session):
     db_session.refresh(trade)
 
     with pytest.raises(HTTPException) as exc:
-        create_partial_exit(trade.id, _payload("10"), db_session)
+        PartialExitService(db_session).create_partial_exit(trade.id, _payload("10"))
 
     assert exc.value.status_code == 400
     assert "Use full close for remaining quantity" in exc.value.detail
@@ -88,7 +88,7 @@ def test_partial_exit_rejects_final_remaining_after_prior_partial(db_session):
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc:
-        create_partial_exit(trade.id, _payload("4"), db_session)
+        PartialExitService(db_session).create_partial_exit(trade.id, _payload("4"))
 
     assert exc.value.status_code == 400
     assert _remaining_qty(trade, db_session) == Decimal("4.00000000")
@@ -99,13 +99,13 @@ def test_list_partial_exits_returns_entries_and_remaining_quantity(db_session):
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
-    first = create_partial_exit(trade.id, _payload("3"), db_session)
-    second = create_partial_exit(trade.id, _payload("2"), db_session)
+    first = PartialExitService(db_session).create_partial_exit(trade.id, _payload("3"))
+    second = PartialExitService(db_session).create_partial_exit(trade.id, _payload("2"))
 
-    data = list_partial_exits(trade.id, db_session)
+    data = PartialExitService(db_session).list_partial_exits(trade.id)
 
-    assert [item.id for item in data["items"]] == [first.id, second.id]
-    assert data["remaining_qty"] == "5.00000000"
+    assert [item.id for item in data[0]] == [first.id, second.id]
+    assert data[1] == Decimal("5.00000000")
 
 
 def test_delete_partial_exit_restores_remaining_quantity(db_session):
@@ -113,12 +113,13 @@ def test_delete_partial_exit_restores_remaining_quantity(db_session):
     db_session.add(trade)
     db_session.commit()
     db_session.refresh(trade)
-    entry = create_partial_exit(trade.id, _payload("3"), db_session)
+    entry = PartialExitService(db_session).create_partial_exit(trade.id, _payload("3"))
 
-    result = delete_partial_exit(trade.id, entry.id, db_session)
+    result = PartialExitService(db_session).delete_partial_exit(trade.id, entry.id)
 
     assert result is None
-    assert list_partial_exits(trade.id, db_session)["items"] == []
+    items, _ = PartialExitService(db_session).list_partial_exits(trade.id)
+    assert items == []
     assert _remaining_qty(trade, db_session) == Decimal("10.00000000")
 
 
@@ -130,7 +131,7 @@ def test_full_close_after_partial_exit_uses_remaining_quantity(db_session):
     db_session.commit()
     db_session.refresh(trade)
 
-    create_partial_exit(trade.id, _payload("4"), db_session)
+    PartialExitService(db_session).create_partial_exit(trade.id, _payload("4"))
     trade.exit_price = Decimal("120.00")
     trade.exit_time = datetime.fromisoformat("2025-01-13T11:00:00")
     db_session.commit()
