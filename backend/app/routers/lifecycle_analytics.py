@@ -221,7 +221,7 @@ def grade_summary(
         grade_pnl_summary.append({
             "grade": grade,
             "count": len(matching),
-            "avg_pnl": str(round(sum(float(p) for p in pnls) / len(pnls), 2)) if pnls else "0.00",
+            "avg_pnl": str(round(sum(pnls) / len(pnls), 2)) if pnls else "0.00",
             "total_pnl": str(sum(pnls)),
             "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
         })
@@ -269,12 +269,12 @@ def behavioral_analytics(
     for t in closed_trades:
         emotions = emotion_by_trade.get(t.id, [])
         grade = grade_by_trade.get(t.id)
-        pnl = float(t.pnl or 0)
+        pnl = t.pnl or Decimal("0")
 
         for e in emotions:
             key = e.emotion
             if key not in matrix:
-                matrix[key] = {"avg_pnl": 0, "win_rate": 0, "avg_grade_numeric": 0, "count": 0, "wins": 0, "total_pnl": 0, "grade_sum": 0}
+                matrix[key] = {"avg_pnl": Decimal("0"), "win_rate": 0, "avg_grade_numeric": 0, "count": 0, "wins": 0, "total_pnl": Decimal("0"), "grade_sum": 0}
             m = matrix[key]
             m["count"] += 1
             m["total_pnl"] += pnl
@@ -384,9 +384,9 @@ def revenge_trades(
                 "hours_after_loss": None,
             })
             if t.pnl is not None:
-                flagged_pnls.append(float(t.pnl))
+                flagged_pnls.append(t.pnl)
         elif t.pnl is not None:
-            unflagged_pnls.append(float(t.pnl))
+            unflagged_pnls.append(t.pnl)
 
     loss_times_sorted = sorted(loss_times_sorted)
     for rt in revenge_trades_list:
@@ -458,7 +458,7 @@ def overtrading_detection(
     for day_key in sorted(daily.keys()):
         day_trades = daily[day_key]
         if len(day_trades) > daily_threshold:
-            pnls = [float(t.pnl or 0) for t in day_trades if t.exit_price is not None]
+            pnls = [t.pnl or Decimal("0") for t in day_trades if t.exit_price is not None]
             emotions_day = []
             for t in day_trades:
                 for e in emotion_by_trade.get(t.id, []):
@@ -478,7 +478,7 @@ def overtrading_detection(
     for week_key in sorted(weekly.keys()):
         week_trades = weekly[week_key]
         if len(week_trades) > weekly_threshold:
-            pnls = [float(t.pnl or 0) for t in week_trades if t.exit_price is not None]
+            pnls = [t.pnl or Decimal("0") for t in week_trades if t.exit_price is not None]
             emotions_week = []
             for t in week_trades:
                 for e in emotion_by_trade.get(t.id, []):
@@ -500,8 +500,8 @@ def overtrading_detection(
         for t in weekly.get(week["week"], []):
             ot_trade_ids.add(t.id)
 
-    ot_pnls = [float(t.pnl or 0) for t in all_trades if t.id in ot_trade_ids and t.exit_price is not None]
-    normal_pnls = [float(t.pnl or 0) for t in all_trades if t.id not in ot_trade_ids and t.exit_price is not None]
+    ot_pnls = [t.pnl or Decimal("0") for t in all_trades if t.id in ot_trade_ids and t.exit_price is not None]
+    normal_pnls = [t.pnl or Decimal("0") for t in all_trades if t.id not in ot_trade_ids and t.exit_price is not None]
 
     unique_days = set(daily.keys())
     overtrading_day_set = {d["date"] for d in overtrading_days}
@@ -565,26 +565,26 @@ def early_exit_analysis(
     manual_exits = 0
 
     for t in closed_trades:
-        pnl = float(t.pnl or 0)
+        pnl = t.pnl or Decimal("0")
         reason = t.exit_reason or "manual"
         exit_reasons[reason]["count"] += 1
         exit_reasons[reason]["pnl"] += pnl
         if pnl > 0:
             exit_reasons[reason]["wins"] += 1
 
-        entry = float(t.entry_price or 0)
-        stop = float(t.stop_price or 0) if t.stop_price else None
-        target = float(t.target_price or 0) if t.target_price else None
-        exit_p = float(t.exit_price or 0)
+        entry = t.entry_price or Decimal("0")
+        stop = t.stop_price if t.stop_price else None
+        target = t.target_price if t.target_price else None
+        exit_p = t.exit_price or Decimal("0")
 
-        if target and stop and entry and (target - entry) != 0 and (entry - stop) != 0:
+        if target is not None and stop is not None and entry != 0 and (target - entry) != 0 and (entry - stop) != 0:
             risk = entry - stop
             reward = target - entry
             actual_r = pnl / risk if risk != 0 else None
             max_r = reward / risk if risk != 0 else None
 
             if actual_r is not None and max_r is not None and max_r != 0:
-                capture = actual_r / max_r
+                capture = float(actual_r / max_r)
                 capture_ratios.append(capture)
 
                 is_early = reason not in ("target",) and capture < 0.8
@@ -630,9 +630,9 @@ def early_exit_analysis(
     median_capture = sorted(capture_ratios)[len(capture_ratios) // 2] if capture_ratios else None
     target_reach_rate = round(target_reached / has_target * 100, 1) if has_target else None
 
-    early_exit_pnls = [float(t.pnl or 0) for t in closed_trades
+    early_exit_pnls = [t.pnl or Decimal("0") for t in closed_trades
                        if (t.exit_reason or "manual") not in ("target", "stop_loss") and t.target_price]
-    full_exit_pnls = [float(t.pnl or 0) for t in closed_trades
+    full_exit_pnls = [t.pnl or Decimal("0") for t in closed_trades
                       if (t.exit_reason or "manual") in ("target",) or not t.target_price]
 
     graded_exits = [all_grades[t.id] for t in closed_trades if t.id in all_grades and all_grades[t.id].exit_quality]
@@ -709,7 +709,7 @@ def composite_discipline_score(
     else:
         execution_grade_score = None
 
-    trades_with_stop = sum(1 for t in all_trades if t.stop_price is not None and float(t.stop_price) > 0)
+    trades_with_stop = sum(1 for t in all_trades if t.stop_price is not None and (t.stop_price or Decimal("0")) > 0)
     stop_discipline = round(trades_with_stop / len(all_trades) * 100, 1) if all_trades else None
 
     target_reached = 0
@@ -752,7 +752,7 @@ def composite_discipline_score(
         journal_consistency = None
 
     revenge_count = 0
-    loss_times = [t.entry_time for t in closed_trades if t.pnl is not None and float(t.pnl) < 0 and t.entry_time]
+    loss_times = [t.entry_time for t in closed_trades if t.pnl is not None and t.pnl < 0 and t.entry_time]
     for t in all_trades:
         emotion = emotion_by_trade.get(t.id)
         if emotion and any(e.emotion in ("revenge", "fomo") for e in emotion):

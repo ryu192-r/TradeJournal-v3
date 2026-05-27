@@ -307,21 +307,21 @@ def operational_dashboard(db: Session = Depends(get_db)):
         .order_by(CapitalEvent.timestamp.asc())
         .all()
     )
-    daily_changes_dd: dict = defaultdict(float)
+    daily_changes_dd: dict[date, Decimal] = defaultdict(Decimal)
     for dt_val, day_pnl in daily_pnl_rows:
         dt_key = dt_val.date() if hasattr(dt_val, 'date') else dt_val
-        daily_changes_dd[dt_key] += float(day_pnl)
+        daily_changes_dd[dt_key] += ensure_decimal(day_pnl)
     for evt in capital_event_rows_dd:
         dt_key = evt.timestamp.date() if hasattr(evt.timestamp, 'date') else evt.timestamp
-        amt = float(evt.amount)
+        amt = ensure_decimal(evt.amount)
         if evt.event_type == "withdrawal":
             amt = -abs(amt)
         daily_changes_dd[dt_key] += amt
 
-    initial = float(account.initial_balance or 0)
+    initial = ensure_decimal(account.initial_balance or 0)
     peak = initial
-    max_dd_amount = 0.0
-    max_dd_pct = 0.0
+    max_dd_amount = Decimal("0")
+    max_dd_pct = Decimal("0")
     cum = initial
     for day in sorted(daily_changes_dd.keys()):
         cum += daily_changes_dd[day]
@@ -477,13 +477,13 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
         .filter(Trade.status != "deleted", Trade.pnl.isnot(None))
         .all()
     )
-    emotion_pnl: dict[str, float] = defaultdict(float)
+    emotion_pnl: dict[str, Decimal] = defaultdict(Decimal)
     emotion_count: dict[str, int] = defaultdict(int)
     for t, e in closed_with_emotion:
-        emotion_pnl[e.emotion] += float(t.pnl or 0)
+        emotion_pnl[e.emotion] += t.pnl or Decimal("0")
         emotion_count[e.emotion] += 1
     worst_emotion = None
-    worst_pnl = float('inf')
+    worst_pnl = Decimal("Infinity")
     for emo, pnl in emotion_pnl.items():
         if pnl < worst_pnl and emotion_count[emo] >= 3:
             worst_pnl = pnl
@@ -521,7 +521,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
             overtrading_weeks += 1
 
     # Revenge trades
-    loss_times = sorted([t.entry_time for t in all_trades if t.pnl is not None and float(t.pnl) < 0 and t.entry_time])
+    loss_times = sorted([t.entry_time for t in all_trades if t.pnl is not None and t.pnl < 0 and t.entry_time])
     revenge_count = 0
     for t in all_trades:
         if t.entry_time:
@@ -562,7 +562,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
     for sp in setups:
         sp_trades = [t for t in all_trades if t.setup == sp.name and t.status != "deleted"]
         closed_sp = [t for t in sp_trades if t.pnl is not None]
-        pnls = [float(t.pnl) for t in closed_sp]
+        pnls = [t.pnl for t in closed_sp]
         wins = [p for p in pnls if p > 0]
         setup_highlights.append({
             "name": sp.name,
@@ -571,7 +571,7 @@ def intelligence_dashboard(db: Session = Depends(get_db)):
             "avg_r": sp.avg_r,
             "total_pnl": str(round(sum(pnls), 2)) if pnls else None,
         })
-    setup_highlights.sort(key=lambda x: float(x["total_pnl"] or 0), reverse=True)
+    setup_highlights.sort(key=lambda x: Decimal(x["total_pnl"] or 0), reverse=True)
 
     # ── Market context highlights ──
     latest_snap = (

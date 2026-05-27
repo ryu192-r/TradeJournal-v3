@@ -146,14 +146,14 @@ def _compute_hold_time(trades: list[Trade]) -> dict:
 
 
 def _compute_market_conditions(trades: list[Trade]) -> dict:
-    time_of_day: dict[int, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
-    day_of_week: dict[int, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
+    time_of_day: dict[int, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": Decimal("0")})
+    day_of_week: dict[int, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": Decimal("0")})
 
     for t in trades:
         if t.entry_time and t.exit_price is not None and t.pnl is not None:
             hour = t.entry_time.hour
             dow = t.entry_time.weekday()
-            pnl = float(t.pnl)
+            pnl = t.pnl
 
             time_of_day[hour]["count"] += 1
             time_of_day[hour]["pnl"] += pnl
@@ -205,7 +205,7 @@ def _compute_market_conditions(trades: list[Trade]) -> dict:
 
 def _compute_failure_patterns(trades: list[Trade]) -> dict:
     closed = [t for t in trades if t.exit_price is not None and t.pnl is not None]
-    losers = [t for t in closed if float(t.pnl or 0) < 0]
+    losers = [t for t in closed if (t.pnl or Decimal("0")) < 0]
 
     exit_reasons: dict[str, int] = defaultdict(int)
     for t in losers:
@@ -216,17 +216,17 @@ def _compute_failure_patterns(trades: list[Trade]) -> dict:
     max_streak = 0
     current_streak = 0
     for t in sorted(closed, key=lambda x: x.entry_time or datetime.min):
-        if float(t.pnl or 0) < 0:
+        if (t.pnl or Decimal("0")) < 0:
             current_streak += 1
             max_streak = max(max_streak, current_streak)
         else:
             current_streak = 0
     streak = current_streak
 
-    avg_loss = round(sum(float(t.pnl or 0) for t in losers) / len(losers), 2) if losers else None
-    max_loss = round(min(float(t.pnl or 0) for t in losers), 2) if losers else None
+    avg_loss = round(sum(t.pnl or Decimal("0") for t in losers) / len(losers), 2) if losers else None
+    max_loss = round(min(t.pnl or Decimal("0") for t in losers), 2) if losers else None
 
-    no_stop_losses = [t for t in losers if not t.stop_price or float(t.stop_price) <= 0]
+    no_stop_losses = [t for t in losers if not t.stop_price or (t.stop_price or Decimal("0")) <= 0]
     missing_stop_rate = round(len(no_stop_losses) / len(losers) * 100, 1) if losers else None
 
     failure_insights = []
@@ -274,13 +274,13 @@ def _compute_behavior_crossover(db: Session, trades: list[Trade]) -> dict:
     for g in all_grades:
         grade_by_trade[g.trade_id] = g
 
-    emotion_agg: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
-    grade_agg: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
+    emotion_agg: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": Decimal("0")})
+    grade_agg: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": Decimal("0")})
 
     for t in trades:
         if t.exit_price is None or t.pnl is None:
             continue
-        pnl = float(t.pnl)
+        pnl = t.pnl
         is_win = pnl > 0
 
         for e in emotion_by_trade.get(t.id, []):
@@ -333,7 +333,7 @@ def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) ->
             if not closed:
                 results.append({"tactic": tactic_name, "trade_count": len(tactic_trades_list), "closed_count": 0})
                 continue
-            pnls = [float(t.pnl) for t in closed]
+            pnls = [t.pnl for t in closed]
             wins = [p for p in pnls if p > 0]
             results.append({
                 "tactic": tactic_name,
@@ -361,7 +361,7 @@ def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) ->
         closed = [t for t in t_list if t.exit_price is not None and t.pnl is not None]
         if not t_list:
             continue
-        pnls = [float(t.pnl) for t in closed] if closed else []
+        pnls = [t.pnl for t in closed] if closed else []
         wins = [p for p in pnls if p > 0]
         results.append({
             "tactic": name,
@@ -374,7 +374,7 @@ def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) ->
 
     if uncategorized:
         closed = [t for t in uncategorized if t.exit_price is not None and t.pnl is not None]
-        pnls = [float(t.pnl) for t in closed] if closed else []
+        pnls = [t.pnl for t in closed] if closed else []
         wins = [p for p in pnls if p > 0]
         results.append({
             "tactic": "Other",

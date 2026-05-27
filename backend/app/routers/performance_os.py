@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta, datetime
 from typing import Optional
+from decimal import Decimal
 import calendar
 
 from app.db.database import get_db
@@ -267,6 +268,8 @@ def update_weekly_review(week_start: date, payload: WeeklyReviewUpdate, db: Sess
     return WeeklyReviewResponse.model_validate(review)
 
 
+from decimal import Decimal
+
 def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailResponse:
     week_end_dt = datetime.combine(review.week_end, datetime.max.time())
     week_start_dt = datetime.combine(review.week_start, datetime.min.time())
@@ -276,8 +279,8 @@ def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailRespo
         Trade.entry_time <= week_end_dt,
     ).all()
     closed = [t for t in trades if t.exit_price is not None]
-    wins = [t for t in closed if t.pnl and float(t.pnl) > 0]
-    total_pnl = sum(float(t.pnl or 0) for t in closed)
+    wins = [t for t in closed if t.pnl and t.pnl > 0]
+    total_pnl = sum(t.pnl or Decimal("0") for t in closed)
     win_rate = len(wins) / len(closed) if closed else 0
 
     update_data = {
@@ -285,8 +288,8 @@ def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailRespo
         "win_rate": f"{win_rate:.1%}" if closed else None,
     }
     if closed:
-        best = max(closed, key=lambda t: float(t.pnl or 0))
-        worst = min(closed, key=lambda t: float(t.pnl or 0))
+        best = max(closed, key=lambda t: t.pnl or Decimal("0"))
+        worst = min(closed, key=lambda t: t.pnl or Decimal("0"))
         update_data["best_trade_id"] = best.id
         update_data["worst_trade_id"] = worst.id
         setups = {}
@@ -316,7 +319,7 @@ def _enrich_weekly(db: Session, review: WeeklyReview) -> WeeklyReviewDetailRespo
     for offset in range(5):
         day = review.week_start + timedelta(days=offset)
         day_trades = [t for t in trades if t.entry_time and t.entry_time.date() == day]
-        day_pnl = sum(float(t.pnl or 0) for t in day_trades if t.exit_price)
+        day_pnl = sum(t.pnl or Decimal("0") for t in day_trades if t.exit_price)
         daily_breakdown.append({"date": day.isoformat(), "trades": len(day_trades), "pnl": f"{day_pnl:.2f}"})
 
     return WeeklyReviewDetailResponse(
@@ -393,8 +396,8 @@ def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailRe
     for t in closed:
         s = t.setup or "Unknown"
         if s not in setups:
-            setups[s] = {"pnl": 0, "count": 0}
-        setups[s]["pnl"] += float(t.pnl or 0)
+            setups[s] = {"pnl": Decimal("0"), "count": 0}
+        setups[s]["pnl"] += t.pnl or Decimal("0")
         setups[s]["count"] += 1
     best_setup = max(setups, key=lambda s: setups[s]["pnl"]) if setups else None
     worst_setup = min(setups, key=lambda s: setups[s]["pnl"]) if setups else None
