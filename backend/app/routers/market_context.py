@@ -15,7 +15,7 @@ GET  /api/v1/market/live-quotes                — get cached live quotes
 POST /api/v1/market/sync-quotes                — fetch + cache fresh live quotes
 """
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from decimal import Decimal
 from collections import defaultdict
@@ -650,7 +650,7 @@ def get_live_quotes(
 ):
     """Get cached live quotes for all tracked stocks."""
     quotes = db.query(LiveQuote).order_by(LiveQuote.symbol).all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     status_counts: dict[str, int] = defaultdict(int)
     quote_rows = []
     for q in quotes:

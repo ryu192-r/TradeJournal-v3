@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from typing import Optional
 from decimal import Decimal
 import calendar
@@ -262,7 +262,7 @@ def update_weekly_review(week_start: date, payload: WeeklyReviewUpdate, db: Sess
         raise HTTPException(404, "Weekly review not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(review, k, v)
-    review.updated_at = datetime.utcnow()
+    review.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(review)
     return WeeklyReviewResponse.model_validate(review)
@@ -363,7 +363,7 @@ def update_monthly_review(month: str, payload: MonthlyReviewUpdate, db: Session 
         raise HTTPException(404, "Monthly review not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(review, k, v)
-    review.updated_at = datetime.utcnow()
+    review.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(review)
     return MonthlyReviewResponse.model_validate(review)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Optional, List
 
@@ -56,7 +56,7 @@ logger = get_logger(__name__)
 @router.post("/", response_model=AccountResponse, status_code=status.HTTP_201_CREATED)
 def create_account(acc: AccountCreate, db: Session = Depends(get_db)):
     """Create a new trading account."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     db_account = Account(
         name=acc.name,
         broker=acc.broker,
@@ -108,7 +108,7 @@ def update_account(account_id: int, acc_update: AccountUpdate, db: Session = Dep
         if value is not None:
             setattr(db_account, field, value)
 
-    db_account.updated_at = datetime.utcnow()
+    db_account.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(db_account)
 
@@ -148,7 +148,7 @@ def rebalance_account_balance(account_id: int, body: RebalanceBody, db: Session 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
     db_account.current_balance = body.new_balance
-    db_account.updated_at = datetime.utcnow()
+    db_account.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(db_account)
 
