@@ -207,6 +207,7 @@ async def import_broker_csv(
     added = 0
     merged = 0
     setups_seen = set()
+    preview_rows = []
     for row in rows:
         symbol = row.get("symbol", "").upper()[:20]
         if not symbol:
@@ -256,6 +257,11 @@ async def import_broker_csv(
             added += 1
         if trade.setup:
             setups_seen.add(trade.setup)
+        preview_rows.append({
+            "symbol": symbol,
+            "entry_price": str(entry_price),
+            "quantity": str(quantity),
+        })
 
     for setup_name in setups_seen:
         _update_setup_stats(db, setup_name, user_id=current_user.id)
@@ -263,7 +269,7 @@ async def import_broker_csv(
     db.commit()
     account = db.query(Account).filter(Account.user_id == current_user.id).first()
     if account:
-        _reconcile_account(account.id, db)
+        _reconcile_account(account.id, db, user_id=current_user.id)
 
     return {
         "status": "success",
@@ -271,7 +277,7 @@ async def import_broker_csv(
         "merged": merged,
         "total": len(rows),
         "errors": errors,
-        "preview": preview,
+        "preview": preview_rows[:50],
     }
 
 

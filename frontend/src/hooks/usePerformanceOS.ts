@@ -1,15 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getDailyDashboard, updateDailyWorkflow, advanceWorkflowPhase, resetWorkflow,
-  getCurrentWeeklyReview, getWeeklyReview, updateWeeklyReview,
-  getCurrentMonthlyReview, getMonthlyReview, updateMonthlyReview,
+  ensureWorkflow, getDailyDashboard, updateDailyWorkflow, advanceWorkflowPhase, resetWorkflow,
+  enrichWeeklyReview, updateWeeklyReview,
+  enrichMonthlyReview, updateMonthlyReview,
 } from '@/lib/endpoints'
 import type { DailyWorkflowUpdate, WeeklyReviewUpdate, MonthlyReviewUpdate } from '@/types/performanceOs'
 
 export function useDailyDashboard(date?: string) {
   return useQuery({
     queryKey: ['daily-dashboard', date ?? 'today'],
-    queryFn: () => getDailyDashboard(date),
+    queryFn: async () => {
+      await ensureWorkflow(date)
+      return getDailyDashboard(date)
+    },
     placeholderData: (previousData) => previousData,
   })
 }
@@ -41,7 +44,7 @@ export function useResetWorkflow(date: string) {
 export function useWeeklyReview(weekStart?: string) {
   return useQuery({
     queryKey: ['weekly-review', weekStart ?? 'current'],
-    queryFn: () => weekStart ? getWeeklyReview(weekStart) : getCurrentWeeklyReview(),
+    queryFn: () => enrichWeeklyReview(weekStart),
     placeholderData: (previousData) => previousData,
   })
 }
@@ -57,7 +60,7 @@ export function useUpdateWeeklyReview(weekStart: string) {
 export function useMonthlyReview(month?: string) {
   return useQuery({
     queryKey: ['monthly-review', month ?? 'current'],
-    queryFn: () => month ? getMonthlyReview(month) : getCurrentMonthlyReview(),
+    queryFn: () => enrichMonthlyReview(month),
     placeholderData: (previousData) => previousData,
   })
 }

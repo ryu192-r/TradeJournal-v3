@@ -210,7 +210,7 @@ class TradeIdeaService:
         if new_trade:
             from app.services.capital_service import _auto_reconcile
             from app.services.setup_playbook_service import _update_setup_stats
-            _auto_reconcile(db)
+            _auto_reconcile(db, user_id=user_id)
             _update_setup_stats(db, new_trade.setup, user_id=user_id)
 
         return db_idea, new_trade

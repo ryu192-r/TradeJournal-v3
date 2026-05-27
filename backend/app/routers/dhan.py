@@ -76,7 +76,7 @@ def sync_dhan_trades(
 
     for setup_name in setups_seen:
         _update_setup_stats(db, setup_name, user_id=current_user.id)
-    _auto_reconcile(db)
+    _auto_reconcile(db, user_id=current_user.id)
     db.commit()
 
     return {

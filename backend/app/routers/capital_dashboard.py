@@ -153,8 +153,14 @@ def _compute_tiers(net_equity: Decimal, db: Session) -> tuple[list[dict], Option
 # ───────────────────────── Helpers ─────────────────────────
 
 
-def _get_partial_exits_by_trade(db: Session) -> dict[int, list[PartialExit]]:
-    all_partials = db.query(PartialExit).order_by(PartialExit.exit_time.asc()).all()
+def _get_partial_exits_by_trade(db: Session, user_id: int) -> dict[int, list[PartialExit]]:
+    all_partials = (
+        db.query(PartialExit)
+        .join(Trade)
+        .filter(Trade.user_id == user_id, Trade.status != "deleted")
+        .order_by(PartialExit.exit_time.asc())
+        .all()
+    )
     by_trade: dict[int, list[PartialExit]] = defaultdict(list)
     for pe in all_partials:
         by_trade[pe.trade_id].append(pe)
@@ -212,7 +218,7 @@ def get_capital_dashboard(db: Session = Depends(get_db), current_user: User = De
         ))
 
     # Load all partial exits indexed by trade_id
-    pe_by_trade = _get_partial_exits_by_trade(db)
+    pe_by_trade = _get_partial_exits_by_trade(db, current_user.id)
 
     # ── Realized PnL: closed trade pnl + partial exit realized_pnl from open trades ──
     closed_trades = (

@@ -567,6 +567,10 @@ export function syncLiveQuotes() {
 
 // ────────────────────────── Performance OS ──────────────────────────
 
+export function ensureWorkflow(date?: string) {
+  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>('/perf-os/workflow', { date: date || undefined }).then(r => r.data)
+}
+
 export function getDailyDashboard(date?: string) {
   const path = date ? `/perf-os/workflow/${date}` : '/perf-os/workflow/today'
   return apiClient.get<import('@/types/performanceOs').DailyDashboard>(path).then(r => r.data)
@@ -584,8 +588,8 @@ export function resetWorkflow(date: string) {
   return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/reset`).then(r => r.data)
 }
 
-export function getCurrentWeeklyReview() {
-  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>('/perf-os/weekly/current').then(r => r.data)
+export function enrichWeeklyReview(weekStart?: string) {
+  return apiClient.post<import('@/types/performanceOs').WeeklyReviewDetail>('/perf-os/enrich/weekly', { week_start: weekStart || undefined }).then(r => r.data)
 }
 
 export function getWeeklyReview(weekStart: string) {
@@ -596,8 +600,8 @@ export function updateWeeklyReview(weekStart: string, payload: import('@/types/p
   return apiClient.put<import('@/types/performanceOs').WeeklyReview>(`/perf-os/weekly/${weekStart}`, payload).then(r => r.data)
 }
 
-export function getCurrentMonthlyReview() {
-  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>('/perf-os/monthly/current').then(r => r.data)
+export function enrichMonthlyReview(month?: string) {
+  return apiClient.post<import('@/types/performanceOs').MonthlyReviewDetail>('/perf-os/enrich/monthly', { month: month || undefined }).then(r => r.data)
 }
 
 export function getMonthlyReview(month: string) {

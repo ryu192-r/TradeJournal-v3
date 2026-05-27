@@ -23,3 +23,9 @@ def test_rate_limit_unauthenticated_health_not_limited(client):
     for _ in range(5):
         resp = client.get("/api/v1/health")
         assert resp.status_code == 200
+
+
+def test_uploads_route_not_available_in_production(client):
+    """Public /uploads route must NOT be served when DEBUG=False."""
+    resp = client.get("/uploads/")
+    assert resp.status_code in (404, 405), "StaticFiles should not be mounted in production"

@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List, Optional
 from decimal import Decimal
+import io
 import os
 import uuid
 import shutil
+from PIL import Image
 
 from app.schemas.trade import TradeCreate, TradeUpdate, TradeResponse, TradeListResponse, PyramidTradeRequest, OpenLiveTradeResponse
 from app.schemas.stop_history import StopHistoryCreate, StopHistoryResponse, StopHistoryListResponse
@@ -15,6 +17,7 @@ from app.models.stop_history import StopHistory
 from app.models.trade_timeline import TradeTimeline
 from app.models.partial_exit import PartialExit
 from app.models.capital_event import CapitalEvent
+from app.models.account import Account
 from app.models.user import User
 from app.services.trade_service import TradeService
 from app.services.capital_service import _auto_reconcile
@@ -22,6 +25,8 @@ from app.services.setup_playbook_service import _update_setup_stats
 from app.db.database import get_db
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_user_trade_or_404, scoped_trade_query
+
+ALLOWED_EXT = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 
 def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
@@ -84,12 +89,20 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
 
 
 def _resolve_upload_path(url: str) -> str:
-    prefix = "/uploads/"
-    if not url.startswith(prefix):
+    old_prefix = "/uploads/"
+    new_prefix = "/api/v1/trades/"
+    upload_root = os.path.abspath(settings.UPLOAD_DIR)
+
+    if url.startswith(new_prefix):
+        parts = url[len(new_prefix):].split("/", 2)
+        if len(parts) < 3 or parts[1] != "images":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload URL")
+        rel_path = os.path.join(parts[0], parts[2])
+    elif url.startswith(old_prefix):
+        rel_path = url[len(old_prefix):]
+    else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload URL")
 
-    rel_path = url[len(prefix):]
-    upload_root = os.path.abspath(settings.UPLOAD_DIR)
     filepath = os.path.abspath(os.path.join(upload_root, rel_path))
     if os.path.commonpath([upload_root, filepath]) != upload_root:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload URL")
@@ -380,10 +393,20 @@ def upload_chart_image(
 ):
     trade = get_user_trade_or_404(db, trade_id, current_user.id)
 
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image")
+    ext = os.path.splitext(file.filename or "chart.png")[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"File type {ext} not allowed. Allowed: {', '.join(sorted(ALLOWED_EXT))}")
 
-    ext = os.path.splitext(file.filename or "chart.png")[1] or ".png"
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    raw = file.file.read()
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"File too large. Max {settings.MAX_UPLOAD_SIZE_MB}MB")
+
+    try:
+        Image.open(io.BytesIO(raw)).verify()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File content does not match a valid image format")
+
     filename = f"{trade_id}_{uuid.uuid4().hex[:8]}{ext}"
     upload_dir = os.path.join(settings.UPLOAD_DIR, str(trade_id))
     os.makedirs(upload_dir, exist_ok=True)
@@ -391,11 +414,11 @@ def upload_chart_image(
 
     try:
         with open(filepath, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            f.write(raw)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save file: {e}")
 
-    url = f"/uploads/{trade_id}/{filename}"
+    url = f"/api/v1/trades/{trade_id}/images/{filename}"
     images = [i for i in (trade.chart_images or []) if i] + [url]
     trade.chart_images = images
     db.commit()
@@ -435,6 +458,9 @@ def serve_chart_image(
     current_user: User = Depends(get_current_user),
 ):
     trade = get_user_trade_or_404(db, trade_id, current_user.id)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image type")
     upload_dir = os.path.abspath(os.path.join(settings.UPLOAD_DIR, str(trade_id)))
     filepath = os.path.abspath(os.path.join(upload_dir, filename))
     if os.path.commonpath([upload_dir, filepath]) != upload_dir:
@@ -460,14 +486,17 @@ def soft_delete_trade(
     db.add(timeline)
 
     if trade.pnl is not None:
-        deletion_event = CapitalEvent(
-            event_type="trade_deletion",
-            amount=trade.pnl,
-            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
-            description=f"Soft-deleted trade: {trade.symbol} (PnL removed)",
-            trade_id=trade.id,
-        )
-        db.add(deletion_event)
+        account = db.query(Account).filter(Account.user_id == current_user.id).order_by(Account.id).first()
+        if account:
+            deletion_event = CapitalEvent(
+                account_id=account.id,
+                event_type="trade_deletion",
+                amount=trade.pnl,
+                timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+                description=f"Soft-deleted trade: {trade.symbol} (PnL removed)",
+                trade_id=trade.id,
+            )
+            db.add(deletion_event)
 
     _auto_reconcile(db, user_id=current_user.id)
     _update_setup_stats(db, trade.setup, user_id=current_user.id)

@@ -5,7 +5,7 @@ import {
   Loader2, ArrowRight,
 } from 'lucide-react'
 import { useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow } from '@/hooks/usePerformanceOS'
-import { getCurrentWeeklyReview, updateWeeklyReview, getCurrentMonthlyReview, updateMonthlyReview } from '@/lib/endpoints'
+import { enrichWeeklyReview, updateWeeklyReview, enrichMonthlyReview, updateMonthlyReview } from '@/lib/endpoints'
 import { useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJournalMutation'
 import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
 import { cn } from '@/lib/utils'
@@ -561,7 +561,7 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
   const qc = useQueryClient()
   const { data: review, isLoading: reviewLoading } = useQuery({
     queryKey: ['weekly-review', 'current'],
-    queryFn: () => getCurrentWeeklyReview(),
+    queryFn: () => enrichWeeklyReview(),
   })
   const updateMut = useMutation({
     mutationFn: (data: import('@/types/performanceOs').WeeklyReviewUpdate) => updateWeeklyReview(review?.week_start ?? '', data),
@@ -672,7 +672,7 @@ function MonthlyReviewSection() {
   const qc = useQueryClient()
   const { data: review, isLoading } = useQuery({
     queryKey: ['monthly-review', 'current'],
-    queryFn: () => getCurrentMonthlyReview(),
+    queryFn: () => enrichMonthlyReview(),
   })
   const updateMut = useMutation({
     mutationFn: (data: import('@/types/performanceOs').MonthlyReviewUpdate) => updateMonthlyReview(review?.month ?? '', data),

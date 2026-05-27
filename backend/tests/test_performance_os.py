@@ -13,7 +13,7 @@ from app.models.daily_journal import DailyJournal
 from app.models.performance_os import MonthlyReview
 from app.models.trade import Trade
 from app.models.user import User
-from app.routers.performance_os import _enrich_monthly, get_workflow_by_date
+from app.routers.performance_os import _enrich_monthly, get_workflow_by_date, ensure_workflow, WorkflowEnsureRequest
 
 _email_counter = count(1)
 
@@ -71,6 +71,7 @@ def test_workflow_by_date_returns_same_journal_shape_as_today(db_session):
     )
     db_session.commit()
 
+    ensure_workflow(WorkflowEnsureRequest(date="2025-01-13"), db_session, current_user=user)
     data = get_workflow_by_date(target, db_session, current_user=user)
 
     assert data.journal == {

@@ -254,3 +254,34 @@ def test_two_closed_trades_same_day_merge(client, auth_user_token):
     t2 = body2.get("data", body2)
     assert t2["id"] == t1_id, "Two closed entries same day should merge"
     assert float(t2["quantity"]) == 15
+
+
+def test_soft_delete_no_orphan_capital_event(client, auth_user_token):
+    """Soft-deleting a trade without an account should not create a CapitalEvent."""
+    from app.models.capital_event import CapitalEvent
+    from app.db.database import SessionLocal
+    from app.models.trade import Trade
+    r = _create(client, auth_user_token)
+    body = r.json()
+    trade_id = body.get("data", body)["id"]
+    _delete(client, auth_user_token, trade_id)
+    db = SessionLocal()
+    try:
+        orphans = db.query(CapitalEvent).filter(CapitalEvent.trade_id == trade_id).all()
+        assert len(orphans) == 0
+    finally:
+        db.close()
+
+
+def test_broker_import_response_shape(client, auth_user_token):
+    """Broker import response must include a preview key (even empty list)."""
+    csv_content = "symbol,entry_price,quantity,entry_time\nRELIANCE,2500,10,2025-01-13 09:30:00"
+    resp = client.post(
+        "/api/v1/trades/import?broker=generic&dry_run=true",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+        files={"file": ("trades.csv", csv_content, "text/csv")},
+    )
+    assert resp.status_code in (200, 201), resp.text
+    data = resp.json()
+    assert "preview" in data, "Response must have a preview key"
+    assert isinstance(data["preview"], list)

@@ -24,6 +24,9 @@ def _reconcile_account(account_id: int, db: Session, user_id: Optional[int] = No
     if not account:
         return Decimal("0")
 
+    # Use account's user_id for trade scoping if no explicit user_id provided
+    effective_user_id = user_id if user_id is not None else account.user_id
+
     initial = ensure_decimal(account.initial_balance)
     current = ensure_decimal(account.current_balance)
 
@@ -36,18 +39,18 @@ def _reconcile_account(account_id: int, db: Session, user_id: Optional[int] = No
     # Realized PnL (non-deleted, closed trades) — scoped to user
     realized_pnl = Decimal("0")
     closed_query = db.query(Trade).filter(Trade.pnl.isnot(None), Trade.status != "deleted")
-    if user_id is not None:
-        closed_query = closed_query.filter(Trade.user_id == user_id)
+    if effective_user_id is not None:
+        closed_query = closed_query.filter(Trade.user_id == effective_user_id)
     closed_trades = closed_query.all()
     for t in closed_trades:
         realized_pnl += ensure_decimal(t.pnl)
 
-    # Open trades: partial exit realized PnL + deployed capital (remaining qty after partial exits)
+    # Open trades: partial exit realized PnL + deployed capital
     partial_realized = Decimal("0")
     deployed = Decimal("0")
     open_query = db.query(Trade).filter(Trade.exit_price.is_(None), Trade.status != "deleted")
-    if user_id is not None:
-        open_query = open_query.filter(Trade.user_id == user_id)
+    if effective_user_id is not None:
+        open_query = open_query.filter(Trade.user_id == effective_user_id)
     open_trades_list = open_query.all()
     for t in open_trades_list:
         partials = db.query(PartialExit).filter(PartialExit.trade_id == t.id).all()

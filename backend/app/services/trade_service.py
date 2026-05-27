@@ -242,6 +242,8 @@ class TradeService:
 
     def create_from_dhan_leg(self, leg, direction: str = "LONG", is_open: bool = True, user_id: Optional[int] = None) -> Trade:
         """Map a Dhan trade leg to our Trade model."""
+        if user_id is None:
+            raise ValueError("user_id required for Dhan trade creation")
         entry_price = None
         exit_price = None
         entry_time = None
@@ -263,12 +265,15 @@ class TradeService:
             "exit_time": exit_time,
             "fees": Decimal("0"),
             "status": "open",
+            "user_id": user_id,
         }
         trade, _ = self.merge_or_create(trade_data)
         return trade
 
     def find_or_create_pair(self, open_leg, close_leg, direction: str = "LONG", user_id: Optional[int] = None) -> Trade:
         """Match OPEN and CLOSE legs into a single trade, merging by (symbol, date)."""
+        if user_id is None:
+            raise ValueError("user_id required for Dhan trade creation")
         entry_time = _to_ist_naive(datetime.fromisoformat(open_leg.order_timestamp.replace("Z", "+00:00")))
         exit_time = _to_ist_naive(datetime.fromisoformat(close_leg.order_timestamp.replace("Z", "+00:00"))) if close_leg else None
 
@@ -282,6 +287,7 @@ class TradeService:
             "exit_time": exit_time,
             "fees": Decimal("0"),
             "status": "open",
+            "user_id": user_id,
         }
         trade, _ = self.merge_or_create(trade_data)
         return trade

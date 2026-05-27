@@ -21,19 +21,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _get_first_user_id():
-    """Return the id of the first user, or create one if none exists."""
     conn = op.get_bind()
     user = conn.execute(sa.text("SELECT id FROM users ORDER BY id ASC LIMIT 1")).fetchone()
     if user:
         return user[0]
-    # Create a default admin user so orphaned rows have a home
-    conn.execute(sa.text(
-        "INSERT INTO users (email, full_name, hashed_password, is_active) "
-        "VALUES ('admin@default.local', 'Default Admin', "
-        "'$2b$12$placeholder', true)"
-    ))
-    result = conn.execute(sa.text("SELECT id FROM users WHERE email = 'admin@default.local'")).fetchone()
-    return result[0]
+    return None
+
+
+def _backfill_or_fail(table: str, user_id: int | None):
+    conn = op.get_bind()
+    result = conn.execute(sa.text(f"SELECT COUNT(*) FROM {table} WHERE user_id IS NULL"))
+    count = result.scalar()
+    if count == 0:
+        return
+    if user_id is None:
+        # There are data rows but no user to assign them to — this is a bad state.
+        # Cli must create a user first and re-run migration.
+        raise RuntimeError(
+            f"Migration cannot proceed: {table} has {count} orphaned rows but no users exist. "
+            "Create a user in the database first, then re-run this migration."
+        )
+    conn.execute(sa.text(f"UPDATE {table} SET user_id = {user_id} WHERE user_id IS NULL"))
 
 
 def upgrade() -> None:
@@ -42,7 +50,7 @@ def upgrade() -> None:
 
     # ── TRADES ──
     op.add_column('trades', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE trades SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('trades', first_user_id)
     op.alter_column('trades', 'user_id', nullable=False)
     op.create_foreign_key('fk_trades_user_id', 'trades', 'users', ['user_id'], ['id'])
     op.create_index('ix_trades_user_id', 'trades', ['user_id'])
@@ -51,38 +59,35 @@ def upgrade() -> None:
 
     # ── ACCOUNTS ──
     op.add_column('accounts', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE accounts SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('accounts', first_user_id)
     op.alter_column('accounts', 'user_id', nullable=False)
     op.create_foreign_key('fk_accounts_user_id', 'accounts', 'users', ['user_id'], ['id'])
     op.create_index('ix_accounts_user_id', 'accounts', ['user_id'])
 
     # ── COACH_REVIEWS ──
     op.add_column('coach_reviews', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE coach_reviews SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('coach_reviews', first_user_id)
     op.alter_column('coach_reviews', 'user_id', nullable=False)
     op.create_foreign_key('fk_coach_reviews_user_id', 'coach_reviews', 'users', ['user_id'], ['id'])
     op.create_index('ix_coach_reviews_user_id', 'coach_reviews', ['user_id'])
 
     # ── TRADE_IDEAS ──
     op.add_column('trade_ideas', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE trade_ideas SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('trade_ideas', first_user_id)
     op.alter_column('trade_ideas', 'user_id', nullable=False)
     op.create_foreign_key('fk_trade_ideas_user_id', 'trade_ideas', 'users', ['user_id'], ['id'])
     op.create_index('ix_trade_ideas_user_id', 'trade_ideas', ['user_id'])
 
     # ── DAILY_JOURNALS — make user_id NOT NULL and add composite unique ──
-    # (user_id may already exist as nullable from previous migration)
-    conn.execute(sa.text(
-        f"UPDATE daily_journals SET user_id = {first_user_id} WHERE user_id IS NULL"
-    ))
+    _backfill_or_fail('daily_journals', first_user_id)
     try:
         op.alter_column('daily_journals', 'user_id', nullable=False)
     except Exception:
-        pass  # already non-nullable or has values
+        pass
     try:
         op.drop_constraint('daily_journals_date_key', 'daily_journals', type_='unique')
     except Exception:
-        pass  # may not exist
+        pass
     try:
         op.drop_index('ix_daily_journals_date', table_name='daily_journals')
     except Exception:
@@ -94,7 +99,7 @@ def upgrade() -> None:
 
     # ── DAILY_WORKFLOWS ──
     op.add_column('daily_workflows', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE daily_workflows SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('daily_workflows', first_user_id)
     op.alter_column('daily_workflows', 'user_id', nullable=False)
     op.create_foreign_key('fk_daily_workflows_user_id', 'daily_workflows', 'users', ['user_id'], ['id'])
     op.create_index('ix_daily_workflows_user_id', 'daily_workflows', ['user_id'])
@@ -113,7 +118,7 @@ def upgrade() -> None:
 
     # ── WEEKLY_REVIEWS ──
     op.add_column('weekly_reviews', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE weekly_reviews SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('weekly_reviews', first_user_id)
     op.alter_column('weekly_reviews', 'user_id', nullable=False)
     op.create_foreign_key('fk_weekly_reviews_user_id', 'weekly_reviews', 'users', ['user_id'], ['id'])
     op.create_index('ix_weekly_reviews_user_id', 'weekly_reviews', ['user_id'])
@@ -132,7 +137,7 @@ def upgrade() -> None:
 
     # ── MONTHLY_REVIEWS ──
     op.add_column('monthly_reviews', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE monthly_reviews SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('monthly_reviews', first_user_id)
     op.alter_column('monthly_reviews', 'user_id', nullable=False)
     op.create_foreign_key('fk_monthly_reviews_user_id', 'monthly_reviews', 'users', ['user_id'], ['id'])
     op.create_index('ix_monthly_reviews_user_id', 'monthly_reviews', ['user_id'])
@@ -151,7 +156,7 @@ def upgrade() -> None:
 
     # ── MARKET_SNAPSHOTS ──
     op.add_column('market_snapshots', sa.Column('user_id', sa.Integer(), nullable=True))
-    conn.execute(sa.text(f"UPDATE market_snapshots SET user_id = {first_user_id} WHERE user_id IS NULL"))
+    _backfill_or_fail('market_snapshots', first_user_id)
     op.alter_column('market_snapshots', 'user_id', nullable=False)
     op.create_foreign_key('fk_market_snapshots_user_id', 'market_snapshots', 'users', ['user_id'], ['id'])
     op.create_index('ix_market_snapshots_user_id', 'market_snapshots', ['user_id'])

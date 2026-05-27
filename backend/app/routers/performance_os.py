@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta, datetime, timezone
@@ -103,7 +104,9 @@ def _phase_progress(wf: DailyWorkflow) -> dict:
 @router.get("/workflow/today", response_model=DailyWorkflowDashboardResponse)
 def get_today_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     today = date.today()
-    wf = _get_or_create_workflow(db, today, current_user.id)
+    wf = db.query(DailyWorkflow).filter(DailyWorkflow.date == today, DailyWorkflow.user_id == current_user.id).first()
+    if wf is None:
+        raise HTTPException(404, "Workflow not found. POST /perf-os/workflow to create one.")
     journal = db.query(DailyJournal).filter(DailyJournal.date == today, DailyJournal.user_id == current_user.id).first()
     regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == today, MarketSnapshot.user_id == current_user.id).first()
 
@@ -132,7 +135,9 @@ def get_today_dashboard(db: Session = Depends(get_db), current_user: User = Depe
 
 @router.get("/workflow/{d}", response_model=DailyWorkflowDashboardResponse)
 def get_workflow_by_date(d: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    wf = _get_or_create_workflow(db, d, current_user.id)
+    wf = db.query(DailyWorkflow).filter(DailyWorkflow.date == d, DailyWorkflow.user_id == current_user.id).first()
+    if wf is None:
+        raise HTTPException(404, "Workflow not found. POST /perf-os/workflow to create one.")
     journal = db.query(DailyJournal).filter(DailyJournal.date == d, DailyJournal.user_id == current_user.id).first()
     regime = db.query(MarketSnapshot).filter(MarketSnapshot.date == d, MarketSnapshot.user_id == current_user.id).first()
 
@@ -237,13 +242,10 @@ def _week_range(d: date) -> tuple[date, date]:
 @router.get("/weekly/current", response_model=WeeklyReviewDetailResponse)
 def get_current_weekly_review(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     today = date.today()
-    week_start, week_end = _week_range(today)
+    week_start, _ = _week_range(today)
     review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start, WeeklyReview.user_id == current_user.id).first()
     if review is None:
-        review = WeeklyReview(week_start=week_start, week_end=week_end, user_id=current_user.id)
-        db.add(review)
-        db.commit()
-        db.refresh(review)
+        raise HTTPException(404, "Weekly review not found. POST /perf-os/enrich/weekly to create one.")
     return _enrich_weekly(db, review, current_user.id)
 
 
@@ -251,12 +253,61 @@ def get_current_weekly_review(db: Session = Depends(get_db), current_user: User 
 def get_weekly_review(week_start: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     review = db.query(WeeklyReview).filter(WeeklyReview.week_start == week_start, WeeklyReview.user_id == current_user.id).first()
     if review is None:
-        week_end = week_start + timedelta(days=4)
-        review = WeeklyReview(week_start=week_start, week_end=week_end, user_id=current_user.id)
+        raise HTTPException(404, "Weekly review not found. POST /perf-os/enrich/weekly to create one.")
+    return _enrich_weekly(db, review, current_user.id)
+
+
+# ── Enrich endpoints (idempotent create-or-enrich) ──
+
+
+class EnrichWeeklyRequest(BaseModel):
+    week_start: Optional[str] = None
+
+
+class EnrichMonthlyRequest(BaseModel):
+    month: Optional[str] = None
+
+
+class WorkflowEnsureRequest(BaseModel):
+    date: Optional[str] = None
+
+
+@router.post("/enrich/weekly", response_model=WeeklyReviewDetailResponse, status_code=201)
+def enrich_weekly_review(payload: EnrichWeeklyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if payload.week_start:
+        ws = datetime.strptime(payload.week_start, "%Y-%m-%d").date()
+    else:
+        ws, _ = _week_range(date.today())
+    we = ws + timedelta(days=4)
+    review = db.query(WeeklyReview).filter(WeeklyReview.week_start == ws, WeeklyReview.user_id == current_user.id).first()
+    if review is None:
+        review = WeeklyReview(week_start=ws, week_end=we, user_id=current_user.id)
         db.add(review)
         db.commit()
         db.refresh(review)
     return _enrich_weekly(db, review, current_user.id)
+
+
+@router.post("/enrich/monthly", response_model=MonthlyReviewDetailResponse, status_code=201)
+def enrich_monthly_review(payload: EnrichMonthlyRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mon = payload.month or date.today().strftime("%Y-%m")
+    review = db.query(MonthlyReview).filter(MonthlyReview.month == mon, MonthlyReview.user_id == current_user.id).first()
+    if review is None:
+        review = MonthlyReview(month=mon, user_id=current_user.id)
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+    return _enrich_monthly(db, review, current_user.id)
+
+
+@router.post("/workflow", response_model=DailyWorkflowResponse, status_code=201)
+def ensure_workflow(payload: WorkflowEnsureRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if payload.date:
+        d = datetime.strptime(payload.date, "%Y-%m-%d").date()
+    else:
+        d = date.today()
+    wf = _get_or_create_workflow(db, d, current_user.id)
+    return DailyWorkflowResponse.model_validate(wf)
 
 
 @router.put("/weekly/{week_start}", response_model=WeeklyReviewResponse)
@@ -288,37 +339,20 @@ def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyRev
     total_pnl = sum(t.pnl or Decimal("0") for t in closed)
     win_rate = len(wins) / len(closed) if closed else 0
 
-    update_data = {
-        "total_trades": len(trades), "total_pnl": f"{total_pnl:.2f}",
-        "win_rate": f"{win_rate:.1%}" if closed else None,
-    }
+    best_trade = None
+    worst_trade = None
+    top_setup = None
     if closed:
         best = max(closed, key=lambda t: t.pnl or Decimal("0"))
         worst = min(closed, key=lambda t: t.pnl or Decimal("0"))
-        update_data["best_trade_id"] = best.id
-        update_data["worst_trade_id"] = worst.id
+        best_trade = {"id": best.id, "symbol": best.symbol, "pnl": str(best.pnl)} if best.pnl else None
+        worst_trade = {"id": worst.id, "symbol": worst.symbol, "pnl": str(worst.pnl)} if worst.pnl else None
         setups = {}
         for t in closed:
             s = t.setup or "Unknown"
             setups[s] = setups.get(s, 0) + 1
         if setups:
-            update_data["top_setup"] = max(setups, key=setups.get)
-
-    for k, v in update_data.items():
-        setattr(review, k, v)
-    db.commit()
-    db.refresh(review)
-
-    best_trade = None
-    if review.best_trade_id:
-        bt = db.query(Trade).get(review.best_trade_id)
-        if bt:
-            best_trade = {"id": bt.id, "symbol": bt.symbol, "pnl": str(bt.pnl)}
-    worst_trade = None
-    if review.worst_trade_id:
-        wt = db.query(Trade).get(review.worst_trade_id)
-        if wt:
-            worst_trade = {"id": wt.id, "symbol": wt.symbol, "pnl": str(wt.pnl)}
+            top_setup = max(setups, key=setups.get)
 
     daily_breakdown = []
     for offset in range(5):
@@ -327,10 +361,13 @@ def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyRev
         day_pnl = sum(t.pnl or Decimal("0") for t in day_trades if t.exit_price)
         daily_breakdown.append({"date": day.isoformat(), "trades": len(day_trades), "pnl": f"{day_pnl:.2f}"})
 
+    base = WeeklyReviewResponse.model_validate(review).model_dump()
     return WeeklyReviewDetailResponse(
-        **WeeklyReviewResponse.model_validate(review).model_dump(),
+        **{**base, "total_trades": len(trades), "total_pnl": f"{total_pnl:.2f}",
+           "win_rate": f"{win_rate:.1%}" if closed else None},
         best_trade=best_trade,
         worst_trade=worst_trade,
+        top_setup=top_setup,
         daily_breakdown=daily_breakdown,
         setup_breakdown=[],
     )
@@ -343,10 +380,7 @@ def get_current_monthly_review(db: Session = Depends(get_db), current_user: User
     month = date.today().strftime("%Y-%m")
     review = db.query(MonthlyReview).filter(MonthlyReview.month == month, MonthlyReview.user_id == current_user.id).first()
     if review is None:
-        review = MonthlyReview(month=month, user_id=current_user.id)
-        db.add(review)
-        db.commit()
-        db.refresh(review)
+        raise HTTPException(404, "Monthly review not found. POST /perf-os/enrich/monthly to create one.")
     return _enrich_monthly(db, review, current_user.id)
 
 
@@ -354,10 +388,7 @@ def get_current_monthly_review(db: Session = Depends(get_db), current_user: User
 def get_monthly_review(month: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     review = db.query(MonthlyReview).filter(MonthlyReview.month == month, MonthlyReview.user_id == current_user.id).first()
     if review is None:
-        review = MonthlyReview(month=month, user_id=current_user.id)
-        db.add(review)
-        db.commit()
-        db.refresh(review)
+        raise HTTPException(404, "Monthly review not found. POST /perf-os/enrich/monthly to create one.")
     return _enrich_monthly(db, review, current_user.id)
 
 
@@ -408,24 +439,14 @@ def _enrich_monthly(db: Session, review: MonthlyReview, user_id: int) -> Monthly
     best_setup = max(setups, key=lambda s: setups[s]["pnl"]) if setups else None
     worst_setup = min(setups, key=lambda s: setups[s]["pnl"]) if setups else None
 
-    review.total_trades = len(trades)
-    review.total_pnl = f"{total_pnl:.2f}"
-    review.win_rate = f"{win_rate / 100:.1%}" if win_rate is not None else None
-    review.profit_factor = f"{profit_factor:.2f}" if profit_factor is not None else None
-    review.avg_r = f"{avg_r:.2f}" if avg_r is not None else None
-    if best_setup:
-        review.best_setup = best_setup
-    if worst_setup and worst_setup != best_setup:
-        review.worst_setup = worst_setup
-    db.commit()
-    db.refresh(review)
-
     weekly_reviews = db.query(WeeklyReview).filter(
         WeeklyReview.week_start >= month_start,
         WeeklyReview.week_start <= month_end,
+        WeeklyReview.user_id == user_id,
     ).all()
 
     emotion_q = db.query(EmotionLog).join(Trade).filter(
+        Trade.user_id == user_id,
         Trade.status != "deleted",
         Trade.entry_time >= start_dt,
         Trade.entry_time <= end_dt,
@@ -437,8 +458,13 @@ def _enrich_monthly(db: Session, review: MonthlyReview, user_id: int) -> Monthly
 
     setup_perf = [{"setup": s, "count": d["count"], "pnl": f"{d['pnl']:.2f}"} for s, d in setups.items()]
 
+    base = MonthlyReviewResponse.model_validate(review).model_dump()
     return MonthlyReviewDetailResponse(
-        **MonthlyReviewResponse.model_validate(review).model_dump(),
+        **{**base, "total_trades": len(trades), "total_pnl": f"{total_pnl:.2f}",
+           "win_rate": f"{win_rate / 100:.1%}" if win_rate is not None else None,
+           "profit_factor": f"{profit_factor:.2f}" if profit_factor is not None else None,
+           "avg_r": f"{avg_r:.2f}" if avg_r is not None else None,
+           "best_setup": best_setup, "worst_setup": worst_setup},
         weekly_summaries=[{"week_start": wr.week_start.isoformat(), "total_trades": wr.total_trades, "total_pnl": wr.total_pnl} for wr in weekly_reviews],
         top_emotions=[{"emotion": e, "count": c} for e, c in top_emotions],
         setup_performance=setup_perf,
