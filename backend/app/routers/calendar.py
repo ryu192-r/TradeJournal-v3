@@ -9,11 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
-from app.core.dependencies import get_current_user
+from app.utils.calculations import compute_aggregate_kpis
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/calendar", tags=["calendar"])
@@ -118,9 +119,8 @@ def get_calendar_month(
 
     for current in _date_range(month_start, month_end):
         day_trades = trades_by_day.get(current, [])
-        closed = [t for t in day_trades if t.exit_price is not None]
-        wins = [t for t in closed if Decimal(t.pnl or 0) > 0]
-        net_pnl = sum((Decimal(t.pnl or 0) for t in closed), Decimal("0"))
+        kpis = compute_aggregate_kpis(day_trades)
+        net_pnl = sum((Decimal(t.pnl or 0) for t in day_trades), Decimal("0"))
         day_emotions = [emotion for trade in day_trades for emotion in emotions_by_trade.get(trade.id, [])]
         journal = journals_by_day.get(current)
         workflow = workflows_by_day.get(current)
@@ -128,9 +128,9 @@ def get_calendar_month(
         days.append({
             "date": current.isoformat(),
             "trade_count": len(day_trades),
-            "closed_count": len(closed),
+            "closed_count": kpis["trade_count"],
             "net_pnl": _money(net_pnl),
-            "win_rate": round((len(wins) / len(closed)) * 100, 2) if closed else None,
+            "win_rate": kpis["win_rate"],
             "discipline_rating": journal.discipline_rating if journal else workflow.discipline_rating if workflow else None,
             "discipline_score": (journal.discipline_rating * 20) if journal and journal.discipline_rating else None,
             "journal_done": _journal_done(journal),

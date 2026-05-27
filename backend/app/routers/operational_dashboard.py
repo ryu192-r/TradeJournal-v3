@@ -28,7 +28,7 @@ from app.models.setup_playbook import SetupPlaybook
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
 from app.utils.decimal_utils import ensure_decimal
-from app.utils.calculations import calculate_trade_metrics
+from app.utils.calculations import calculate_trade_metrics, compute_aggregate_kpis
 from app.core.dependencies import get_current_user
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/dashboard", tags=["dashboard"])
@@ -278,36 +278,20 @@ def operational_dashboard(db: Session = Depends(get_db)):
         if t.stop_price is None:
             warnings.append({"severity": "high", "code": "missing_stop", "message": f"{t.symbol} has no stop loss", "trade_id": t.id, "symbol": t.symbol})
 
-    # ── KPI (all closed trades, aggregated in SQL) ──
-    total_trades, net_pnl_sum, gross_profit_sum, gross_loss_sum, win_count, avg_r_value = db.query(
-        func.count(Trade.id),
-        func.coalesce(func.sum(Trade.pnl), 0),
-        func.coalesce(func.sum(case((Trade.pnl > 0, Trade.pnl), else_=0)), 0),
-        func.coalesce(func.sum(case((Trade.pnl < 0, Trade.pnl), else_=0)), 0),
-        func.coalesce(func.sum(case((Trade.pnl > 0, 1), else_=0)), 0),
-        func.avg(Trade.r_multiple),
-    ).filter(
+    # ── KPI (all closed trades) ──
+    closed_trades_for_kpi = db.query(Trade).filter(
         Trade.status != "deleted",
         Trade.pnl.isnot(None),
-    ).one()
-
-    if total_trades:
-        gross_profit_val = float(gross_profit_sum or 0)
-        gross_loss_val = abs(float(gross_loss_sum or 0))
-        net_pnl = round(float(net_pnl_sum or 0), 2)
-        win_rate = round(int(win_count or 0) / total_trades * 100, 1)
-
-        profit_factor = None
-        if gross_loss_val > 0:
-            profit_factor = round(gross_profit_val / gross_loss_val, 2)
-        elif gross_profit_val > 0:
-            profit_factor = None  # no losses yet; avoid Infinity
-
-        expectancy = round(net_pnl / total_trades, 2)
-        avg_r = round(float(avg_r_value), 2) if avg_r_value is not None else None
-    else:
-        net_pnl, win_rate, profit_factor, expectancy, avg_r = None, None, None, None, None
-        gross_profit_val, gross_loss_val = 0.0, 0.0
+    ).all()
+    kpis = compute_aggregate_kpis(closed_trades_for_kpi)
+    total_trades = kpis["trade_count"]
+    net_pnl = kpis["net_pnl"]
+    gross_profit_val = kpis["gross_profit"] or 0.0
+    gross_loss_val = kpis["gross_loss"] or 0.0
+    win_rate = kpis["win_rate"]
+    profit_factor = kpis["profit_factor"]
+    expectancy = kpis["expectancy"]
+    avg_r = kpis["avg_r"]
 
     # ── Max drawdown (includes capital events for correct peak tracking) ──
     daily_pnl_rows = (

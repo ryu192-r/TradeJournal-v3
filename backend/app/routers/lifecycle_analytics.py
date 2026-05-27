@@ -21,12 +21,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.trade_timeline import TradeTimeline
 from app.models.daily_journal import DailyJournal
-from app.core.dependencies import get_current_user
+from app.utils.calculations import compute_aggregate_kpis
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/lifecycle", tags=["lifecycle-analytics"])
 
@@ -104,12 +105,11 @@ def emotion_summary(
     for emotion_type in set(r.emotion for r in rows):
         ids = list(set(emotion_trade_ids[emotion_type]))
         trades_with = [trades_map[tid] for tid in ids if tid in trades_map and trades_map[tid].exit_price is not None]
-        pnls = [float(t.pnl or 0) for t in trades_with]
-        wins = [p for p in pnls if p > 0]
+        kpis = compute_aggregate_kpis(trades_with)
         emotion_pnl[emotion_type] = {
-            "trade_count": len(trades_with),
-            "total_pnl": str(Decimal(str(sum(pnls))).quantize(Decimal("0.01"))) if pnls else "0.00",
-            "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
+            "trade_count": kpis["trade_count"],
+            "total_pnl": str(Decimal(str(kpis["net_pnl"] or 0)).quantize(Decimal("0.01"))),
+            "win_rate": kpis["win_rate"],
         }
 
     emotions = []

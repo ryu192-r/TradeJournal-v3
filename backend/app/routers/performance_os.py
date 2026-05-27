@@ -22,6 +22,7 @@ from app.schemas.performance_os import (
     ChecklistItem,
 )
 from app.utils.logging import get_logger
+from app.utils.calculations import compute_aggregate_kpis
 from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
@@ -382,14 +383,11 @@ def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailRe
         Trade.entry_time <= end_dt,
     ).all()
     closed = [t for t in trades if t.exit_price is not None]
-    wins = [t for t in closed if t.pnl and float(t.pnl) > 0]
-    total_pnl = sum(float(t.pnl or 0) for t in closed)
-    gross_profit = sum(float(t.pnl) for t in wins) if wins else 0
-    gross_loss = abs(sum(float(t.pnl) for t in closed if float(t.pnl or 0) < 0)) if closed else 0
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else None
-    win_rate = len(wins) / len(closed) if closed else None
-    r_values = [float(t.r_multiple) for t in closed if t.r_multiple]
-    avg_r = sum(r_values) / len(r_values) if r_values else None
+    kpis = compute_aggregate_kpis(closed)
+    total_pnl = kpis["net_pnl"] or 0
+    win_rate = kpis["win_rate"]
+    profit_factor = kpis["profit_factor"]
+    avg_r = kpis["avg_r"]
 
     setups = {}
     for t in closed:
@@ -403,9 +401,9 @@ def _enrich_monthly(db: Session, review: MonthlyReview) -> MonthlyReviewDetailRe
 
     review.total_trades = len(trades)
     review.total_pnl = f"{total_pnl:.2f}"
-    review.win_rate = f"{win_rate:.1%}" if win_rate else None
-    review.profit_factor = f"{profit_factor:.2f}" if profit_factor else None
-    review.avg_r = f"{avg_r:.2f}" if avg_r else None
+    review.win_rate = f"{win_rate / 100:.1%}" if win_rate is not None else None
+    review.profit_factor = f"{profit_factor:.2f}" if profit_factor is not None else None
+    review.avg_r = f"{avg_r:.2f}" if avg_r is not None else None
     if best_setup:
         review.best_setup = best_setup
     if worst_setup and worst_setup != best_setup:

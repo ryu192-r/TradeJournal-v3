@@ -147,7 +147,7 @@ def _calc_kpi(df: pd.DataFrame) -> Dict[str, Any]:
     avg_win = float(winners["pnl"].mean()) if len(winners) > 0 else 0.0
     avg_loss = float(losers["pnl"].mean()) if len(losers) > 0 else 0.0
     w_rate = win_rate_ratio or 0.0
-    expectancy = (w_rate * avg_win) + ((1 - w_rate) * avg_loss)
+    expectancy = (w_rate * avg_win) - ((1 - w_rate) * avg_loss)
 
     avg_r = _safe_mean(df["r_multiple"].dropna())
     max_drawdown_amount, max_drawdown_pct = _calc_max_drawdown(df)
@@ -199,7 +199,7 @@ def _calc_setup_performance(df: pd.DataFrame) -> List[Dict[str, Any]]:
         avg_w = float(winners["pnl"].mean()) if len(winners) > 0 else 0.0
         avg_l = float(losers["pnl"].mean()) if len(losers) > 0 else 0.0
         wr = win_rate_ratio or 0.0
-        exp = (wr * avg_w) + ((1 - wr) * avg_l)
+        exp = (wr * avg_w) - ((1 - wr) * avg_l)
 
         results.append({
             "setup": setup_name,

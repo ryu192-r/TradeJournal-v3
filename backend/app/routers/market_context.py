@@ -27,7 +27,9 @@ from app.db.database import get_db
 from app.models.trade import Trade
 from app.models.market_snapshot import MarketSnapshot
 from app.models.live_quote import LiveQuote
+from app.utils.calculations import compute_aggregate_kpis
 from app.utils.logging import get_logger
+
 from app.services.live_quote_sync import LIVE_QUOTE_STALE_AFTER_SECONDS, sync_open_trade_quotes
 from app.core.dependencies import get_current_user
 
@@ -422,20 +424,20 @@ def performance_correlation(
             matched_trades.append((t, snap_map[trade_date]))
 
     def _aggregate(trades_snaps: list[tuple[Trade, MarketSnapshot]], key_fn) -> dict:
-        buckets: dict[str, list[float]] = defaultdict(list)
+        buckets: dict[str, list[Trade]] = defaultdict(list)
         for t, s in trades_snaps:
             key = key_fn(t, s)
-            buckets[key].append(float(t.pnl or 0))
+            buckets[key].append(t)
 
         result = {}
-        for key, pnls in sorted(buckets.items()):
-            wins = [p for p in pnls if p > 0]
+        for key, trades_list in sorted(buckets.items()):
+            kpis = compute_aggregate_kpis(trades_list)
             result[key] = {
-                "trade_count": len(pnls),
-                "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
-                "avg_pnl": round(sum(pnls) / len(pnls), 2) if pnls else None,
-                "total_pnl": round(sum(pnls), 2),
-                "expectancy": round(sum(pnls) / len(pnls), 2) if pnls else None,
+                "trade_count": kpis["trade_count"],
+                "win_rate": kpis["win_rate"],
+                "avg_pnl": round(float(kpis["net_pnl"] or 0) / kpis["trade_count"], 2) if kpis["trade_count"] else None,
+                "total_pnl": kpis["net_pnl"],
+                "expectancy": kpis["expectancy"],
             }
         return result
 

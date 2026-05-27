@@ -14,6 +14,7 @@ from app.models.partial_exit import PartialExit
 from app.models.tier_config import TierConfig
 from app.db.database import get_db
 from app.utils.logging import get_logger
+from app.utils.calculations import compute_aggregate_kpis
 from app.utils.decimal_utils import ensure_decimal
 from app.core.dependencies import get_current_user
 
@@ -256,30 +257,25 @@ def get_capital_dashboard(db: Session = Depends(get_db)):
     unrealized_pnl = Decimal("0")
 
     # ── Stats from all realized PnLs (closed trade PnL + partial exit PnL) ──
-    total_trades = len(all_realized_pnls)
-    win_count = 0
-    loss_count = 0
     best_trade = Decimal("0")
     worst_trade = Decimal("0")
-    total_wins = Decimal("0")
-    total_losses = Decimal("0")
-
     for pnl_val in all_realized_pnls:
         if pnl_val > best_trade:
             best_trade = pnl_val
         if pnl_val < worst_trade:
             worst_trade = pnl_val
-        if pnl_val >= 0:
-            win_count += 1
-            total_wins += pnl_val
-        else:
-            loss_count += 1
-            total_losses += pnl_val
 
-    win_rate = round((win_count / total_trades * 100), 2) if total_trades > 0 else None
-    average_win = round(total_wins / win_count, 2) if win_count > 0 else Decimal("0")
-    average_loss = round(total_losses / loss_count, 2) if loss_count > 0 else Decimal("0")
-    profit_factor = round(float(total_wins / abs(total_losses)), 2) if total_losses != 0 else None
+    _SimpleKpiTrade = type("_SimpleKpiTrade", (), {"pnl": 0.0, "r_multiple": None})
+    kpi_trades = []
+    for pnl_val in all_realized_pnls:
+        t = _SimpleKpiTrade()
+        t.pnl = float(pnl_val)
+        kpi_trades.append(t)
+    kpis = compute_aggregate_kpis(kpi_trades)
+    win_rate = kpis["win_rate"]
+    profit_factor = kpis["profit_factor"]
+    average_win = Decimal(str(kpis["gross_profit"])) / Decimal(str(kpis["trade_count"])) if kpis["gross_profit"] and kpis["trade_count"] else Decimal("0")
+    average_loss = Decimal(str(kpis["gross_loss"])) / Decimal(str(kpis["trade_count"])) if kpis["gross_loss"] and kpis["trade_count"] else Decimal("0")
 
     # Net equity = initial_balance + capital events net + all realized PnL
     capital_net = total_deposits - total_withdrawals - total_fees

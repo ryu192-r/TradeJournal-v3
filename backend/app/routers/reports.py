@@ -9,10 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.trade import Trade
-from app.core.dependencies import get_current_user
+from app.utils.calculations import compute_aggregate_kpis
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/reports", tags=["reports"])
@@ -60,11 +61,10 @@ def _report_payload(db: Session, period: str, start: date, end: date) -> dict:
         .all()
     )
     closed = [trade for trade in trades if trade.exit_price is not None]
-    wins = [trade for trade in closed if Decimal(trade.pnl or 0) > 0]
-    losses = [trade for trade in closed if Decimal(trade.pnl or 0) < 0]
-    gross_profit = sum((Decimal(trade.pnl or 0) for trade in wins), Decimal("0"))
-    gross_loss = abs(sum((Decimal(trade.pnl or 0) for trade in losses), Decimal("0")))
-    total_pnl = gross_profit - gross_loss
+    kpis = compute_aggregate_kpis(closed)
+    total_pnl = Decimal(kpis["net_pnl"] or 0)
+    gross_profit = Decimal(kpis["gross_profit"] or 0)
+    gross_loss = Decimal(kpis["gross_loss"] or 0)
 
     setups: dict[str, dict] = defaultdict(lambda: {"trade_count": 0, "closed_count": 0, "net_pnl": Decimal("0"), "wins": 0})
     days: dict[str, dict] = defaultdict(lambda: {"date": "", "trade_count": 0, "net_pnl": Decimal("0")})
@@ -129,8 +129,8 @@ def _report_payload(db: Session, period: str, start: date, end: date) -> dict:
             "net_pnl": _money(total_pnl),
             "gross_profit": _money(gross_profit),
             "gross_loss": _money(gross_loss),
-            "win_rate": round((len(wins) / len(closed)) * 100, 2) if closed else None,
-            "profit_factor": round(float(gross_profit / gross_loss), 2) if gross_loss > 0 else None,
+            "win_rate": kpis["win_rate"],
+            "profit_factor": kpis["profit_factor"],
             "best_trade": _serialise_trade(max(closed, key=lambda trade: Decimal(trade.pnl or 0))) if closed else None,
             "worst_trade": _serialise_trade(min(closed, key=lambda trade: Decimal(trade.pnl or 0))) if closed else None,
         },
