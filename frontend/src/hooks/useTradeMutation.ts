@@ -117,5 +117,6 @@ export function useTradeQuery(id: number) {
     queryKey: ['trade', id],
     queryFn: () => getTrade(id),
     enabled: id > 0,
+    placeholderData: (previousData) => previousData,
   })
 }

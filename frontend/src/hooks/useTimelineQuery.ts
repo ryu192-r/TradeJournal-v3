@@ -8,6 +8,7 @@ export function useTimelineQuery(tradeId: number | null) {
     queryKey: ['timeline', tradeId],
     queryFn: () => listTimeline(tradeId!),
     enabled: tradeId != null,
+    placeholderData: (previousData) => previousData,
   })
 }
 

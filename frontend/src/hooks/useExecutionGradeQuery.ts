@@ -18,6 +18,7 @@ export function useExecutionGradeQuery(tradeId: number | null) {
       }
     },
     enabled: tradeId != null,
+    placeholderData: (previousData) => previousData,
   })
 }
 

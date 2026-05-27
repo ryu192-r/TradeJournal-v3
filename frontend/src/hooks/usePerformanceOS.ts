@@ -10,6 +10,7 @@ export function useDailyDashboard(date?: string) {
   return useQuery({
     queryKey: ['daily-dashboard', date ?? 'today'],
     queryFn: () => getDailyDashboard(date),
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -41,6 +42,7 @@ export function useWeeklyReview(weekStart?: string) {
   return useQuery({
     queryKey: ['weekly-review', weekStart ?? 'current'],
     queryFn: () => weekStart ? getWeeklyReview(weekStart) : getCurrentWeeklyReview(),
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -56,6 +58,7 @@ export function useMonthlyReview(month?: string) {
   return useQuery({
     queryKey: ['monthly-review', month ?? 'current'],
     queryFn: () => month ? getMonthlyReview(month) : getCurrentMonthlyReview(),
+    placeholderData: (previousData) => previousData,
   })
 }
 

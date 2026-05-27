@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { ActiveView, NavMode } from '@/app/navigation'
 
 interface Position {
@@ -41,60 +42,62 @@ interface AppState {
   setTheme: (theme: 'dark' | 'light') => void
 }
 
-const getInitialTheme = (): 'dark' | 'light' => {
-  const stored = localStorage.getItem('tjv3-theme')
-  if (stored === 'light' || stored === 'dark') return stored
+const getSystemTheme = (): 'dark' | 'light' => {
   return window.matchMedia?.('(prefers-color-scheme:light)').matches ? 'light' : 'dark'
 }
 
 const applyTheme = (theme: 'dark' | 'light') => {
   document.documentElement.setAttribute('data-theme', theme)
-  localStorage.setItem('tjv3-theme', theme)
 }
 
-const getInitialNavMode = (): NavMode => {
-  const stored = localStorage.getItem('tjv3-nav-mode')
-  return stored === 'advanced' ? 'advanced' : 'simple'
-}
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      positions: [],
+      setPositions: (positions) => set({ positions }),
 
-export const useAppStore = create<AppState>((set, get) => ({
-  positions: [],
-  setPositions: (positions) => set({ positions }),
+      accountBalance: null,
+      setAccountBalance: (balance) => set({ accountBalance: balance }),
 
-  accountBalance: null,
-  setAccountBalance: (balance) => set({ accountBalance: balance }),
+      sidebarOpen: true,
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-  sidebarOpen: true,
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      navMode: 'simple',
+      setNavMode: (mode) => set({ navMode: mode }),
 
-  navMode: getInitialNavMode(),
-  setNavMode: (mode) => {
-    localStorage.setItem('tjv3-nav-mode', mode)
-    set({ navMode: mode })
-  },
+      activeView: 'dashboard',
+      setActiveView: (view) => set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null }),
 
-  activeView: 'dashboard',
-  setActiveView: (view) => set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null }),
+      tradeFormMode: 'list',
+      selectedTradeId: null,
+      openCreateTrade: () => set({ activeView: 'trades', tradeFormMode: 'create', selectedTradeId: null }),
+      openEditTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'edit', selectedTradeId: id }),
+      openDetailTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'detail', selectedTradeId: id }),
+      closeTradeForm: () => set({ tradeFormMode: 'list', selectedTradeId: null }),
 
-  tradeFormMode: 'list',
-  selectedTradeId: null,
-  openCreateTrade: () => set({ activeView: 'trades', tradeFormMode: 'create', selectedTradeId: null }),
-  openEditTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'edit', selectedTradeId: id }),
-  openDetailTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'detail', selectedTradeId: id }),
-  closeTradeForm: () => set({ tradeFormMode: 'list', selectedTradeId: null }),
-
-  theme: getInitialTheme(),
-  toggleTheme: () => {
-    const next = get().theme === 'dark' ? 'light' : 'dark'
-    applyTheme(next)
-    set({ theme: next })
-  },
-  setTheme: (theme) => {
-    applyTheme(theme)
-    set({ theme })
-  },
-}))
+      theme: getSystemTheme(),
+      toggleTheme: () => {
+        const next = get().theme === 'dark' ? 'light' : 'dark'
+        applyTheme(next)
+        set({ theme: next })
+      },
+      setTheme: (theme) => {
+        applyTheme(theme)
+        set({ theme })
+      },
+    }),
+    {
+      name: 'app-storage',
+      partialize: (state) => ({ navMode: state.navMode, theme: state.theme }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          applyTheme(state.theme)
+        }
+      },
+    }
+  )
+)
 
 // Apply initial theme immediately
-applyTheme(getInitialTheme())
+applyTheme(useAppStore.getState().theme)

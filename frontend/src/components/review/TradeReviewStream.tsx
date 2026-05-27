@@ -4,6 +4,7 @@ import { useReviewTradeMutation } from '@/hooks/useReviewTradeMutation'
 import { useUpdateTradeMutation } from '@/hooks/useTradeMutation'
 import { useToastStore } from '@/store/toastStore'
 import { ArrowLeft, ArrowRight, CheckCircle2, Layers, X, Loader2 } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 import { useState, useCallback, useEffect } from 'react'
 
 type ReviewFilter = 'unreviewed' | 'all'
@@ -107,16 +108,11 @@ export function TradeReviewStream() {
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-6 sm:p-[2rem_2.5rem]">
-        <div className="bg-card rounded-2xl border border-border p-6 sm:p-8 text-center space-y-3 max-w-md w-full">
-          <div className="text-loss font-medium">Failed to load trades</div>
-          <div className="text-sm text-text-muted">{error instanceof Error ? error.message : 'Unknown error'}</div>
-          <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer"
-          >
-            Retry
-          </button>
-        </div>
+        <ErrorState
+          title="Failed to load trades"
+          message={error instanceof Error ? error.message : 'Unknown error'}
+          onRetry={() => window.location.reload()}
+        />
       </div>
     )
   }

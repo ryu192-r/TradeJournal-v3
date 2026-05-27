@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useSetupPlaybookQuery'
 import { useToastStore } from '@/store/toastStore'
 import { Loader2, Plus, RefreshCw, Filter, BookOpen, BarChart3 } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 import { cn } from '@/lib/utils'
 import type { SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload } from '@/types/setupPlaybook'
 import { PlaybookIntelligenceFull } from './PlaybookIntelligenceFull'
@@ -208,10 +209,10 @@ export function SetupPlaybookPage() {
 
       {/* Error state */}
       {error && (
-        <div className="py-12 text-center">
-          <p className="text-sm text-loss">Failed to load setups.</p>
-          <p className="text-xs text-text-muted mt-1">{error.message}</p>
-        </div>
+        <ErrorState
+          title="Failed to load setups"
+          message={error.message}
+        />
       )}
 
       {/* Cards grid */}

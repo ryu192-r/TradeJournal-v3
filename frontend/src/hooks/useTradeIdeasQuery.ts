@@ -13,6 +13,7 @@ export function useTradeIdeasQuery(status?: TradeIdeaStatus, symbol?: string, di
   return useQuery<TradeIdeaListResponse>({
     queryKey: ['ideas', { status, symbol, direction, confidence }],
     queryFn: () => listIdeas(status, symbol, direction, confidence),
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -21,6 +22,7 @@ export function useTradeIdeaQuery(id: number | null) {
     queryKey: ['idea', id],
     queryFn: () => getIdea(id!),
     enabled: id != null && id > 0,
+    placeholderData: (previousData) => previousData,
   })
 }
 

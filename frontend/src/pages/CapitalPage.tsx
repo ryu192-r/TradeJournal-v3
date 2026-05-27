@@ -12,7 +12,7 @@ import {
 import type { CapitalDashboardPayload, CapitalEventType } from '@/types'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, parseDecimal } from '@/utils/format'
-import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, AlertTriangle, Settings, Plus, Trash2, Save, Edit3, X, Loader2, RefreshCw } from 'lucide-react'
+import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, Settings, Plus, Trash2, Save, Edit3, X, Loader2, RefreshCw } from 'lucide-react'
 import {
   AreaChart,
   Area,
@@ -23,6 +23,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { GlassBadge } from '@/components/ui/GlassBadge'
+import { ErrorState } from '@/components/ui/StateComponents'
 
 const CARD_CLASS = 'bg-card rounded-2xl border border-border p-[var(--page-px)]'
 const CARD_STATIC = `${CARD_CLASS} animate-card-in`
@@ -703,14 +704,12 @@ export function CapitalPage() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className={`${CARD_STATIC} py-12 text-center`}>
-          <AlertTriangle className="w-8 h-8 text-loss mx-auto mb-3" />
-          <h2 className="text-lg font-medium text-text-heading font-display mb-2">Failed to load capital data</h2>
-          <p className="text-text-muted text-sm font-data">
-            {(error as Error)?.message || 'Something went wrong fetching capital dashboard.'}
-          </p>
-        </div>
+      <div className="px-[var(--page-px)] py-[var(--page-py)]">
+        <ErrorState
+          title="Failed to load capital data"
+          message={(error as Error)?.message || 'Something went wrong fetching capital dashboard.'}
+          onRetry={() => window.location.reload()}
+        />
       </div>
     )
   }

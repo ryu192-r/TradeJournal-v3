@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
-  Calendar, Sunrise, Sunset, GitCompare, Loader2, AlertCircle,
+  Calendar, Sunrise, Sunset, GitCompare, Loader2,
   ChevronLeft, ChevronRight, BookOpen,
 } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import {
   useJournalQuery,
@@ -260,11 +261,10 @@ export function DailySANotesPage() {
 
       {/* Error */}
       {isError && activeTab === 'notes' && (
-        <div className="rounded-2xl border border-loss/25 bg-card p-6 text-center">
-          <AlertCircle className="w-5 h-5 text-loss mx-auto" />
-          <p className="text-[length:var(--text-sm)] text-text-heading mt-2">Failed to load notes.</p>
-          <p className="text-xs text-text-muted mt-1">{error instanceof Error ? error.message : 'Unknown error'}</p>
-        </div>
+        <ErrorState
+          title="Failed to load notes"
+          message={error instanceof Error ? error.message : 'Unknown error'}
+        />
       )}
 
       {/* Tab content */}

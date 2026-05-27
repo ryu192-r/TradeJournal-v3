@@ -18,6 +18,7 @@ export function useJournalQuery(date: string) {
       }
     },
     enabled: date.length > 0,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -26,6 +27,7 @@ export function useWeeklyJournalsQuery(weekStart: string) {
     queryKey: [...JOURNAL_KEY, 'weekly', weekStart],
     queryFn: () => getWeeklyJournals(weekStart),
     enabled: weekStart.length > 0,
+    placeholderData: (previousData) => previousData,
   })
 }
 
@@ -34,6 +36,7 @@ export function useWeeklyJournalStatsQuery(weekStart: string) {
     queryKey: [...JOURNAL_KEY, 'weekly-stats', weekStart],
     queryFn: () => getWeeklyJournalStats(weekStart),
     enabled: weekStart.length > 0,
+    placeholderData: (previousData) => previousData,
   })
 }
 

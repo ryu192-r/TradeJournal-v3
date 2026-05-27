@@ -22,11 +22,11 @@ import {
   GitCompare,
   LayoutList,
   Loader2,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   BookOpen,
 } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -465,13 +465,10 @@ export function JournalPage() {
 
       {/* Error */}
       {isError && activeTab === 'journal' && (
-        <div className="rounded-xl border border-loss/25 bg-bg-card py-8 text-center">
-          <AlertCircle className="w-5 h-5 text-loss mx-auto" />
-          <p className="text-sm text-text-heading mt-2">Failed to load journal entry.</p>
-          <p className="text-xs text-text-muted mt-1">
-            {error instanceof Error ? error.message : 'Unknown error'}
-          </p>
-        </div>
+        <ErrorState
+          title="Failed to load journal entry"
+          message={error instanceof Error ? error.message : 'Unknown error'}
+        />
       )}
 
       {/* Tab content */}

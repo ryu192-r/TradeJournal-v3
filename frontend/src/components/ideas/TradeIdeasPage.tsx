@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useTradeIdeasQuery'
 import { useToastStore } from '@/store/toastStore'
 import { Loader2, Plus, Filter, Lightbulb } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 import { cn } from '@/lib/utils'
 import type { TradeIdeaStatus, TradeIdeaCreatePayload, TradeIdeaUpdatePayload, ConvertToTradePayload } from '@/types/tradeIdea'
 
@@ -192,10 +193,10 @@ export function TradeIdeasPage() {
         )}
 
         {error && (
-          <div className="py-12 text-center">
-            <p className="text-sm text-loss">Failed to load trade ideas.</p>
-            <p className="text-xs text-text-muted mt-1">{error.message}</p>
-          </div>
+          <ErrorState
+            title="Failed to load trade ideas"
+            message={error.message}
+          />
         )}
 
         {!isLoading && !error && (

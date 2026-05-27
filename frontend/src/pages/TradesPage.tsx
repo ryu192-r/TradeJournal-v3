@@ -14,6 +14,7 @@ import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
 import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit, updateTrade } from '@/lib/endpoints'
 import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList } from 'lucide-react'
+import { ErrorState } from '@/components/ui/StateComponents'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
@@ -687,10 +688,11 @@ export function TradesPage() {
           </div>
         )}
         {error && (
-          <div className="py-16 text-center">
-            <p className="text-sm text-loss">Failed to load trades.</p>
-            <p className="text-xs text-text-muted mt-1">{error.message}</p>
-          </div>
+          <ErrorState
+            title="Failed to load trades"
+            message={error.message}
+            onRetry={() => window.location.reload()}
+          />
         )}
         {!isLoading && !error && displayedTrades.length === 0 && (
           <div className="py-16 text-center">
