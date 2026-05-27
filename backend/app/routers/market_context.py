@@ -19,7 +19,7 @@ from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from decimal import Decimal
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -32,6 +32,12 @@ from app.utils.logging import get_logger
 
 from app.services.live_quote_sync import LIVE_QUOTE_STALE_AFTER_SECONDS, sync_open_trade_quotes
 from app.core.dependencies import get_current_user
+from app.schemas.market_context import (
+    MarketSnapshotCreate,
+    MarketSnapshotResponse,
+    LiveQuotesRequest,
+    LiveQuotesResponse,
+)
 
 logger = get_logger(__name__)
 
@@ -160,20 +166,20 @@ def get_snapshot(
     }
 
 
-@router.post("/snapshot")
+@router.post("/snapshot", response_model=MarketSnapshotResponse)
 def create_or_update_snapshot(
-    payload: dict,
+    payload: MarketSnapshotCreate,
     db: Session = Depends(get_db),
 ):
     """Create or update a market snapshot. If date exists, updates fields."""
-    snap_date_str = payload.get("date")
+    snap_date_str = payload.date
     if not snap_date_str:
-        raise HTTPException(400, "date is required (YYYY-MM-DD)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date is required (YYYY-MM-DD)")
 
     try:
         d = date.fromisoformat(snap_date_str)
     except ValueError:
-        raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
 
     snap = db.query(MarketSnapshot).filter(MarketSnapshot.date == d).first()
 
@@ -181,21 +187,9 @@ def create_or_update_snapshot(
         snap = MarketSnapshot(date=d)
         db.add(snap)
 
-    for field in (
-        "nifty_close", "nifty_change_pct", "nifty_high", "nifty_low", "nifty_open",
-        "nifty_trend", "nifty_regime", "india_vix", "atr_14", "atr_pct",
-        "advance_count", "decline_count", "advance_decline_ratio",
-        "sector_strength", "fii_flow_cr", "dii_flow_cr",
-        "is_earnings_season", "macro_events", "notes",
-    ):
-        if field in payload:
-            val = payload[field]
-            if isinstance(val, (int, float)) and field not in (
-                "advance_count", "decline_count", "sector_strength", "macro_events",
-                "is_earnings_season", "nifty_trend", "nifty_regime", "notes",
-            ):
-                val = Decimal(str(val))
-            setattr(snap, field, val)
+    data = payload.model_dump(exclude={"date"}, exclude_none=True)
+    for field, val in data.items():
+        setattr(snap, field, val)
 
     if not snap.nifty_trend or not snap.nifty_regime:
         trend, regime = _classify_trend(snap)
@@ -291,37 +285,20 @@ def fetch_market_data(
     payload: dict,
     db: Session = Depends(get_db),
 ):
-    """Save a market snapshot from Tapetide API data.
-
-    Frontend calls Tapetide tools (market_pulse, market_heatmap,
-    market_valuations, get_fii_dii_detail, get_fpi_sectors) and sends
-    the combined payload here. Fields are mapped to MarketSnapshot columns.
-
-    Expected payload shape (all fields optional — missing ones stay null):
-    {
-      "date": "2025-01-15",
-      "pulse": { "nifty_close": 23500, "nifty_change_pct": 0.85, "vix": 14.2, ... },
-      "heatmap": [ { "sector": "IT", "change_pct": 1.5, ... }, ... ],
-      "fii_dii": { "fii_net": -1200.5, "dii_net": 1500.3, ... },
-      "sectors": { "IT": { "aum_share": 18.5, "fortnight_change": 0.3 }, ... },
-      "valuations": { "pe": 22.5, "pb": 4.1, "dividend_yield": 1.2 },
-      "advances": 1200,
-      "declines": 800
-    }
-    """
+    """Save a market snapshot from Tapetide API data."""
     snap_date_str = payload.get("date")
     if not snap_date_str:
-        raise HTTPException(400, "date is required (YYYY-MM-DD)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date is required (YYYY-MM-DD)")
 
     try:
         d = date.fromisoformat(snap_date_str)
     except ValueError:
-        raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
 
     snap_data = _parse_tapetide_payload(payload)
     snap_data["date"] = str(d)
 
-    saved = create_or_update_snapshot(snap_data, db)
+    saved = create_or_update_snapshot(MarketSnapshotCreate(**snap_data), db)
     return saved
 
 
@@ -330,14 +307,10 @@ def seed_snapshots(
     payload: dict,
     db: Session = Depends(get_db),
 ):
-    """Bulk-seed market snapshots from Tapetide historical data.
-
-    Accepts a list of snapshot dicts (same format as /fetch payload).
-    Skips dates that already have snapshots.
-    """
+    """Bulk-seed market snapshots from Tapetide historical data."""
     snapshots = payload.get("snapshots") or []
     if not isinstance(snapshots, list):
-        raise HTTPException(400, "snapshots must be a list")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="snapshots must be a list")
 
     added = 0
     skipped = 0
@@ -357,7 +330,7 @@ def seed_snapshots(
 
             parsed = _parse_tapetide_payload(snap_payload)
             parsed["date"] = d_str
-            create_or_update_snapshot(parsed, db)
+            create_or_update_snapshot(MarketSnapshotCreate(**parsed), db)
             added += 1
         except Exception as e:
             errors.append(f"row {i}: {str(e)}")
@@ -583,25 +556,20 @@ def my_symbols(
     return {"symbols": [s[0] for s in symbols]}
 
 
-@router.post("/live-quotes")
+@router.post("/live-quotes", response_model=LiveQuotesResponse)
 def upsert_live_quotes(
-    payload: dict,
+    payload: LiveQuotesRequest,
     db: Session = Depends(get_db),
 ):
-    """Upsert live stock quotes from Tapetide batch quote data.
-
-    Expected payload: { "quotes": [ { "symbol": "RELIANCE", "ltp": 1335.9, ... }, ... ] }
-    """
-    quotes = payload.get("quotes") or []
-    if not isinstance(quotes, list):
-        raise HTTPException(400, "quotes must be a list")
+    """Upsert live stock quotes from Tapetide batch quote data."""
+    quotes = payload.quotes
 
     upserted = 0
     errors = []
 
     for i, q in enumerate(quotes):
         try:
-            sym = q.get("symbol")
+            sym = q.symbol
             if not sym:
                 errors.append(f"row {i}: missing symbol")
                 continue
@@ -611,19 +579,13 @@ def upsert_live_quotes(
                 existing = LiveQuote(symbol=sym)
                 db.add(existing)
 
-            for field in (
-                "company_name", "ltp", "change", "change_pct", "volume",
-                "high_52w", "low_52w", "pe", "market_cap_cr", "sector",
-            ):
-                if field in q and q[field] is not None:
-                    val = q[field]
-                    if field not in ("company_name", "sector") and isinstance(val, (int, float)):
-                        val = Decimal(str(val))
-                    setattr(existing, field, val)
+            data = q.model_dump(exclude={"symbol"}, exclude_none=True)
+            for field, val in data.items():
+                setattr(existing, field, val)
 
             upserted += 1
         except Exception as e:
-            errors.append(f"row {i} ({q.get('symbol', '?')}): {str(e)}")
+            errors.append(f"row {i} ({q.symbol}): {str(e)}")
 
     db.commit()
     provider_status = "fresh" if upserted and not errors else "partial" if upserted else "failed" if errors else "not_synced"
