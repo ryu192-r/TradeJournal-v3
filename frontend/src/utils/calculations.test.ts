@@ -245,3 +245,37 @@ describe('computeCapPct', () => {
     expect(computeCapPct(500, 0)).toBeNull()
   })
 })
+
+// ── Cross-runtime fixture validation (#38) ──
+
+import cases from '../../../shared/fixtures/calculation_test_cases.json'
+
+const ROUND = (v: number | null) => v == null ? null : Math.round(v * 100) / 100
+
+describe('cross-runtime fixture tests', () => {
+  it.each(cases)('$name', (payload: any) => {
+    const exp = payload.expected
+    const result = calculateTradeMetrics({
+      entryPrice: payload.entry_price,
+      exitPrice: payload.exit_price,
+      quantity: payload.quantity,
+      fees: payload.fees,
+      stopPrice: payload.stop_price,
+      targetPrice: payload.target_price,
+      direction: payload.direction,
+    })
+
+    expect(ROUND(result.pnlPerUnit)).toBe(ROUND(exp.pnl_per_unit))
+    expect(ROUND(result.grossPnl)).toBe(ROUND(exp.gross_pnl))
+    expect(ROUND(result.netPnl)).toBe(ROUND(exp.net_pnl))
+    expect(ROUND(result.riskPerUnit)).toBe(ROUND(exp.risk_per_unit))
+    expect(ROUND(result.rewardPerUnit)).toBe(ROUND(exp.reward_per_unit))
+    expect(ROUND(result.riskAmount)).toBe(ROUND(exp.risk_amount))
+    expect(ROUND(result.plannedRewardAmount)).toBe(ROUND(exp.planned_reward_amount))
+    expect(ROUND(result.riskRewardRatio)).toBe(ROUND(exp.risk_reward_ratio))
+    expect(ROUND(result.rMultiple)).toBe(ROUND(exp.r_multiple))
+    expect(result.isValidForPnl).toBe(exp.is_valid_for_pnl)
+    expect(result.isValidForRiskReward).toBe(exp.is_valid_for_risk_reward)
+    expect(result.warnings).toEqual(exp.warnings)
+  })
+})

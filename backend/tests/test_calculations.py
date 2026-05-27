@@ -1,6 +1,8 @@
 """Tests for trade calculation utilities — P&L, R-multiple, risk/reward, streaks, KPIs."""
 
+import json
 from decimal import Decimal
+from pathlib import Path
 import pytest
 from app.utils.calculations import (
     calculate_trade_metrics,
@@ -9,6 +11,51 @@ from app.utils.calculations import (
     compute_live_pnl,
     compute_aggregate_kpis,
 )
+
+CALC_FIXTURE_PATH = Path(__file__).parents[2] / "shared" / "fixtures" / "calculation_test_cases.json"
+
+
+def _load_cases():
+    with open(CALC_FIXTURE_PATH) as f:
+        return json.load(f)
+
+
+def _assert_decimal(actual, expected_str):
+    if expected_str is None:
+        assert actual is None
+    else:
+        assert actual == Decimal(str(expected_str)), f"expected {expected_str}, got {actual}"
+
+
+class TestSharedFixture:
+    """Cross-runtime test — backend must match canonical frontend fixture."""
+
+    @pytest.mark.parametrize("case", _load_cases(), ids=lambda c: c["name"])
+    def test_calculate_trade_metrics(self, case):
+        payload = case
+        exp = payload["expected"]
+        result = calculate_trade_metrics(
+            entry_price=payload.get("entry_price"),
+            exit_price=payload.get("exit_price"),
+            quantity=payload.get("quantity"),
+            fees=payload.get("fees"),
+            stop_price=payload.get("stop_price"),
+            target_price=payload.get("target_price"),
+            direction=payload["direction"],
+        )
+        _assert_decimal(result.pnl_per_unit, exp.get("pnl_per_unit"))
+        _assert_decimal(result.gross_pnl, exp.get("gross_pnl"))
+        _assert_decimal(result.net_pnl, exp.get("net_pnl"))
+        _assert_decimal(result.risk_per_unit, exp.get("risk_per_unit"))
+        _assert_decimal(result.reward_per_unit, exp.get("reward_per_unit"))
+        _assert_decimal(result.risk_amount, exp.get("risk_amount"))
+        _assert_decimal(result.planned_reward_amount, exp.get("planned_reward_amount"))
+        _assert_decimal(result.risk_reward_ratio, exp.get("risk_reward_ratio"))
+        _assert_decimal(result.r_multiple, exp.get("r_multiple"))
+        assert result.is_valid_for_pnl == exp["is_valid_for_pnl"]
+        assert result.is_valid_for_risk_reward == exp["is_valid_for_risk_reward"]
+        assert result.warnings == exp["warnings"]
+
 
 
 # ─────────────────────── calculate_trade_metrics ───────────────────────
