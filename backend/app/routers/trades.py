@@ -90,13 +90,13 @@ def _auto_detect_exit_reason(trade: Trade) -> str:
 def _resolve_upload_path(url: str) -> str:
     prefix = "/uploads/"
     if not url.startswith(prefix):
-        raise HTTPException(status_code=400, detail="Invalid upload URL")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload URL")
 
     rel_path = url[len(prefix):]
     upload_root = os.path.abspath(settings.UPLOAD_DIR)
     filepath = os.path.abspath(os.path.join(upload_root, rel_path))
     if os.path.commonpath([upload_root, filepath]) != upload_root:
-        raise HTTPException(status_code=400, detail="Invalid upload URL")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload URL")
     return filepath
 
 
@@ -349,7 +349,7 @@ def upload_chart_image(trade_id: int, file: UploadFile = File(...), db: Session 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
 
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be an image")
 
     ext = os.path.splitext(file.filename or "chart.png")[1] or ".png"
     filename = f"{trade_id}_{uuid.uuid4().hex[:8]}{ext}"
@@ -361,7 +361,7 @@ def upload_chart_image(trade_id: int, file: UploadFile = File(...), db: Session 
         with open(filepath, "wb") as f:
             shutil.copyfileobj(file.file, f)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save file: {e}")
 
     url = f"/uploads/{trade_id}/{filename}"
     images = [i for i in (trade.chart_images or []) if i] + [url]
@@ -381,7 +381,7 @@ def delete_chart_image(trade_id: int, url: str, db: Session = Depends(get_db)):
     filepath = _resolve_upload_path(url)
     images = [i for i in (trade.chart_images or []) if i]
     if url not in images:
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     images.remove(url)
     trade.chart_images = images

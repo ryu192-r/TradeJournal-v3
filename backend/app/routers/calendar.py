@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -25,7 +25,7 @@ def _parse_month(month: str) -> tuple[date, date]:
         year, mon = map(int, month.split("-"))
         start = date(year, mon, 1)
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="month must use YYYY-MM format")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="month must use YYYY-MM format")
     end = date(year, mon, calendar_lib.monthrange(year, mon)[1])
     return start, end
 

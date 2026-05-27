@@ -1,5 +1,5 @@
 """Broker import router — upload broker CSV files to import trades."""
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -97,11 +97,10 @@ def download_template(broker: str):
             "Status": "Traded",
         }
     else:
-        raise HTTPException(status_code=400, detail=f"Unknown broker '{broker}'. Supported: {list(BROKER_DISPLAY.keys())}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown broker '{broker}'. Supported: {list(BROKER_DISPLAY.keys())}")
 
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=headers)
-    writer.writeheader()
     writer.writerow(sample)
     content = output.getvalue()
 
@@ -129,12 +128,12 @@ async def import_broker_csv(
     """
     if broker not in BROKER_PARSERS:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown broker '{broker}'. Supported: {list(BROKER_DISPLAY.keys())}",
         )
 
     if not file.filename:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file uploaded")
 
     content_bytes = await file.read()
     try:
@@ -150,7 +149,7 @@ async def import_broker_csv(
 
     if errors and not rows:
         raise HTTPException(
-            status_code=422,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"message": errors[0], "errors": errors},
         )
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
@@ -33,9 +33,60 @@ def create_idea(
         return created
     except SQLAlchemyError as e:
         logger.exception("create_idea_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to create trade idea")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create trade idea")
+
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{idea_id}", response_model=dict)
+def get_trade_idea(
+    idea_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get a single trade idea by ID."""
+    db_idea = TradeIdeaService.get_by_id(db, idea_id)
+    if not db_idea:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade idea not found")
+    return db_idea
+
+
+@router.patch("/{idea_id}", response_model=dict)
+def update_trade_idea(
+    idea_id: int,
+    data: dict,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update a trade idea. Status transitions are validated."""
+    db_idea = TradeIdeaService.get_by_id(db, idea_id)
+    if not db_idea:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade idea not found")
+
+    try:
+        updated = TradeIdeaService.update_idea(db, db_idea, data)
+        if not updated:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update trade idea")
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete("/{idea_id}")
+def delete_trade_idea(
+    idea_id: int,
+    db: Session = Depends(get_db),
+):
+    """Soft delete a trade idea (archive it)."""
+    db_idea = TradeIdeaService.get_by_id(db, idea_id)
+    if not db_idea:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade idea not found")
+
+    try:
+        TradeIdeaService.archive_idea(db, db_idea)
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/", response_model=TradeIdeaListResponse)
@@ -58,7 +109,7 @@ def list_ideas(
         return TradeIdeaListResponse(total=total, items=items)
     except SQLAlchemyError as e:
         logger.exception("list_ideas_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to list trade ideas")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list trade ideas")
 
 
 @router.get("/{idea_id}", response_model=TradeIdeaResponse)
@@ -69,7 +120,7 @@ def get_idea(
     """Get a single trade idea by ID."""
     db_idea = TradeIdeaService.get_by_id(db, idea_id)
     if not db_idea:
-        raise HTTPException(status_code=404, detail="Trade idea not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade idea not found")
     return db_idea
 
 
@@ -82,60 +133,13 @@ def update_idea(
     """Update a trade idea. Status transitions are validated."""
     db_idea = TradeIdeaService.get_by_id(db, idea_id)
     if not db_idea:
-        raise HTTPException(status_code=404, detail="Trade idea not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade idea not found")
 
     try:
         updated = TradeIdeaService.update(db, idea_id, update)
         logger.info("trade_idea_updated", idea_id=idea_id, status=updated.status)
         return updated
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except SQLAlchemyError:
-        logger.exception("update_idea_failed", idea_id=idea_id)
-        raise HTTPException(status_code=500, detail="Failed to update trade idea")
-
-
-@router.delete("/{idea_id}", status_code=204)
-def delete_idea(
-    idea_id: int,
-    db: Session = Depends(get_db),
-):
-    """Soft delete a trade idea (archive it)."""
-    db_idea = TradeIdeaService.get_by_id(db, idea_id)
-    if not db_idea:
-        raise HTTPException(status_code=404, detail="Trade idea not found")
-
-    try:
-        TradeIdeaService.delete(db, idea_id)
-        logger.info("trade_idea_archived", idea_id=idea_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except SQLAlchemyError:
-        logger.exception("delete_idea_failed", idea_id=idea_id)
-        raise HTTPException(status_code=500, detail="Failed to delete trade idea")
-
-
-@router.post("/{idea_id}/trade", response_model=ConvertToTradeResponse)
-def convert_to_trade(
-    idea_id: int,
-    convert: ConvertToTradeRequest,
-    db: Session = Depends(get_db),
-):
-    """Convert a trade idea into an actual trade.
-
-    Creates a Trade record (if entry_price + quantity provided) and links
-    it via traded_trade_id. The idea status becomes 'traded'.
-    """
-    db_idea = TradeIdeaService.get_by_id(db, idea_id)
-    if not db_idea:
-        raise HTTPException(status_code=404, detail="Trade idea not found")
-
-    try:
-        updated_idea, new_trade = TradeIdeaService.convert_to_trade(db, idea_id, convert)
-        logger.info("idea_converted_to_trade", idea_id=idea_id, trade_id=new_trade.id if new_trade else None)
-        return ConvertToTradeResponse(idea=updated_idea, trade_id=new_trade.id if new_trade else None)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except SQLAlchemyError:
-        logger.exception("convert_to_trade_failed", idea_id=idea_id)
-        raise HTTPException(status_code=500, detail="Failed to convert idea to trade")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to convert idea to trade")
