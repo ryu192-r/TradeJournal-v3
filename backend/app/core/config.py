@@ -14,8 +14,8 @@ class Settings:
     DEBUG: bool = config("DEBUG", default=False, cast=bool)
     
     # Security settings
-    SECRET_KEY: str = config("SECRET_KEY", default="trading-journal-secret-key")
-    JWT_SECRET_KEY: str = config("JWT_SECRET_KEY", default="jwt-secret-key-change-in-production")
+    SECRET_KEY: str = config("SECRET_KEY")
+    JWT_SECRET_KEY: str = config("JWT_SECRET_KEY")
     JWT_ALGORITHM: str = config("JWT_ALGORITHM", default="HS256")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = config("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", default=30, cast=int)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = config("JWT_REFRESH_TOKEN_EXPIRE_DAYS", default=7, cast=int)

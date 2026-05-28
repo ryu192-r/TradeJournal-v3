@@ -25,8 +25,20 @@ class CapitalEventService:
 
     USER_ALLOWED_TYPES = {"deposit", "withdrawal", "profit", "fee"}
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
+        self.user_id = user_id
+
+    def _verify_account_ownership(self, account_id: int) -> Account:
+        if self.user_id is not None:
+            account = self.db.query(Account).filter(Account.id == account_id, Account.user_id == self.user_id).first()
+            if not account:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+            return account
+        account = self.db.query(Account).filter(Account.id == account_id).first()
+        if not account:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+        return account
 
     # ─────────────────────── CRUD ───────────────────────
 
@@ -37,12 +49,7 @@ class CapitalEventService:
                 detail=f"event_type '{event.event_type}' is reserved. Allowed: {', '.join(sorted(self.USER_ALLOWED_TYPES))}",
             )
 
-        account = self.db.query(Account).filter(Account.id == event.account_id).first()
-        if not account:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Account not found",
-            )
+        account = self._verify_account_ownership(event.account_id)
 
         db_event = CapitalEvent(
             account_id=event.account_id,
@@ -77,6 +84,7 @@ class CapitalEventService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Capital event not found",
             )
+        self._verify_account_ownership(event_obj.account_id)
         return event_obj
 
     def list_events(
@@ -89,6 +97,7 @@ class CapitalEventService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> Tuple[int, list]:
+        self._verify_account_ownership(account_id)
         query = self.db.query(CapitalEvent).filter(CapitalEvent.account_id == account_id)
 
         if event_type:
@@ -106,6 +115,7 @@ class CapitalEventService:
 
     def update_event(self, event_id: int, event_update: CapitalEventUpdate) -> CapitalEvent:
         db_event = self.get_by_id(event_id)
+        self._verify_account_ownership(db_event.account_id)
 
         update_data = event_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -128,6 +138,7 @@ class CapitalEventService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Capital event not found",
             )
+        self._verify_account_ownership(db_event.account_id)
 
         account_id = db_event.account_id
         self.db.delete(db_event)
@@ -145,6 +156,7 @@ class CapitalEventService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> CapitalSummaryResponse:
+        self._verify_account_ownership(account_id)
         base_filters = [CapitalEvent.account_id == account_id]
         if start_date:
             base_filters.append(CapitalEvent.timestamp >= start_date)
@@ -202,7 +214,8 @@ class CapitalEventService:
     # ─────────────────────── Reconcile ───────────────────────
 
     def reconcile_account(self, account_id: int) -> dict:
-        delta = _reconcile_account(account_id, self.db)
+        account = self._verify_account_ownership(account_id)
+        delta = _reconcile_account(account_id, self.db, user_id=self.user_id)
         self.db.commit()
         account = self.db.query(Account).filter(Account.id == account_id).first()
         return {

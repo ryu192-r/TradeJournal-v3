@@ -23,7 +23,6 @@ import os
 configure_logging()
 logger = get_logger(__name__)
 
-# Run alembic migrations on startup, then ensure all tables exist
 def run_migrations():
     alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
@@ -31,7 +30,10 @@ def run_migrations():
         command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations applied successfully")
     except Exception as e:
-        logger.warning(f"Alembic migration failed: {e}")
+        logger.error(f"Alembic migration failed: {e}")
+        if not settings.DEBUG:
+            raise
+        logger.warning("Running in DEBUG mode — create_all fallback, schema may be stale")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured via create_all")
 

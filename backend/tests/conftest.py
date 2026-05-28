@@ -2,6 +2,7 @@
 
 import os
 
+os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("RATE_LIMIT_OFF", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("SECRET_KEY", "test-secret")
