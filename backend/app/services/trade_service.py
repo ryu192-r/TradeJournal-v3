@@ -57,18 +57,41 @@ class TradeService:
             q = q.filter(Trade.exit_price.isnot(None))
         return q.first()
 
+    def get_by_exact_signature(self, symbol: str, entry_price, quantity, entry_time, exit_price=None, exit_time=None, user_id: Optional[int] = None) -> Optional[Trade]:
+        """Find existing trade matching exact identity: symbol + entry_price + qty + entry_time + exit_time.
+
+        This is used for broker import deduplication — only rows that represent
+        the exact same trade are merged, not merely same symbol + date.
+        """
+        q = self.db.query(Trade).filter(
+            Trade.symbol == symbol,
+            Trade.entry_price == entry_price,
+            Trade.quantity == quantity,
+            Trade.entry_time == entry_time,
+            Trade.status != "deleted",
+        )
+        if user_id is not None:
+            q = q.filter(Trade.user_id == user_id)
+        if exit_price is None:
+            q = q.filter(Trade.exit_price.is_(None))
+        else:
+            q = q.filter(Trade.exit_price == exit_price)
+        if exit_time is None:
+            q = q.filter(Trade.exit_time.is_(None))
+        else:
+            q = q.filter(Trade.exit_time == exit_time)
+        return q.first()
+
     def merge_or_create(self, trade_data: dict, allow_merge: bool = False) -> Tuple[Trade, str]:
         """Create a new trade, or merge with existing when allow_merge=True.
 
         By default (allow_merge=False), always creates a new trade.
         This prevents manual same-day trades from being silently merged.
 
-        When allow_merge=True (broker import), merges trades in the same
-        open/closed state for the same (symbol, date). This allows broker
-        import rows for the same position to consolidate.
-
-        Uses retry to handle race conditions: if two concurrent requests both
-        find no existing trade, the second will find the first's on retry.
+        When allow_merge=True (broker import, Dhan sync), only merges if an
+        existing trade matches the EXACT signature (symbol, entry_price,
+        quantity, entry_time, exit_price, exit_time). Broader (symbol+date)
+        matching is not used — that can collapse separate intraday trades.
 
         Returns (trade, action) where action is 'merged' or 'created'.
         """
@@ -93,32 +116,33 @@ class TradeService:
                 self.db.rollback()
                 raise
 
-        incoming_is_open = trade_data.get("exit_price") is None
+        # Exact-duplicate merge for broker imports
+        existing = self.get_by_exact_signature(
+            symbol=trade_data["symbol"],
+            entry_price=trade_data.get("entry_price"),
+            quantity=trade_data.get("quantity"),
+            entry_time=entry_time,
+            exit_price=trade_data.get("exit_price"),
+            exit_time=trade_data.get("exit_time"),
+            user_id=trade_data.get("user_id"),
+        )
+        if existing:
+            return existing, "merged"
 
-        for attempt in range(2):
-            existing = self.get_by_symbol_date(trade_data["symbol"], entry_time, is_open=incoming_is_open, user_id=trade_data.get("user_id"))
-            if existing:
-                self._merge_trade(existing, trade_data)
-                return existing, "merged"
+        trade = Trade(**trade_data)
+        trade.compute_pnl()
+        self.db.add(trade)
+        self.db.commit()
+        self.db.refresh(trade)
+        return trade, "created"
 
-            trade = Trade(**trade_data)
-            trade.compute_pnl()
-            self.db.add(trade)
-            try:
-                self.db.commit()
-                self.db.refresh(trade)
-                return trade, "created"
-            except Exception:
-                self.db.rollback()
-                if attempt == 0:
-                    continue
-                raise
-
-    def _merge_trade(self, existing: Trade, incoming: dict) -> Trade:
+    def _merge_trade(self, existing: Trade, incoming: dict, defer_commit: bool = False) -> Trade:
         """Merge incoming trade data into existing trade (same symbol+date).
 
         Weighted-average entry/exit prices, sum quantities/fees/PnL,
         keep earliest entry_time, latest exit_time.
+
+        If defer_commit=True, does NOT commit — caller controls the transaction.
         """
         old_qty = Decimal(str(existing.quantity or "0"))
         new_qty = Decimal(str(incoming.get("quantity", "0")))
@@ -162,8 +186,9 @@ class TradeService:
         else:
             existing.compute_pnl()
 
-        self.db.commit()
-        self.db.refresh(existing)
+        if not defer_commit:
+            self.db.commit()
+            self.db.refresh(existing)
         return existing
 
     def pyramid_trade(self, trade_id: int, entry_price: Decimal, quantity: Decimal,
@@ -205,7 +230,8 @@ class TradeService:
 
     def merge_duplicates(self, user_id: Optional[int] = None) -> int:
         """Find and merge trades with same (symbol, date, open/closed state).
-        Reassigns all child records before deleting duplicates.
+        Reassigns child records, handles ExecutionGrade unique constraint,
+        and commits atomically. Each kept trade gets compute_pnl called.
         Returns count of merged duplicates."""
         from collections import defaultdict
         from app.models.trade_timeline import TradeTimeline
@@ -224,11 +250,13 @@ class TradeService:
             groups[key].append(t)
 
         merged_count = 0
+        kept_trade_ids = set()
         for key, group in groups.items():
             if len(group) <= 1:
                 continue
             group.sort(key=lambda t: t.entry_time)
             keep = group[0]
+            kept_trade_ids.add(keep.id)
             for dup in group[1:]:
                 dup_data = {
                     "symbol": dup.symbol,
@@ -254,19 +282,36 @@ class TradeService:
                     else:
                         keep.tags = dup.tags
 
-                self._merge_trade(keep, dup_data)
+                self._merge_trade(keep, dup_data, defer_commit=True)
 
                 self.db.query(PartialExit).filter(PartialExit.trade_id == dup.id).update({"trade_id": keep.id})
                 self.db.query(TradeTimeline).filter(TradeTimeline.trade_id == dup.id).update({"trade_id": keep.id})
                 self.db.query(EmotionLog).filter(EmotionLog.trade_id == dup.id).update({"trade_id": keep.id})
                 self.db.query(StopHistory).filter(StopHistory.trade_id == dup.id).update({"trade_id": keep.id})
-                self.db.query(ExecutionGrade).filter(ExecutionGrade.trade_id == dup.id).update({"trade_id": keep.id})
+
+                # ExecutionGrade has unique trade_id — delete duplicate if keep already has one
+                dup_grade = self.db.query(ExecutionGrade).filter(ExecutionGrade.trade_id == dup.id).first()
+                if dup_grade:
+                    keep_grade = self.db.query(ExecutionGrade).filter(ExecutionGrade.trade_id == keep.id).first()
+                    if keep_grade:
+                        # Both have grades — discard the duplicate's grade (keep wins)
+                        self.db.delete(dup_grade)
+                        self.db.flush()
+                    else:
+                        # Only dup has a grade — reassign to kept trade before deleting dup
+                        dup_grade.trade_id = keep.id
+                        self.db.flush()
 
                 self.db.delete(dup)
                 merged_count += 1
 
+        # Recompute P&L for every kept trade that absorbed duplicates
+        for tid in kept_trade_ids:
+            trade = self.db.query(Trade).filter(Trade.id == tid).first()
+            if trade:
+                trade.compute_pnl()
+
         if merged_count > 0:
-            keep.compute_pnl()
             self.db.commit()
         return merged_count
 

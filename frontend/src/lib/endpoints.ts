@@ -380,11 +380,11 @@ export function listPartialExits(tradeId: number) {
 }
 
 export function createPartialExit(tradeId: number, payload: import('@/types').PartialExitCreatePayload) {
-  return apiClient.post<import('@/types').PartialExit>(`/trades/${tradeId}/partial-exits`, payload).then(r => r.data)
+  return apiClient.post<{ partial_exit: import('@/types').PartialExit; trade: import('@/types').ApiTrade }>(`/trades/${tradeId}/partial-exits`, payload).then(r => r.data)
 }
 
 export function deletePartialExit(tradeId: number, exitId: number) {
-  return apiClient.delete(`/trades/${tradeId}/partial-exits/${exitId}`).then(() => {})
+  return apiClient.delete<{ trade: import('@/types').ApiTrade }>(`/trades/${tradeId}/partial-exits/${exitId}`).then(r => r.data)
 }
 
 // ───────────────────────── Emotion Logs ─────────────────────────

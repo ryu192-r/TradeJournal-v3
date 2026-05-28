@@ -36,7 +36,7 @@ def _headers(token: str) -> dict:
 
 class TestPartialExitAPI:
     def test_create_partial_exit_returns_enriched_trade(self, client, auth_user_token):
-        """GET trade after partial exit should include partial_realized_pnl and remaining_qty."""
+        """POST partial exit returns both partial_exit and enriched trade."""
         r = client.post("/api/v1/trades/", json=TRADE, headers=_headers(auth_user_token))
         trade_id = r.json()["id"]
 
@@ -46,10 +46,10 @@ class TestPartialExitAPI:
             headers=_headers(auth_user_token),
         )
         assert r.status_code == 201
-
-        r = client.get(f"/api/v1/trades/{trade_id}", headers=_headers(auth_user_token))
-        trade = r.json()
-        assert trade["remaining_qty"] is not None
+        body = r.json()
+        assert "partial_exit" in body
+        assert "trade" in body
+        trade = body["trade"]
         assert float(trade["remaining_qty"]) == 6.0
         assert trade["partial_realized_pnl"] is not None
         assert float(trade["partial_realized_pnl"]) > 0
@@ -64,13 +64,13 @@ class TestPartialExitAPI:
             json=PARTIAL,
             headers=_headers(auth_user_token),
         )
-        exit_id = r.json()["id"]
+        exit_id = r.json()["partial_exit"]["id"]
 
         r = client.delete(
             f"/api/v1/trades/{trade_id}/partial-exits/{exit_id}",
             headers=_headers(auth_user_token),
         )
-        assert r.status_code == 204
+        assert r.status_code == 200
 
         r = client.get(f"/api/v1/trades/{trade_id}", headers=_headers(auth_user_token))
         trade = r.json()
@@ -130,7 +130,7 @@ class TestPartialExitAPI:
             json=PARTIAL,
             headers=_headers(token_a),
         )
-        exit_id = r.json()["id"]
+        exit_id = r.json()["partial_exit"]["id"]
 
         r = client.delete(
             f"/api/v1/trades/{trade_id}/partial-exits/{exit_id}",

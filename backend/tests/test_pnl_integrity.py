@@ -519,8 +519,9 @@ class TestMergeSafety:
         assert t1.quantity == Decimal("10")
         assert t2.quantity == Decimal("5")
 
-    def test_broker_import_merges_same_day_open(self, db_session):
-        """Broker import (allow_merge=True) merges same-day open trades."""
+    def test_broker_import_merges_exact_duplicate(self, db_session):
+        """Broker import (allow_merge=True) merges only when the exact signature
+        matches: same symbol, entry_price, quantity, entry_time, exit_price, exit_time."""
         user = _make_user(db_session)
         svc = TradeService(db_session)
         t1, a1 = svc.merge_or_create({
@@ -531,6 +532,34 @@ class TestMergeSafety:
             "entry_time": datetime.fromisoformat("2025-01-13T09:30:00"),
             "user_id": user.id,
         }, allow_merge=True)
+        # Same exact signature → merges
+        t2, a2 = svc.merge_or_create({
+            "symbol": "RELIANCE",
+            "direction": "LONG",
+            "entry_price": Decimal("100"),
+            "quantity": Decimal("10"),
+            "entry_time": datetime.fromisoformat("2025-01-13T09:30:00"),
+            "user_id": user.id,
+        }, allow_merge=True)
+
+        assert a1 == "created"
+        assert a2 == "merged"
+        assert t1.id == t2.id
+
+    def test_broker_import_does_not_merge_different_price(self, db_session):
+        """Broker import does NOT merge trades with different entry prices
+        on the same day — they are separate trades."""
+        user = _make_user(db_session)
+        svc = TradeService(db_session)
+        t1, a1 = svc.merge_or_create({
+            "symbol": "RELIANCE",
+            "direction": "LONG",
+            "entry_price": Decimal("100"),
+            "quantity": Decimal("10"),
+            "entry_time": datetime.fromisoformat("2025-01-13T09:30:00"),
+            "user_id": user.id,
+        }, allow_merge=True)
+        # Different entry price → creates separate trade
         t2, a2 = svc.merge_or_create({
             "symbol": "RELIANCE",
             "direction": "LONG",
@@ -541,8 +570,8 @@ class TestMergeSafety:
         }, allow_merge=True)
 
         assert a1 == "created"
-        assert a2 == "merged"
-        assert t1.id == t2.id
+        assert a2 == "created"
+        assert t1.id != t2.id
 
     def test_pyramid_endpoint_still_works(self, db_session):
         """Explicit pyramid endpoint still works."""
@@ -681,6 +710,85 @@ class TestMergeDuplicatesChildData:
         orphans_tl = db_session.query(TradeTimeline).filter(~TradeTimeline.trade_id.in_(surviving_ids)).all()
         assert len(orphans_pe) == 0
         assert len(orphans_tl) == 0
+
+    def test_execution_grade_unique_constraint_handled(self, db_session):
+        """merge_duplicates handles ExecutionGrade unique trade_id — deletes
+        duplicate if kept trade already has one, reassigns otherwise."""
+        from app.models.execution_grade import ExecutionGrade
+        user = _make_user(db_session)
+        t1 = _trade(user.id, symbol="EG", quantity=Decimal("10"))
+        t2 = _trade(user.id, symbol="EG", quantity=Decimal("10"),
+                     entry_time=datetime.fromisoformat("2025-01-13T10:00:00"))
+        db_session.add_all([t1, t2])
+        db_session.commit()
+        db_session.refresh(t1)
+        db_session.refresh(t2)
+
+        db_session.add(ExecutionGrade(trade_id=t1.id, overall_grade="A", entry_quality="A"))
+        db_session.add(ExecutionGrade(trade_id=t2.id, overall_grade="C", entry_quality="C"))
+        db_session.commit()
+
+        svc = TradeService(db_session)
+        merged = svc.merge_duplicates(user_id=user.id)
+
+        assert merged >= 1
+        surviving_grades = db_session.query(ExecutionGrade).filter(ExecutionGrade.trade_id == t1.id).all()
+        assert len(surviving_grades) == 1
+        assert surviving_grades[0].overall_grade == "A"
+
+    def test_execution_grade_reassigned_when_keep_has_none(self, db_session):
+        """If keep trade has no ExecutionGrade, dup's grade is reassigned."""
+        from app.models.execution_grade import ExecutionGrade
+        user = _make_user(db_session)
+        t1 = _trade(user.id, symbol="EG2", quantity=Decimal("10"))
+        t2 = _trade(user.id, symbol="EG2", quantity=Decimal("10"),
+                     entry_time=datetime.fromisoformat("2025-01-13T10:00:00"))
+        db_session.add_all([t1, t2])
+        db_session.commit()
+        db_session.refresh(t1)
+        db_session.refresh(t2)
+
+        db_session.add(ExecutionGrade(trade_id=t2.id, overall_grade="B", entry_quality="B"))
+        db_session.commit()
+
+        svc = TradeService(db_session)
+        merged = svc.merge_duplicates(user_id=user.id)
+
+        assert merged >= 1
+        surviving_grades = db_session.query(ExecutionGrade).filter(ExecutionGrade.trade_id == t1.id).all()
+        assert len(surviving_grades) == 1
+        assert surviving_grades[0].overall_grade == "B"
+
+    def test_each_kept_trade_gets_pnl_recomputed(self, db_session):
+        """When multiple duplicate groups are merged, each kept trade gets compute_pnl."""
+        user = _make_user(db_session)
+        # Group 1: symbol A (closed trades so PnL is computed)
+        t1a = _trade(user.id, symbol="AAA", quantity=Decimal("10"), entry_price=Decimal("100"),
+                      exit_price=Decimal("120"), exit_time=datetime.fromisoformat("2025-01-13T15:00:00"))
+        t1b = _trade(user.id, symbol="AAA", quantity=Decimal("10"), entry_price=Decimal("110"),
+                     entry_time=datetime.fromisoformat("2025-01-13T10:00:00"),
+                     exit_price=Decimal("130"), exit_time=datetime.fromisoformat("2025-01-13T16:00:00"))
+        # Group 2: symbol B (closed trades)
+        t2a = _trade(user.id, symbol="BBB", quantity=Decimal("20"), entry_price=Decimal("200"),
+                      exit_price=Decimal("240"), exit_time=datetime.fromisoformat("2025-01-13T15:00:00"))
+        t2b = _trade(user.id, symbol="BBB", quantity=Decimal("20"), entry_price=Decimal("210"),
+                     entry_time=datetime.fromisoformat("2025-01-13T10:00:00"),
+                     exit_price=Decimal("250"), exit_time=datetime.fromisoformat("2025-01-13T16:00:00"))
+        db_session.add_all([t1a, t1b, t2a, t2b])
+        db_session.commit()
+        for t in [t1a, t1b, t2a, t2b]:
+            db_session.refresh(t)
+
+        svc = TradeService(db_session)
+        merged = svc.merge_duplicates(user_id=user.id)
+
+        assert merged >= 2
+        db_session.refresh(t1a)
+        db_session.refresh(t2a)
+        assert t1a.quantity == Decimal("20")
+        assert t2a.quantity == Decimal("40")
+        assert t1a.pnl is not None
+        assert t2a.pnl is not None
 
 
 # ── User isolation for partial exits ──

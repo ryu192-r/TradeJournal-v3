@@ -6,7 +6,7 @@ import {
 } from '@/lib/queryInvalidation'
 import { span } from '@/utils/performance'
 import { useRef } from 'react'
-import type { PartialExit, PartialExitCreatePayload, PartialExitListResponse } from '@/types'
+import type { PartialExit, PartialExitCreatePayload, PartialExitListResponse, ApiTrade } from '@/types'
 
 export function usePartialExitsQuery(tradeId: number | null) {
   return useQuery<PartialExitListResponse>({
@@ -20,7 +20,7 @@ export function usePartialExitsQuery(tradeId: number | null) {
 export function useCreatePartialExitMutation() {
   const qc = useQueryClient()
   const endSpanRef = useRef<(() => void) | null>(null)
-  return useMutation<PartialExit, Error, { tradeId: number; payload: PartialExitCreatePayload }>({
+  return useMutation<{ partial_exit: PartialExit; trade: ApiTrade }, Error, { tradeId: number; payload: PartialExitCreatePayload }>({
     mutationKey: ['partial-exit', 'create'],
     mutationFn: ({ tradeId, payload }) => createPartialExit(tradeId, payload),
     onMutate: () => {
@@ -47,7 +47,7 @@ export function useCreatePartialExitMutation() {
 export function useDeletePartialExitMutation() {
   const qc = useQueryClient()
   const endSpanRef = useRef<(() => void) | null>(null)
-  return useMutation<void, Error, { tradeId: number; exitId: number }>({
+  return useMutation<{ trade: ApiTrade }, Error, { tradeId: number; exitId: number }>({
     mutationKey: ['partial-exit', 'delete'],
     mutationFn: ({ tradeId, exitId }) => deletePartialExit(tradeId, exitId),
     onMutate: () => {
