@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Target, Loader2, Edit3, Trash2, ShieldAlert, Info,
-  CalendarClock, NotebookPen, Tag, AlertTriangle,
+  CalendarClock, NotebookPen, Tag, AlertTriangle, BarChart3, Image,
 } from 'lucide-react'
 import { ChartImageGallery } from '@/components/trades/ChartImageGallery'
+import { TradeLightweightChart } from '@/components/charts/TradeLightweightChart'
 import { LifecycleReviewPanel } from '@/components/lifecycle/LifecycleReviewPanel'
 import { useTradeReviewMutation } from '@/hooks/useTradeReviewMutation'
 import { useDeleteTradeMutation } from '@/hooks/useTradeMutation'
@@ -330,6 +331,47 @@ function AiReviewCard({ review }: { review: TradeReviewResponse }) {
   )
 }
 
+/* ── Chart Tabs ── */
+
+type ChartTab = 'dynamic' | 'uploads'
+
+function ChartTabs({ trade }: { trade: ApiTrade }) {
+  const [tab, setTab] = useState<ChartTab>('dynamic')
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setTab('dynamic')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[length:var(--text-xs)] rounded-lg transition-colors ${
+            tab === 'dynamic'
+              ? 'bg-accent text-accent-foreground font-medium'
+              : 'text-text-muted hover:text-text hover:bg-border'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          Dynamic Chart
+        </button>
+        <button
+          onClick={() => setTab('uploads')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[length:var(--text-xs)] rounded-lg transition-colors ${
+            tab === 'uploads'
+              ? 'bg-accent text-accent-foreground font-medium'
+              : 'text-text-muted hover:text-text hover:bg-border'
+          }`}
+        >
+          <Image className="w-3.5 h-3.5" />
+          Uploaded Images
+        </button>
+      </div>
+      {tab === 'dynamic' ? (
+        <TradeLightweightChart trade={trade} />
+      ) : (
+        <ChartImageGallery tradeId={trade.id} images={trade.chart_images ?? []} />
+      )}
+    </div>
+  )
+}
+
 /* ── Main ── */
 
 interface TradeDetailContentProps {
@@ -427,7 +469,7 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
       </div>
 
       <div>
-        <ChartImageGallery tradeId={trade.id} images={trade.chart_images ?? []} />
+        <ChartTabs trade={trade} />
       </div>
 
       {trade.notes && (

@@ -611,3 +611,14 @@ export function getMonthlyReview(month: string) {
 export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
   return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
 }
+
+// ────────────────────────── Chart Data ──────────────────────────
+
+export function getTradeChartData(tradeId: number, params?: { timeframe?: string; range?: string; source?: string }) {
+  const searchParams = new URLSearchParams()
+  if (params?.timeframe) searchParams.append('timeframe', params.timeframe)
+  if (params?.range) searchParams.append('range', params.range)
+  if (params?.source) searchParams.append('source', params.source)
+  const qs = searchParams.toString()
+  return apiClient.get<import('@/types/chart').TradeChartData>(`/trades/${tradeId}/chart-data${qs ? `?${qs}` : ''}`).then(r => r.data)
+}

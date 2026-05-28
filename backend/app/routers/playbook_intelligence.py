@@ -27,6 +27,7 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.setup_playbook import SetupPlaybook
 from app.utils.calculations import compute_aggregate_kpis
+from app.utils.pnl_helpers import get_realized_pnl_events
 from app.core.dependencies import get_current_user
 from app.models.user import User
 
@@ -405,10 +406,17 @@ def playbook_intelligence_overview(
     if not setups:
         return {"setups": [], "best_by_expectancy": None, "best_by_win_rate": None, "best_by_pnl": None}
 
+    # Fetch partial exit realized PnL events for open trades in this period
+    realized_events = get_realized_pnl_events(db, current_user.id, start, end) if start and end else []
+    pe_by_setup: dict[str, list] = defaultdict(list)
+    for ev in realized_events:
+        if ev.source == "partial_exit":
+            pe_by_setup[ev.setup or "Unassigned"].append(ev)
+
     results = []
     for sp in setups:
         trades = _get_setup_trades(db, sp.name, start, end, current_user.id)
-        if not trades:
+        if not trades and sp.name not in pe_by_setup:
             results.append({
                 "setup_id": sp.id,
                 "setup_name": sp.name,
@@ -423,6 +431,23 @@ def playbook_intelligence_overview(
             continue
 
         perf = _compute_performance(trades)
+
+        # Merge partial exit PnL into setup stats
+        partial_events = pe_by_setup.get(sp.name, [])
+        if partial_events:
+            pe_pnl = sum(ev.pnl for ev in partial_events)
+            pe_wins = sum(1 for ev in partial_events if ev.pnl > 0)
+            total_pnl_val = Decimal(str(perf["total_pnl"])) + pe_pnl if perf["total_pnl"] is not None else pe_pnl
+            perf["total_pnl"] = total_pnl_val
+            perf["closed_count"] = perf["closed_count"] + len(partial_events)
+            closed_with_pe = perf["trade_count"] + len(partial_events)
+            all_wins = (perf.get("win_rate") or 0) / 100 * perf.get("closed_count", 0) if perf.get("win_rate") else 0
+            all_wins += pe_wins
+            perf["win_rate"] = round(all_wins / closed_with_pe * 100, 1) if closed_with_pe > 0 else None
+            # Recalculate expectancy with partial exits
+            if perf.get("expectancy") is not None:
+                perf["expectancy"] = round(perf["expectancy"] + pe_pnl / len(partial_events) * (len(partial_events) / max(perf["closed_count"], 1)), 2)
+
         results.append({
             "setup_id": sp.id,
             "setup_name": sp.name,
@@ -468,7 +493,11 @@ def setup_intelligence(
 
     trades = _get_setup_trades(db, setup_name, start, end, current_user.id)
 
-    if not trades:
+    # Fetch partial exit realized PnL events for this setup
+    realized_events = get_realized_pnl_events(db, current_user.id, start, end) if start and end else []
+    partial_events = [ev for ev in realized_events if ev.source == "partial_exit" and (ev.setup or "Unassigned") == setup_name]
+
+    if not trades and not partial_events:
         return {
             "setup_name": setup_name,
             "description": playbook.description,
@@ -484,6 +513,14 @@ def setup_intelligence(
             "recent_trades": [],
         }
 
+    perf = _compute_performance(trades)
+    if partial_events:
+        pe_pnl = sum(ev.pnl for ev in partial_events)
+        pe_wins = sum(1 for ev in partial_events if ev.pnl > 0)
+        total_pnl_val = Decimal(str(perf["total_pnl"])) + pe_pnl if perf["total_pnl"] is not None else pe_pnl
+        perf["total_pnl"] = total_pnl_val
+        perf["closed_count"] = perf["closed_count"] + len(partial_events)
+
     closed_trades = [t for t in trades if t.exit_price is not None]
     recent = sorted(closed_trades, key=lambda t: t.entry_time or datetime.min, reverse=True)[:10]
 
@@ -493,7 +530,7 @@ def setup_intelligence(
         "ideal_conditions": playbook.ideal_conditions,
         "risk_profile": playbook.risk_profile,
         "rules": playbook.rules,
-        "performance": _compute_performance(trades),
+        "performance": perf,
         "hold_time": _compute_hold_time(trades),
         "market_conditions": _compute_market_conditions(trades),
         "failure_patterns": _compute_failure_patterns(trades),
