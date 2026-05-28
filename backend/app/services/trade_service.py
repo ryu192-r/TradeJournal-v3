@@ -93,6 +93,41 @@ class TradeService:
 
     # ─── Core import API ─────────────────────────
 
+    def preview_import_decision(self, trade_data: dict) -> str:
+        """Determine import decision without mutating DB. Returns 'import' | 'skip'.
+        Checks same dedup chain as import_trade (fingerprint → external_order_id → exact_signature)."""
+        user_id = trade_data.get("user_id")
+        if not user_id:
+            return "import"
+
+        fingerprint = self.compute_fingerprint(trade_data)
+
+        # 1. fingerprint duplicate
+        if self.get_by_import_fingerprint(user_id, fingerprint):
+            return "skipped"
+
+        # 2. external_order_id duplicate
+        ext_id = trade_data.get("external_order_id")
+        if ext_id:
+            if self.get_by_external_order_id(user_id, ext_id, trade_data.get("symbol", "")):
+                return "skipped"
+
+        # 3. exact signature fallback
+        entry_time = trade_data.get("entry_time")
+        if entry_time:
+            if self.get_by_exact_signature(
+                symbol=trade_data["symbol"],
+                entry_price=trade_data.get("entry_price"),
+                quantity=trade_data.get("quantity"),
+                entry_time=entry_time,
+                exit_price=trade_data.get("exit_price"),
+                exit_time=trade_data.get("exit_time"),
+                user_id=user_id,
+            ):
+                return "skipped"
+
+        return "import"
+
     def import_trade(self, trade_data: dict, defer_commit: bool = False) -> Tuple[Trade, str, dict]:
         """Import-aware create/update with idempotency.
 

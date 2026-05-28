@@ -203,13 +203,8 @@ async def import_broker_csv(
             continue
 
         if dry_run:
-            # Exact duplicate check for preview
-            trade_data["user_id"] = current_user.id
-            existing = svc.get_by_import_fingerprint(
-                user_id=current_user.id,
-                fingerprint=svc.compute_fingerprint(trade_data),
-            )
-            if existing:
+            decision = svc.preview_import_decision(trade_data)
+            if decision == "skipped":
                 preview_row["_skipped"] = True
                 skipped += 1
             else:
@@ -217,12 +212,11 @@ async def import_broker_csv(
             preview_rows.append(preview_row)
             continue
 
-        # Import
+        # Import with deferred commit
         try:
-            trade, action, info = svc.import_trade(trade_data)
+            trade, action, info = svc.import_trade(trade_data, defer_commit=True)
         except Exception as e:
             logger.warning("import_row_failed", row=i, error=str(e), user_id=current_user.id)
-            db.rollback()
             row_errors.append({"row": i, "reason": str(e)})
             preview_row["_error"] = str(e)
             preview_rows.append(preview_row)
@@ -261,15 +255,30 @@ async def import_broker_csv(
             "warnings": [],
         }
 
-    # Post-import side effects (once)
-    for setup_name in setups_seen:
-        _update_setup_stats(db, setup_name, user_id=current_user.id)
+    # Post-import side effects — single atomic commit for all rows + side effects
+    try:
+        for setup_name in setups_seen:
+            _update_setup_stats(db, setup_name, user_id=current_user.id)
 
-    if added or updated:
-        db.commit()
-        account = db.query(Account).filter(Account.user_id == current_user.id).first()
-        if account:
-            _reconcile_account(account.id, db, user_id=current_user.id)
+        if added or updated:
+            db.commit()
+            account = db.query(Account).filter(Account.user_id == current_user.id).first()
+            if account:
+                _reconcile_account(account.id, db, user_id=current_user.id)
+                db.commit()
+    except Exception as e:
+        logger.warning("broker_import_side_effects_failed", user_id=current_user.id, error=str(e))
+        db.rollback()
+        return {
+            "status": "error",
+            "added": added,
+            "skipped": skipped,
+            "updated": updated,
+            "errors": [{"row": "side_effects", "reason": str(e)}],
+            "total": len(rows),
+            "preview": preview_rows[:50],
+            "warnings": warnings,
+        }
 
     logger.info(
         "broker_import_completed",

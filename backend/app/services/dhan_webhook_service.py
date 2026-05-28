@@ -51,9 +51,22 @@ class DhanWebhookService:
         target_price: Optional[Decimal] = None,
         remarks: Optional[str] = None,
         event_id: Optional[str] = None,
+        defer_commit: bool = False,
     ) -> Tuple[Optional[Trade], Optional[WebhookProcessingError]]:
-        """Process single webhook event. Matches open trade by symbol + direction + user_id."""
+        """Process single webhook event. Matches open trade by symbol + direction + user_id.
+
+        Persistent dedup: checks TradeTimeline for event_id before processing.
+        Returns early (None, None) if event_id was already processed.
+        """
         try:
+            if event_id:
+                existing_tl = self.db.query(TradeTimeline).filter(
+                    TradeTimeline.note.like(f"%event_id={event_id}%"),
+                ).first()
+                if existing_tl:
+                    self.logger.info("webhook_event_already_processed", event_id=event_id)
+                    return None, None
+
             trade = self._find_matching_trade(symbol, direction)
             if not trade:
                 self.logger.info("no_matching_trade", symbol=symbol, direction=direction, user_id=self.user_id, event_id=event_id)
@@ -87,7 +100,6 @@ class DhanWebhookService:
                     timestamp=exit_time,
                 )
 
-            # timeline event
             tl = TradeTimeline(
                 trade_id=trade.id,
                 event_type="trade_closed",
@@ -96,12 +108,12 @@ class DhanWebhookService:
             )
             self.db.add(tl)
 
-            self.db.commit()
-            self.db.refresh(trade)
-
             _update_setup_stats(self.db, trade.setup, user_id=self.user_id)
             _auto_reconcile(self.db, user_id=self.user_id)
-            self.db.commit()
+
+            if not defer_commit:
+                self.db.commit()
+                self.db.refresh(trade)
 
             self.logger.info(
                 "trade_closed_via_webhook",

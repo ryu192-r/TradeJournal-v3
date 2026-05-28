@@ -125,28 +125,38 @@ class TestDhanSyncIdempotency:
 
 class TestDhanWebhookSecurity:
     def test_user_id_from_env(self):
+        import importlib
+        import app.routers.dhan_webhook as dhan_webhook_mod
         os.environ["DHAN_WEBHOOK_USER_ID"] = "1"
-        from app.routers.dhan_webhook import _get_webhook_user_id
-        assert _get_webhook_user_id() == 1
+        importlib.reload(dhan_webhook_mod)
+        assert dhan_webhook_mod._get_webhook_user_id() == 1
         del os.environ["DHAN_WEBHOOK_USER_ID"]
+        importlib.reload(dhan_webhook_mod)
 
     def test_user_id_missing_raises(self):
+        import importlib
+        import app.routers.dhan_webhook as dhan_webhook_mod
         if "DHAN_WEBHOOK_USER_ID" in os.environ:
             del os.environ["DHAN_WEBHOOK_USER_ID"]
-        from app.routers.dhan_webhook import _get_webhook_user_id
+        importlib.reload(dhan_webhook_mod)
         from fastapi import HTTPException
         with pytest.raises(HTTPException) as exc:
-            _get_webhook_user_id()
+            dhan_webhook_mod._get_webhook_user_id()
         assert exc.value.status_code == 403
+        importlib.reload(dhan_webhook_mod)
 
     def test_signature_verification(self):
-        from app.routers.dhan_webhook import _verify_webhook_signature
-        secret = "mysecret"
-        payload = b'{"test":1}'
+        import importlib
+        import app.routers.dhan_webhook as dhan_webhook_mod
+        os.environ["DHAN_WEBHOOK_SECRET"] = "mysecret"
+        importlib.reload(dhan_webhook_mod)
+        raw_body = b'{"test":1}'
         import hmac, hashlib
-        sig = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-        assert _verify_webhook_signature(payload, sig, secret) is True
-        assert _verify_webhook_signature(payload, "bad", secret) is False
+        sig = hmac.new("mysecret".encode(), raw_body, hashlib.sha256).hexdigest()
+        assert dhan_webhook_mod._verify_webhook_signature(raw_body, sig) is True
+        assert dhan_webhook_mod._verify_webhook_signature(raw_body, "bad") is False
+        del os.environ["DHAN_WEBHOOK_SECRET"]
+        importlib.reload(dhan_webhook_mod)
 
 
 class TestDhanWebhookProcessing:

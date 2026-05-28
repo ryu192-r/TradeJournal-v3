@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Union
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Header
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Header, Request
 
 from app.db.database import get_db
 from app.schemas.webhook import (
@@ -21,7 +21,9 @@ from app.services.dhan_webhook_service import DhanWebhookService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/webhooks/dhan", tags=["dhan-webhook"])
+DHAN_WEBHOOK_SECRET = os.environ.get("DHAN_WEBHOOK_SECRET")
+DHAN_WEBHOOK_USER_ID = os.environ.get("DHAN_WEBHOOK_USER_ID")
+DHAN_WEBHOOK_DEDUP_HOURS = int(os.environ.get("DHAN_WEBHOOK_DEDUP_HOURS", "168"))
 
 
 def _parse_exit_time(timestamp_str: str) -> datetime:
@@ -39,22 +41,26 @@ def _parse_exit_time(timestamp_str: str) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
-    """Verify HMAC-SHA256 webhook signature."""
-    if not secret or not signature:
+router = APIRouter(prefix="/webhooks/dhan", tags=["dhan-webhook"])
+
+
+def _verify_webhook_signature(raw_body: bytes, signature: str) -> bool:
+    """Verify HMAC-SHA256 webhook signature against raw request body bytes."""
+    if not DHAN_WEBHOOK_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook secret not configured")
+    if not signature:
         return False
-    expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    expected = hmac.new(DHAN_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
 def _get_webhook_user_id() -> int:
     """Return fixed user_id for single-account personal webhook.
     Require DHAN_WEBHOOK_USER_ID env var."""
-    raw = os.environ.get("DHAN_WEBHOOK_USER_ID")
-    if not raw:
+    if not DHAN_WEBHOOK_USER_ID:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook user mapping not configured")
     try:
-        return int(raw)
+        return int(DHAN_WEBHOOK_USER_ID)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid DHAN_WEBHOOK_USER_ID")
 
@@ -70,22 +76,36 @@ def _get_webhook_user_id() -> int:
     },
 )
 async def handle_dhan_webhook(
-    event: DhanWebhookEvent,
+    request: Request,
     response: Response,
     x_webhook_signature: str | None = Header(default=None, alias="X-Webhook-Signature"),
     db=Depends(get_db),
 ) -> Union[WebhookTradeUpdateResponse, WebhookUnmatchedResponse]:
-    """Receive single Dhan order fill event. Requires X-Webhook-Signature header if DHAN_WEBHOOK_SECRET set."""
-    secret = os.environ.get("DHAN_WEBHOOK_SECRET")
-    if secret:
-        # Require signature
-        if not x_webhook_signature:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
-        import json
-        payload = json.dumps(event.model_dump(by_alias=True), separators=(",", ":")).encode("utf-8")
-        if not _verify_webhook_signature(payload, x_webhook_signature, secret):
-            logger.warning("webhook_signature_rejected", event_id=event.event_id)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
+    """Receive single Dhan order fill event. Requires X-Webhook-Signature header.
+    Secret is required when DHAN_WEBHOOK_SECRET is configured; without it, 403 is returned."""
+    # Read raw body for HMAC verification before any JSON parsing
+    raw_body = await request.body()
+
+    # Require secret — without it, webhook endpoints are disabled
+    if not DHAN_WEBHOOK_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook secret not configured")
+    if not x_webhook_signature:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
+    if not _verify_webhook_signature(raw_body, x_webhook_signature):
+        logger.warning("webhook_signature_rejected", event_id=getattr(getattr(request, '_body', None), 'event_id', 'unknown'))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
+
+    import json
+    try:
+        event_data = json.loads(raw_body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {e}")
+
+    # Parse into Pydantic model after verification
+    try:
+        event = DhanWebhookEvent(**event_data)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid payload: {e}")
 
     user_id = _get_webhook_user_id()
     svc = DhanWebhookService(db, user_id=user_id)
@@ -106,13 +126,16 @@ async def handle_dhan_webhook(
         target_price=event.target_price,
         remarks=event.remarks,
         event_id=event.event_id,
+        defer_commit=True,
     )
 
     if error:
+        db.rollback()
         logger.error("webhook_processing_error", event_id=event.event_id, symbol=event.symbol, error=str(error))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error))
 
     if trade:
+        db.commit()
         return WebhookTradeUpdateResponse(
             trade_id=trade.id,
             symbol=trade.symbol,
@@ -137,20 +160,32 @@ async def handle_dhan_webhook(
     response_model=WebhookBatchResponse,
 )
 async def handle_dhan_webhook_batch(
-    events: list[DhanWebhookEvent],
+    request: Request,
     x_webhook_signature: str | None = Header(default=None, alias="X-Webhook-Signature"),
     db=Depends(get_db),
 ) -> WebhookBatchResponse:
-    """Process batch webhook events."""
-    secret = os.environ.get("DHAN_WEBHOOK_SECRET")
-    if secret:
-        if not x_webhook_signature:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
-        import json
-        payload = json.dumps([e.model_dump(by_alias=True) for e in events], separators=(",", ":")).encode("utf-8")
-        if not _verify_webhook_signature(payload, x_webhook_signature, secret):
-            logger.warning("batch_webhook_signature_rejected", event_count=len(events))
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
+    """Process batch webhook events atomically in a single transaction.
+    Requires X-Webhook-Signature header when DHAN_WEBHOOK_SECRET is configured."""
+    raw_body = await request.body()
+
+    if not DHAN_WEBHOOK_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook secret not configured")
+    if not x_webhook_signature:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
+    if not _verify_webhook_signature(raw_body, x_webhook_signature):
+        logger.warning("batch_webhook_signature_rejected", event_count="unknown")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
+
+    import json
+    try:
+        events_data = json.loads(raw_body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {e}")
+
+    try:
+        events = [DhanWebhookEvent(**e) for e in events_data]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid payload: {e}")
 
     user_id = _get_webhook_user_id()
     svc = DhanWebhookService(db, user_id=user_id)
@@ -159,11 +194,11 @@ async def handle_dhan_webhook_batch(
     matched_count = 0
     unmatched_count = 0
     error_count = 0
-    seen_ids = set()
+    seen_ids: set = set()
 
     for event in events:
-        # Replay dedup
-        if event.event_id in seen_ids:
+        # In-batch dedup: skip if same event_id appears twice in this batch
+        if event.event_id and event.event_id in seen_ids:
             unmatched_count += 1
             results.append(WebhookBatchResultEntry(
                 event_id=event.event_id,
@@ -171,7 +206,8 @@ async def handle_dhan_webhook_batch(
                 status="duplicate",
             ))
             continue
-        seen_ids.add(event.event_id)
+        if event.event_id:
+            seen_ids.add(event.event_id)
 
         is_sell = event.transaction_type.upper() == "SELL"
         is_buy = event.transaction_type.upper() == "BUY"
@@ -189,6 +225,7 @@ async def handle_dhan_webhook_batch(
             target_price=event.target_price,
             remarks=event.remarks,
             event_id=event.event_id,
+            defer_commit=True,
         )
 
         if error:
@@ -215,6 +252,14 @@ async def handle_dhan_webhook_batch(
                 symbol=event.symbol,
                 status="unmatched",
             ))
+
+    # Single atomic commit for entire batch after all events processed
+    try:
+        db.commit()
+    except Exception as e:
+        logger.error("batch_commit_failed", error=str(e), event_count=len(events))
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Batch commit failed")
 
     return WebhookBatchResponse(
         total_events=len(events),

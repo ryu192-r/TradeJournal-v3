@@ -63,7 +63,7 @@ def sync_dhan_trades(
                     "fees": 0,
                     "external_order_id": oid,
                     "import_source": "dhan_sync",
-                })
+                }, defer_commit=True)
             except Exception as e:
                 logger.warning("dhan_sync_import_failed", user_id=current_user.id, oid=oid, error=str(e))
                 errors.append({"oid": oid, "error": str(e)})
@@ -79,44 +79,27 @@ def sync_dhan_trades(
             if trade and trade.setup:
                 setups_seen.add(trade.setup)
 
-        # Unmatched CLOSE legs (single-leg close without open)
+        # Unmatched CLOSE legs — trade unmatched, not an invalid import
         for oid, close_leg in closes.items():
             if oid in opens:
                 continue
-            try:
-                trade, action, _ = trade_svc.import_trade({
-                    "user_id": current_user.id,
-                    "symbol": close_leg.trading_symbol,
-                    "direction": "LONG",
-                    "entry_price": None,
-                    "exit_price": close_leg.price,
-                    "quantity": close_leg.quantity,
-                    "entry_time": parse_datetime(close_leg.order_timestamp),
-                    "exit_time": parse_datetime(close_leg.order_timestamp),
-                    "fees": 0,
-                    "external_order_id": oid,
-                    "import_source": "dhan_sync",
-                })
-            except Exception as e:
-                logger.warning("dhan_sync_close_import_failed", user_id=current_user.id, oid=oid, error=str(e))
-                errors.append({"oid": oid, "error": str(e)})
-                db.rollback()
-                continue
+            errors.append({
+                "oid": oid,
+                "symbol": close_leg.trading_symbol,
+                "error": "unmatched_close_leg",
+                "detail": "No matching OPEN leg found for this CLOSE — not imported",
+            })
+            continue
 
-            if action == "created":
-                added += 1
-            elif action == "updated":
-                updated += 1
-            else:
-                skipped += 1
-            if trade and trade.setup:
-                setups_seen.add(trade.setup)
-
-    if added or updated:
-        for setup_name in setups_seen:
-            _update_setup_stats(db, setup_name, user_id=current_user.id)
-        _auto_reconcile(db, user_id=current_user.id)
-        db.commit()
+    if added or updated or errors:
+        try:
+            for setup_name in setups_seen:
+                _update_setup_stats(db, setup_name, user_id=current_user.id)
+            _auto_reconcile(db, user_id=current_user.id)
+            db.commit()
+        except Exception as e:
+            logger.warning("dhan_sync_side_effects_failed", user_id=current_user.id, error=str(e))
+            db.rollback()
 
     logger.info(
         "dhan_sync_completed",

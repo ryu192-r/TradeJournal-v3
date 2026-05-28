@@ -22,8 +22,21 @@ def upgrade() -> None:
     op.add_column('trades', sa.Column('external_order_id', sa.String(100), nullable=True))
     op.create_index('ix_trades_import_fingerprint', 'trades', ['user_id', 'import_fingerprint'])
 
+    # Partial unique index for PostgreSQL: prevents duplicate fingerprints per user.
+    # SQLite doesn't support partial unique indexes; app-level check covers SQLite.
+    # Using batch_alter_table for cross-database compatibility.
+    with op.batch_alter_table('trades') as batch_op:
+        batch_op.create_index(
+            'ix_trades_import_fingerprint_unique',
+            ['user_id', 'import_fingerprint'],
+            unique=True,
+            postgresql_where=sa.text('import_fingerprint IS NOT NULL'),
+        )
+
 
 def downgrade() -> None:
+    with op.batch_alter_table('trades') as batch_op:
+        batch_op.drop_index('ix_trades_import_fingerprint_unique', if_exists=True)
     op.drop_index('ix_trades_import_fingerprint', table_name='trades')
     op.drop_column('trades', 'external_order_id')
     op.drop_column('trades', 'import_fingerprint')
