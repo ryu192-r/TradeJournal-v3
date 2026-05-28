@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { createChart, CandlestickSeries, HistogramSeries, type IChartApi, type ISeriesApi, type CandlestickData, type Time, ColorType, CrosshairMode } from 'lightweight-charts'
+import { createChart, CandlestickSeries, HistogramSeries, createSeriesMarkers, type IChartApi, type ISeriesApi, type CandlestickData, type Time, ColorType, CrosshairMode } from 'lightweight-charts'
 import { useQuery } from '@tanstack/react-query'
 import { getTradeChartData } from '@/lib/endpoints'
 import type { ChartTimeframe, ChartRange, TradeChartData } from '@/types/chart'
@@ -47,14 +47,38 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
   const markers = useMemo(() => data?.markers ?? [], [data])
   const priceLines = useMemo(() => data?.price_lines ?? [], [data])
   const meta = data?.meta
+  const hasNoData = !isLoading && (candles.length === 0 || (meta && !meta.has_real_data && !meta.is_mock))
 
   const isDark = useMemo(() => {
     if (typeof document === 'undefined') return true
     return document.documentElement.getAttribute('data-theme') !== 'light'
   }, [])
 
+  // Empty-state panel — nothing to render on the chart
+  if (hasNoData && !error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
+        <BarChart3 className="w-10 h-10 opacity-40" />
+        <p className="text-sm font-medium text-text-heading">No candle data available</p>
+        <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
+          No historical data provider is configured yet. You can still upload chart screenshots using the "Uploaded Images" tab.
+        </p>
+        {meta?.message && (
+          <p className="text-[length:var(--text-xs)] text-text-muted italic">{meta.message}</p>
+        )}
+        <button
+          onClick={() => refetch()}
+          className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   useEffect(() => {
     if (!containerRef.current) return
+    if (candles.length === 0 && !meta?.is_mock) return
 
     if (chartRef.current) {
       chartRef.current.remove()
@@ -90,7 +114,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       wickDownColor: '#dc2626',
     })
 
-    const hasVolume = candles.length > 0 && candles.some(c => c.volume != null)
+    const hasVolume = candles.some(c => c.volume != null)
     let volumeSeries: ISeriesApi<'Histogram'> | null = null
     if (hasVolume) {
       volumeSeries = chart.addSeries(HistogramSeries, {
@@ -105,7 +129,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
     chartRef.current = chart
     candleSeriesRef.current = candleSeries
 
-    // Set data
+    // Set candle data
     const candleData: CandlestickData<Time>[] = candles.map(c => ({
       time: c.time as Time,
       open: c.open,
@@ -126,7 +150,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       volumeSeries.setData(volumeData)
     }
 
-    // Markers
+    // Markers — use createSeriesMarkers helper for v5 compatibility
     if (markers.length > 0) {
       const markerData = markers.map(m => ({
         time: m.time as Time,
@@ -135,8 +159,12 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         color: m.color,
         text: m.text,
       }))
-      // @ts-expect-error — lightweight-charts v5 setMarkers available at runtime
-      candleSeries.setMarkers(markerData)
+      try {
+        createSeriesMarkers(candleSeries, markerData)
+      } catch {
+        // Fallback: lightweight-charts v5 may not support createSeriesMarkers
+        // Markers will be absent but chart remains functional
+      }
     }
 
     // Price lines
@@ -262,8 +290,8 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       </div>
 
       {/* Meta info */}
-      {meta && !meta.has_real_data && meta.message && (
-        <p className="text-[length:var(--text-xs)] text-text-muted italic">{meta.message}</p>
+      {meta && meta.is_mock && (
+        <p className="text-[length:var(--text-xs)] text-amber-500/70">Mock data — for development only</p>
       )}
       {meta && meta.has_real_data && (
         <p className="text-[length:var(--text-xs)] text-text-muted">

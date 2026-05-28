@@ -33,6 +33,7 @@ class ChartAnnotationsResponse(BaseModel):
 
 class ChartMetaResponse(BaseModel):
     has_real_data: bool = False
+    is_mock: bool = False
     message: Optional[str] = None
 
 

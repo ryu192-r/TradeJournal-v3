@@ -239,3 +239,34 @@ class TestChartDataEndpoint:
         )
         assert resp.status_code == status.HTTP_200_OK
         assert resp.json()["range"] == "auto"
+
+    def test_invalid_source_returns_400(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?source=yfinance",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_mock_meta_includes_is_mock(self, client, db_session, auth_headers, monkeypatch):
+        from app.core import config
+        monkeypatch.setattr(config.settings, "DEBUG", True)
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?source=mock",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["meta"]["is_mock"] is True
+        assert data["meta"]["has_real_data"] is False
+
+    def test_non_mock_empty_data_is_not_mock(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?source=cache",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["meta"]["is_mock"] is False

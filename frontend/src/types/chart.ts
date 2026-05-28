@@ -38,6 +38,7 @@ export interface ChartAnnotations {
 
 export interface ChartMeta {
   has_real_data: boolean
+  is_mock: boolean
   message: string | null
 }
 

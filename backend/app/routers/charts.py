@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.dependencies import get_current_user, get_user_trade_or_404
 from app.models.user import User
-from app.models.trade import Trade
 from app.schemas.chart import ChartDataResponse
 from app.services.chart_data_service import (
     get_chart_data_for_trade,
     validate_timeframe,
     validate_range,
+    validate_source,
 )
 from app.utils.logging import get_logger
 
@@ -40,7 +40,9 @@ def get_trade_chart_data(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    if source == "mock" and not hasattr(current_user, 'is_active'):
-        pass
+    try:
+        validate_source(source)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     return get_chart_data_for_trade(db, trade, timeframe, range, source)

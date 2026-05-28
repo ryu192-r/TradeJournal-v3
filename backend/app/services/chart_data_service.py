@@ -23,6 +23,7 @@ IST = ZoneInfo("Asia/Kolkata")
 
 VALID_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "1d"}
 VALID_RANGES = {"auto", "1d", "5d", "1mo", "3mo", "6mo", "1y"}
+VALID_SOURCES = {"auto", "cache", "dhan", "mock"}
 
 MAX_CANDLES = 5000
 
@@ -37,6 +38,12 @@ def validate_range(range_: str) -> str:
     if range_ not in VALID_RANGES:
         raise ValueError(f"Invalid range '{range_}'. Allowed: {sorted(VALID_RANGES)}")
     return range_
+
+
+def validate_source(source: str) -> str:
+    if source not in VALID_SOURCES:
+        raise ValueError(f"Invalid source '{source}'. Allowed: {sorted(VALID_SOURCES)}")
+    return source
 
 
 def _timeframe_to_timedelta(tf: str) -> timedelta:
@@ -156,7 +163,8 @@ def upsert_candles(db: Session, candles: List[dict]) -> int:
                 source=c.get("source", "cache"),
             ))
             added += 1
-    db.commit()
+    if candles:
+        db.commit()
     return added
 
 
@@ -204,18 +212,22 @@ def _dt_to_unix(dt: datetime) -> int:
     return int(dt.timestamp())
 
 
-def build_chart_markers(trade: Trade, partials: List[PartialExit], candle_times: List[int]) -> Tuple[List[ChartMarkerResponse], List[PriceLineResponse], ChartAnnotationsResponse]:
+def build_chart_markers(trade: Trade, partials: List[PartialExit], candle_times: List[int], timeframe: str = "5m") -> Tuple[List[ChartMarkerResponse], List[PriceLineResponse], ChartAnnotationsResponse]:
     """Build markers and price lines from trade data."""
     markers: List[ChartMarkerResponse] = []
     price_lines: List[PriceLineResponse] = []
 
     entry_ts = _dt_to_unix(trade.entry_time) if trade.entry_time else None
 
+    max_snap_seconds = _timeframe_to_timedelta(timeframe).total_seconds() * 2
+    if max_snap_seconds < 300:
+        max_snap_seconds = 300
+
     def snap_to_candle(ts: int) -> int:
         if not candle_times:
             return ts
         best = min(candle_times, key=lambda c: abs(c - ts))
-        if abs(best - ts) <= 86400:
+        if abs(best - ts) <= max_snap_seconds:
             return best
         return ts
 
@@ -310,11 +322,11 @@ def get_chart_data_for_trade(
                 timeframe=timeframe,
                 range=range_,
                 source="mock",
-                meta=ChartMetaResponse(has_real_data=False, message="Mock data only available in DEBUG mode"),
+                meta=ChartMetaResponse(has_real_data=False, is_mock=False, message="Mock data only available in DEBUG mode"),
             )
         candles = _generate_mock_candles(trade, timeframe, start, end)
         candle_times = [c.time for c in candles]
-        markers, price_lines, annotations = build_chart_markers(trade, partials, candle_times)
+        markers, price_lines, annotations = build_chart_markers(trade, partials, candle_times, timeframe)
         return ChartDataResponse(
             trade_id=trade.id,
             symbol=trade.symbol,
@@ -325,7 +337,7 @@ def get_chart_data_for_trade(
             markers=markers,
             price_lines=price_lines,
             annotations=annotations,
-            meta=ChartMetaResponse(has_real_data=False, message="Mock data for development"),
+            meta=ChartMetaResponse(has_real_data=False, is_mock=True, message="Showing mock data for development"),
         )
 
     # Try cache first
@@ -379,7 +391,7 @@ def get_chart_data_for_trade(
         ))
 
     candle_times = [c.time for c in candles]
-    markers, price_lines, annotations = build_chart_markers(trade, partials, candle_times)
+    markers, price_lines, annotations = build_chart_markers(trade, partials, candle_times, timeframe)
 
     has_real = len(candles) > 0
     message = None if has_real else "No candle data available yet. Configure a historical data provider or upload screenshots."
