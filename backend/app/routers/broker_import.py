@@ -1,23 +1,27 @@
 """Broker import router — upload broker CSV files to import trades."""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import io
 import csv
 
 from app.db.database import get_db
 from app.models.trade import Trade
 from app.models.account import Account
+from app.models.trade_timeline import TradeTimeline
 from app.services.capital_service import _reconcile_account
 from app.services.setup_playbook_service import _update_setup_stats
-from app.services.broker_import import BROKER_PARSERS, BROKER_DISPLAY, GENERIC_REQUIRED
+from app.services.broker_import import BROKER_PARSERS, BROKER_DISPLAY, GENERIC_REQUIRED, parse_generic_csv
+from app.services.import_normalization import normalize_import_row, parse_datetime, parse_decimal
 from app.services.trade_service import TradeService
-from datetime import datetime
-from decimal import Decimal
 from app.core.dependencies import get_current_user
 from app.models.user import User
+from datetime import datetime
+from decimal import Decimal
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_user)], )
 
@@ -59,7 +63,7 @@ def download_template(broker: str):
             "stop_price": "2620",
             "target_price": "2750",
             "r_multiple": "1.5",
-            "status": "draft",
+            "status": "open",
             "notes": "Followed my rules - good entry",
         }
     elif broker == "zerodha":
@@ -85,7 +89,7 @@ def download_template(broker: str):
             "Trade Value", "Status",
         ]
         sample = {
-            "Date": "13/05/26",
+            "Date": "15/01/24",
             "Time": "09:20:30",
             "Name": "RELIANCE",
             "Buy/Sell": "BUY",
@@ -98,10 +102,14 @@ def download_template(broker: str):
             "Status": "Traded",
         }
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown broker '{broker}'. Supported: {list(BROKER_DISPLAY.keys())}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown broker '{broker}'. Supported: {list(BROKER_DISPLAY.keys())}",
+        )
 
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
     writer.writerow(sample)
     content = output.getvalue()
 
@@ -120,14 +128,11 @@ def download_template(broker: str):
 async def import_broker_csv(
     broker: str = Query(..., description="Broker id: zerodha, dhan, or generic"),
     file: UploadFile = File(...),
-    dry_run: bool = Query(False, description="If true, preview which rows would be skipped without importing"),
+    dry_run: bool = Query(False, description="Preview rows without importing"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upload a broker CSV and import trades.
-
-    Returns {status, added, skipped, total, errors, preview}.
-    """
+    """Upload broker CSV. Returns {status, added, skipped, updated, errors, total, preview, warnings}."""
     if broker not in BROKER_PARSERS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -159,156 +164,130 @@ async def import_broker_csv(
         return {
             "status": "success",
             "added": 0,
-            "merged": 0,
-            "total": 0,
+            "skipped": 0,
+            "updated": 0,
             "errors": errors,
+            "total": 0,
             "preview": [],
+            "warnings": [],
         }
-
-    from app.services.trade_service import TradeService
-    from sqlalchemy import func
 
     svc = TradeService(db)
+    added = 0
+    skipped = 0
+    updated = 0
+    row_errors: List[Dict[str, Any]] = []
+    preview_rows: List[Dict[str, Any]] = []
+    setups_seen = set()
+    warnings: List[str] = []
 
-    # Dry-run mode: preview which rows would be skipped without importing
+    for i, row in enumerate(rows, start=2):
+        # Inject identity
+        row.setdefault("user_id", current_user.id)
+        row.setdefault("import_source", f"broker_csv:{broker}")
+
+        preview_row = {
+            "symbol": row.get("symbol", ""),
+            "entry_price": row.get("entry_price", ""),
+            "quantity": row.get("quantity", ""),
+            "_dry_run": dry_run,
+        }
+
+        # Validate/normalize
+        try:
+            trade_data = normalize_import_row(row)
+        except ValueError as e:
+            row_errors.append({"row": i, "reason": str(e)})
+            preview_row["_error"] = str(e)
+            preview_rows.append(preview_row)
+            continue
+
+        if dry_run:
+            # Exact duplicate check for preview
+            trade_data["user_id"] = current_user.id
+            existing = svc.get_by_import_fingerprint(
+                user_id=current_user.id,
+                fingerprint=svc.compute_fingerprint(trade_data),
+            )
+            if existing:
+                preview_row["_skipped"] = True
+                skipped += 1
+            else:
+                preview_row["_skipped"] = False
+            preview_rows.append(preview_row)
+            continue
+
+        # Import
+        try:
+            trade, action, info = svc.import_trade(trade_data)
+        except Exception as e:
+            logger.warning("import_row_failed", row=i, error=str(e), user_id=current_user.id)
+            db.rollback()
+            row_errors.append({"row": i, "reason": str(e)})
+            preview_row["_error"] = str(e)
+            preview_rows.append(preview_row)
+            continue
+
+        if action == "created":
+            added += 1
+            tl = TradeTimeline(
+                trade_id=trade.id,
+                event_type="trade_imported",
+                note=f"Imported from {broker}",
+            )
+            db.add(tl)
+        elif action == "merged":
+            skipped += 1
+            preview_row["_skipped"] = True
+        elif action == "updated":
+            updated += 1
+            warnings.append(f"Row {i}: existing trade updated (external_order_id match)")
+        else:
+            skipped += 1
+
+        if trade and trade.setup:
+            setups_seen.add(trade.setup)
+        preview_rows.append(preview_row)
+
     if dry_run:
-        preview_rows = []
-        skipped = 0
-        for row in rows:
-            symbol = row.get("symbol", "").upper()[:20]
-            entry_time_str = row.get("entry_time", "")
-            entry_time = _parse_dt(entry_time_str) if entry_time_str else None
-            is_skipped = False
-            if symbol and entry_time:
-                existing = (
-                    db.query(Trade)
-                    .filter(Trade.symbol == symbol, func.date(Trade.entry_time) == entry_time.date(), Trade.status != "deleted", Trade.user_id == current_user.id)
-                    .first()
-                )
-                if existing:
-                    is_skipped = True
-                    skipped += 1
-            preview_rows.append({
-                "symbol": symbol or row.get("symbol", ""),
-                "entry_price": row.get("entry_price", ""),
-                "quantity": row.get("quantity", ""),
-                "_skipped": is_skipped,
-            })
         return {
-            "status": "success",
+            "status": "preview",
             "added": 0,
             "skipped": skipped,
-            "total": len(rows),
+            "updated": 0,
             "errors": errors,
+            "total": len(rows),
             "preview": preview_rows[:50],
+            "warnings": [],
         }
 
-    # Actual import
-    added = 0
-    merged = 0
-    setups_seen = set()
-    preview_rows = []
-    for row in rows:
-        symbol = row.get("symbol", "").upper()[:20]
-        if not symbol:
-            continue
-
-        try:
-            entry_time_str = row.get("entry_time", "")
-            entry_time = _parse_dt(entry_time_str) if entry_time_str else None
-            if not entry_time:
-                continue
-        except ValueError:
-            continue
-
-        direction = "LONG"
-
-        entry_price = _parse_decimal(row.get("entry_price", "")) or Decimal("0")
-        quantity = _parse_decimal(row.get("quantity", "")) or Decimal("0")
-        if entry_price <= 0 or quantity <= 0:
-            continue
-
-        exit_price = _parse_decimal(row.get("exit_price", ""))
-        exit_time_str = row.get("exit_time", "")
-        exit_time = _parse_dt(exit_time_str) if exit_time_str else None
-        fees = _parse_decimal(row.get("fees", "")) or Decimal("0")
-
-        trade_data = {
-            "user_id": current_user.id,
-            "symbol": symbol,
-            "direction": direction,
-            "entry_price": entry_price,
-            "quantity": quantity,
-            "entry_time": entry_time,
-            "exit_price": exit_price,
-            "exit_time": exit_time,
-            "fees": fees,
-            "stop_price": _parse_decimal(row.get("stop_price", "")),
-            "target_price": _parse_decimal(row.get("target_price", "")),
-            "setup": row.get("setup") or None,
-            "tactic": row.get("tactic") or None,
-            "notes": row.get("notes") or None,
-        }
-
-        trade, action = svc.merge_or_create(trade_data, allow_merge=True)
-        if action == "merged":
-            merged += 1
-        else:
-            added += 1
-        if trade.setup:
-            setups_seen.add(trade.setup)
-        preview_rows.append({
-            "symbol": symbol,
-            "entry_price": str(entry_price),
-            "quantity": str(quantity),
-        })
-
+    # Post-import side effects (once)
     for setup_name in setups_seen:
         _update_setup_stats(db, setup_name, user_id=current_user.id)
 
-    db.commit()
-    account = db.query(Account).filter(Account.user_id == current_user.id).first()
-    if account:
-        _reconcile_account(account.id, db, user_id=current_user.id)
+    if added or updated:
+        db.commit()
+        account = db.query(Account).filter(Account.user_id == current_user.id).first()
+        if account:
+            _reconcile_account(account.id, db, user_id=current_user.id)
+
+    logger.info(
+        "broker_import_completed",
+        user_id=current_user.id,
+        broker=broker,
+        added=added,
+        skipped=skipped,
+        updated=updated,
+        errors=len(row_errors),
+    )
 
     return {
-        "status": "success",
+        "status": "success" if not row_errors else "partial_errors",
         "added": added,
-        "merged": merged,
+        "skipped": skipped,
+        "updated": updated,
+        "errors": row_errors,
         "total": len(rows),
-        "errors": errors,
         "preview": preview_rows[:50],
+        "warnings": warnings,
     }
-
-
-def _parse_dt(s: str):
-    if not s:
-        return None
-    for fmt in [
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-        "%d-%m-%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M:%S",
-        "%d-%m-%Y %H:%M",
-        "%d/%m/%Y %H:%M",
-        "%d-%m-%Y",
-        "%d/%m/%Y",
-    ]:
-        try:
-            return datetime.strptime(s.strip(), fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def _parse_decimal(s):
-    if not s:
-        return None
-    s = s.strip().replace(",", "")
-    try:
-        return Decimal(s)
-    except Exception:
-        return None

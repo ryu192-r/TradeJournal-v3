@@ -42,7 +42,12 @@ class Trade(Base):
     # Exit tracking
     exit_reason = Column(String(20))  # stop_loss, target, manual, trailing, system
     exit_notes = Column(Text)
-    
+
+    # Import identity (idempotency + dedup)
+    import_source = Column(String(30))
+    import_fingerprint = Column(String(64))
+    external_order_id = Column(String(100))
+
     # Timestamps (auto-managed)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -58,10 +63,15 @@ class Trade(Base):
     execution_grade = relationship("ExecutionGrade", back_populates="trade", uselist=False)
 
     def _auto_set_status(self):
-        """Auto-set status based on exit_price. Preserves 'deleted' status."""
+        """Auto-set status based on exit_price. Preserves 'deleted' and granular closed statuses."""
         if self.status == "deleted":
             return
-        self.status = "closed" if self.exit_price is not None else "open"
+        if self.exit_price is not None:
+            # Preserve webhook/exit-reason-specific statuses; only set generic closed from open states
+            if self.status in ("open", "draft", "reviewed", "analytics"):
+                self.status = "closed"
+        else:
+            self.status = "open"
 
     def compute_pnl(self):
         """Auto-compute PnL and R-multiple. Direction-aware. Handles partial exits
@@ -145,6 +155,7 @@ Index('ix_trades_entry_time_exit_time', Trade.entry_time, Trade.exit_time)
 Index('ix_trades_status', Trade.status)
 Index('ix_trades_status_exit_entry', Trade.status, Trade.exit_price, Trade.entry_time)
 Index('ix_trades_setup_status', Trade.setup, Trade.status)
+Index('ix_trades_import_fingerprint', Trade.user_id, Trade.import_fingerprint)
 
 # Auto-update updated_at on modification
 @event.listens_for(Trade, 'before_update')

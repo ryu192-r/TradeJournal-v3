@@ -460,6 +460,22 @@ def parse_generic_csv(content: str) -> Tuple[List[str], List[Dict[str, str]]]:
             if v is None or v <= 0:
                 row_errors.append(f"Row {i}: '{col}' must be a positive number")
 
+        # Validate entry_time is parseable
+        if normed.get("entry_time"):
+            from app.services.import_normalization import parse_datetime
+            try:
+                parse_datetime(normed["entry_time"])
+            except ValueError:
+                row_errors.append(f"Row {i}: 'entry_time' is not a valid datetime")
+
+        # Validate exit_time if present
+        if normed.get("exit_time"):
+            from app.services.import_normalization import parse_datetime
+            try:
+                parse_datetime(normed["exit_time"])
+            except ValueError:
+                row_errors.append(f"Row {i}: 'exit_time' is not a valid datetime")
+
         if row_errors:
             errors.extend(row_errors)
         else:

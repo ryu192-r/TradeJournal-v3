@@ -35,6 +35,9 @@ class TradeBase(BaseModel):
     target_price: Optional[Decimal] = Field(None, description="Target profit price")
     r_multiple: Optional[Decimal] = Field(None, description="Risk multiple")
     exit_reason: Optional[str] = Field(None, description="Exit reason: stop_loss, target, manual, trailing, system")
+    import_source: Optional[str] = Field(None, description="Source of import (broker_csv, dhan_sync, dhan_webhook)")
+    import_fingerprint: Optional[str] = Field(None, description="SHA-256 fingerprint for deduplication")
+    external_order_id: Optional[str] = Field(None, description="Broker order/trade ID")
 
     @field_validator("direction")
     @classmethod

@@ -1,5 +1,5 @@
 """Dhan webhook processing service for stop-loss/target hit notifications."""
-import structlog
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Tuple
@@ -9,13 +9,14 @@ from sqlalchemy import and_
 
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
+from app.models.trade_timeline import TradeTimeline
+from app.services.capital_service import _auto_reconcile
+from app.services.setup_playbook_service import _update_setup_stats
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
-# Valid exit reasons
 VALID_EXIT_REASONS = {"stop_loss", "target", "manual", "trailing", "system"}
 
-# Map Dhan order types to exit reasons
 ORDER_TYPE_TO_EXIT_REASON = {
     "SL": "stop_loss",
     "SL-M": "stop_loss",
@@ -32,9 +33,10 @@ class WebhookProcessingError(Exception):
 class DhanWebhookService:
     """Process Dhan webhook events and update trade state."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
-        self.logger = logger.bind(component="dhan_webhook")
+        self.user_id = user_id
+        self.logger = logger.getChild("dhan_webhook")
 
     def process_event(
         self,
@@ -48,30 +50,15 @@ class DhanWebhookService:
         stop_price: Optional[Decimal] = None,
         target_price: Optional[Decimal] = None,
         remarks: Optional[str] = None,
+        event_id: Optional[str] = None,
     ) -> Tuple[Optional[Trade], Optional[WebhookProcessingError]]:
-        """Process a single webhook event.
-
-        Matches against open trades by symbol + direction.
-        If multiple open trades exist, matches the earliest entry_time.
-
-        Returns:
-            Tuple of (updated_trade, error)
-            - On success: (trade, None)
-            - On no match: (None, None) -- caller should log as unmatched
-            - On error: (None, error)
-        """
+        """Process single webhook event. Matches open trade by symbol + direction + user_id."""
         try:
-            # Find matching open trade
             trade = self._find_matching_trade(symbol, direction)
             if not trade:
-                self.logger.info(
-                    "no_matching_trade",
-                    symbol=symbol,
-                    direction=direction,
-                )
+                self.logger.info("no_matching_trade", symbol=symbol, direction=direction, user_id=self.user_id, event_id=event_id)
                 return None, None
 
-            # Determine exit reason
             exit_reason = self._determine_exit_reason(
                 order_type=order_type,
                 trade=trade,
@@ -81,17 +68,17 @@ class DhanWebhookService:
                 remarks=remarks,
             )
 
-            # Update trade
             trade.exit_price = exit_price
             trade.exit_time = exit_time
             trade.fees = (trade.fees or Decimal("0")) + fees
             trade.exit_reason = exit_reason
             trade.status = self._status_from_exit_reason(exit_reason)
             trade.exit_notes = remarks or f"Webhook exit: {order_type}"
+            trade.external_order_id = order_id
+            trade.import_source = "dhan_webhook"
 
             trade.compute_pnl()
 
-            # Record stop history if SL or target hit
             if exit_reason in ("stop_loss", "target"):
                 self._record_stop_history(
                     trade=trade,
@@ -100,8 +87,21 @@ class DhanWebhookService:
                     timestamp=exit_time,
                 )
 
+            # timeline event
+            tl = TradeTimeline(
+                trade_id=trade.id,
+                event_type="trade_closed",
+                new_value=f"PnL={trade.pnl}",
+                note=f"webhook exit_reason={exit_reason} event_id={event_id or 'none'}",
+            )
+            self.db.add(tl)
+
             self.db.commit()
             self.db.refresh(trade)
+
+            _update_setup_stats(self.db, trade.setup, user_id=self.user_id)
+            _auto_reconcile(self.db, user_id=self.user_id)
+            self.db.commit()
 
             self.logger.info(
                 "trade_closed_via_webhook",
@@ -110,43 +110,33 @@ class DhanWebhookService:
                 direction=direction,
                 exit_reason=exit_reason,
                 status=trade.status,
+                event_id=event_id,
             )
-
             return trade, None
 
         except Exception as e:
             self.db.rollback()
             error = WebhookProcessingError(f"Failed to process webhook: {str(e)}")
-            self.logger.error(
-                "webhook_processing_failed",
-                symbol=symbol,
-                direction=direction,
-                error=str(e),
-            )
+            self.logger.error("webhook_processing_failed", symbol=symbol, direction=direction, error=str(e), event_id=event_id)
             return None, error
 
     def _find_matching_trade(self, symbol: str, direction: str) -> Optional[Trade]:
-        """Find an open trade matching symbol and direction.
-
-        Prioritizes by: analytics > reviewed > draft
-        Within same status, picks earliest entry_time.
-        """
-        # Query open trades with priority statuses
         open_statuses = ("open",)
-        trade = (
+        q = (
             self.db.query(Trade)
             .filter(
                 and_(
                     Trade.symbol == symbol,
                     Trade.direction == direction,
                     Trade.status.in_(open_statuses),
-                    Trade.exit_price.is_(None),  # Not already exited
+                    Trade.exit_price.is_(None),
                 )
             )
-            .order_by(Trade.status, Trade.entry_time)
-            .first()
+            .order_by(Trade.entry_time)
         )
-        return trade
+        if self.user_id is not None:
+            q = q.filter(Trade.user_id == self.user_id)
+        return q.first()
 
     def _determine_exit_reason(
         self,
@@ -157,14 +147,6 @@ class DhanWebhookService:
         target_price: Optional[Decimal],
         remarks: Optional[str],
     ) -> str:
-        """Determine the exit reason from order type and trade context.
-
-        Priority:
-        1. If order_type is SL/SL-M and price matches stop_price → stop_loss
-        2. If order_type is LIMIT and price matches target_price → target
-        3. If order_type is MARKET → could be system or manual
-        4. Fall back to order_type mapping
-        """
         if remarks:
             remarks_lower = remarks.lower()
             if "target" in remarks_lower:
@@ -184,40 +166,23 @@ class DhanWebhookService:
         return ORDER_TYPE_TO_EXIT_REASON.get(order_type, "system")
 
     def _status_from_exit_reason(self, exit_reason: str) -> str:
-        """Map exit reason to trade status."""
         status_map = {
             "stop_loss": "closed_sl_hit",
             "target": "closed_target_hit",
             "manual": "closed_manual",
-            "trailing": "closed_sl_hit",  # Trailing SL hit maps to SL hit
-            "system": "closed_manual",    # System exits map to manual
+            "trailing": "closed_sl_hit",
+            "system": "closed_manual",
         }
         return status_map.get(exit_reason, "closed_manual")
 
-    def _record_stop_history(
-        self,
-        trade: Trade,
-        exit_reason: str,
-        price: Decimal,
-        timestamp: datetime,
-    ) -> None:
-        """Record a stop_history entry for the exit."""
-        stop_type_map = {
-            "stop_loss": "initial",
-            "target": "target",
-        }
+    def _record_stop_history(self, trade: Trade, exit_reason: str, price: Decimal, timestamp: datetime) -> None:
+        stop_type_map = {"stop_loss": "initial", "target": "target"}
         stop_type = stop_type_map.get(exit_reason, "initial")
-
-        stop_entry = StopHistory(
+        entry = StopHistory(
             trade_id=trade.id,
             stop_type=stop_type,
             price=price,
             timestamp=timestamp,
         )
-        self.db.add(stop_entry)
-        self.logger.info(
-            "stop_history_recorded",
-            trade_id=trade.id,
-            stop_type=stop_type,
-            price=str(price),
-        )
+        self.db.add(entry)
+        self.logger.info("stop_history_recorded", trade_id=trade.id, stop_type=stop_type, price=str(price))

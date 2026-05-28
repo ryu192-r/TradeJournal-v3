@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import date
 from typing import Optional
+import logging
 
 from app.db.database import get_db
 from app.services.dhan_client import DhanSyncService
@@ -12,6 +13,7 @@ from app.services.setup_playbook_service import _update_setup_stats
 from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades/dhan", tags=["dhan-sync"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/sync")
@@ -21,7 +23,7 @@ def sync_dhan_trades(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Sync trades from Dhan for a date range."""
+    """Sync trades from Dhan for a date range. Idempotent."""
     if from_date > to_date:
         raise HTTPException(status_code=400, detail="from_date must be <= to_date")
 
@@ -31,56 +33,105 @@ def sync_dhan_trades(
     try:
         day_trades = svc.get_range_trades(from_date, to_date)
     except Exception as e:
+        logger.warning("dhan_api_error", user_id=current_user.id, error=str(e))
         raise HTTPException(status_code=502, detail=f"Dhan API error: {str(e)}")
 
     added = 0
     skipped = 0
+    updated = 0
+    errors = []
     setups_seen = set()
+
+    from app.services.import_normalization import parse_datetime
+
     for day in day_trades:
-        # Pair OPEN/CLOSE legs
         opens = {t.exchange_order_id: t for t in day.trades if t.leg_type == "OPEN"}
         closes = {t.exchange_order_id: t for t in day.trades if t.leg_type == "CLOSE"}
 
         for oid, open_leg in opens.items():
             close_leg = closes.get(oid)
-            existing = trade_svc.get_by_symbol_time(
-                open_leg.trading_symbol,
-                open_leg.order_timestamp,
-                close_leg.order_timestamp if close_leg else None,
-                user_id=current_user.id,
-            )
-            if existing:
-                skipped += 1
+            try:
+                trade, action, info = trade_svc.import_trade({
+                    "user_id": current_user.id,
+                    "symbol": open_leg.trading_symbol,
+                    "direction": "LONG",
+                    "entry_price": open_leg.price,
+                    "exit_price": close_leg.price if close_leg else None,
+                    "quantity": open_leg.quantity,
+                    "entry_time": parse_datetime(open_leg.order_timestamp),
+                    "exit_time": parse_datetime(close_leg.order_timestamp) if close_leg else None,
+                    "fees": 0,
+                    "external_order_id": oid,
+                    "import_source": "dhan_sync",
+                })
+            except Exception as e:
+                logger.warning("dhan_sync_import_failed", user_id=current_user.id, oid=oid, error=str(e))
+                errors.append({"oid": oid, "error": str(e)})
+                db.rollback()
                 continue
-            trade = trade_svc.find_or_create_pair(open_leg, close_leg, user_id=current_user.id)
-            added += 1
-            if trade.setup:
+
+            if action == "created":
+                added += 1
+            elif action == "updated":
+                updated += 1
+            else:
+                skipped += 1
+            if trade and trade.setup:
                 setups_seen.add(trade.setup)
 
         # Unmatched CLOSE legs (single-leg close without open)
         for oid, close_leg in closes.items():
-            if oid not in opens:
-                existing = trade_svc.get_by_symbol_time(
-                    close_leg.trading_symbol,
-                    close_leg.order_timestamp,
-                    None,
-                    user_id=current_user.id,
-                )
-                if existing:
-                    skipped += 1
-                    continue
-                trade = trade_svc.create_from_dhan_leg(close_leg, is_open=False, user_id=current_user.id)
-                added += 1
-                if trade.setup:
-                    setups_seen.add(trade.setup)
+            if oid in opens:
+                continue
+            try:
+                trade, action, _ = trade_svc.import_trade({
+                    "user_id": current_user.id,
+                    "symbol": close_leg.trading_symbol,
+                    "direction": "LONG",
+                    "entry_price": None,
+                    "exit_price": close_leg.price,
+                    "quantity": close_leg.quantity,
+                    "entry_time": parse_datetime(close_leg.order_timestamp),
+                    "exit_time": parse_datetime(close_leg.order_timestamp),
+                    "fees": 0,
+                    "external_order_id": oid,
+                    "import_source": "dhan_sync",
+                })
+            except Exception as e:
+                logger.warning("dhan_sync_close_import_failed", user_id=current_user.id, oid=oid, error=str(e))
+                errors.append({"oid": oid, "error": str(e)})
+                db.rollback()
+                continue
 
-    for setup_name in setups_seen:
-        _update_setup_stats(db, setup_name, user_id=current_user.id)
-    _auto_reconcile(db, user_id=current_user.id)
-    db.commit()
+            if action == "created":
+                added += 1
+            elif action == "updated":
+                updated += 1
+            else:
+                skipped += 1
+            if trade and trade.setup:
+                setups_seen.add(trade.setup)
+
+    if added or updated:
+        for setup_name in setups_seen:
+            _update_setup_stats(db, setup_name, user_id=current_user.id)
+        _auto_reconcile(db, user_id=current_user.id)
+        db.commit()
+
+    logger.info(
+        "dhan_sync_completed",
+        user_id=current_user.id,
+        added=added,
+        skipped=skipped,
+        updated=updated,
+        errors=len(errors),
+    )
 
     return {
+        "status": "success" if not errors else "partial_errors",
         "days_fetched": len(day_trades),
         "trades_added": added,
         "trades_skipped": skipped,
+        "trades_updated": updated,
+        "errors": errors,
     }

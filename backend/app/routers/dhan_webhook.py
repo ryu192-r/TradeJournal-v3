@@ -1,9 +1,13 @@
 """Dhan webhook handler for real-time stop-loss/target hit notifications."""
+import os
+import hmac
+import hashlib
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Union
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Header
 
 from app.db.database import get_db
 from app.schemas.webhook import (
@@ -15,75 +19,79 @@ from app.schemas.webhook import (
 )
 from app.services.dhan_webhook_service import DhanWebhookService
 
-import structlog
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/dhan", tags=["dhan-webhook"])
-
-logger = structlog.get_logger()
 
 
 def _parse_exit_time(timestamp_str: str) -> datetime:
     """Parse Dhan order timestamp to datetime."""
-    # Dhan timestamps typically come as ISO 8601 strings
-    # Handle various formats from Dhan
-    ts = timestamp_str.strip()
-
-    # Try ISO format first
+    ts = timestamp_str.strip() if timestamp_str else ""
     try:
         return datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         pass
-
-    # Try common Dhan format: "2024-01-15 09:30:00"
     try:
-        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(
-            tzinfo=timezone.utc
-        )
+        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     except (ValueError, AttributeError):
         pass
-
-    # Fallback: current time with a warning
-    logger.warning(
-        "could_not_parse_timestamp",
-        timestamp=timestamp_str,
-    )
+    logger.warning("could_not_parse_timestamp", timestamp=timestamp_str)
     return datetime.now(timezone.utc)
+
+
+def _verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
+    """Verify HMAC-SHA256 webhook signature."""
+    if not secret or not signature:
+        return False
+    expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def _get_webhook_user_id() -> int:
+    """Return fixed user_id for single-account personal webhook.
+    Require DHAN_WEBHOOK_USER_ID env var."""
+    raw = os.environ.get("DHAN_WEBHOOK_USER_ID")
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook user mapping not configured")
+    try:
+        return int(raw)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid DHAN_WEBHOOK_USER_ID")
 
 
 @router.post(
     "/",
     response_model=Union[WebhookTradeUpdateResponse, WebhookUnmatchedResponse],
     responses={
-        200: {"description": "Webhook processed successfully"},
-        400: {"description": "Invalid webhook payload"},
-        422: {"description": "Validation error"},
+        200: {"description": "Webhook processed"},
+        400: {"description": "Invalid payload"},
+        401: {"description": "Missing/invalid signature"},
+        403: {"description": "Webhook not configured"},
     },
 )
 async def handle_dhan_webhook(
     event: DhanWebhookEvent,
     response: Response,
+    x_webhook_signature: str | None = Header(default=None, alias="X-Webhook-Signature"),
     db=Depends(get_db),
 ) -> Union[WebhookTradeUpdateResponse, WebhookUnmatchedResponse]:
-    """Receive a single Dhan order fill event.
+    """Receive single Dhan order fill event. Requires X-Webhook-Signature header if DHAN_WEBHOOK_SECRET set."""
+    secret = os.environ.get("DHAN_WEBHOOK_SECRET")
+    if secret:
+        # Require signature
+        if not x_webhook_signature:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
+        import json
+        payload = json.dumps(event.model_dump(by_alias=True), separators=(",", ":")).encode("utf-8")
+        if not _verify_webhook_signature(payload, x_webhook_signature, secret):
+            logger.warning("webhook_signature_rejected", event_id=event.event_id)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
-    This endpoint is called by Dhan when an order is executed.
-    It matches the event against open trades and updates their state.
+    user_id = _get_webhook_user_id()
+    svc = DhanWebhookService(db, user_id=user_id)
 
-    For CLOSE/SELL events on existing positions, updates the trade:
-    - Sets exit_price and exit_time
-    - Computes exit_reason (stop_loss, target, manual, trailing)
-    - Transitions status (analytics → closed_sl_hit/closed_target_hit/closed_manual)
-    - Records stop_history entry if SL or target hit
-    """
-    svc = DhanWebhookService(db)
-
-    # Only process exit/close events (SELL for LONG positions, BUY for SHORT)
     is_sell = event.transaction_type.upper() == "SELL"
     is_buy = event.transaction_type.upper() == "BUY"
-
-    # Determine direction based on order context
-    # For LONG positions, exit is SELL; for SHORT positions, exit is BUY
-    # We'll try both directions to match
     exit_time = _parse_exit_time(event.timestamp)
 
     trade, error = svc.process_event(
@@ -93,24 +101,16 @@ async def handle_dhan_webhook(
         exit_time=exit_time,
         order_type=event.order_type,
         order_id=event.order_id,
-        fees=Decimal("0"),  # Will be updated during sync if needed
+        fees=Decimal("0"),
         stop_price=event.stop_price,
         target_price=event.target_price,
         remarks=event.remarks,
+        event_id=event.event_id,
     )
 
     if error:
-        # Unexpected error during processing
-        logger.error(
-            "webhook_processing_error",
-            event_id=event.event_id,
-            symbol=event.symbol,
-            error=str(error),
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        )
+        logger.error("webhook_processing_error", event_id=event.event_id, symbol=event.symbol, error=str(error))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error))
 
     if trade:
         return WebhookTradeUpdateResponse(
@@ -122,20 +122,12 @@ async def handle_dhan_webhook(
             matched=True,
         )
 
-    # No matching trade found — log but don't error
-    # Dhan may send events for orders we're not tracking
-    logger.info(
-        "webhook_unmatched",
-        event_id=event.event_id,
-        symbol=event.symbol,
-        transaction_type=event.transaction_type,
-    )
-
+    logger.info("webhook_unmatched", event_id=event.event_id, symbol=event.symbol, transaction_type=event.transaction_type)
     direction_hint = "LONG" if is_sell else "SHORT"
     return WebhookUnmatchedResponse(
         symbol=event.symbol,
         matched=False,
-        reason=f"No open {direction_hint} trade found for {event.symbol} with status analytics/reviewed/draft",
+        reason=f"No open {direction_hint} trade found for {event.symbol}",
     )
 
 
@@ -146,25 +138,41 @@ async def handle_dhan_webhook(
 )
 async def handle_dhan_webhook_batch(
     events: list[DhanWebhookEvent],
+    x_webhook_signature: str | None = Header(default=None, alias="X-Webhook-Signature"),
     db=Depends(get_db),
 ) -> WebhookBatchResponse:
-    """Process a batch of Dhan webhook events.
+    """Process batch webhook events."""
+    secret = os.environ.get("DHAN_WEBHOOK_SECRET")
+    if secret:
+        if not x_webhook_signature:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing webhook signature")
+        import json
+        payload = json.dumps([e.model_dump(by_alias=True) for e in events], separators=(",", ":")).encode("utf-8")
+        if not _verify_webhook_signature(payload, x_webhook_signature, secret):
+            logger.warning("batch_webhook_signature_rejected", event_count=len(events))
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
-    Useful for:
-    - Manual re-processing of events
-    - Bulk testing of webhook handler
-    - Historical event replay
-
-    Returns summary of processed events.
-    """
-    svc = DhanWebhookService(db)
+    user_id = _get_webhook_user_id()
+    svc = DhanWebhookService(db, user_id=user_id)
 
     results: list[WebhookBatchResultEntry] = []
     matched_count = 0
     unmatched_count = 0
     error_count = 0
+    seen_ids = set()
 
     for event in events:
+        # Replay dedup
+        if event.event_id in seen_ids:
+            unmatched_count += 1
+            results.append(WebhookBatchResultEntry(
+                event_id=event.event_id,
+                symbol=event.symbol,
+                status="duplicate",
+            ))
+            continue
+        seen_ids.add(event.event_id)
+
         is_sell = event.transaction_type.upper() == "SELL"
         is_buy = event.transaction_type.upper() == "BUY"
         exit_time = _parse_exit_time(event.timestamp)
@@ -180,6 +188,7 @@ async def handle_dhan_webhook_batch(
             stop_price=event.stop_price,
             target_price=event.target_price,
             remarks=event.remarks,
+            event_id=event.event_id,
         )
 
         if error:
