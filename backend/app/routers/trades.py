@@ -296,15 +296,18 @@ def update_trade(
     return _enrich_response(db_trade, db)
 
 
-@router.post("/merge-duplicates")
+@router.post("/merge-duplicates", deprecated=True)
 def merge_duplicate_trades(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    svc = TradeService(db)
-    merged = svc.merge_duplicates(user_id=current_user.id)
-    _auto_reconcile(db, user_id=current_user.id)
-    return {"merged": merged}
+    """Disabled. Groups by symbol+date which collapses legitimate separate
+    same-day trades. Use exact-duplicate broker import instead."""
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="merge-duplicates is disabled — it can collapse legitimate same-day trades. "
+               "Broker import uses exact-signature matching instead.",
+    )
 
 
 @router.post("/{trade_id}/pyramid", response_model=TradeResponse)
