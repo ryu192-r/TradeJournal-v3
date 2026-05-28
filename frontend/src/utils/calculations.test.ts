@@ -248,7 +248,7 @@ describe('computeCapPct', () => {
 
 // ── Cross-runtime fixture validation (#38) ──
 
-import cases from '../../../shared/fixtures/calculation_test_cases.json'
+import cases from '../test/fixtures/calculation_test_cases.json'
 
 const ROUND = (v: number | null) => v == null ? null : Math.round(v * 100) / 100
 
