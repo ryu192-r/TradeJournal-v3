@@ -278,11 +278,14 @@ def get_capital_dashboard(db: Session = Depends(get_db), current_user: User = De
         t = _SimpleKpiTrade()
         t.pnl = float(pnl_val)
         kpi_trades.append(t)
+    total_trades = len(closed_trades) + sum(1 for t in open_trades if pe_by_trade.get(t.id, []))
     kpis = compute_aggregate_kpis(kpi_trades)
     win_rate = kpis["win_rate"]
     profit_factor = kpis["profit_factor"]
-    average_win = Decimal(str(kpis["gross_profit"])) / Decimal(str(kpis["trade_count"])) if kpis["gross_profit"] and kpis["trade_count"] else Decimal("0")
-    average_loss = Decimal(str(kpis["gross_loss"])) / Decimal(str(kpis["trade_count"])) if kpis["gross_loss"] and kpis["trade_count"] else Decimal("0")
+    win_count = sum(1 for p in all_realized_pnls if p > 0)
+    loss_count = sum(1 for p in all_realized_pnls if p < 0)
+    average_win = Decimal(str(kpis["gross_profit"])) / Decimal(str(win_count)) if kpis["gross_profit"] and win_count else Decimal("0")
+    average_loss = Decimal(str(kpis["gross_loss"])) / Decimal(str(loss_count)) if kpis["gross_loss"] and loss_count else Decimal("0")
 
     # Net equity = initial_balance + capital events net + all realized PnL
     capital_net = total_deposits - total_withdrawals - total_fees

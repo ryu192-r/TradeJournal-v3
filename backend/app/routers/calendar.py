@@ -16,6 +16,7 @@ from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
 from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
+from app.utils.pnl_helpers import get_realized_pnl_events
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/calendar", tags=["calendar"])
@@ -180,6 +181,24 @@ def get_calendar_month(
 
     closed_month_trades = [t for t in trades if t.exit_price is not None]
     month_pnl = sum((Decimal(t.pnl or 0) for t in closed_month_trades), Decimal("0"))
+
+    # Include partial exit realized PnL from still-open trades
+    realized_events = get_realized_pnl_events(db, current_user.id, start_dt, end_dt)
+    partial_pnl_by_day: dict[date, Decimal] = defaultdict(Decimal)
+    partial_pnl_by_trade: dict[int, Decimal] = defaultdict(Decimal)
+    for ev in realized_events:
+        if ev.source == "partial_exit":
+            ev_day = ev.timestamp.date() if hasattr(ev.timestamp, "date") else ev.timestamp
+            partial_pnl_by_day[ev_day] += ev.pnl
+            partial_pnl_by_trade[ev.trade_id] += ev.pnl
+            month_pnl += ev.pnl
+
+    # Patch per-day net_pnl with partial exits
+    for day_data in days:
+        day_date = date.fromisoformat(day_data["date"])
+        pe_pnl = partial_pnl_by_day.get(day_date, Decimal("0"))
+        if pe_pnl:
+            day_data["net_pnl"] = _money(Decimal(day_data["net_pnl"]) + pe_pnl)
     journal_days = sum(1 for day in days if day["journal_done"])
     warning_days = sum(1 for day in days if day["warnings"])
 

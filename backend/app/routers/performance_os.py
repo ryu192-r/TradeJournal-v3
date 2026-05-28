@@ -26,6 +26,7 @@ from app.schemas.performance_os import (
 )
 from app.utils.logging import get_logger
 from app.utils.calculations import compute_aggregate_kpis
+from app.utils.pnl_helpers import get_realized_pnl_events
 from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
@@ -337,6 +338,11 @@ def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyRev
     closed = [t for t in trades if t.exit_price is not None]
     wins = [t for t in closed if t.pnl and t.pnl > 0]
     total_pnl = sum(t.pnl or Decimal("0") for t in closed)
+
+    # Include partial exit realized PnL from still-open trades
+    realized_events = get_realized_pnl_events(db, user_id, week_start_dt, week_end_dt)
+    partial_pnl_total = sum(ev.pnl for ev in realized_events if ev.source == "partial_exit")
+    total_pnl += partial_pnl_total
     win_rate = len(wins) / len(closed) if closed else 0
 
     best_trade = None
@@ -425,6 +431,11 @@ def _enrich_monthly(db: Session, review: MonthlyReview, user_id: int) -> Monthly
     closed = [t for t in trades if t.exit_price is not None]
     kpis = compute_aggregate_kpis(closed)
     total_pnl = kpis["net_pnl"] or 0
+
+    # Include partial exit realized PnL from still-open trades
+    realized_events = get_realized_pnl_events(db, user_id, start_dt, end_dt)
+    partial_pnl_total = sum(ev.pnl for ev in realized_events if ev.source == "partial_exit")
+    total_pnl += partial_pnl_total
     win_rate = kpis["win_rate"]
     profit_factor = kpis["profit_factor"]
     avg_r = kpis["avg_r"]
