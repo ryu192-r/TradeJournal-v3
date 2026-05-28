@@ -116,14 +116,21 @@ def calculate_trade_metrics(
     return result
 
 
-def compute_pnl_value(
+def calculate_trade_leg_pnl(
+    direction,
     entry_price,
     exit_price,
     quantity,
-    fees=None,
-    direction="LONG",
+    fees=Decimal("0"),
 ) -> Optional[Decimal]:
-    """Simple PnL: (exit - entry) * qty - fees. Returns None if any input is invalid."""
+    """Direction-aware P&L for a single trade leg (partial or full).
+
+    LONG:  (exit - entry) * qty - fees
+    SHORT: (entry - exit) * qty - fees
+
+    Fees are subtracted (not allocated) — caller must allocate
+    proportional fees before calling.
+    """
     entry = _safe_decimal(entry_price)
     exit_ = _safe_decimal(exit_price)
     qty = _safe_decimal(quantity)
@@ -134,9 +141,20 @@ def compute_pnl_value(
     if entry <= 0 or qty <= 0:
         return None
 
-    is_long = direction.upper() == "LONG"
+    is_long = (direction or "LONG").upper() == "LONG"
     pnl_per_unit = (exit_ - entry) if is_long else (entry - exit_)
     return (pnl_per_unit * qty) - fee
+
+
+def compute_pnl_value(
+    entry_price,
+    exit_price,
+    quantity,
+    fees=None,
+    direction="LONG",
+) -> Optional[Decimal]:
+    """Simple PnL: (exit - entry) * qty - fees. Returns None if any input is invalid."""
+    return calculate_trade_leg_pnl(direction, entry_price, exit_price, quantity, fees)
 
 
 def compute_r_multiple(net_pnl, risk_amount) -> Optional[Decimal]:

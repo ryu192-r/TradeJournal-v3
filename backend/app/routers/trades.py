@@ -54,7 +54,10 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
     else:
         remaining_qty = trade.quantity - total_exited_qty
         unrealized = Decimal("0") if partials else None
-        weighted_avg = None
+        if partials and total_exited_qty > 0:
+            weighted_avg = sum(p.exit_price * p.qty for p in partials) / total_exited_qty
+        else:
+            weighted_avg = None
 
     d = {
         "remaining_qty": remaining_qty,
@@ -63,6 +66,17 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
         "weighted_avg_exit_price": weighted_avg,
     }
     return d
+
+
+def _enrich_response(trade: Trade, db: Session) -> TradeResponse:
+    """Build TradeResponse with partial-exit enrichment."""
+    resp = TradeResponse.model_validate(trade)
+    extra = _enrich_trade_with_partials(trade, db)
+    resp.remaining_qty = extra["remaining_qty"]
+    resp.partial_realized_pnl = extra["partial_realized_pnl"]
+    resp.unrealized_pnl = extra["unrealized_pnl"]
+    resp.weighted_avg_exit_price = extra["weighted_avg_exit_price"]
+    return resp
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/trades", tags=["trades"])
@@ -124,7 +138,7 @@ def create_trade(
     _auto_reconcile(db, user_id=current_user.id)
     db.commit()
     db.refresh(db_trade)
-    return db_trade
+    return _enrich_response(db_trade, db)
 
 
 @router.get("/", response_model=TradeListResponse)
@@ -154,12 +168,7 @@ def list_trades(
     trades = query.order_by(Trade.entry_time.desc()).offset(skip).limit(limit).all()
     items = []
     for t in trades:
-        resp = TradeResponse.model_validate(t)
-        extra = _enrich_trade_with_partials(t, db)
-        resp.remaining_qty = extra["remaining_qty"]
-        resp.partial_realized_pnl = extra["partial_realized_pnl"]
-        resp.unrealized_pnl = extra["unrealized_pnl"]
-        resp.weighted_avg_exit_price = extra["weighted_avg_exit_price"]
+        resp = _enrich_response(t, db)
         items.append(resp)
     return {"total": total, "items": items}
 
@@ -218,13 +227,7 @@ def read_trade(
     current_user: User = Depends(get_current_user),
 ):
     trade = get_user_trade_or_404(db, trade_id, current_user.id)
-    resp = TradeResponse.model_validate(trade)
-    extra = _enrich_trade_with_partials(trade, db)
-    resp.remaining_qty = extra["remaining_qty"]
-    resp.partial_realized_pnl = extra["partial_realized_pnl"]
-    resp.unrealized_pnl = extra["unrealized_pnl"]
-    resp.weighted_avg_exit_price = extra["weighted_avg_exit_price"]
-    return resp
+    return _enrich_response(trade, db)
 
 
 @router.put("/{trade_id}", response_model=TradeResponse)
@@ -290,7 +293,7 @@ def update_trade(
         _update_setup_stats(db, old_setup, user_id=current_user.id)
     db.commit()
     db.refresh(db_trade)
-    return db_trade
+    return _enrich_response(db_trade, db)
 
 
 @router.post("/merge-duplicates")
@@ -328,7 +331,7 @@ def pyramid_trade(
     _update_setup_stats(db, trade.setup, user_id=current_user.id)
     db.commit()
     db.refresh(trade)
-    return trade
+    return _enrich_response(trade, db)
 
 
 # ─────────────────────── Stop History ───────────────────────

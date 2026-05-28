@@ -356,12 +356,15 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
     direction: trade.direction ?? 'LONG',
   }), [trade])
 
-  const pnlValue = calc.netPnl
+  const backendPnl = trade.pnl != null ? Number(trade.pnl) : null
+  const pnlValue = backendPnl != null ? backendPnl : calc.netPnl
+  const backendRMultiple = trade.r_multiple != null ? Number(trade.r_multiple) : null
+  const displayedRMultiple = backendRMultiple != null ? backendRMultiple : calc.rMultiple
   const pnlIsProfit = pnlValue != null && pnlValue >= 0
   const remainingQty = trade.remaining_qty != null ? Number(trade.remaining_qty) : null
   const partialPnl = trade.partial_realized_pnl != null ? Number(trade.partial_realized_pnl) : null
   const showPartialInfo = remainingQty != null && remainingQty < Number(trade.quantity)
-  const isOpen = !trade.exit_price
+  const isOpen = trade.exit_price == null
 
   const duration = useMemo(() => {
     if (!trade.entry_time) return '—'
@@ -402,7 +405,7 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
       <PnLHero
         pnlValue={pnlValue}
         pnlIsProfit={pnlIsProfit}
-        rMultiple={calc.rMultiple}
+        rMultiple={displayedRMultiple}
         partialPnl={partialPnl}
         isOpen={isOpen}
       />

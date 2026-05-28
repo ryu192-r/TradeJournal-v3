@@ -64,44 +64,76 @@ class Trade(Base):
         self.status = "closed" if self.exit_price is not None else "open"
 
     def compute_pnl(self):
-        """Auto-compute PnL and R-multiple using shared calculation module."""
+        """Auto-compute PnL and R-multiple. Direction-aware. Handles partial exits
+        for both open and closed trades."""
         self._auto_set_status()
+        direction = (self.direction or "LONG").upper()
+        is_long = direction == "LONG"
+
+        # Gather partial exits from DB or relationship
         partials = []
-        if self.exit_price is not None:
-            session = object_session(self)
-            if session is not None and self.id is not None:
-                from app.models.partial_exit import PartialExit
-                partials = session.query(PartialExit).filter(PartialExit.trade_id == self.id).all()
-            else:
-                partials = list(self.partial_exits or [])
+        session = object_session(self)
+        if session is not None and self.id is not None:
+            from app.models.partial_exit import PartialExit
+            partials = session.query(PartialExit).filter(PartialExit.trade_id == self.id).all()
+        else:
+            partials = list(self.partial_exits or [])
+
+        total_exited_qty = sum(p.qty for p in partials)
+        quantity = self.quantity or Decimal('0')
+        remaining_qty = quantity - total_exited_qty
+        partial_realized = sum(p.realized_pnl or Decimal('0') for p in partials)
+
+        # Clamp remaining_qty to avoid negatives from data corruption
+        if remaining_qty < 0:
+            remaining_qty = Decimal('0')
+
+        fees = self.fees or Decimal('0')
 
         if self.exit_price is not None and partials:
-            total_exited_qty = sum(p.qty for p in partials)
-            remaining_qty = self.quantity - total_exited_qty
-            partial_realized = sum(p.realized_pnl or Decimal('0') for p in partials)
+            # Closed trade with partial exits: total PnL = partial_realized + remaining leg
             fee_share = Decimal('0')
-            if self.fees and self.quantity and remaining_qty > 0:
-                fee_share = Decimal(str(self.fees)) * (remaining_qty / self.quantity)
-
-            self.pnl = partial_realized + ((self.exit_price - self.entry_price) * remaining_qty) - fee_share
-            if self.stop_price and self.entry_price:
-                risk = (self.entry_price - self.stop_price) * self.quantity
-                if risk and risk > 0:
-                    self.r_multiple = self.pnl / risk
+            if quantity > 0 and remaining_qty > 0:
+                fee_share = fees * (remaining_qty / quantity)
+            direction_mult = Decimal('1') if is_long else Decimal('-1')
+            remaining_pnl = (self.exit_price - self.entry_price) * direction_mult * remaining_qty - fee_share
+            self.pnl = partial_realized + remaining_pnl
+        elif self.exit_price is not None:
+            # Closed trade without partial exits — standard calculation
+            calc = calculate_trade_metrics(
+                entry_price=self.entry_price,
+                exit_price=self.exit_price,
+                quantity=quantity,
+                fees=fees,
+                stop_price=self.stop_price,
+                target_price=self.target_price,
+                direction=direction,
+            )
+            self.pnl = calc.net_pnl
+            if calc.r_multiple is not None:
+                self.r_multiple = calc.r_multiple
             return self.pnl
+        elif partials:
+            # Open trade with partial exits: pnl stays null (no full exit)
+            self.pnl = None
+        else:
+            # Open trade without partials or exit
+            self.pnl = None
 
-        calc = calculate_trade_metrics(
-            entry_price=self.entry_price,
-            exit_price=self.exit_price,
-            quantity=self.quantity,
-            fees=self.fees or Decimal('0'),
-            stop_price=self.stop_price,
-            target_price=self.target_price,
-            direction=self.direction,
-        )
-        self.pnl = calc.net_pnl
-        if calc.r_multiple is not None:
-            self.r_multiple = calc.r_multiple
+        # R-multiple for partial or full closed trades
+        if self.stop_price and self.entry_price and self.pnl is not None and quantity > 0:
+            if is_long:
+                risk_per_unit = self.entry_price - self.stop_price
+            else:
+                risk_per_unit = self.stop_price - self.entry_price
+            risk = risk_per_unit * quantity
+            if risk and risk > 0:
+                self.r_multiple = self.pnl / risk
+            else:
+                self.r_multiple = None
+        elif self.pnl is None and partials:
+            self.r_multiple = None
+
         return self.pnl
 
 

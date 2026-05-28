@@ -6,6 +6,7 @@ from sqlalchemy import and_, func
 from datetime import datetime, timezone, timedelta
 
 from app.models.trade import Trade
+from app.models.partial_exit import PartialExit
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -56,13 +57,15 @@ class TradeService:
             q = q.filter(Trade.exit_price.isnot(None))
         return q.first()
 
-    def merge_or_create(self, trade_data: dict) -> Tuple[Trade, str]:
-        """Merge with existing trade for same (symbol, date) or create new.
+    def merge_or_create(self, trade_data: dict, allow_merge: bool = False) -> Tuple[Trade, str]:
+        """Create a new trade, or merge with existing when allow_merge=True.
 
-        Only merges trades in the same open/closed state:
-        - Open + Open  → merge (pyramiding)
-        - Closed + Closed → merge (same-day round-trip averaging)
-        - Open + Closed or Closed + Open → create new separate trade
+        By default (allow_merge=False), always creates a new trade.
+        This prevents manual same-day trades from being silently merged.
+
+        When allow_merge=True (broker import), merges trades in the same
+        open/closed state for the same (symbol, date). This allows broker
+        import rows for the same position to consolidate.
 
         Uses retry to handle race conditions: if two concurrent requests both
         find no existing trade, the second will find the first's on retry.
@@ -77,6 +80,18 @@ class TradeService:
             self.db.commit()
             self.db.refresh(trade)
             return trade, "created"
+
+        if not allow_merge:
+            trade = Trade(**trade_data)
+            trade.compute_pnl()
+            self.db.add(trade)
+            try:
+                self.db.commit()
+                self.db.refresh(trade)
+                return trade, "created"
+            except Exception:
+                self.db.rollback()
+                raise
 
         incoming_is_open = trade_data.get("exit_price") is None
 
@@ -189,8 +204,14 @@ class TradeService:
         return trade
 
     def merge_duplicates(self, user_id: Optional[int] = None) -> int:
-        """Find and merge trades with same (symbol, date, open/closed state). Returns count of merged duplicates."""
+        """Find and merge trades with same (symbol, date, open/closed state).
+        Reassigns all child records before deleting duplicates.
+        Returns count of merged duplicates."""
         from collections import defaultdict
+        from app.models.trade_timeline import TradeTimeline
+        from app.models.emotion_log import EmotionLog
+        from app.models.execution_grade import ExecutionGrade
+        from app.models.stop_history import StopHistory
 
         q = self.db.query(Trade).filter(Trade.status != 'deleted')
         if user_id is not None:
@@ -232,11 +253,20 @@ class TradeService:
                         keep.tags = list(set(existing_tags + dup_tags))
                     else:
                         keep.tags = dup.tags
+
                 self._merge_trade(keep, dup_data)
+
+                self.db.query(PartialExit).filter(PartialExit.trade_id == dup.id).update({"trade_id": keep.id})
+                self.db.query(TradeTimeline).filter(TradeTimeline.trade_id == dup.id).update({"trade_id": keep.id})
+                self.db.query(EmotionLog).filter(EmotionLog.trade_id == dup.id).update({"trade_id": keep.id})
+                self.db.query(StopHistory).filter(StopHistory.trade_id == dup.id).update({"trade_id": keep.id})
+                self.db.query(ExecutionGrade).filter(ExecutionGrade.trade_id == dup.id).update({"trade_id": keep.id})
+
                 self.db.delete(dup)
                 merged_count += 1
 
         if merged_count > 0:
+            keep.compute_pnl()
             self.db.commit()
         return merged_count
 
@@ -267,7 +297,7 @@ class TradeService:
             "status": "open",
             "user_id": user_id,
         }
-        trade, _ = self.merge_or_create(trade_data)
+        trade, _ = self.merge_or_create(trade_data, allow_merge=True)
         return trade
 
     def find_or_create_pair(self, open_leg, close_leg, direction: str = "LONG", user_id: Optional[int] = None) -> Trade:
@@ -289,5 +319,5 @@ class TradeService:
             "status": "open",
             "user_id": user_id,
         }
-        trade, _ = self.merge_or_create(trade_data)
+        trade, _ = self.merge_or_create(trade_data, allow_merge=True)
         return trade

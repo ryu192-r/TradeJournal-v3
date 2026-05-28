@@ -25,7 +25,7 @@ type ListingMode = 'auto' | 'table' | 'cards'
 
 function statusBadgeClass(trade: ApiTrade): string {
   if (trade.status === 'deleted') return 'bg-text-faint text-text-muted'
-  if (!trade.exit_price) return 'bg-border text-text-muted'
+  if (trade.exit_price == null) return 'bg-border text-text-muted'
   return Number(trade.pnl) >= 0 ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'
 }
 
@@ -957,7 +957,7 @@ function TradeCard({
 }) {
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const isProfitable = pnlNum >= 0
-  const isOpen = !trade.exit_price
+  const isOpen = trade.exit_price == null
   return (
     <button
       onClick={onTap}
@@ -1055,7 +1055,7 @@ function FilterToggle({ label, checked, onChange }: { label: string; checked: bo
 
 function getStatusLabel(trade: ApiTrade): string {
   if (trade.status === 'deleted') return 'Deleted'
-  return trade.exit_price ? 'Closed' : 'Open'
+  return trade.exit_price != null ? 'Closed' : 'Open'
 }
 // ── TradeRow component ──
 
@@ -1088,7 +1088,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
   const ltp = quote?.ltp ? parseFloat(quote.ltp) : null
   const ltpChg = quote?.change_pct ? parseFloat(quote.change_pct) : null
   const quoteStatus = getLiveQuoteDisplayStatus(quote)
-  const isOpen = !trade.exit_price
+  const isOpen = trade.exit_price == null
   const remainingQty = trade.remaining_qty ? Number(trade.remaining_qty) : Number(trade.quantity)
   const partialRealized = trade.partial_realized_pnl ? Number(trade.partial_realized_pnl) : null
   const hasPartials = partialRealized != null
@@ -1263,7 +1263,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
       {activeColumns.map(renderCell)}
       <td className={`${cellClass} text-right`}>
         <div className="flex items-center justify-end gap-0.5">
-          {!trade.exit_price && (
+          {trade.exit_price == null && (
             <>
               <button
                 onClick={() => { openSellTrade(trade) }}

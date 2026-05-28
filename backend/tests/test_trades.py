@@ -224,7 +224,9 @@ def test_open_then_closed_same_day_creates_separate(client, auth_user_token):
     assert t2["id"] != t1["id"], "Closing entry should be a separate trade record"
 
 
-def test_two_open_trades_same_day_merge(client, auth_user_token):
+def test_two_open_trades_same_day_creates_separate(client, auth_user_token):
+    """Manual trade creation should NOT auto-merge — two open trades same day
+    must remain as separate trade records. Use /pyramid endpoint for pyramiding."""
     trade1 = _create(client, auth_user_token, symbol="INFY", quantity=10,
                      entry_price=1500, exit_price=None,
                      entry_time="2025-03-01T09:30:00")
@@ -236,11 +238,13 @@ def test_two_open_trades_same_day_merge(client, auth_user_token):
                      entry_time="2025-03-01T10:00:00")
     body2 = trade2.json()
     t2 = body2.get("data", body2)
-    assert t2["id"] == t1_id, "Two open entries same day should merge (pyramid)"
-    assert float(t2["quantity"]) == 15
+    assert t2["id"] != t1_id, "Manual same-day open trades should NOT merge"
+    assert float(t2["quantity"]) == 5
 
 
-def test_two_closed_trades_same_day_merge(client, auth_user_token):
+def test_two_closed_trades_same_day_creates_separate(client, auth_user_token):
+    """Manual trade creation should NOT auto-merge — two closed trades same day
+    must remain as separate trade records."""
     trade1 = _create(client, auth_user_token, symbol="HDFCBANK", quantity=10,
                      entry_price=1600, exit_price=1650,
                      entry_time="2025-04-01T09:30:00", exit_time="2025-04-01T10:00:00")
@@ -252,8 +256,8 @@ def test_two_closed_trades_same_day_merge(client, auth_user_token):
                      entry_time="2025-04-01T09:45:00", exit_time="2025-04-01T10:30:00")
     body2 = trade2.json()
     t2 = body2.get("data", body2)
-    assert t2["id"] == t1_id, "Two closed entries same day should merge"
-    assert float(t2["quantity"]) == 15
+    assert t2["id"] != t1_id, "Manual same-day closed trades should NOT merge"
+    assert float(t2["quantity"]) == 5
 
 
 def test_soft_delete_no_orphan_capital_event(client, auth_user_token):

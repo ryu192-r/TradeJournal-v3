@@ -250,7 +250,7 @@ async def import_broker_csv(
             "notes": row.get("notes") or None,
         }
 
-        trade, action = svc.merge_or_create(trade_data)
+        trade, action = svc.merge_or_create(trade_data, allow_merge=True)
         if action == "merged":
             merged += 1
         else:
