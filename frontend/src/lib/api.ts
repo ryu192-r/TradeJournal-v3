@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { mark, measure } from '@/utils/performance'
 import { queryClient } from '@/lib/queryClient'
+import { useAuthStore } from '@/store/authStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/logout-all']
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -21,6 +24,11 @@ function processQueue(error: unknown, token: string | null = null) {
     else if (token) p.resolve(token)
   })
   failedQueue = []
+}
+
+function isAuthEndpoint(url: string | undefined): boolean {
+  if (!url) return false
+  return AUTH_ENDPOINTS.some((ep) => url.includes(ep))
 }
 
 apiClient.interceptors.request.use((config) => {
@@ -50,13 +58,20 @@ apiClient.interceptors.response.use(
       measure(timingKey, `${timingKey}:start`, `${timingKey}:end`)
     }
     const originalRequest = error.config
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const requestUrl = originalRequest?.url
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(requestUrl)
+    ) {
       const refreshToken = localStorage.getItem('refresh_token')
       if (!refreshToken) {
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
         queryClient.clear()
-        window.location.href = '/'
+        useAuthStore.getState().setToken(null)
+        window.location.reload()
         return Promise.reject(error)
       }
 
@@ -78,9 +93,8 @@ apiClient.interceptors.response.use(
         })
         const newAccessToken = data.access_token
         localStorage.setItem('auth_token', newAccessToken)
-        if (data.refresh_token) {
-          localStorage.setItem('refresh_token', data.refresh_token)
-        }
+        localStorage.setItem('refresh_token', data.refresh_token)
+        useAuthStore.getState().setToken(newAccessToken)
         processQueue(null, newAccessToken)
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
         return apiClient(originalRequest)
@@ -89,7 +103,8 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
         queryClient.clear()
-        window.location.href = '/'
+        useAuthStore.getState().setToken(null)
+        window.location.reload()
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
@@ -98,5 +113,11 @@ apiClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+export function clearAuthState() {
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('refresh_token')
+  queryClient.clear()
+}
 
 export default apiClient

@@ -22,6 +22,7 @@ class TokenResponse(BaseSchema):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    expires_in: Optional[int] = None
 
 
 class RefreshRequest(BaseSchema):
@@ -30,7 +31,9 @@ class RefreshRequest(BaseSchema):
 
 class RefreshResponse(BaseSchema):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    expires_in: Optional[int] = None
 
 
 class ChangePasswordRequest(BaseSchema):
@@ -45,3 +48,7 @@ class UserResponse(BaseSchema):
     is_active: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class LogoutRequest(BaseSchema):
+    refresh_token: Optional[str] = None

@@ -39,10 +39,10 @@ def get_current_user(
 
     try:
         payload = decode_token(auth_token, expected_type="access")
-    except JWTError as e:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
+            detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -50,7 +50,7 @@ def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Invalid or expired token",
         )
     if not user.is_active:
         raise HTTPException(
