@@ -47,35 +47,14 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
   const markers = useMemo(() => data?.markers ?? [], [data])
   const priceLines = useMemo(() => data?.price_lines ?? [], [data])
   const meta = data?.meta
-  const hasNoData = !isLoading && (candles.length === 0 || (meta && !meta.has_real_data && !meta.is_mock))
+  const hasNoData = !isLoading && (candles.length === 0 || (meta != null && !meta.has_real_data && !meta.is_mock))
 
   const isDark = useMemo(() => {
     if (typeof document === 'undefined') return true
     return document.documentElement.getAttribute('data-theme') !== 'light'
   }, [])
 
-  // Empty-state panel — nothing to render on the chart
-  if (hasNoData && !error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
-        <BarChart3 className="w-10 h-10 opacity-40" />
-        <p className="text-sm font-medium text-text-heading">No candle data available</p>
-        <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
-          No historical data provider is configured yet. You can still upload chart screenshots using the "Uploaded Images" tab.
-        </p>
-        {meta?.message && (
-          <p className="text-[length:var(--text-xs)] text-text-muted italic">{meta.message}</p>
-        )}
-        <button
-          onClick={() => refetch()}
-          className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    )
-  }
-
+  // Chart render effect — all hooks declared unconditionally
   useEffect(() => {
     if (!containerRef.current) return
     if (candles.length === 0 && !meta?.is_mock) return
@@ -150,7 +129,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       volumeSeries.setData(volumeData)
     }
 
-    // Markers — use createSeriesMarkers helper for v5 compatibility
+    // Markers — use createSeriesMarkers for v5 compat
     if (markers.length > 0) {
       const markerData = markers.map(m => ({
         time: m.time as Time,
@@ -162,8 +141,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       try {
         createSeriesMarkers(candleSeries, markerData)
       } catch {
-        // Fallback: lightweight-charts v5 may not support createSeriesMarkers
-        // Markers will be absent but chart remains functional
+        // Fallback: markers absent, chart functional
       }
     }
 
@@ -192,7 +170,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
     }
   }, [candles, markers, priceLines, isDark, isFullscreen, timeframe])
 
-  // Resize observer
+  // Resize observer — always declared
   useEffect(() => {
     if (!containerRef.current) return
     const observer = new ResizeObserver(entries => {
@@ -209,6 +187,9 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
     return () => observer.disconnect()
   }, [isFullscreen])
 
+  // All hooks above — conditional returns only below this line
+
+  // Error state
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
@@ -217,6 +198,28 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         <button
           onClick={() => refetch()}
           className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // Empty state — no real data and not mock
+  if (hasNoData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
+        <BarChart3 className="w-10 h-10 opacity-40" />
+        <p className="text-sm font-medium text-text-heading">No candle data available</p>
+        <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
+          No historical data provider is configured yet. You can still upload chart screenshots using the &quot;Uploaded Images&quot; tab.
+        </p>
+        {meta?.message && (
+          <p className="text-[length:var(--text-xs)] text-text-muted italic">{meta.message}</p>
+        )}
+        <button
+          onClick={() => refetch()}
+          className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
         >
           Retry
         </button>

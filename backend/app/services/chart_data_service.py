@@ -131,7 +131,8 @@ def get_cached_candles(db: Session, symbol: str, timeframe: str, start: datetime
     )
 
 
-def upsert_candles(db: Session, candles: List[dict]) -> int:
+def upsert_candles(db: Session, candles: List[dict], _commit: bool = True) -> int:
+    """Insert or update candles. Commits by default; set _commit=False to let caller control the transaction."""
     added = 0
     for c in candles:
         existing = (
@@ -163,7 +164,7 @@ def upsert_candles(db: Session, candles: List[dict]) -> int:
                 source=c.get("source", "cache"),
             ))
             added += 1
-    if candles:
+    if candles and _commit:
         db.commit()
     return added
 
