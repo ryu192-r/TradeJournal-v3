@@ -10,6 +10,7 @@ from sqlalchemy import and_
 from app.models.trade import Trade
 from app.models.stop_history import StopHistory
 from app.models.trade_timeline import TradeTimeline
+from app.models.webhook_event import WebhookEvent
 from app.services.capital_service import _auto_reconcile
 from app.services.setup_playbook_service import _update_setup_stats
 
@@ -60,16 +61,26 @@ class DhanWebhookService:
         """
         try:
             if event_id:
-                existing_tl = self.db.query(TradeTimeline).filter(
-                    TradeTimeline.note.like(f"%event_id={event_id}%"),
+                existing = self.db.query(WebhookEvent).filter(
+                    WebhookEvent.user_id == self.user_id,
+                    WebhookEvent.event_id == event_id,
                 ).first()
-                if existing_tl:
+                if existing:
                     self.logger.info("webhook_event_already_processed", event_id=event_id)
                     return None, None
 
             trade = self._find_matching_trade(symbol, direction)
             if not trade:
                 self.logger.info("no_matching_trade", symbol=symbol, direction=direction, user_id=self.user_id, event_id=event_id)
+                if event_id:
+                    existing = self.db.query(WebhookEvent).filter(
+                        WebhookEvent.user_id == self.user_id,
+                        WebhookEvent.event_id == event_id,
+                    ).first()
+                    if not existing:
+                        self.db.add(WebhookEvent(user_id=self.user_id, event_id=event_id))
+                        if not defer_commit:
+                            self.db.commit()
                 return None, None
 
             exit_reason = self._determine_exit_reason(
@@ -107,6 +118,15 @@ class DhanWebhookService:
                 note=f"webhook exit_reason={exit_reason} event_id={event_id or 'none'}",
             )
             self.db.add(tl)
+
+            if event_id:
+                from sqlalchemy.exc import IntegrityError
+                try:
+                    with self.db.begin_nested():
+                        self.db.add(WebhookEvent(user_id=self.user_id, event_id=event_id))
+                        self.db.flush()
+                except IntegrityError:
+                    pass
 
             _update_setup_stats(self.db, trade.setup, user_id=self.user_id)
             _auto_reconcile(self.db, user_id=self.user_id)

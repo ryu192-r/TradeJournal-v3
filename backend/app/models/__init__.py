@@ -18,6 +18,7 @@ from .market_snapshot import MarketSnapshot
 from .live_quote import LiveQuote
 from .performance_os import DailyWorkflow, WeeklyReview, MonthlyReview
 from .refresh_token import RefreshToken
+from .webhook_event import WebhookEvent
 
 __all__ = [
     'Base',
@@ -42,4 +43,5 @@ __all__ = [
     'WeeklyReview',
     'MonthlyReview',
     'RefreshToken',
+    'WebhookEvent',
 ]
