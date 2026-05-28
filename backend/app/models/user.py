@@ -24,3 +24,4 @@ class User(Base):
     weekly_reviews = relationship("WeeklyReview", back_populates="user")
     monthly_reviews = relationship("MonthlyReview", back_populates="user")
     market_snapshots = relationship("MarketSnapshot", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")

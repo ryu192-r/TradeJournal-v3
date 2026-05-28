@@ -53,3 +53,14 @@ def auth_user_token(client) -> str:
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["access_token"]
+
+
+@pytest.fixture(scope="function")
+def db_session():
+    """Provide a direct DB session for asserting DB state in tests."""
+    from app.db.database import SessionLocal
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

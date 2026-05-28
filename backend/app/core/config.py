@@ -19,6 +19,7 @@ class Settings:
     JWT_ALGORITHM: str = config("JWT_ALGORITHM", default="HS256")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = config("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", default=30, cast=int)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = config("JWT_REFRESH_TOKEN_EXPIRE_DAYS", default=7, cast=int)
+    REFRESH_TOKEN_REUSE_REVOKE_ALL: bool = config("REFRESH_TOKEN_REUSE_REVOKE_ALL", default=True, cast=bool)
     
     # Telegram settings
     TELEGRAM_BOT_TOKEN: str = config("TELEGRAM_BOT_TOKEN", default="")

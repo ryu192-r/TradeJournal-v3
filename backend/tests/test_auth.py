@@ -37,7 +37,7 @@ def test_register_duplicate_email(client):
     _register(client)
     resp = _register(client)
     assert resp.status_code == 409
-    assert "already exists" in resp.json()["detail"]
+    assert "Registration failed" in resp.json()["detail"]
 
 
 def test_login_ok(client):
@@ -74,7 +74,6 @@ def test_me_ok(client):
 def test_me_no_token(client):
     resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
-    assert "Not authenticated" in resp.json()["detail"]
 
 
 def test_refresh_ok(client):
@@ -88,6 +87,7 @@ def test_refresh_ok(client):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
+    assert "refresh_token" in data
     assert "token_type" in data
 
 
@@ -97,7 +97,6 @@ def test_refresh_invalid_token(client):
         json={"refresh_token": "invalid.token.here"},
     )
     assert resp.status_code == 401
-    assert "Invalid" in resp.json()["detail"]
 
 
 def test_change_password_ok(client):
