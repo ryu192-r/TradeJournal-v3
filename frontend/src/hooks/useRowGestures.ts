@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, type TouchEvent } from 'react'
 
 interface UseRowGesturesOptions {
   onDoubleTap: () => void
@@ -13,7 +13,7 @@ export function useRowGestures({ onDoubleTap, onSwipeRight, onLongPress, disable
   const startY = useRef(0)
   const longPressTimer = useRef<number | undefined>(undefined)
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: TouchEvent) => {
     if (disabled) return
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
@@ -29,7 +29,7 @@ export function useRowGestures({ onDoubleTap, onSwipeRight, onLongPress, disable
     }
   }, [])
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
     if (disabled) return
     if (longPressTimer.current) {
       window.clearTimeout(longPressTimer.current)

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { ReactElement } from 'react'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PerformanceOSPage } from '@/pages/PerformanceOSPage'
 import { TradeDetailPage } from '@/pages/TradeDetailPage'
@@ -203,7 +204,7 @@ vi.mock('@/hooks/usePartialExitQuery', () => ({
   useDeletePartialExitMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
-function renderWithQueryClient(ui: React.ReactElement) {
+function renderWithQueryClient(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })

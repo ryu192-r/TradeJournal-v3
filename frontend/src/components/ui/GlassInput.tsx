@@ -1,15 +1,16 @@
+import type { ReactNode, Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { type InputHTMLAttributes, forwardRef, useId } from 'react'
 
 interface GlassInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
-  icon?: React.ReactNode
+  icon?: ReactNode
 }
 
 function GlassInputFn(
   { label, error, icon, className, ...props }: GlassInputProps,
-  ref: React.Ref<HTMLInputElement>
+  ref: Ref<HTMLInputElement>
 ) {
   const inputId = useId()
   const errorId = error ? `${inputId}-error` : undefined

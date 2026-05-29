@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
 import { type SelectHTMLAttributes, forwardRef, useId } from 'react'
@@ -16,7 +17,7 @@ interface GlassSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 function GlassSelectFn(
   { label, error, options, placeholder, className, ...props }: GlassSelectProps,
-  ref: React.Ref<HTMLSelectElement>
+  ref: Ref<HTMLSelectElement>
 ) {
   const selectId = useId()
   const errorId = error ? `${selectId}-error` : undefined

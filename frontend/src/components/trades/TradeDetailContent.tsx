@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import {
   Target, Loader2, Edit3, Trash2, ShieldAlert, Info,
   CalendarClock, NotebookPen, Tag, AlertTriangle, BarChart3, Image,
@@ -266,7 +266,7 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
   )
 }
 
-function StatCard({ label, value, detail }: { label: string; value: React.ReactNode; detail: React.ReactNode }) {
+function StatCard({ label, value, detail }: { label: string; value: ReactNode; detail: ReactNode }) {
   return (
     <div className={CARD}>
       <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider font-display mb-1">{label}</div>

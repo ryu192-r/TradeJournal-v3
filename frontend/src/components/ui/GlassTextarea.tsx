@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { type TextareaHTMLAttributes, forwardRef, useId } from 'react'
 
@@ -8,7 +9,7 @@ interface GlassTextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement>
 
 function GlassTextareaFn(
   { label, error, className, ...props }: GlassTextareaProps,
-  ref: React.Ref<HTMLTextAreaElement>
+  ref: Ref<HTMLTextAreaElement>
 ) {
   const textareaId = useId()
   const errorId = error ? `${textareaId}-error` : undefined

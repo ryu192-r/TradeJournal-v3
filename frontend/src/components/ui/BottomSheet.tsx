@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
@@ -5,7 +6,7 @@ import { X } from 'lucide-react'
 interface BottomSheetProps {
   open: boolean
   onClose: () => void
-  children: React.ReactNode
+  children: ReactNode
   title?: string
 }
 

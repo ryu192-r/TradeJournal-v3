@@ -15,7 +15,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mark, measure } from '@/utils/performance'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
@@ -105,7 +105,7 @@ function WidgetShell({
   children,
 }: {
   pref: WidgetPreference
-  children: React.ReactNode
+  children: ReactNode
 }) {
   if (!pref.visible) return null
   return (
@@ -848,7 +848,7 @@ export function DashboardPage() {
 
   const dashboardData = operationalData as OperationalDashboardPayload
 
-  const widgetContent: Record<DashboardWidgetId, React.ReactNode> = {
+  const widgetContent: Record<DashboardWidgetId, ReactNode> = {
     alerts: <AlertZone alerts={dashboardAlerts} />,
     kpis: <KpiCards kpi={dashboardData.kpi} />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,

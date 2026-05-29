@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, type ElementType } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useSwipeTabs } from '@/hooks/useSwipeTabs'
@@ -75,7 +75,7 @@ function computeDailyStats(trades: ApiTrade[], date: string) {
 
 type TabId = 'journal' | 'compare' | 'weekly'
 
-const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+  const tabs: { id: TabId; label: string; icon: ElementType }[] = [
   { id: 'journal', label: 'Journal Entry', icon: BookOpen },
   { id: 'compare', label: 'Compare', icon: GitCompare },
   { id: 'weekly', label: 'Weekly', icon: LayoutList },

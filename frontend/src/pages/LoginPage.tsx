@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { Loader2, BarChart3 } from 'lucide-react'
 
@@ -11,7 +11,7 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [formError, setFormError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setFormError('')
     clearError()

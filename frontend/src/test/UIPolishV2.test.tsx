@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
+import type { ReactElement } from 'react'
 
 vi.mock('lightweight-charts', () => ({
   createChart: () => ({
@@ -44,7 +45,7 @@ vi.mock('@tanstack/react-query', async () => {
   }
 })
 
-function renderWithClient(ui: React.ReactElement) {
+function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, type ElementType } from 'react'
 import {
   Calendar, Sunrise, Sunset, GitCompare, Loader2,
   ChevronLeft, ChevronRight, BookOpen,
@@ -181,7 +181,7 @@ export function DailySANotesPage() {
     setSelectedDate(toISODate(d))
   }, [selectedDate])
 
-  const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+  const tabs: { id: TabId; label: string; icon: ElementType }[] = [
     { id: 'notes', label: 'SA Notes', icon: BookOpen },
     { id: 'compare', label: 'Compare', icon: GitCompare },
     { id: 'weekly', label: 'Weekly', icon: Calendar },

@@ -17,7 +17,7 @@ import { Save, Loader2, ShieldAlert, Info, ArrowUpRight, DollarSign, Tag, Notebo
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { calculateTradeMetrics } from '@/utils/calculations'
 import { formatCurrency } from '@/utils/format'
-import { useMemo } from 'react'
+import { useMemo, type ComponentType, type ReactNode } from 'react'
 
 const TACTIC_OPTIONS = [
   { value: '', label: '— Select Tactic —' },
@@ -69,7 +69,7 @@ function formatSignCurrency(n: number | null | undefined): string {
 
 /* ── Section Header ── */
 
-function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ComponentType<{ className?: string }>; title: string; subtitle?: string }) {
+function SectionTitle({ icon: Icon, title, subtitle }: { icon: ComponentType<{ className?: string }>; title: string; subtitle?: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       {Icon && <Icon className="w-3.5 h-3.5 text-accent shrink-0" />}
@@ -83,7 +83,7 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ComponentTy
 
 /* ── Metrics Preview ── */
 
-function MetricCell({ label, children, tone }: { label: string; children: React.ReactNode; tone?: 'profit' | 'loss' | 'warning' | 'neutral' }) {
+function MetricCell({ label, children, tone }: { label: string; children: ReactNode; tone?: 'profit' | 'loss' | 'warning' | 'neutral' }) {
   const color = tone === 'profit' ? 'text-profit' : tone === 'loss' ? 'text-loss' : tone === 'warning' ? 'text-gold' : tone === 'neutral' ? 'text-text-heading' : 'text-text-faint'
   return (
     <div className="flex flex-col gap-0.5 min-w-0">

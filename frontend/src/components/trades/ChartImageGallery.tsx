@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type ChangeEvent } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useUploadChartImageMutation, useDeleteChartImageMutation } from '@/hooks/useChartImagesMutation'
 import { useToastStore } from '@/store/toastStore'
@@ -24,7 +24,7 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
   const goPrev = () => setActiveIndex((i) => (i > 0 ? i - 1 : slides.length - 1))
   const goNext = () => setActiveIndex((i) => (i < slides.length - 1 ? i + 1 : 0))
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {

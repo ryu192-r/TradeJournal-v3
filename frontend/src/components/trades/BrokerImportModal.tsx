@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent, type DragEvent as ReactDragEvent } from 'react'
 import { Upload, FileText, Download, X, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-react'
 import { GlassButton } from '@/components/ui/GlassButton'
 import { GlassSelect } from '@/components/ui/GlassSelect'
@@ -29,7 +29,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleBrokerChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleBrokerChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
     setBroker(e.target.value)
     setFile(null)
     setResult(null)
@@ -39,7 +39,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [])
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) {
       setFile(f)
@@ -59,9 +59,9 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [broker])
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    const f = e.dataTransfer.files?.[0]
+    const f = e.dataTransfer?.files?.[0]
     if (f && f.name.endsWith('.csv')) {
       setFile(f)
       setError('')
@@ -123,7 +123,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [broker, addToast])
 
-  const handleDropzoneKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleDropzoneKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       fileInputRef.current?.click()
