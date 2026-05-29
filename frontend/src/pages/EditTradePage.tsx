@@ -53,7 +53,7 @@ export function EditTradePage({ tradeId }: EditTradePageProps) {
   }
 
   return (
-    <div className="p-6">
+    <div className="px-[var(--page-px)] py-[var(--page-py)]">
       <TradeEntryForm
         mode="edit"
         initialData={trade}

@@ -253,24 +253,30 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
                             />
                           </div>
                           <div>
-                            <label className={labelCls}>Win Rate (optional)</label>
-                            <input
-                              className={inputCls}
-                              value={tactic.win_rate ?? ''}
-                              onChange={(e) => handleTacticChange(ti, 'win_rate', e.target.value)}
-                              placeholder="62%"
-                              disabled={isPending}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Avg R (optional)</label>
-                            <input
-                              className={inputCls}
-                              value={tactic.avg_r ?? ''}
-                              onChange={(e) => handleTacticChange(ti, 'avg_r', e.target.value)}
-                              placeholder="2.1"
-                              disabled={isPending}
-                            />
+                <label className={labelCls}>Win Rate (optional)</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    step="1"
+                    inputMode="numeric"
+                    value={tactic.win_rate ?? ''}
+                    onChange={(e) => handleTacticChange(ti, 'win_rate', e.target.value)}
+                    placeholder="62"
+                    disabled={isPending}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Avg R (optional)</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={tactic.avg_r ?? ''}
+                    onChange={(e) => handleTacticChange(ti, 'avg_r', e.target.value)}
+                    placeholder="2.1"
+                    disabled={isPending}
+                  />
                           </div>
                         </div>
 

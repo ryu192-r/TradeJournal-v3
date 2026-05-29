@@ -421,6 +421,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                 <label className="block text-xs text-text-muted mb-1.5 font-medium">Amount (₹)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={modalType === 'fee' ? 'e.g. 500' : 'e.g. 50000'}
@@ -769,6 +770,7 @@ export function CapitalPage() {
                 <label className="block text-xs text-text-muted mb-1.5 font-medium">Starting Capital (₹)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={editInitialBalance}
                   onChange={(e) => setEditInitialBalance(e.target.value)}
                   min="0"
@@ -783,6 +785,7 @@ export function CapitalPage() {
                 <label className="block text-xs text-text-muted mb-1.5 font-medium">Breakeven Threshold (±₹)</label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={editBreakevenThreshold}
                   onChange={(e) => setEditBreakevenThreshold(e.target.value)}
                   min="0"

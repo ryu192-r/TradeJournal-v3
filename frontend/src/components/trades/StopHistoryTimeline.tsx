@@ -84,7 +84,8 @@ export function StopHistoryTimeline({ tradeId }: StopHistoryTimelineProps) {
           <input
             type="number"
             step="0.01"
-            placeholder="Stop price"
+            inputMode="decimal"
+            placeholder="Stop price (₹)"
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
             className="w-full px-2 py-1.5 rounded-lg text-sm bg-bg-card border border-border text-text-heading"

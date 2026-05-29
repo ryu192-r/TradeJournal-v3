@@ -1205,7 +1205,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
         <td key={column} className={cellClass}>
           {slEditing ? (
             <div className="flex items-center gap-1 min-w-[140px]">
-              <input ref={slRef} type="number" step="0.01" value={slPrice} onChange={(e) => setSlPrice(e.target.value)} className="w-20 px-1.5 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading" placeholder="Price" />
+              <input ref={slRef} type="number" step="0.01" inputMode="decimal" value={slPrice} onChange={(e) => setSlPrice(e.target.value)} className="w-20 px-1.5 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading" placeholder="Price" />
               <select value={slType} onChange={(e) => setSlType(e.target.value)} className="w-16 px-1 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading">
                 {STOP_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>

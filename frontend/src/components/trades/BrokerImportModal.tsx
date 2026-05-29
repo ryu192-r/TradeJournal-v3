@@ -305,16 +305,19 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
             {result.preview && result.preview.length > 0 && (
               <div>
                 <p className="text-[length:var(--text-xs)] font-medium text-text-muted mb-2 uppercase tracking-wider">
-                  Preview ({result.skipped > 0 ? 'greyed rows will be skipped' : `first ${result.preview.length} rows`})
+                  {result.skipped > 0
+                    ? 'Greyed rows already exist (same symbol + date) and will be skipped'
+                    : `First ${result.preview.length} rows`}
                 </p>
                 <div className="overflow-x-auto rounded-lg border border-border max-h-64 overflow-y-auto">
                   <table className="min-w-full text-xs">
                     <thead className="sticky top-0 bg-bg-card">
                       <tr className="border-b border-border">
-                        <th className="px-3 py-2 text-left text-text-muted font-medium w-12">#</th>
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Symbol</th>
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Entry</th>
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Qty</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">#</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Symbol</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Entry</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Qty</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -322,11 +325,13 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
                         <tr
                           key={i}
                           className={`transition-colors ${row._skipped ? 'opacity-40 bg-bg-elevated/20' : 'hover:bg-bg-card-h'}`}
+                          title={row._skipped ? 'Duplicate — same symbol + date already exists' : undefined}
                         >
-                          <td className="px-3 py-1.5 text-text-muted text-center">{i + 1}</td>
-                          <td className={`px-3 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.symbol}</td>
-                          <td className={`px-3 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.entry_price}</td>
-                          <td className={`px-3 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.quantity}</td>
+                          <td className="px-2 py-1.5 text-text-muted text-center">{i + 1}</td>
+                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.symbol}</td>
+                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.entry_price}</td>
+                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.quantity}</td>
+                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.entry_time ? row.entry_time.slice(0, 10) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -402,9 +407,12 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
 
             {result.errors.length > 0 && (
               <div className="rounded-lg border border-loss/20 bg-loss-muted/10 p-3 max-h-32 overflow-y-auto">
-                <p className="text-[length:var(--text-xs)] font-medium text-loss mb-1">Warnings ({result.errors.length})</p>
+                <p className="text-[length:var(--text-xs)] font-medium text-loss mb-1">Issues ({result.errors.length})</p>
                 {result.errors.slice(0, 10).map((err, i) => (
-                  <p key={i} className="text-[length:var(--text-xs)] text-text-muted">{err}</p>
+                  <div key={i} className="flex items-start gap-1.5 text-[length:var(--text-xs)] text-text-muted py-0.5">
+                    <span className="text-loss shrink-0 mt-0.5">•</span>
+                    <span>{err}</span>
+                  </div>
                 ))}
                 {result.errors.length > 10 && (
                   <p className="text-xs text-text-faint mt-1">...and {result.errors.length - 10} more</p>
@@ -415,23 +423,23 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
             {result.preview && result.preview.length > 0 && (
               <div>
                 <p className="text-[length:var(--text-xs)] font-medium text-text-muted mb-2 uppercase tracking-wider">
-                  Preview (first {result.preview.length} trades)
+                  Imported trades ({result.preview.length})
                 </p>
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-full text-xs">
                     <thead>
                       <tr className="bg-bg-low">
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Symbol</th>
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Entry</th>
-                        <th className="px-3 py-2 text-left text-text-muted font-medium">Qty</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Symbol</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Entry</th>
+                        <th className="px-2 py-2 text-left text-text-muted font-medium">Qty</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {result.preview.map((row, i) => (
                         <tr key={i} className="hover:bg-bg-card-h transition-colors">
-                          <td className="px-3 py-1.5 text-text-heading">{row.symbol}</td>
-                          <td className="px-3 py-1.5 text-text-heading">{row.entry_price}</td>
-                          <td className="px-3 py-1.5 text-text-heading">{row.quantity}</td>
+                          <td className="px-2 py-1.5 text-text-heading">{row.symbol}</td>
+                          <td className="px-2 py-1.5 text-text-heading">{row.entry_price}</td>
+                          <td className="px-2 py-1.5 text-text-heading">{row.quantity}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -441,12 +449,20 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
             )}
 
             <div className="flex items-center justify-end gap-3 pt-2">
-              <GlassButton variant="ghost" size="sm" onClick={handleClose}>
-                Close
-              </GlassButton>
-              <GlassButton variant="accent" size="sm" onClick={() => { setStep('upload'); setFile(null); setResult(null); setError('') }}>
-                Import More
-              </GlassButton>
+              {result.status === 'error' ? (
+                <GlassButton variant="accent" size="sm" onClick={() => { setStep('upload'); setResult(null); setError('') }}>
+                  Retry
+                </GlassButton>
+              ) : (
+                <>
+                  <GlassButton variant="ghost" size="sm" onClick={handleClose}>
+                    Close
+                  </GlassButton>
+                  <GlassButton variant="accent" size="sm" onClick={() => { setStep('upload'); setFile(null); setResult(null); setError('') }}>
+                    Import More
+                  </GlassButton>
+                </>
+              )}
             </div>
           </div>
         )}

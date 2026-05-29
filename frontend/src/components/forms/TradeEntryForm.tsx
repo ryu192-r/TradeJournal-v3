@@ -2,6 +2,7 @@ import { GlassButton } from '@/components/ui/GlassButton'
 import { GlassInput } from '@/components/ui/GlassInput'
 import { GlassSelect } from '@/components/ui/GlassSelect'
 import { GlassTextarea } from '@/components/ui/GlassTextarea'
+import { FormActions, SubmitButton } from '@/components/ui/FormComponents'
 import {
   tradeFormSchema,
   type TradeFormData,
@@ -13,7 +14,7 @@ import { useToastStore } from '@/store/toastStore'
 import type { ApiTrade } from '@/types'
 import { useSetupsQuery } from '@/hooks/useSetupPlaybookQuery'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Save, Loader2, ShieldAlert, Info, ArrowUpRight, DollarSign, Tag, NotebookPen, TrendingUp } from 'lucide-react'
+import { Loader2, ShieldAlert, Info, ArrowUpRight, DollarSign, Tag, NotebookPen, TrendingUp } from 'lucide-react'
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { calculateTradeMetrics } from '@/utils/calculations'
 import { formatCurrency } from '@/utils/format'
@@ -310,21 +311,22 @@ export function TradeEntryForm({
         {/* ── 6. Notes ── */}
         <div>
           <SectionTitle icon={NotebookPen} title="Notes & Review" subtitle="Trade thesis, observations, mistakes, lessons learned" />
-          <GlassTextarea label="" rows={4} placeholder="What was your thesis? What went well? What would you change?..." {...register('notes')} error={errors.notes?.message} />
+          <GlassTextarea label="Notes" rows={4} placeholder="What was your thesis? What went well? What would you change?..." {...register('notes')} error={errors.notes?.message} />
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-1">
+        <FormActions sticky>
           {mode === 'create' && (
             <GlassButton variant="ghost" size="md" type="button" onClick={() => reset()} disabled={isSubmitting}>
               Reset
             </GlassButton>
           )}
-          <GlassButton variant="accent" size="md" type="submit" disabled={isSubmitting} className="min-w-[140px]">
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {isSubmitting ? 'Saving...' : mode === 'create' ? 'Save Trade' : 'Update Trade'}
-          </GlassButton>
-        </div>
+          <SubmitButton
+            isSubmitting={isSubmitting}
+            label={mode === 'create' ? 'Save Trade' : 'Update Trade'}
+            submittingLabel="Saving..."
+          />
+        </FormActions>
       </form>
     </div>
   )
