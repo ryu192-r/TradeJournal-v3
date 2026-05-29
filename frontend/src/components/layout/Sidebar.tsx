@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { mobileNavigationItems, navigationSections, type ActiveView } from '@/app/navigation'
 import { PanelLeft, Sparkles, Plus, BarChart3, TrendingUp } from 'lucide-react'
 import { type ReactNode } from 'react'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 
 function isSelectableView(value: string): value is ActiveView {
   return navigationSections
@@ -14,13 +16,18 @@ function isSelectableView(value: string): value is ActiveView {
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode, openCreateTrade } = useAppStore()
   const user = useAuthStore((s) => s.user)
-  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'calendar', 'analytics']
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false)
+  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'analytics']
   const moreActive = !coreMobileViews.includes(activeView)
 
   const selectView = (view: ActiveView) => {
     setActiveView(view)
     if (window.innerWidth < 1024 && sidebarOpen) toggleSidebar()
   }
+
+  const moreItems = navigationSections
+    .flatMap((s) => s.items)
+    .filter((item) => item.view && !coreMobileViews.includes(item.view))
 
   return (
     <>
@@ -31,15 +38,13 @@ export function Sidebar() {
         />
       )}
 
-      <aside
-        aria-hidden={!sidebarOpen}
-        inert={!sidebarOpen}
-        className={cn(
-          'fixed top-0 left-0 h-full z-50 bg-bg-low border-r border-border flex flex-col transition-transform duration-300 ease-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          'w-64'
-        )}
-      >
+       <aside
+         className={cn(
+           'fixed top-0 left-0 h-full z-50 bg-bg-low border-r border-border flex flex-col transition-transform duration-300 ease-out',
+           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+           'w-64 lg:translate-x-0'
+         )}
+       >
         <div className="flex items-center gap-2.5 px-5 pt-[1.375rem] pb-[1.125rem] border-b border-border">
           <div className="w-8 h-8 rounded-lg bg-accent-muted flex items-center justify-center">
             <svg className="w-[17px] h-[17px] text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -191,10 +196,37 @@ export function Sidebar() {
             icon={TrendingUp}
             label="More"
             isActive={moreActive}
-            onClick={() => selectView('settings')}
+            onClick={() => setMoreSheetOpen(true)}
           />
         </div>
       </nav>
+
+      <BottomSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} title="More">
+        <div className="flex flex-col gap-1">
+          {moreItems.map((item) => {
+            const Icon = item.icon
+            const isActive = item.view === activeView
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.view) selectView(item.view)
+                  setMoreSheetOpen(false)
+                }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer',
+                  isActive
+                    ? 'bg-accent-muted text-accent'
+                    : 'text-text hover:bg-accent-faint'
+                )}
+              >
+                {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                <span className="truncate">{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </BottomSheet>
     </>
   )
 }

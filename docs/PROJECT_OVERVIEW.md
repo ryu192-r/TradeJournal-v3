@@ -1,7 +1,7 @@
 # Trading Journal v3 — Project Overview
 
 > **Personal trading journal with AI coaching, capital management, and live market data.**
-> Last updated: May 2026 — v2 overhaul complete (calculations, design system, mobile nav, trade detail polish)
+> Last updated: May 2026 — v2 Phase-1 polish shipped (shared components, mobile nav, trade detail polish)
 
 ---
 

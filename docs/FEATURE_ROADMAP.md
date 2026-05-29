@@ -2,7 +2,7 @@
 
 > Source: v2 features + v1 ideas + new brainstorm
 > Format: Vertical slices — each item is independent
-> Last updated: May 2026 — v2 overhaul in progress
+> Last updated: May 2026 — v2 Phase-1 polish in progress
 
 ---
 

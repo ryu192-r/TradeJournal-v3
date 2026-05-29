@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 import { RefreshCw, Clock, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
@@ -51,8 +52,8 @@ interface SectionHeaderProps {
   icon?: LucideIcon
   title?: string
   subtitle?: string
-  badge?: React.ReactNode
-  right?: React.ReactNode
+  badge?: ReactNode
+  right?: ReactNode
   className?: string
 }
 
@@ -106,7 +107,7 @@ export function SectionTitle({
 
 interface MetricCardProps {
   label: string
-  value: React.ReactNode
+  value: ReactNode
   detail?: string
   icon: LucideIcon
   tone?: 'neutral' | 'accent' | 'profit' | 'loss' | 'warning'
@@ -193,8 +194,8 @@ interface CollapsibleSectionProps {
   title: string
   icon: LucideIcon
   defaultOpen?: boolean
-  summary?: React.ReactNode
-  children: React.ReactNode
+  summary?: ReactNode
+  children: ReactNode
   className?: string
 }
 
@@ -250,8 +251,8 @@ export function PageHeader({
 }: {
   title: string
   subtitle?: string
-  left?: React.ReactNode
-  right?: React.ReactNode
+  left?: ReactNode
+  right?: ReactNode
 }) {
   return (
     <div className="flex items-end justify-between gap-3">
@@ -297,7 +298,7 @@ export function InlineBadge({
   children,
   tone = 'neutral',
 }: {
-  children: React.ReactNode
+  children: ReactNode
   tone?: 'profit' | 'loss' | 'neutral' | 'accent' | 'warning'
 }) {
   const map: Record<string, string> = {
@@ -390,7 +391,7 @@ export function AlertRow({
 
 /* ─── SafeAreaPadding ──────────────────────────────────────── */
 
-export function SafeAreaPadding({ children }: { children: React.ReactNode }) {
+export function SafeAreaPadding({ children }: { children: ReactNode }) {
   return (
     <div className="px-[var(--page-px)] py-[var(--page-py)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
       {children}

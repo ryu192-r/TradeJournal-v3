@@ -1,7 +1,7 @@
 # Trading Journal v3 — Architecture & File Map
 
 > Central reference — every file, every endpoint, every component mapped.
-> Last updated: May 2026. After v2 overhaul: calculation centralization, design system, mobile nav, trade detail polish.
+> Last updated: May 2026. After v2 Phase-1 polish: calculation centralization, design system, mobile nav, trade detail polish.
 
 ---
 
