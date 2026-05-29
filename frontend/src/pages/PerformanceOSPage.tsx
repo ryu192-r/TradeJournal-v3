@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState, type TextareaHTMLAttributes } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
-  Loader2, ArrowRight,
+  Loader2, ArrowRight, RefreshCw,
 } from 'lucide-react'
-import { useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow } from '@/hooks/usePerformanceOS'
-import { enrichWeeklyReview, updateWeeklyReview, enrichMonthlyReview, updateMonthlyReview } from '@/lib/endpoints'
+import {
+  useDailyDashboard, useAdvancePhase, useUpdateWorkflow, useResetWorkflow,
+  useWeeklyReview, useUpdateWeeklyReview,
+  useMonthlyReview, useUpdateMonthlyReview,
+} from '@/hooks/usePerformanceOS'
+import { enrichWeeklyReview, enrichMonthlyReview } from '@/lib/endpoints'
 import { useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJournalMutation'
 import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
 import { cn } from '@/lib/utils'
 import type { WorkflowPhase, DailyDashboard, ChecklistItem } from '@/types/performanceOs'
 import { PageShell } from '@/components/layout/PageShell'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { EmptyState, LoadingState } from '@/components/ui'
+import { EmptyState, ErrorState, CardSkeleton } from '@/components/ui'
+import { SectionHeader } from '@/components/ui/SharedUI'
 
 type ViewTab = 'daily' | 'weekly' | 'monthly'
 
@@ -25,7 +30,7 @@ const PHASE_LABEL: Record<WorkflowPhase, string> = {
   behavior: 'Behavior',
 }
 
-type SaveStatus = 'saved' | 'saving'
+type SaveStatus = 'saved' | 'saving' | 'error'
 
 type DebouncedTextareaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onBlur'> & {
   value: string
@@ -76,14 +81,15 @@ export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className,
     try {
       await onSave(nextValue)
       lastSavedRef.current = nextValue
+      if (mountedRef.current) setStatus('saved')
+    } catch {
+      if (mountedRef.current) setStatus('error')
     } finally {
       inFlightRef.current = false
       const queuedValue = queuedValueRef.current
       queuedValueRef.current = null
       if (queuedValue !== null && queuedValue !== lastSavedRef.current) {
         void saveNow(queuedValue)
-      } else if (mountedRef.current) {
-        setStatus('saved')
       }
     }
   }
@@ -123,7 +129,9 @@ export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className,
         onBlur={flushSave}
         className={className}
       />
-      <div className="mt-1 h-3 text-[10px] text-text-faint">{status === 'saving' ? 'Saving...' : 'Saved'}</div>
+      <div className={cn('mt-1 h-3 text-[10px]', status === 'error' ? 'text-loss' : 'text-text-faint')}>
+        {status === 'saving' ? 'Saving...' : status === 'error' ? 'Save failed' : 'Saved'}
+      </div>
     </>
   )
 }
@@ -170,12 +178,12 @@ function CommandStrip({ dashboard, selectedDate, onDateChange }: { dashboard: Da
   }
 
   return (
-    <div className="flex items-center gap-3 text-xs">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       <div className="flex items-center gap-1">
-        <button onClick={() => shiftDate(-1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
-        <span className="font-data text-text-heading">{formatDate(new Date(selectedDate + 'T00:00:00'))}</span>
-        <button onClick={() => shiftDate(1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
-        {selectedDate === today && <span className="text-accent font-medium ml-0.5">today</span>}
+        <button onClick={() => shiftDate(-1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer" aria-label="Previous day"><ChevronLeft className="w-3.5 h-3.5" /></button>
+        <span className="font-data text-text-heading whitespace-nowrap">{formatDate(new Date(selectedDate + 'T00:00:00'))}</span>
+        <button onClick={() => shiftDate(1)} className="p-1 rounded text-text-muted hover:text-text-heading cursor-pointer" aria-label="Next day"><ChevronRight className="w-3.5 h-3.5" /></button>
+        {selectedDate === today && <span className="text-accent font-medium ml-0.5 whitespace-nowrap">today</span>}
       </div>
 
       <div className="w-px h-3 bg-border" />
@@ -218,11 +226,10 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
   const advanceMut = useAdvancePhase(dateStr)
   const wf = dashboard.workflow!
   const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>(wf.checklist_items)
-  const initialized = useRef(false)
-  if (!initialized.current) { initialized.current = true }
-  if (initialized.current && localChecklist !== wf.checklist_items && wf.checklist_items.length > 0 && localChecklist.length === 0) {
+
+  useEffect(() => {
     setLocalChecklist(wf.checklist_items)
-  }
+  }, [wf.checklist_items])
 
   const checkedCount = localChecklist.filter(c => c.checked).length
   const allChecked = localChecklist.every(c => c.checked)
@@ -492,7 +499,7 @@ export function PerformanceOSPage() {
   const today = toISODate(new Date())
   const isToday = selectedDate === today
 
-  const { data: dashboard, isLoading } = useDailyDashboard(isToday ? undefined : selectedDate)
+  const { data: dashboard, isLoading, isError, error, refetch } = useDailyDashboard(isToday ? undefined : selectedDate)
   const resetMut = useResetWorkflow(today)
   const qc = useQueryClient()
 
@@ -508,7 +515,7 @@ export function PerformanceOSPage() {
       {dashboard && <CommandStrip dashboard={dashboard} selectedDate={selectedDate} onDateChange={setSelectedDate} />}
 
       {/* View range selector */}
-      <div className="flex items-center gap-1 mt-4 mb-5">
+      <div className="flex flex-wrap items-center gap-1 mt-4 mb-5">
         {([
           { id: 'daily' as ViewTab, label: 'Daily' },
           { id: 'weekly' as ViewTab, label: 'Weekly' },
@@ -518,7 +525,7 @@ export function PerformanceOSPage() {
             key={t.id}
             onClick={() => setViewTab(t.id)}
             className={cn(
-              'px-3 py-1 rounded-lg text-[length:var(--text-xs)] font-medium transition-all cursor-pointer',
+              'px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium transition-all cursor-pointer',
               viewTab === t.id ? 'bg-bg-elevated/80 text-text-heading' : 'text-text-faint hover:text-text-muted',
             )}
           >
@@ -529,6 +536,7 @@ export function PerformanceOSPage() {
           <button
             onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
             className="ml-auto text-[10px] text-text-faint hover:text-text-muted cursor-pointer"
+            aria-label="Reset today's workflow"
           >
             reset
           </button>
@@ -537,18 +545,29 @@ export function PerformanceOSPage() {
 
       {/* Daily: Phase content */}
       {viewTab === 'daily' && isLoading && (
-        <LoadingState variant="skeleton" />
+        <div className="space-y-4">
+          <CardSkeleton height="h-48" />
+        </div>
+      )}
+      {viewTab === 'daily' && isError && (
+        <ErrorState
+          title="Failed to load dashboard"
+          message={error instanceof Error ? error.message : 'Could not load daily data'}
+          onRetry={() => refetch()}
+        />
       )}
       {viewTab === 'daily' && dashboard && (
-        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-          <PhaseDots phase={phase} progress={dashboard.phase_progress} />
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+          <div className="overflow-x-auto scrollbar-thin pb-1">
+            <PhaseDots phase={phase} progress={dashboard.phase_progress} />
+          </div>
           <div className="mt-5 border-t border-border/50 pt-5">
             <PhaseComponent dashboard={dashboard} dateStr={selectedDate} />
           </div>
         </div>
       )}
-      {viewTab === 'daily' && !dashboard && !isLoading && (
-        <EmptyState title="No workflow data" message="Create today workflow and start with pre-market checklist." />
+      {viewTab === 'daily' && !dashboard && !isLoading && !isError && (
+        <EmptyState title="No workflow data" message="Create today's workflow and start with pre-market checklist." />
       )}
 
       {viewTab === 'weekly' && <WeeklyReviewSection selectedDate={selectedDate} onSelectDate={setSelectedDate} />}
@@ -558,16 +577,6 @@ export function PerformanceOSPage() {
 }
 
 function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: string; onSelectDate: (d: string) => void }) {
-  const qc = useQueryClient()
-  const { data: review, isLoading: reviewLoading } = useQuery({
-    queryKey: ['weekly-review', 'current'],
-    queryFn: () => enrichWeeklyReview(),
-  })
-  const updateMut = useMutation({
-    mutationFn: (data: import('@/types/performanceOs').WeeklyReviewUpdate) => updateWeeklyReview(review?.week_start ?? '', data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['weekly-review'] }) },
-  })
-
   const d = new Date(selectedDate)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
@@ -575,27 +584,54 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
   const mondayISO = toISODate(monday)
   const weekDays = Array.from({ length: 5 }, (_, i) => { const cd = new Date(monday); cd.setDate(monday.getDate() + i); return cd })
 
+  const { data: review, isLoading: reviewLoading, isError: reviewError, refetch: refetchReview } = useWeeklyReview(mondayISO)
+  const updateMut = useUpdateWeeklyReview(mondayISO)
   const { data: stats } = useWeeklyJournalStatsQuery(mondayISO)
   const { data: weekJournals } = useWeeklyJournalsQuery(mondayISO)
+  const enrichMut = useMutation({
+    mutationFn: () => enrichWeeklyReview(mondayISO),
+    onSuccess: () => { refetchReview() },
+  })
 
-  if (reviewLoading && !review) return <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
+  const reviewData = review || undefined
+  const pnl = reviewData ? Number(reviewData.total_pnl) : 0
 
-  const pnl = review ? Number(review.total_pnl) : 0
+  if (reviewLoading) {
+    return (
+      <div className="space-y-5 animate-card-in">
+        <CardSkeleton height="h-44" />
+        <CardSkeleton height="h-32" />
+      </div>
+    )
+  }
+
+  if (reviewError) {
+    return (
+      <div className="space-y-5 animate-card-in">
+        <ErrorState
+          title="Weekly review unavailable"
+          message="Could not load or create the weekly review."
+          onRetry={() => refetchReview()}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 animate-card-in">
-      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-        <div className="flex items-baseline justify-between mb-4">
-          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">Week of {review?.week_start ? new Date(review.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}</span>
-          <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
+      {/* Week header with day picker */}
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+        <div className="flex items-baseline justify-between gap-3 mb-4">
+          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">Week of {reviewData?.week_start ? new Date(reviewData.week_start + 'T00:00:00').toLocaleDateString() : formatDate(monday)}</span>
+          <span className={cn('text-lg font-data font-semibold whitespace-nowrap', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
         </div>
 
-        <div className="flex items-center gap-6 mb-4 text-sm font-data">
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{review?.total_trades ?? stats?.trade_count ?? 0}</span></div>
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{review?.win_rate ?? (stats ? `${parseFloat(stats.win_rate).toFixed(1)}%` : '—')}</span></div>
-          {review?.top_setup && <div><span className="text-[length:var(--text-xs)] text-text-muted block">Best Setup</span><span className="text-text-heading font-medium">{review.top_setup}</span></div>}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm font-data">
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{reviewData?.total_trades ?? stats?.trade_count ?? 0}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{reviewData?.win_rate ?? (stats ? `${parseFloat(stats.win_rate).toFixed(1)}%` : '—')}</span></div>
+          {reviewData?.top_setup && <div><span className="text-[length:var(--text-xs)] text-text-muted block">Best Setup</span><span className="text-text-heading font-medium">{reviewData.top_setup}</span></div>}
         </div>
 
         <div className="grid grid-cols-5 gap-1.5">
@@ -611,6 +647,7 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
                   'rounded-lg p-2 text-center transition-all cursor-pointer',
                   isSelected ? 'bg-accent/10 text-accent' : 'hover:bg-bg-elevated/50 text-text-muted',
                 )}
+                aria-label={wd.toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
               >
                 <div className="text-[10px] uppercase tracking-wider mb-0.5">{wd.toLocaleDateString('en-IN', { weekday: 'short' })}</div>
                 <div className={cn('text-sm font-semibold', isToday ? 'text-accent' : 'text-text-heading')}>{wd.getDate()}</div>
@@ -620,14 +657,15 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
         </div>
       </div>
 
-      {review?.daily_breakdown && review.daily_breakdown.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Daily Breakdown</span>
+      {/* Day breakdown */}
+      {reviewData?.daily_breakdown && reviewData.daily_breakdown.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+          <SectionHeader icon={CheckCircle2} title="Daily Breakdown" subtitle="PnL per trading day" />
           <div className="mt-3 divide-y divide-border/50">
-            {review.daily_breakdown.map(d => (
+            {reviewData.daily_breakdown.map(d => (
               <div key={d.date} className="flex items-center justify-between py-2">
                 <span className="text-[length:var(--text-xs)] text-text-muted">{new Date(d.date + 'T00:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                <span className="text-[length:var(--text-xs)] text-text-faint">{d.trades}</span>
+                <span className="text-[length:var(--text-xs)] text-text-faint">{d.trades} trades</span>
                 <span className={cn('text-[length:var(--text-xs)] font-data', Number(d.pnl) >= 0 ? 'text-profit/70' : 'text-loss/70')}>{Number(d.pnl) >= 0 ? '+' : ''}{formatCurrency(Number(d.pnl))}</span>
               </div>
             ))}
@@ -635,12 +673,13 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
         </div>
       )}
 
+      {/* Journal entries */}
       {weekJournals && weekJournals.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Journal Entries</span>
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+          <SectionHeader icon={RefreshCw} title="Journal Entries" subtitle="Daily notes from this week" />
           <div className="mt-3 divide-y divide-border/50">
             {weekJournals.map(j => (
-              <button key={j.id} onClick={() => onSelectDate(j.date)} className="w-full text-left py-2.5 cursor-pointer group">
+              <button key={j.id} onClick={() => onSelectDate(j.date)} className="w-full text-left py-2.5 cursor-pointer group" aria-label={`Open journal for ${j.date}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[length:var(--text-xs)] font-medium text-text-heading group-hover:text-accent transition-colors">
                     {new Date(j.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -654,54 +693,102 @@ function WeeklyReviewSection({ selectedDate, onSelectDate }: { selectedDate: str
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+      {/* Key lessons */}
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Key Lessons</label>
-        <DebouncedTextarea
-          value={review?.key_lessons ?? ''}
-          onSave={(value) => updateMut.mutateAsync({ key_lessons: value })}
-          placeholder="What did you learn this week?"
-          rows={3}
-          className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
-        />
+        {!reviewData && !enrichMut.isPending ? (
+          <div className="py-4 text-center">
+            <EmptyState
+              compact
+              title="No weekly review yet"
+              message="Create an enriched review to see computed stats and add notes."
+              action={{ label: enrichMut.isPending ? 'Creating...' : 'Create Weekly Review', onClick: () => enrichMut.mutate() }}
+            />
+          </div>
+        ) : (
+          <DebouncedTextarea
+            value={reviewData?.key_lessons ?? ''}
+            onSave={(value) => updateMut.mutateAsync({ key_lessons: value })}
+            placeholder="What did you learn this week?"
+            rows={3}
+            className="w-full rounded-xl border border-border bg-bg-elevated/30 px-4 py-3 text-sm text-text placeholder:text-text-faint/50 focus:outline-none focus:border-accent/30 resize-y"
+          />
+        )}
       </div>
     </div>
   )
 }
 
 function MonthlyReviewSection() {
-  const qc = useQueryClient()
-  const { data: review, isLoading } = useQuery({
-    queryKey: ['monthly-review', 'current'],
-    queryFn: () => enrichMonthlyReview(),
-  })
-  const updateMut = useMutation({
-    mutationFn: (data: import('@/types/performanceOs').MonthlyReviewUpdate) => updateMonthlyReview(review?.month ?? '', data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['monthly-review'] }) },
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { data: review, isLoading, isError, refetch: refetchReview } = useMonthlyReview(month)
+  const updateMut = useUpdateMonthlyReview(month)
+  const enrichMut = useMutation({
+    mutationFn: () => enrichMonthlyReview(month),
+    onSuccess: () => { refetchReview() },
   })
 
-  if (isLoading) return <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
+  if (isLoading) {
+    return (
+      <div className="space-y-5 animate-card-in">
+        <CardSkeleton height="h-36" />
+        <CardSkeleton height="h-48" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-5 animate-card-in">
+        <ErrorState
+          title="Monthly review unavailable"
+          message="Could not load or create the monthly review."
+          onRetry={() => refetchReview()}
+        />
+      </div>
+    )
+  }
 
   const pnl = review ? Number(review.total_pnl) : 0
+
+  if (!review) {
+    return (
+      <div className="space-y-5 animate-card-in">
+        <EmptyState
+          title="No monthly review yet"
+          message="Create an enriched review with computed stats and add your reflections."
+          action={{
+            label: enrichMut.isPending ? 'Creating...' : 'Create Monthly Review',
+            onClick: () => enrichMut.mutate(),
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5 animate-card-in">
-      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-        <div className="flex items-baseline justify-between mb-4">
-          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">{review?.month ?? 'Current Month'}</span>
-          <span className={cn('text-lg font-data font-semibold', pnl >= 0 ? 'text-profit' : 'text-loss')}>
+      {/* Summary card */}
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+        <div className="flex items-baseline justify-between gap-3 mb-4">
+          <span className="text-[length:var(--text-sm)] font-medium text-text-heading">{review.month ?? 'Current Month'}</span>
+          <span className={cn('text-lg font-data font-semibold whitespace-nowrap', pnl >= 0 ? 'text-profit' : 'text-loss')}>
             {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
           </span>
         </div>
-        <div className="flex items-center gap-6 text-sm font-data">
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{review?.total_trades ?? 0}</span></div>
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{review?.win_rate ?? '—'}</span></div>
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">PF</span><span className="text-text-heading font-medium">{review?.profit_factor ?? '—'}</span></div>
-          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Avg R</span><span className="text-text-heading font-medium">{review?.avg_r ?? '—'}</span></div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-data">
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{review.total_trades}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{review.win_rate ?? '—'}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">PF</span><span className="text-text-heading font-medium">{review.profit_factor ?? '—'}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Avg R</span><span className="text-text-heading font-medium">{review.avg_r ?? '—'}</span></div>
         </div>
       </div>
 
-      {review?.setup_performance && review.setup_performance.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider">Setup Performance</span>
+      {/* Setup performance */}
+      {review.setup_performance && review.setup_performance.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+          <SectionHeader icon={RefreshCw} title="Setup Performance" subtitle="PnL by playbook setup" />
           <div className="mt-3 divide-y divide-border/50">
             {review.setup_performance.map(s => (
               <div key={s.setup} className="flex items-center justify-between py-2">
@@ -714,10 +801,11 @@ function MonthlyReviewSection() {
         </div>
       )}
 
-      {review?.top_emotions && review.top_emotions.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
-          <span className="text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-2 block">Emotional Landscape</span>
-          <div className="flex flex-wrap gap-1.5 mt-1">
+      {/* Emotional landscape */}
+      {review.top_emotions && review.top_emotions.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+          <SectionHeader icon={CheckCircle2} title="Emotional Landscape" subtitle="Top emotions logged this month" />
+          <div className="flex flex-wrap gap-1.5 mt-3">
             {review.top_emotions.map(e => (
               <span key={e.emotion} className="text-[10px] px-2.5 py-0.5 rounded-full bg-accent/8 text-accent/70 capitalize">{e.emotion} {e.count}</span>
             ))}
@@ -725,10 +813,11 @@ function MonthlyReviewSection() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
+      {/* Notes */}
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
         <label className="block text-[length:var(--text-xs)] font-medium text-text-muted uppercase tracking-wider mb-1.5">Notes</label>
         <DebouncedTextarea
-          value={review?.notes ?? ''}
+          value={review.notes ?? ''}
           onSave={(value) => updateMut.mutateAsync({ notes: value })}
           placeholder="Reflections, goals, next month targets..."
           rows={3}
