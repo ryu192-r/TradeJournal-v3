@@ -1,4 +1,5 @@
 import pytest
+import json
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
@@ -9,6 +10,8 @@ from app.services.providers.tapetide_market_data import (
     fetch_price_history,
     build_tapetide_symbol,
     _parse_tapetide_response,
+    _extract_json_response,
+    _parse_sse_response,
 )
 
 
@@ -73,7 +76,6 @@ class TestParseTapetideResponse:
     ]
 
     def test_parse_mcp_content_text(self):
-        import json
         response = {
             "result": {
                 "content": [
@@ -142,6 +144,7 @@ class TestFetchPriceHistoryHttp:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
+        mock_response.headers = {"content-type": "application/json"}
         mock_response.json.return_value = {
             "result": {
                 "data": [
@@ -155,6 +158,26 @@ class TestFetchPriceHistoryHttp:
 
         assert len(candles) == 1
         assert candles[0]["source"] == "tapetide"
+        assert candles[0]["close"] == Decimal("100.5")
+
+    def test_sse_response_handled(self, monkeypatch):
+        from app.core import config
+        monkeypatch.setattr(config.settings, "TAPETIDE_ENABLED", True)
+        monkeypatch.setattr(config.settings, "TAPETIDE_API_KEY", "test-key")
+        monkeypatch.setattr(config.settings, "TAPETIDE_MCP_URL", "https://mcp.example.com/mcp")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.headers = {"content-type": "text/event-stream"}
+        mock_response.text = (
+            'data: {"result":{"content":[{"type":"text","text":"{\\"data\\":[{\\"date\\":\\"2024-06-15\\",\\"open\\":100,\\"high\\":101,\\"low\\":99,\\"close\\":100.5}]}"}]}}\n\n'
+        )
+
+        with patch("app.services.providers.tapetide_market_data.httpx.post", return_value=mock_response):
+            candles = fetch_price_history("RELIANCE", "1d", datetime(2024, 6, 1), datetime(2024, 6, 30))
+
+        assert len(candles) == 1
         assert candles[0]["close"] == Decimal("100.5")
 
     def test_http_error_raises_provider_error(self, monkeypatch):
@@ -189,3 +212,54 @@ class TestFetchPriceHistoryHttp:
                 fetch_price_history("RELIANCE", "1d", datetime(2024, 6, 1), datetime(2024, 6, 30))
             except TapetideProviderError as e:
                 assert "super-secret-key-12345" not in str(e)
+
+    def test_upstream_error_message_sanitized(self):
+        response = {"error": {"code": -32600, "message": "Internal server leak: user_id=42 token=abc"}}
+        with pytest.raises(TapetideProviderError, match="could not be loaded") as exc_info:
+            _parse_tapetide_response(response, "RELIANCE", "1d")
+        assert "user_id=42" not in str(exc_info.value)
+        assert "token=abc" not in str(exc_info.value)
+
+    def test_mcp_isError_sanitized(self):
+        response = {"result": {"isError": True, "content": [{"text": "Stock not found: NSE. API key=sekrit"}]}}
+        with pytest.raises(TapetideProviderError, match="could not be loaded") as exc_info:
+            _parse_tapetide_response(response, "RELIANCE", "1d")
+        assert "sekrit" not in str(exc_info.value)
+
+
+class TestExtractJsonResponse:
+    def test_json_content_type(self):
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "application/json"}
+        mock_resp.json.return_value = {"result": {"data": []}}
+        result = _extract_json_response(mock_resp)
+        assert result == {"result": {"data": []}}
+
+    def test_sse_content_type(self):
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "text/event-stream"}
+        mock_resp.text = 'data: {"result": {"data": []}}\n\n'
+        result = _extract_json_response(mock_resp)
+        assert result == {"result": {"data": []}}
+
+    def test_sse_multiple_data_lines(self):
+        mock_resp = MagicMock()
+        mock_resp.headers = {"content-type": "text/event-stream"}
+        mock_resp.text = 'event: ping\ndata: {}\n\ndata: {"result": {"data": [{"x": 1}]}}\n\n'
+        result = _extract_json_response(mock_resp)
+        assert result == {"result": {"data": [{"x": 1}]}}
+
+
+class TestParseSseResponse:
+    def test_simple_data_line(self):
+        text = 'data: {"result": "ok"}\n\n'
+        assert _parse_sse_response(text) == {"result": "ok"}
+
+    def test_no_data_lines_raises(self):
+        with pytest.raises(TapetideProviderError, match="SSE"):
+            _parse_sse_response("event: ping\n\n")
+
+    def test_empty_data_line_skipped(self):
+        text = 'data: \n\ndata: {"result": {"data": [{"x": 1}]}}\n\n'
+        result = _parse_sse_response(text)
+        assert result == {"result": {"data": [{"x": 1}]}}

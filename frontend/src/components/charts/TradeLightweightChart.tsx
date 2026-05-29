@@ -25,11 +25,11 @@ const RANGE_OPTIONS: { value: ChartRange; label: string }[] = [
   { value: '1y', label: '1Y' },
 ]
 
-const SOURCE_OPTIONS: { value: ChartSource; label: string }[] = [
+const SOURCE_OPTIONS: { value: ChartSource; label: string; devOnly?: boolean }[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'tapetide', label: 'Tapetide' },
   { value: 'cache', label: 'Cache' },
-  { value: 'mock', label: 'Mock (dev)' },
+  { value: 'mock', label: 'Mock (dev)', devOnly: true },
 ]
 
 interface TradeLightweightChartProps {
@@ -233,21 +233,21 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         ))}
       </div>
       <div className="w-px h-4 bg-border" />
-      <div className="flex items-center gap-1">
-        {SOURCE_OPTIONS.map(s => (
-          <button
-            key={s.value}
-            onClick={() => setSource(s.value)}
-            className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
-              source === s.value
-                ? 'bg-accent text-accent-foreground font-medium'
-                : 'text-text-muted hover:text-text hover:bg-border'
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+        <div className="flex items-center gap-1">
+          {SOURCE_OPTIONS.filter(s => !s.devOnly || import.meta.env.DEV).map(s => (
+            <button
+              key={s.value}
+              onClick={() => setSource(s.value)}
+              className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+                source === s.value
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-border'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       <div className="flex-1" />
       <button
         onClick={() => refetch()}
@@ -299,10 +299,10 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
               <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
                 Intraday candles are not configured yet. Switch to 1D for Tapetide daily charts.
               </p>
-              <button
-                onClick={() => { setTimeframe('1d'); refetch() }}
-                className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-              >
+            <button
+              onClick={() => setTimeframe('1d')}
+              className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
                 Switch to 1D
               </button>
             </>

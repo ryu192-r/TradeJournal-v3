@@ -6,6 +6,7 @@ Tapetide supports daily/weekly intervals only — NOT intraday (1m/5m/15m/30m/1h
 Timestamps are stored as naive IST (start-of-day for daily candles).
 """
 import httpx
+import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List
@@ -64,11 +65,9 @@ def fetch_price_history(
     interval = "weekly" if timeframe == "1w" else "daily"
     days = max(1, (end.date() - start.date()).days + 1)
 
-    # Build JSON-RPC request for MCP price_history tool
-    request_id = 1
     payload = {
         "jsonrpc": "2.0",
-        "id": request_id,
+        "id": 1,
         "method": "tools/call",
         "params": {
             "name": "get_price_history",
@@ -102,7 +101,34 @@ def fetch_price_history(
             "Tapetide price history could not be loaded right now."
         ) from exc
 
-    return _parse_tapetide_response(resp.json(), symbol, timeframe)
+    response = _extract_json_response(resp)
+    return _parse_tapetide_response(response, symbol, timeframe)
+
+
+def _extract_json_response(resp: httpx.Response) -> dict:
+    """Extract JSON from MCP response. Handles both direct JSON and SSE-wrapped responses."""
+    content_type = resp.headers.get("content-type", "")
+
+    if "text/event-stream" in content_type:
+        return _parse_sse_response(resp.text)
+
+    return resp.json()
+
+
+def _parse_sse_response(text: str) -> dict:
+    """Parse Server-Sent Events response, extracting the JSON-RPC result from data: lines."""
+    for line in text.splitlines():
+        if line.startswith("data: "):
+            payload = line[6:].strip()
+            if not payload:
+                continue
+            try:
+                parsed = json.loads(payload)
+                if isinstance(parsed, dict) and ("result" in parsed or "error" in parsed):
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+    raise TapetideProviderError("Tapetide returned SSE response with no parseable data.")
 
 
 def _parse_tapetide_response(
@@ -118,9 +144,7 @@ def _parse_tapetide_response(
     """
     # Check for JSON-RPC error first
     if "error" in response:
-        err = response["error"]
-        msg = err.get("message", "Unknown error") if isinstance(err, dict) else str(err)
-        raise TapetideProviderError(f"Tapetide API error: {msg}")
+        raise TapetideProviderError("Tapetide API returned an error. Price history could not be loaded.")
 
     candles_raw: list | None = None
 
@@ -129,13 +153,7 @@ def _parse_tapetide_response(
     if isinstance(result, dict):
         # Check MCP error flag
         if result.get("isError"):
-            content = result.get("content", [])
-            err_text = ""
-            if content and isinstance(content[0], dict):
-                err_text = content[0].get("text", "")
-            raise TapetideProviderError(
-                f"Tapetide returned an error: {err_text[:200]}"
-            )
+            raise TapetideProviderError("Tapetide returned an error. Price history could not be loaded.")
 
         content = result.get("content")
         if isinstance(content, list) and len(content) > 0:
@@ -143,11 +161,7 @@ def _parse_tapetide_response(
             if text:
                 # Handle text that starts with "Error:" (non-JSON error)
                 if text.strip().startswith("Error:"):
-                    raise TapetideProviderError(
-                        f"Tapetide returned an error: {text[:200]}"
-                    )
-
-                import json
+                    raise TapetideProviderError("Tapetide returned an error. Price history could not be loaded.")
 
                 try:
                     parsed = json.loads(text)
