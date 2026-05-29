@@ -1,6 +1,6 @@
-export type ChartTimeframe = '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '1d'
+export type ChartTimeframe = '1m' | '3m' | '5m' | '15m' | '30m' | '1h' | '1d' | '1w'
 export type ChartRange = 'auto' | '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y'
-export type ChartSource = 'auto' | 'cache' | 'dhan' | 'mock'
+export type ChartSource = 'auto' | 'cache' | 'tapetide' | 'dhan' | 'mock'
 
 export interface ChartCandle {
   time: number

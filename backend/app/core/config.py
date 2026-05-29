@@ -46,6 +46,12 @@ class Settings:
     # Market Data Provider (Tapetide or other)
     MARKET_DATA_API_URL: str = config("MARKET_DATA_API_URL", default="")
     MARKET_DATA_API_KEY: str = config("MARKET_DATA_API_KEY", default="")
+
+    # Tapetide daily charts provider
+    TAPETIDE_ENABLED: bool = config("TAPETIDE_ENABLED", default=True, cast=bool)
+    TAPETIDE_MCP_URL: str = config("TAPETIDE_MCP_URL", default="https://mcp.tapetide.com/mcp")
+    TAPETIDE_API_KEY: str = config("TAPETIDE_API_KEY", default="tpt_rt_d274b475b87e6bf41fa10b856eca10e32ccdee40e7edf629295774c0")
+    TAPETIDE_DEFAULT_EXCHANGE: str = config("TAPETIDE_DEFAULT_EXCHANGE", default="NSE")
     
     class Config:
         case_sensitive = True

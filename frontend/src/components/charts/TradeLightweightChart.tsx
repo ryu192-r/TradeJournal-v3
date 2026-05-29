@@ -2,16 +2,17 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { createChart, CandlestickSeries, HistogramSeries, createSeriesMarkers, type IChartApi, type ISeriesApi, type CandlestickData, type Time, ColorType, CrosshairMode } from 'lightweight-charts'
 import { useQuery } from '@tanstack/react-query'
 import { getTradeChartData } from '@/lib/endpoints'
-import type { ChartTimeframe, ChartRange, TradeChartData } from '@/types/chart'
+import type { ChartTimeframe, ChartRange, ChartSource, TradeChartData } from '@/types/chart'
 import type { ApiTrade } from '@/types'
 import { RefreshCw, Maximize2, Minimize2, BarChart3 } from 'lucide-react'
 
 const TIMEFRAME_OPTIONS: { value: ChartTimeframe; label: string }[] = [
+  { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' },
   { value: '1m', label: '1m' },
   { value: '5m', label: '5m' },
   { value: '15m', label: '15m' },
   { value: '1h', label: '1H' },
-  { value: '1d', label: '1D' },
 ]
 
 const RANGE_OPTIONS: { value: ChartRange; label: string }[] = [
@@ -24,6 +25,13 @@ const RANGE_OPTIONS: { value: ChartRange; label: string }[] = [
   { value: '1y', label: '1Y' },
 ]
 
+const SOURCE_OPTIONS: { value: ChartSource; label: string; devOnly?: boolean }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'tapetide', label: 'Tapetide' },
+  { value: 'cache', label: 'Cache' },
+  { value: 'mock', label: 'Mock (dev)', devOnly: true },
+]
+
 interface TradeLightweightChartProps {
   trade: ApiTrade
 }
@@ -33,12 +41,13 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [timeframe, setTimeframe] = useState<ChartTimeframe>('5m')
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>('1d')
   const [range, setRange] = useState<ChartRange>('auto')
+  const [source, setSource] = useState<ChartSource>('auto')
 
   const { data, isLoading, error, refetch } = useQuery<TradeChartData>({
-    queryKey: ['chart-data', trade.id, timeframe, range],
-    queryFn: () => getTradeChartData(trade.id, { timeframe, range }),
+    queryKey: ['chart-data', trade.id, timeframe, range, source],
+    queryFn: () => getTradeChartData(trade.id, { timeframe, range, source }),
     staleTime: 60_000,
     placeholderData: (prev) => prev,
   })
@@ -189,95 +198,136 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
 
   // All hooks above — conditional returns only below this line
 
+  // Controls bar — rendered in both empty and data states
+  const controlsBar = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1">
+        {TIMEFRAME_OPTIONS.map(tf => (
+          <button
+            key={tf.value}
+            onClick={() => setTimeframe(tf.value)}
+            className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+              timeframe === tf.value
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-text-muted hover:text-text hover:bg-border'
+            }`}
+          >
+            {tf.label}
+          </button>
+        ))}
+      </div>
+      <div className="w-px h-4 bg-border" />
+      <div className="flex items-center gap-1">
+        {RANGE_OPTIONS.map(r => (
+          <button
+            key={r.value}
+            onClick={() => setRange(r.value as ChartRange)}
+            className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+              range === r.value
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-text-muted hover:text-text hover:bg-border'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1">
+          {SOURCE_OPTIONS.filter(s => !s.devOnly || import.meta.env.DEV).map(s => (
+            <button
+              key={s.value}
+              onClick={() => setSource(s.value)}
+              className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+                source === s.value
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-border'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      <div className="flex-1" />
+      <button
+        onClick={() => refetch()}
+        className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => setIsFullscreen(!isFullscreen)}
+        className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
+        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+      >
+        {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  )
+
   // Error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
-        <BarChart3 className="w-10 h-10 opacity-40" />
-        <p className="text-sm">Failed to load chart data</p>
-        <button
-          onClick={() => refetch()}
-          className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-        >
-          Retry
-        </button>
+      <div className="flex flex-col gap-2">
+        {controlsBar}
+        <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
+          <BarChart3 className="w-10 h-10 opacity-40" />
+          <p className="text-sm">Failed to load chart data</p>
+          <button
+            onClick={() => refetch()}
+            className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
 
   // Empty state — no real data and not mock
   if (hasNoData) {
+    const isIntraday = !['1d', '1w'].includes(timeframe)
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
-        <BarChart3 className="w-10 h-10 opacity-40" />
-        <p className="text-sm font-medium text-text-heading">No candle data available</p>
-        <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
-          No historical data provider is configured yet. You can still upload chart screenshots using the &quot;Uploaded Images&quot; tab.
-        </p>
-        {meta?.message && (
-          <p className="text-[length:var(--text-xs)] text-text-muted italic">{meta.message}</p>
-        )}
-        <button
-          onClick={() => refetch()}
-          className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-        >
-          Retry
-        </button>
+      <div className="flex flex-col gap-2">
+        {controlsBar}
+        <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
+          <BarChart3 className="w-10 h-10 opacity-40" />
+          <p className="text-sm font-medium text-text-heading">No candle data available</p>
+          {isIntraday ? (
+            <>
+              <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
+                Intraday candles are not configured yet. Switch to 1D for Tapetide daily charts.
+              </p>
+            <button
+              onClick={() => setTimeframe('1d')}
+              className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+                Switch to 1D
+              </button>
+            </>
+          ) : (
+            <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
+              {meta?.message || 'No historical data provider is configured yet.'}
+            </p>
+          )}
+          <p className="text-[length:var(--text-xs)] text-text-muted/60">
+            Uploaded chart screenshots are still available in the Uploaded Images tab.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Controls */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1">
-          {TIMEFRAME_OPTIONS.map(tf => (
-            <button
-              key={tf.value}
-              onClick={() => setTimeframe(tf.value)}
-              className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
-                timeframe === tf.value
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-text-muted hover:text-text hover:bg-border'
-              }`}
-            >
-              {tf.label}
-            </button>
-          ))}
-        </div>
-        <div className="w-px h-4 bg-border" />
-        <div className="flex items-center gap-1">
-          {RANGE_OPTIONS.map(r => (
-            <button
-              key={r.value}
-              onClick={() => setRange(r.value as ChartRange)}
-              className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
-                range === r.value
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-text-muted hover:text-text hover:bg-border'
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <button
-          onClick={() => refetch()}
-          className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
-          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        >
-          {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-        </button>
-      </div>
+      {controlsBar}
 
       {/* Chart container */}
       <div className={`rounded-xl border border-border overflow-hidden bg-[#0f1117] ${isFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}>
@@ -298,7 +348,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       )}
       {meta && meta.has_real_data && (
         <p className="text-[length:var(--text-xs)] text-text-muted">
-          Source: {data?.source} &middot; {candles.length} candles
+          Source: {data?.source === 'tapetide' ? 'Tapetide daily OHLCV' : data?.source} &middot; {candles.length} candles
         </p>
       )}
     </div>

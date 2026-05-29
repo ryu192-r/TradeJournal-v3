@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch, MagicMock
 from fastapi import status
 
 from app.models.trade import Trade
@@ -222,14 +223,14 @@ class TestChartDataEndpoint:
         assert len(data["candles"]) >= 1
         assert data["source"] == "cache"
 
-    def test_default_timeframe_is_5m(self, client, db_session, auth_headers):
+    def test_default_timeframe_is_1d(self, client, db_session, auth_headers):
         trade = _create_trade(db_session, user_id=1)
         resp = client.get(
             f"/api/v1/trades/{trade.id}/chart-data",
             headers=auth_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.json()["timeframe"] == "5m"
+        assert resp.json()["timeframe"] == "1d"
 
     def test_default_range_is_auto(self, client, db_session, auth_headers):
         trade = _create_trade(db_session, user_id=1)
@@ -270,3 +271,125 @@ class TestChartDataEndpoint:
         assert resp.status_code == status.HTTP_200_OK
         data = resp.json()
         assert data["meta"]["is_mock"] is False
+
+    def test_tapetide_source_with_unsupported_timeframe_returns_message(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=5m&source=tapetide",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["meta"]["has_real_data"] is False
+        assert "daily" in data["meta"]["message"].lower()
+
+    def test_tapetide_source_not_configured_returns_message(self, client, db_session, auth_headers, monkeypatch):
+        from app.core import config
+        monkeypatch.setattr(config.settings, "TAPETIDE_ENABLED", False)
+        monkeypatch.setattr(config.settings, "TAPETIDE_API_KEY", "")
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=tapetide",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["meta"]["has_real_data"] is False
+        assert "not configured" in data["meta"]["message"].lower() or "TAPETIDE_API_KEY" in data["meta"]["message"]
+
+    def test_cache_source_never_calls_tapetide(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=cache",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["source"] == "cache"
+
+    def test_auto_source_with_daily_timeframe_uses_tapetide_on_no_cache(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=auto",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        # With TAPETIDE_ENABLED=False, falls through to no-data
+        data = resp.json()
+        assert data["meta"]["has_real_data"] is False
+
+    def test_deleted_trade_returns_404(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        trade_id = trade.id
+        db_session.delete(trade)
+        db_session.commit()
+        resp = client.get(
+            f"/api/v1/trades/{trade_id}/chart-data",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_tapetide_valid_source(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?source=tapetide&timeframe=1d",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+
+    def test_1w_timeframe_valid(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1w",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+
+    def test_tapetide_mocked_candles_cached_and_returned(self, client, db_session, auth_headers, monkeypatch):
+        from app.core import config
+        monkeypatch.setattr(config.settings, "TAPETIDE_ENABLED", True)
+        monkeypatch.setattr(config.settings, "TAPETIDE_API_KEY", "test-key")
+        monkeypatch.setattr(config.settings, "TAPETIDE_MCP_URL", "https://mcp.test.com/mcp")
+
+        trade = _create_trade(db_session, user_id=1)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "result": {
+                "data": [
+                    {"date": "2024-06-15", "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 5000},
+                ]
+            }
+        }
+
+        with patch("app.services.providers.tapetide_market_data.httpx.post", return_value=mock_response):
+            resp = client.get(
+                f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=tapetide",
+                headers=auth_headers,
+            )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["source"] == "tapetide"
+        assert len(data["candles"]) >= 1
+
+        # Second request should use cached data
+        resp2 = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=cache",
+            headers=auth_headers,
+        )
+        assert resp2.status_code == status.HTTP_200_OK
+        assert len(resp2.json()["candles"]) >= 1
+
+    def test_auto_daily_does_not_call_dhan(self, client, db_session, auth_headers):
+        trade = _create_trade(db_session, user_id=1)
+        # source=auto with timeframe=1d should not attempt Dhan (intraday-only provider)
+        # With TAPETIDE_ENABLED=False, returns empty — no crash
+        resp = client.get(
+            f"/api/v1/trades/{trade.id}/chart-data?timeframe=1d&source=auto",
+            headers=auth_headers,
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["meta"]["has_real_data"] is False
