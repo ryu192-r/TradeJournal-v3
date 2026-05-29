@@ -457,7 +457,7 @@ export interface BrokerInfo {
 export interface BrokerImportResult {
   status: 'success' | 'error'
   added: number
-  merged?: number
+  updated: number
   skipped: number
   total: number
   errors: string[]

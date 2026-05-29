@@ -93,7 +93,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
       if (res.status === 'success') {
         addToast({
           title: 'Import complete',
-          message: `Added ${res.added} trades${res.merged ? `, merged ${res.merged}` : ''}, skipped ${res.skipped}`,
+          message: `Added ${res.added} trades${res.updated ? `, updated ${res.updated}` : ''}, skipped ${res.skipped}`,
           variant: 'success',
         })
         onImported?.()
@@ -306,7 +306,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
               <div>
                 <p className="text-[length:var(--text-xs)] font-medium text-text-muted mb-2 uppercase tracking-wider">
                   {result.skipped > 0
-                    ? 'Greyed rows already exist (same symbol + date) and will be skipped'
+                    ? 'Greyed rows already exist in your journal (fingerprint/order ID match) and will be skipped'
                     : `First ${result.preview.length} rows`}
                 </p>
                 <div className="overflow-x-auto rounded-lg border border-border max-h-64 overflow-y-auto">
@@ -325,7 +325,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
                         <tr
                           key={i}
                           className={`transition-colors ${row._skipped ? 'opacity-40 bg-bg-elevated/20' : 'hover:bg-bg-card-h'}`}
-                          title={row._skipped ? 'Duplicate — same symbol + date already exists' : undefined}
+                          title={row._skipped ? 'Already exists in your journal (fingerprint/order ID match)' : undefined}
                         >
                           <td className="px-2 py-1.5 text-text-muted text-center">{i + 1}</td>
                           <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.symbol}</td>
@@ -389,12 +389,10 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
                 <p className="text-2xl font-data font-bold text-profit">{result.added}</p>
                 <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Added</p>
               </div>
-              {result.merged != null && (
-                <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
-                  <p className="text-2xl font-data font-bold text-accent">{result.merged}</p>
-                  <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Merged</p>
-                </div>
-              )}
+              <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
+                <p className="text-2xl font-data font-bold text-accent">{result.updated}</p>
+                <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Updated</p>
+              </div>
               <div className="rounded-xl border border-border bg-bg-elevated/50 p-3 text-center">
                 <p className="text-2xl font-data font-bold text-yellow-400">{result.skipped}</p>
                 <p className="text-[length:var(--text-xs)] text-text-muted mt-1">Skipped</p>
