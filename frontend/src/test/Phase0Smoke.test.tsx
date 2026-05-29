@@ -247,8 +247,10 @@ describe('Phase 0 frontend smoke tests', () => {
 
   it('renders Trade Detail page', () => {
     renderWithQueryClient(<TradeDetailPage tradeId={1} />)
-    expect(screen.getByText('Back to trades')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'RELIANCE' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'RELIANCE' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Dynamic Chart' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Uploaded Images' })).toBeInTheDocument()
   })
 
   it('renders Performance OS daily workflow', () => {

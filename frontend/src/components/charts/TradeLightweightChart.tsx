@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { getTradeChartData } from '@/lib/endpoints'
 import type { ChartTimeframe, ChartRange, ChartSource, TradeChartData } from '@/types/chart'
 import type { ApiTrade } from '@/types'
-import { RefreshCw, Maximize2, Minimize2, BarChart3 } from 'lucide-react'
+import { RefreshCw, Maximize2, Minimize2 } from 'lucide-react'
+import { EmptyState, ErrorState } from '@/components/ui'
 
 const TIMEFRAME_OPTIONS: { value: ChartTimeframe; label: string }[] = [
   { value: '1d', label: '1D' },
@@ -201,12 +202,12 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
   // Controls bar — rendered in both empty and data states
   const controlsBar = (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin">
         {TIMEFRAME_OPTIONS.map(tf => (
           <button
             key={tf.value}
             onClick={() => setTimeframe(tf.value)}
-            className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+            className={`min-h-9 shrink-0 px-2.5 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
               timeframe === tf.value
                 ? 'bg-accent text-accent-foreground font-medium'
                 : 'text-text-muted hover:text-text hover:bg-border'
@@ -217,12 +218,12 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         ))}
       </div>
       <div className="w-px h-4 bg-border" />
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin">
         {RANGE_OPTIONS.map(r => (
           <button
             key={r.value}
             onClick={() => setRange(r.value as ChartRange)}
-            className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+            className={`min-h-9 shrink-0 px-2.5 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
               range === r.value
                 ? 'bg-accent text-accent-foreground font-medium'
                 : 'text-text-muted hover:text-text hover:bg-border'
@@ -233,12 +234,12 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         ))}
       </div>
       <div className="w-px h-4 bg-border" />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin">
           {SOURCE_OPTIONS.filter(s => !s.devOnly || import.meta.env.DEV).map(s => (
             <button
               key={s.value}
               onClick={() => setSource(s.value)}
-              className={`px-2 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
+              className={`min-h-9 shrink-0 px-2.5 py-1 text-[length:var(--text-xs)] rounded-md transition-colors ${
                 source === s.value
                   ? 'bg-accent text-accent-foreground font-medium'
                   : 'text-text-muted hover:text-text hover:bg-border'
@@ -251,15 +252,17 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       <div className="flex-1" />
       <button
         onClick={() => refetch()}
-        className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
+        className="min-h-9 min-w-9 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
         title="Refresh"
+        aria-label="Refresh chart"
       >
         <RefreshCw className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={() => setIsFullscreen(!isFullscreen)}
-        className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
+        className="min-h-9 min-w-9 rounded-lg text-text-muted hover:text-text hover:bg-border transition-colors"
         title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
       >
         {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
       </button>
@@ -271,16 +274,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
     return (
       <div className="flex flex-col gap-2">
         {controlsBar}
-        <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
-          <BarChart3 className="w-10 h-10 opacity-40" />
-          <p className="text-sm">Failed to load chart data</p>
-          <button
-            onClick={() => refetch()}
-            className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
+        <ErrorState title="Chart unavailable" message="Failed to load chart data." onRetry={() => refetch()} compact />
       </div>
     )
   }
@@ -291,35 +285,21 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
     return (
       <div className="flex flex-col gap-2">
         {controlsBar}
-        <div className="flex flex-col items-center justify-center py-12 text-text-muted gap-3">
-          <BarChart3 className="w-10 h-10 opacity-40" />
-          <p className="text-sm font-medium text-text-heading">No candle data available</p>
+        <div className="py-2">
+          <EmptyState title="No candle data available" message={isIntraday ? 'Intraday candles are not configured yet. Switch to 1D for Tapetide daily charts.' : (meta?.message || 'No historical data provider is configured yet.')} compact />
           {isIntraday ? (
-            <>
-              <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
-                Intraday candles are not configured yet. Switch to 1D for Tapetide daily charts.
-              </p>
+            <div className="mt-2 flex items-center justify-center">
             <button
               onClick={() => setTimeframe('1d')}
-              className="text-xs px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              className="min-h-9 rounded-lg bg-accent/10 px-3 text-xs text-accent hover:bg-accent/20 transition-colors"
             >
                 Switch to 1D
               </button>
-            </>
-          ) : (
-            <p className="text-[length:var(--text-xs)] text-text-muted max-w-xs text-center">
-              {meta?.message || 'No historical data provider is configured yet.'}
-            </p>
-          )}
-          <p className="text-[length:var(--text-xs)] text-text-muted/60">
+            </div>
+          ) : null}
+          <p className="mt-2 text-center text-[length:var(--text-xs)] text-text-muted/60">
             Uploaded chart screenshots are still available in the Uploaded Images tab.
           </p>
-          <button
-            onClick={() => refetch()}
-            className="text-xs px-3 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-          >
-            Retry
-          </button>
         </div>
       </div>
     )
@@ -330,7 +310,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
       {controlsBar}
 
       {/* Chart container */}
-      <div className={`rounded-xl border border-border overflow-hidden bg-[#0f1117] ${isFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}>
+      <div className={`rounded-xl border border-border overflow-hidden bg-[#0f1117] ${isFullscreen ? 'fixed inset-0 z-50 p-2 sm:p-4' : ''}`}>
         {isLoading && !data && (
           <div className="flex items-center justify-center h-[360px] text-text-muted">
             <div className="flex flex-col items-center gap-2">

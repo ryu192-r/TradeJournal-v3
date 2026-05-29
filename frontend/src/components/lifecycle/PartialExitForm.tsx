@@ -131,8 +131,9 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
                 onChange={(e) => setQty(e.target.value)}
                 placeholder={`max ${remainingQty}`}
                 max={remainingQty}
+                inputMode="numeric"
                 className={cn(
-                  'w-full text-sm border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none font-data',
+                  'min-h-11 w-full text-sm border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none font-data focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
                   qtyExceeded ? 'border-loss/60 focus:border-loss' : 'border-border focus:border-accent',
                 )}
               />
@@ -148,7 +149,8 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
                 placeholder={formatPrice(entryPrice)}
-                className="w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent font-data"
+                inputMode="decimal"
+                className="min-h-11 w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent font-data focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               />
             </div>
           </div>
@@ -167,7 +169,7 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
             <select
               value={exitReason}
               onChange={(e) => setExitReason(e.target.value)}
-              className="w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading focus:outline-none focus:border-accent"
+              className="min-h-11 w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading focus:outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               <option value="">Select reason...</option>
               {EXIT_REASONS.map((r) => (
@@ -180,21 +182,21 @@ export function PartialExitForm({ tradeId, entryPrice, currentQty, remainingQty:
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Optional note..."
-            className="w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none"
+            className="min-h-11 w-full text-sm border border-border rounded-lg bg-bg-elevated/30 px-3 py-2 text-text-heading placeholder:text-text-muted/50 focus:outline-none focus:border-accent resize-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             rows={2}
           />
 
           <div className="flex gap-2 justify-end">
             <button
               onClick={onClose}
-              className="text-sm px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+              className="text-sm min-h-10 px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               Close
             </button>
             <button
               onClick={handleSubmit}
               disabled={!qty || !exitPrice || qtyExceeded || createMutation.isPending}
-              className="text-sm px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+              className="text-sm min-h-10 px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               {createMutation.isPending ? 'Saving...' : 'Record Exit'}
             </button>

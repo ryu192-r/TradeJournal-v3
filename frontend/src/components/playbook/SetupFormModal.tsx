@@ -151,7 +151,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
   const btnGhost =
     'inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
   const btnDangerIcon =
-    'p-1.5 rounded-md hover:bg-loss-muted text-text-muted hover:text-loss transition-colors cursor-pointer shrink-0'
+    'p-1.5 rounded-md hover:bg-loss-muted text-text-muted hover:text-loss transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg'
   const inputCls =
     'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-[150ms] ease-out disabled:opacity-50 disabled:cursor-not-allowed'
   const labelCls = 'block text-xs font-medium text-text-muted mb-1.5'
@@ -159,10 +159,11 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-2xl my-8">
-        <div className="bg-bg-card rounded-2xl border border-border p-6 relative">
+        <div className="bg-bg-card rounded-2xl border border-border p-6 relative" role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit setup dialog' : 'New setup dialog'}>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-bg-elevated/50 text-text-muted hover:text-text transition-colors cursor-pointer"
+            className="absolute top-4 right-4 p-2 min-h-10 min-w-10 rounded-md hover:bg-bg-elevated/50 text-text-muted hover:text-text transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            aria-label="Close setup dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -207,35 +208,36 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-medium text-text-muted">Tactics</label>
-                <button className={btnGhost} onClick={addTactic} disabled={isPending}>
+                <button className={btnGhost} onClick={addTactic} disabled={isPending} type="button">
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
               <div className="space-y-2">
                 {tactics.map((tactic, ti) => (
                   <div key={ti} className="rounded-lg border border-border bg-bg-elevated/30 overflow-hidden">
-                    <button
-                      onClick={() => setExpandedTactic(expandedTactic === ti ? null : ti)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-text-heading hover:bg-bg-elevated/40 transition-colors cursor-pointer"
-                    >
-                      <span className="truncate">
-                        {tactic.name.trim() || `Tactic ${ti + 1}`}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {tactics.length > 1 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeTactic(ti)
-                            }}
-                            className="p-1 rounded hover:bg-loss-muted text-text-muted hover:text-loss cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {expandedTactic === ti ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />}
-                      </div>
-                    </button>
+                    <div className="flex items-stretch">
+                      <button
+                        onClick={() => setExpandedTactic(expandedTactic === ti ? null : ti)}
+                        type="button"
+                        aria-expanded={expandedTactic === ti}
+                        className="flex-1 flex items-center justify-between px-3 py-2.5 text-sm font-medium text-text-heading hover:bg-bg-elevated/40 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                      >
+                        <span className="truncate">
+                          {tactic.name.trim() || `Tactic ${ti + 1}`}
+                        </span>
+                        {expandedTactic === ti ? <ChevronUp className="w-4 h-4 text-text-muted shrink-0" /> : <ChevronDown className="w-4 h-4 text-text-muted shrink-0" />}
+                      </button>
+                      {tactics.length > 1 && (
+                        <button
+                          onClick={() => removeTactic(ti)}
+                          type="button"
+                          className={`${btnDangerIcon} self-stretch rounded-none border-l border-border/60`}
+                          aria-label={`Remove tactic ${ti + 1}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
 
                     {expandedTactic === ti && (
                       <div className="px-3 pb-3 space-y-3 border-t border-border">
@@ -356,6 +358,7 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
                     className={inputCls}
                     type="number"
                     step="0.1"
+                    inputMode="decimal"
                     value={maxRiskPct}
                     onChange={(e) => setMaxRiskPct(e.target.value)}
                     placeholder="2.0"
@@ -406,6 +409,8 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
                     <button
                       onClick={() => removeItem(rules, setRules, i)}
                       className={btnDangerIcon}
+                      aria-label={`Remove rule ${i + 1}`}
+                      type="button"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -416,8 +421,8 @@ export function SetupFormModal({ open, onClose, onSubmit, setup, isPending }: Se
           </div>
 
           <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border">
-            <button className={btnGhost} onClick={onClose} disabled={isPending}>Cancel</button>
-            <button className={btnPrimary} onClick={handleSubmit} disabled={isPending}>
+            <button className={btnGhost} onClick={onClose} disabled={isPending} type="button">Cancel</button>
+            <button className={btnPrimary} onClick={handleSubmit} disabled={isPending} type="button">
               {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Setup'}
             </button>
           </div>

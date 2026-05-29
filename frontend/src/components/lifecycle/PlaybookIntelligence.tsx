@@ -273,7 +273,9 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
           <BookOpen className="w-4 h-4 text-accent" />
           <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.setup_name}</h3>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-border/20 transition-colors"><X className="w-4 h-4 text-text-muted" /></button>
+        <button onClick={onClose} className="p-2 min-h-10 min-w-10 rounded-lg hover:bg-border/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg" aria-label="Close setup detail">
+          <X className="w-4 h-4 text-text-muted" />
+        </button>
       </div>
 
       {data.description && <div className="text-[length:var(--text-xs)] text-text-muted italic">{data.description}</div>}

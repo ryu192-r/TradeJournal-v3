@@ -14,6 +14,8 @@ function isSelectableView(value: string): value is ActiveView {
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode, openCreateTrade } = useAppStore()
   const user = useAuthStore((s) => s.user)
+  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'calendar', 'analytics']
+  const moreActive = !coreMobileViews.includes(activeView)
 
   const selectView = (view: ActiveView) => {
     setActiveView(view)
@@ -30,6 +32,8 @@ export function Sidebar() {
       )}
 
       <aside
+        aria-hidden={!sidebarOpen}
+        inert={!sidebarOpen}
         className={cn(
           'fixed top-0 left-0 h-full z-50 bg-bg-low border-r border-border flex flex-col transition-transform duration-300 ease-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
@@ -148,7 +152,7 @@ export function Sidebar() {
 
       <button
         onClick={toggleSidebar}
-        className="fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
+        className="fixed top-3 left-3 z-50 lg:hidden inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
         aria-label="Open navigation"
       >
         <PanelLeft className="w-5 h-5" />
@@ -172,20 +176,22 @@ export function Sidebar() {
           <button
             onClick={openCreateTrade}
             className="flex min-h-14 min-w-14 -mt-2 flex-col items-center justify-center rounded-full bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover transition-colors cursor-pointer"
+            aria-label="Add trade"
+            title="Add trade"
           >
             <Plus className="w-6 h-6" />
           </button>
           <MobileNavButton
             icon={BarChart3}
-            label="Analytics"
+            label="Reports"
             isActive={activeView === 'analytics'}
             onClick={() => selectView('analytics')}
           />
           <MobileNavButton
             icon={TrendingUp}
-            label="Review"
-            isActive={activeView === 'review'}
-            onClick={() => selectView('review')}
+            label="More"
+            isActive={moreActive}
+            onClick={() => selectView('settings')}
           />
         </div>
       </nav>

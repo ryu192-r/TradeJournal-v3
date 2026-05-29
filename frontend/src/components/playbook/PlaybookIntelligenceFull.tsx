@@ -352,7 +352,9 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
             <BookOpen className="w-4 h-4 text-accent" />
             <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{setupName}</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-border/20"><X className="w-4 h-4 text-text-muted" /></button>
+          <button onClick={onClose} className="p-2 min-h-10 min-w-10 rounded-lg hover:bg-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg" aria-label="Close setup detail">
+            <X className="w-4 h-4 text-text-muted" />
+          </button>
         </div>
         {[1, 2, 3].map(i => <div key={i} className={`${CARD} h-32 animate-pulse`} />)}
       </div>
@@ -369,7 +371,9 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
           <h3 className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.setup_name}</h3>
           <span className="text-[10px] text-text-muted font-data">{data.performance.closed_count} closed</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-border/20"><X className="w-4 h-4 text-text-muted" /></button>
+        <button onClick={onClose} className="p-2 min-h-10 min-w-10 rounded-lg hover:bg-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg" aria-label="Close setup detail">
+          <X className="w-4 h-4 text-text-muted" />
+        </button>
       </div>
 
       {data.description && <div className="text-[length:var(--text-xs)] text-text-muted italic">{data.description}</div>}

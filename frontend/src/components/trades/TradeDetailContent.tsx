@@ -12,7 +12,7 @@ import { useAppStore } from '@/store/appStore'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
 import { calculateTradeMetrics } from '@/utils/calculations'
-import { StatusBadge, SectionHeader } from '@/components/ui'
+import { StatusBadge, SectionHeader, ResponsiveTabs, EmptyState } from '@/components/ui'
 import type { ApiTrade } from '@/types'
 import type { TradeReviewResponse } from '@/types/coach'
 
@@ -337,32 +337,14 @@ type ChartTab = 'dynamic' | 'uploads'
 
 function ChartTabs({ trade }: { trade: ApiTrade }) {
   const [tab, setTab] = useState<ChartTab>('dynamic')
+  const items = [
+    { id: 'dynamic', label: 'Dynamic Chart', icon: BarChart3 },
+    { id: 'uploads', label: 'Uploaded Images', icon: Image },
+  ]
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => setTab('dynamic')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-[length:var(--text-xs)] rounded-lg transition-colors ${
-            tab === 'dynamic'
-              ? 'bg-accent text-accent-foreground font-medium'
-              : 'text-text-muted hover:text-text hover:bg-border'
-          }`}
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          Dynamic Chart
-        </button>
-        <button
-          onClick={() => setTab('uploads')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-[length:var(--text-xs)] rounded-lg transition-colors ${
-            tab === 'uploads'
-              ? 'bg-accent text-accent-foreground font-medium'
-              : 'text-text-muted hover:text-text hover:bg-border'
-          }`}
-        >
-          <Image className="w-3.5 h-3.5" />
-          Uploaded Images
-        </button>
-      </div>
+      <ResponsiveTabs value={tab} onChange={(next) => setTab(next as ChartTab)} items={items} />
       {tab === 'dynamic' ? (
         <TradeLightweightChart trade={trade} />
       ) : (
@@ -497,7 +479,7 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
             <button
               onClick={handleTradeReview}
               disabled={reviewMut.isPending}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[length:var(--text-xs)] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
             >
               {reviewMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
               Generate
@@ -505,13 +487,15 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
           </div>
           {inlineReview ? (
             <div className="mt-3"><AiReviewCard review={inlineReview} /></div>
-          ) : (
-            reviewMut.isPending && (
+          ) : reviewMut.isPending ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-5 h-5 text-accent animate-spin" />
                 <span className="ml-2 text-xs text-text-muted">Generating review...</span>
               </div>
-            )
+          ) : (
+            <div className="mt-3">
+              <EmptyState title="No AI review yet" message="Generate structured coaching feedback for this closed trade." compact />
+            </div>
           )}
         </div>
       )}

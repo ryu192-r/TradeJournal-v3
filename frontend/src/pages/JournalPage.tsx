@@ -27,6 +27,9 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { ErrorState } from '@/components/ui/StateComponents'
+import { EmptyState, LoadingState } from '@/components/ui'
+import { PageShell } from '@/components/layout/PageShell'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -232,9 +235,13 @@ function WeeklyView({ selectedDate, onSelectDate, onSwitchToJournal }: { selecte
               <div className="rounded-lg border-2 border-dashed border-border py-4 text-center">
                 <p className="text-[.75rem] text-text-muted">
                   No journal entries this week.{' '}
-                  <span className="text-accent cursor-pointer" onClick={onSwitchToJournal}>
+                  <button
+                    type="button"
+                    onClick={onSwitchToJournal}
+                    className="text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+                  >
                     Write one
-                  </span>
+                  </button>
                 </p>
               </div>
             )}
@@ -346,43 +353,39 @@ export function JournalPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]" {...swipeTabs.handlers}>
+    <PageShell className="space-y-[var(--page-gap)]" {...swipeTabs.handlers}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-        <div>
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">
-            Journal
-          </h1>
-          <p className="text-[length:var(--text-sm)] text-text-muted mt-1.5 leading-relaxed">
-            Situational awareness — pre-market plan &amp; post-market reflection.
-          </p>
-        </div>
-
-        {/* Date navigation */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => shiftDate(-1)}
-            className="flex items-center justify-center w-[2.25rem] h-[2.25rem] rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer"
-          >
-            <ChevronLeft className="w-[15px] h-[15px]" />
-          </button>
-          <div className="relative">
-            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-text-muted pointer-events-none" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-[2.25rem] pl-[2.125rem] pr-2.5 rounded-lg border border-border bg-bg-card text-[length:var(--text-sm)] text-text-heading font-data focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/15 transition-all cursor-pointer [color-scheme:dark]"
-            />
+      <PageHeader
+        title="Journal"
+        subtitle="Situational awareness - pre-market plan and post-market reflection."
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => shiftDate(-1)}
+              className="flex items-center justify-center w-[2.25rem] h-[2.25rem] rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer"
+              aria-label="Previous date"
+            >
+              <ChevronLeft className="w-[15px] h-[15px]" />
+            </button>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-text-muted pointer-events-none" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-[2.25rem] pl-[2.125rem] pr-2.5 rounded-lg border border-border bg-bg-card text-[length:var(--text-sm)] text-text-heading font-data focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/15 transition-all cursor-pointer [color-scheme:dark]"
+              />
+            </div>
+            <button
+              onClick={() => shiftDate(1)}
+              className="flex items-center justify-center w-[2.25rem] h-[2.25rem] rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer"
+              aria-label="Next date"
+            >
+              <ChevronRight className="w-[15px] h-[15px]" />
+            </button>
           </div>
-          <button
-            onClick={() => shiftDate(1)}
-            className="flex items-center justify-center w-[2.25rem] h-[2.25rem] rounded-lg border border-border text-text-muted hover:text-text-heading hover:bg-bg-card transition-all cursor-pointer"
-          >
-            <ChevronRight className="w-[15px] h-[15px]" />
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -423,13 +426,7 @@ export function JournalPage() {
 
       {/* Empty state hint */}
       {!isLoading && !isError && !journal && activeTab === 'journal' && (
-        <div className="rounded-xl border-2 border-dashed border-border py-8 text-center">
-          <p className="text-[length:var(--text-sm)] text-text-muted">
-            No journal entry yet.{' '}
-            <span className="text-text font-medium">Fill in the form below</span>
-            {' '}and hit Save.
-          </p>
-        </div>
+        <EmptyState title="No journal entry yet" message="Fill form below and save your notes for this day." compact />
       )}
 
       {/* Tab bar */}
@@ -457,10 +454,7 @@ export function JournalPage() {
 
       {/* Loading */}
       {isLoading && activeTab === 'journal' && (
-        <div className="rounded-2xl border border-border bg-bg-card py-12 text-center">
-          <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
-          <p className="text-sm text-text-muted mt-3">Loading entry…</p>
-        </div>
+        <LoadingState variant="skeleton" />
       )}
 
       {/* Error */}
@@ -486,7 +480,7 @@ export function JournalPage() {
       {activeTab === 'weekly' && (
         <WeeklyView selectedDate={selectedDate} onSelectDate={setSelectedDate} onSwitchToJournal={() => setActiveTab('journal')} />
       )}
-    </div>
+    </PageShell>
     </PullToRefresh>
   )
 }

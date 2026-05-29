@@ -14,12 +14,14 @@ import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
 import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit, updateTrade } from '@/lib/endpoints'
 import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList } from 'lucide-react'
-import { ErrorState } from '@/components/ui/StateComponents'
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
 import { invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook, invalidateTradeDetail, invalidateLifecycle, setTradeCache, patchTradeInLists, removeTradeFromLists } from '@/lib/queryInvalidation'
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { PageShell } from '@/components/layout/PageShell'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type ListingMode = 'auto' | 'table' | 'cards'
 
@@ -490,25 +492,25 @@ export function TradesPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+    <PageShell className="space-y-[var(--page-gap)]">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Trades</h1>
-          <p className="text-sm text-text-muted mt-0.5">Track and manage every trade in your journal.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <GlassButton variant="ghost" size="sm" onClick={() => syncQuotes.mutate()} disabled={syncQuotes.isPending}>
-            {syncQuotes.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync
-          </GlassButton>
-          <GlassButton variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
-            <Upload className="w-4 h-4" /> Import
-          </GlassButton>
-          <GlassButton variant="accent" size="sm" onClick={openCreateTrade}>
-            <Plus className="w-4 h-4" /> New Trade
-          </GlassButton>
-        </div>
-      </div>
+      <PageHeader
+        title="Trades"
+        subtitle="Track and manage every trade in your journal."
+        actions={
+          <div className="flex items-center gap-2">
+            <GlassButton variant="ghost" size="sm" onClick={() => syncQuotes.mutate()} disabled={syncQuotes.isPending}>
+              {syncQuotes.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync
+            </GlassButton>
+            <GlassButton variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="w-4 h-4" /> Import
+            </GlassButton>
+            <GlassButton variant="accent" size="sm" onClick={openCreateTrade}>
+              <Plus className="w-4 h-4" /> New Trade
+            </GlassButton>
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] space-y-3">
@@ -520,13 +522,13 @@ export function TradesPage() {
             placeholder="Search symbol..."
             value={symbolFilter}
             onChange={(e) => { setSymbolFilter(e.target.value); setPage(1) }}
-            className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 pl-8 pr-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+            className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 pl-8 pr-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-          className="w-full sm:w-36 rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer"
+          className="min-h-10 w-full sm:w-36 rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all appearance-none cursor-pointer"
         >
           <option value="">All positions</option>
           <option value="open">Open</option>
@@ -548,6 +550,7 @@ export function TradesPage() {
           onClick={() => setListingMode(mode => mode === 'cards' ? 'table' : mode === 'table' ? 'auto' : 'cards')}
           className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer text-text-muted hover:text-text-heading hover:bg-accent-faint"
           title={showCards ? 'Table view' : 'Card view'}
+          aria-label={showCards ? 'Switch to table view' : 'Switch to card view'}
         >
           {showCards ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
         </button>
@@ -609,7 +612,7 @@ export function TradesPage() {
               value={saveViewName}
               onChange={(e) => setSaveViewName(e.target.value)}
               placeholder="Saved view name"
-              className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 sm:w-56"
+            className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 sm:w-56"
             />
             <button onClick={saveCurrentView} disabled={!saveViewName.trim()} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">
               <Save className="w-3.5 h-3.5" /> Save view
@@ -682,25 +685,20 @@ export function TradesPage() {
       {/* Table/Card card container */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         {isLoading && (
-          <div className="py-16 text-center">
-            <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto mb-2.5" />
-            <p className="text-sm text-text-muted">Loading trades…</p>
+          <div className="p-[var(--page-px)]">
+            <LoadingState variant="cards" cards={6} />
           </div>
         )}
         {error && (
           <ErrorState
             title="Failed to load trades"
             message={error.message}
-            onRetry={() => window.location.reload()}
+            onRetry={handleRefresh}
           />
         )}
         {!isLoading && !error && displayedTrades.length === 0 && (
-          <div className="py-16 text-center">
-            <p className="text-sm text-text-muted">No trades found.</p>
-            <p className="text-xs text-text-faint mt-1">Adjust filters or click "New Trade" to get started.</p>
-            <button onClick={openCreateTrade} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer">
-              <Plus className="w-3.5 h-3.5" /> New Trade
-            </button>
+          <div className="p-[var(--page-px)]">
+            <EmptyState title="No trades yet" message="Add or import trades to start tracking performance." action={{ label: 'Add Trade', onClick: openCreateTrade }} />
           </div>
         )}
         {!isLoading && !error && displayedTrades.length > 0 && showCards && (
@@ -752,6 +750,7 @@ export function TradesPage() {
                           else setSelectedIds(new Set(displayedTrades.map(t => t.id)))
                         }}
                         className="text-text-muted hover:text-text-heading cursor-pointer"
+                        aria-label={allSelected ? 'Deselect all trades' : 'Select all trades'}
                       >
                         {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                       </button>
@@ -814,11 +813,13 @@ export function TradesPage() {
           <div>
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Entry Price (₹)</label>
             <input type="number" step="0.01" value={pyramidEntryPrice} onChange={(e) => setPyramidEntryPrice(e.target.value)}
+              inputMode="decimal"
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
           <div>
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Quantity</label>
             <input type="number" step="1" value={pyramidQty} onChange={(e) => setPyramidQty(e.target.value)}
+              inputMode="numeric"
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
           </div>
           <div>
@@ -829,11 +830,13 @@ export function TradesPage() {
           <div>
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Fees (optional)</label>
             <input type="number" step="0.01" value={pyramidFees} onChange={(e) => setPyramidFees(e.target.value)}
+              inputMode="decimal"
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0" />
           </div>
           <div>
             <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Stop Price (optional)</label>
             <input type="number" step="0.01" value={pyramidStopPrice} onChange={(e) => setPyramidStopPrice(e.target.value)}
+              inputMode="decimal"
               className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
           </div>
         </div>
@@ -879,11 +882,13 @@ export function TradesPage() {
                 <div>
                   <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Qty to sell</label>
                   <input type="number" step="1" value={sellQty} onChange={(e) => setSellQty(e.target.value)} max={sellMaxQty ?? undefined}
+                    inputMode="numeric"
                     className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder={sellMaxQty != null ? `max ${sellMaxQty}` : '0'} />
                 </div>
                 <div>
                   <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Sell Price (₹)</label>
                   <input type="number" step="0.01" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)}
+                    inputMode="decimal"
                     className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
                 </div>
               </div>
@@ -911,6 +916,7 @@ export function TradesPage() {
                 <div>
                   <label className="block text-[length:var(--text-xs)] font-medium text-text-muted mb-1">Fees & Charges (optional)</label>
                   <input type="number" step="0.01" value={sellFees} onChange={(e) => setSellFees(e.target.value)}
+                    inputMode="decimal"
                     className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading focus:outline-none focus:border-accent/50 transition-all" placeholder="0.00" />
                 </div>
               )}
@@ -937,7 +943,7 @@ export function TradesPage() {
         void invalidatePlaybook(queryClient)
         void invalidateTradeList(queryClient)
       }} />
-    </div>
+    </PageShell>
     </PullToRefresh>
   )
 }
@@ -958,10 +964,21 @@ function TradeCard({
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const isProfitable = pnlNum >= 0
   const isOpen = trade.exit_price == null
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onTap()
+    }
+  }
+
   return (
-    <button
+    <article
+      role="button"
+      tabIndex={0}
       onClick={onTap}
-      className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${isSelected ? 'border-accent/40 bg-accent-faint/30' : 'border-border bg-bg-elevated/30 hover:border-text-muted/30'}`}
+      onKeyDown={handleKeyDown}
+      aria-label={`${trade.symbol} trade, ${isOpen ? 'open' : 'closed'}, ${pnlNum >= 0 ? 'profit' : 'loss'}`}
+      className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${isSelected ? 'border-accent/40 bg-accent-faint/30' : 'border-border bg-bg-elevated/30 hover:border-text-muted/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -1002,17 +1019,17 @@ function TradeCard({
         </div>
       </div>
       <div className="flex items-center justify-between mt-1.5">
-        <button onClick={(e) => { e.stopPropagation(); onToggleSelect() }} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`}>
+        <button onClick={(e) => { e.stopPropagation(); onToggleSelect() }} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`} aria-label={isSelected ? `Deselect ${trade.symbol}` : `Select ${trade.symbol}`}>
           {isSelected ? 'Selected' : 'Select'}
         </button>
         {isOpen && (
-          <button onClick={(e) => { e.stopPropagation(); onSellTrade() }} className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded text-profit bg-profit-muted hover:text-profit transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); onSellTrade() }} className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded text-profit bg-profit-muted hover:text-profit transition-colors" aria-label={`Sell ${trade.symbol}`}>
             <ArrowDownToLine className="w-3 h-3" />
             Sell
           </button>
         )}
       </div>
-    </button>
+    </article>
   )
 }
 
@@ -1037,7 +1054,8 @@ function FilterInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+        inputMode={type === 'number' ? 'decimal' : undefined}
+        className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
       />
     </div>
   )
@@ -1256,6 +1274,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
         <button
           onClick={() => toggleSelect(trade.id)}
           className={`transition-colors cursor-pointer ${selectedIds.has(trade.id) ? 'text-accent' : 'text-text-muted hover:text-text-heading'}`}
+          aria-label={selectedIds.has(trade.id) ? `Deselect ${trade.symbol}` : `Select ${trade.symbol}`}
         >
           {selectedIds.has(trade.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
         </button>
@@ -1269,6 +1288,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
                 onClick={() => { openSellTrade(trade) }}
                 className="p-1.5 rounded-md text-text-muted hover:text-profit hover:bg-profit-muted transition-colors cursor-pointer"
                 title="Sell"
+                aria-label={`Sell ${trade.symbol}`}
               >
                 <ArrowDownToLine className="w-4 h-4" />
               </button>
@@ -1276,6 +1296,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
                 onClick={() => { setPyramidingTradeId(trade.id); onPyramidOpen() }}
                 className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
                 title="Pyramid"
+                aria-label={`Pyramid ${trade.symbol}`}
               >
                 <Layers className="w-4 h-4" />
               </button>
@@ -1285,6 +1306,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
             onClick={() => openEditTrade(trade.id)}
             className="p-1.5 rounded-md text-text-muted hover:text-accent hover:bg-accent-muted transition-colors cursor-pointer"
             title="Edit"
+            aria-label={`Edit ${trade.symbol}`}
           >
             <Pencil className="w-4 h-4" />
           </button>

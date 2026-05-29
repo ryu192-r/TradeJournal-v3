@@ -50,6 +50,11 @@ const applyTheme = (theme: 'dark' | 'light') => {
   document.documentElement.setAttribute('data-theme', theme)
 }
 
+const getInitialSidebarOpen = (): boolean => {
+  if (typeof window === 'undefined') return true
+  return window.innerWidth >= 1024
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -59,7 +64,7 @@ export const useAppStore = create<AppState>()(
       accountBalance: null,
       setAccountBalance: (balance) => set({ accountBalance: balance }),
 
-      sidebarOpen: true,
+      sidebarOpen: getInitialSidebarOpen(),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 

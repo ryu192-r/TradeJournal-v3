@@ -529,7 +529,9 @@ export function AICoachPage() {
                       <p className="text-sm text-text truncate">{review.content_preview}</p>
                     </div>
                     <button onClick={() => handleDeleteReview(review.id)}
-                      className="p-1.5 rounded-md text-text-muted hover:text-loss hover:bg-loss-muted transition-colors cursor-pointer shrink-0">
+                      className="p-1.5 rounded-md text-text-muted hover:text-loss hover:bg-loss-muted transition-colors cursor-pointer shrink-0"
+                      aria-label={`Delete review ${review.review_type}`}
+                    >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

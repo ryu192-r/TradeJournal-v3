@@ -11,7 +11,7 @@ export function SyncBadge({ isSyncing, onClick }: { isSyncing: boolean; onClick?
     <button
       onClick={onClick}
       disabled={isSyncing}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2 py-1 text-[10px] font-data text-text-muted hover:border-text-muted hover:text-text-heading transition-all disabled:opacity-50 cursor-pointer"
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[10px] font-data text-text-muted hover:border-text-muted hover:text-text-heading transition-all disabled:opacity-50 cursor-pointer"
     >
       {isSyncing ? (
         <>
@@ -333,7 +333,7 @@ export function Tabs({
   onChange: (id: string) => void
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
+    <div role="tablist" aria-label="Sections" className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
       {tabs.map((tab) => {
         const isActive = tab.id === active
         const Icon = tab.icon
@@ -341,8 +341,13 @@ export function Tabs({
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`${tab.id}-panel`}
+            id={`${tab.id}-tab`}
             className={cn(
-              'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium border transition-all cursor-pointer',
+              'shrink-0 inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium border transition-all cursor-pointer',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
               isActive
                 ? 'border-accent/30 bg-accent-muted text-accent'
                 : 'border-transparent text-text-muted hover:text-text-heading hover:bg-accent-faint'

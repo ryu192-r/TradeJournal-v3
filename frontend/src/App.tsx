@@ -1,4 +1,4 @@
-import { Sidebar, TopBar } from '@/components/layout/Sidebar'
+import { AppNavigation, TopBar } from '@/components/layout/AppNavigation'
 import { ToastContainer } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -13,6 +13,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { mark } from '@/utils/performance'
 import { viewMeta } from '@/app/navigation'
 import { Globe2 } from 'lucide-react'
+import { LoadingState } from '@/components/ui'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -41,8 +42,8 @@ const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m
 
 function ViewFallback() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center text-sm text-text-muted">
-      Loading...
+    <div className="px-[var(--page-px)] py-[var(--page-py)]">
+      <LoadingState variant="page" />
     </div>
   )
 }
@@ -99,7 +100,7 @@ function App() {
         </Suspense>
       ) : (
         <div className="min-h-screen bg-bg flex">
-          <Sidebar />
+          <AppNavigation />
           <div
             className={cn(
               'flex-1 flex flex-col min-h-screen transition-all duration-300',
