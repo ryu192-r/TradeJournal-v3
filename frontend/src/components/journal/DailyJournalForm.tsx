@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -182,6 +182,7 @@ export function DailyJournalForm({
     handleSubmit,
     control,
     watch,
+    reset,
     formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -209,6 +210,34 @@ export function DailyJournalForm({
           lessonsLearned: '',
         },
   })
+
+  useEffect(() => {
+    reset(
+      journal
+        ? {
+            preTradeNotes: journal.pre_trade_notes ?? '',
+            postTradeNotes: journal.post_trade_notes ?? '',
+            tradeCount: journal.trade_count ?? undefined,
+            moodRating: journal.mood_rating,
+            disciplineRating: journal.discipline_rating,
+            moodNotes: journal.mood_notes ?? '',
+            rulesFollowed: journal.rules_followed ?? '',
+            rulesViolated: journal.rules_violated ?? '',
+            lessonsLearned: journal.lessons_learned ?? '',
+          }
+        : {
+            preTradeNotes: '',
+            postTradeNotes: '',
+            tradeCount: summaryStats?.tradeCount ?? undefined,
+            moodRating: null,
+            disciplineRating: null,
+            moodNotes: '',
+            rulesFollowed: '',
+            rulesViolated: '',
+            lessonsLearned: '',
+          }
+    )
+  }, [journal, date, summaryStats?.tradeCount, reset])
 
   const onSubmit = (data: FormData) => {
     const payload: import('@/types').DailyJournalPayload = {
@@ -286,7 +315,7 @@ export function DailyJournalForm({
               <MoodRating
                 value={field.value ?? null}
                 onChange={(val) => field.onChange(val)}
-                label="Discipline"
+                label="Mood"
               />
             )}
           />

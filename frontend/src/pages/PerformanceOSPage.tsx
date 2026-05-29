@@ -30,7 +30,7 @@ const PHASE_LABEL: Record<WorkflowPhase, string> = {
   behavior: 'Behavior',
 }
 
-type SaveStatus = 'saved' | 'saving'
+type SaveStatus = 'saved' | 'saving' | 'error'
 
 type DebouncedTextareaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'onBlur'> & {
   value: string
@@ -81,14 +81,15 @@ export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className,
     try {
       await onSave(nextValue)
       lastSavedRef.current = nextValue
+      if (mountedRef.current) setStatus('saved')
+    } catch {
+      if (mountedRef.current) setStatus('error')
     } finally {
       inFlightRef.current = false
       const queuedValue = queuedValueRef.current
       queuedValueRef.current = null
       if (queuedValue !== null && queuedValue !== lastSavedRef.current) {
         void saveNow(queuedValue)
-      } else if (mountedRef.current) {
-        setStatus('saved')
       }
     }
   }
@@ -128,7 +129,9 @@ export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className,
         onBlur={flushSave}
         className={className}
       />
-      <div className="mt-1 h-3 text-[10px] text-text-faint">{status === 'saving' ? 'Saving...' : 'Saved'}</div>
+      <div className={cn('mt-1 h-3 text-[10px]', status === 'error' ? 'text-loss' : 'text-text-faint')}>
+        {status === 'saving' ? 'Saving...' : status === 'error' ? 'Save failed' : 'Saved'}
+      </div>
     </>
   )
 }
@@ -223,6 +226,10 @@ function PreMarketPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dat
   const advanceMut = useAdvancePhase(dateStr)
   const wf = dashboard.workflow!
   const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>(wf.checklist_items)
+
+  useEffect(() => {
+    setLocalChecklist(wf.checklist_items)
+  }, [wf.checklist_items])
 
   const checkedCount = localChecklist.filter(c => c.checked).length
   const allChecked = localChecklist.every(c => c.checked)
