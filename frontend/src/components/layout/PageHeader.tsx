@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -5,7 +6,7 @@ interface LayoutPageHeaderProps {
   title: string
   subtitle?: string
   icon?: LucideIcon
-  actions?: React.ReactNode
+  actions?: ReactNode
   onBack?: () => void
 }
 
