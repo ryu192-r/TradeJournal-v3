@@ -61,6 +61,8 @@ export function GlassTagInput({
           error && 'border-loss/50 focus-within:border-loss/50 focus-within:ring-loss/20'
         )}
         onClick={() => inputRef.current?.focus()}
+        role="group"
+        aria-label={label ?? 'Tags input'}
       >
         {value.map((tag) => (
           <span
@@ -74,7 +76,8 @@ export function GlassTagInput({
                 e.stopPropagation()
                 removeTag(tag)
               }}
-              className="hover:text-accent-hover cursor-pointer"
+              className="min-h-6 min-w-6 rounded hover:text-accent-hover cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-bg"
+              aria-label={`Remove tag ${tag}`}
             >
               <X className="w-3 h-3" />
             </button>
@@ -88,6 +91,7 @@ export function GlassTagInput({
           onBlur={addTag}
           placeholder={value.length === 0 ? placeholder : ''}
           className="flex-1 min-w-[80px] bg-transparent border-none outline-none text-text-heading placeholder:text-text-faint text-sm py-0.5"
+          aria-label={label ?? 'Tags'}
         />
       </div>
       {error && (

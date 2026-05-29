@@ -1,9 +1,9 @@
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useState, type ReactNode, type TouchEvent } from 'react'
 import { Trash2 } from 'lucide-react'
 
 interface SwipeToDeleteProps {
   onDelete: () => void
-  children: React.ReactNode
+  children: ReactNode
   disabled?: boolean
 }
 
@@ -14,12 +14,12 @@ export function SwipeToDelete({ onDelete, children, disabled }: SwipeToDeletePro
   const contentRef = useRef<HTMLDivElement>(null)
   const [revealed, setRevealed] = useState(false)
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: TouchEvent) => {
     if (disabled) return
     startX.current = e.touches[0].clientX
   }, [disabled])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  const handleTouchMove = useCallback((e: TouchEvent) => {
     if (disabled) return
     const dx = e.touches[0].clientX - startX.current
     if (dx > 0) return

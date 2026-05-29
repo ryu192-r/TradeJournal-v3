@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import { mobileNavigationItems, navigationSections, type ActiveView } from '@/app/navigation'
 import { PanelLeft, Sparkles, Plus, BarChart3, TrendingUp } from 'lucide-react'
 import { type ReactNode } from 'react'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 
 function isSelectableView(value: string): value is ActiveView {
   return navigationSections
@@ -14,11 +16,18 @@ function isSelectableView(value: string): value is ActiveView {
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode, openCreateTrade } = useAppStore()
   const user = useAuthStore((s) => s.user)
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false)
+  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'analytics']
+  const moreActive = !coreMobileViews.includes(activeView)
 
   const selectView = (view: ActiveView) => {
     setActiveView(view)
     if (window.innerWidth < 1024 && sidebarOpen) toggleSidebar()
   }
+
+  const moreItems = navigationSections
+    .flatMap((s) => s.items)
+    .filter((item) => item.view && !coreMobileViews.includes(item.view))
 
   return (
     <>
@@ -29,13 +38,13 @@ export function Sidebar() {
         />
       )}
 
-      <aside
-        className={cn(
-          'fixed top-0 left-0 h-full z-50 bg-bg-low border-r border-border flex flex-col transition-transform duration-300 ease-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          'w-64'
-        )}
-      >
+       <aside
+         className={cn(
+           'fixed top-0 left-0 h-full z-50 bg-bg-low border-r border-border flex flex-col transition-transform duration-300 ease-out',
+           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+           'w-64 lg:translate-x-0'
+         )}
+       >
         <div className="flex items-center gap-2.5 px-5 pt-[1.375rem] pb-[1.125rem] border-b border-border">
           <div className="w-8 h-8 rounded-lg bg-accent-muted flex items-center justify-center">
             <svg className="w-[17px] h-[17px] text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -148,7 +157,7 @@ export function Sidebar() {
 
       <button
         onClick={toggleSidebar}
-        className="fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
+        className="fixed top-3 left-3 z-50 lg:hidden inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
         aria-label="Open navigation"
       >
         <PanelLeft className="w-5 h-5" />
@@ -172,23 +181,52 @@ export function Sidebar() {
           <button
             onClick={openCreateTrade}
             className="flex min-h-14 min-w-14 -mt-2 flex-col items-center justify-center rounded-full bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover transition-colors cursor-pointer"
+            aria-label="Add trade"
+            title="Add trade"
           >
             <Plus className="w-6 h-6" />
           </button>
           <MobileNavButton
             icon={BarChart3}
-            label="Analytics"
+            label="Reports"
             isActive={activeView === 'analytics'}
             onClick={() => selectView('analytics')}
           />
           <MobileNavButton
             icon={TrendingUp}
-            label="Review"
-            isActive={activeView === 'review'}
-            onClick={() => selectView('review')}
+            label="More"
+            isActive={moreActive}
+            onClick={() => setMoreSheetOpen(true)}
           />
         </div>
       </nav>
+
+      <BottomSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} title="More">
+        <div className="flex flex-col gap-1">
+          {moreItems.map((item) => {
+            const Icon = item.icon
+            const isActive = item.view === activeView
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.view) selectView(item.view)
+                  setMoreSheetOpen(false)
+                }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer',
+                  isActive
+                    ? 'bg-accent-muted text-accent'
+                    : 'text-text hover:bg-accent-faint'
+                )}
+              >
+                {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                <span className="truncate">{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </BottomSheet>
     </>
   )
 }

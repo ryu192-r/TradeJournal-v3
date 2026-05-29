@@ -4,9 +4,10 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, I
 import { getCalendarMonth } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, parseDecimal } from '@/utils/format'
-import { EmptyState, ErrorState, SectionSkeleton } from '@/components/ui/StateComponents'
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { CalendarDay } from '@/types'
+import { PageShell } from '@/components/layout/PageShell'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
@@ -39,15 +40,15 @@ export function CalendarPage() {
     [data, selectedDate]
   )
 
-  if (isLoading && !data) return <SectionSkeleton rows={6} />
-  if (isError) return <ErrorState title="Calendar unavailable" message="The month aggregate could not be loaded." onRetry={() => refetch()} />
+  if (isLoading && !data) return <PageShell><LoadingState variant="page" /></PageShell>
+  if (isError) return <PageShell><ErrorState title="Calendar unavailable" message="The month aggregate could not be loaded." onRetry={() => refetch()} /></PageShell>
 
   const days = data?.days ?? []
   const firstWeekday = days[0] ? new Date(`${days[0].date}T00:00:00`).getDay() : 0
   const blanks = Array.from({ length: firstWeekday })
 
   return (
-    <div className="min-h-screen p-[var(--page-px)]">
+    <PageShell>
       <PageHeader
         title="Calendar"
         subtitle="Month-level review surface for P&L, discipline, journal coverage, and warning days."
@@ -94,7 +95,7 @@ export function CalendarPage() {
 
         <DayDetail day={selectedDay} />
       </div>
-    </div>
+    </PageShell>
   )
 }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent, type DragEvent as ReactDragEvent } from 'react'
 import { Upload, FileText, Download, X, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-react'
 import { GlassButton } from '@/components/ui/GlassButton'
 import { GlassSelect } from '@/components/ui/GlassSelect'
@@ -29,7 +29,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleBrokerChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleBrokerChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
     setBroker(e.target.value)
     setFile(null)
     setResult(null)
@@ -39,7 +39,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [])
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) {
       setFile(f)
@@ -59,9 +59,9 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [broker])
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: ReactDragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    const f = e.dataTransfer.files?.[0]
+    const f = e.dataTransfer?.files?.[0]
     if (f && f.name.endsWith('.csv')) {
       setFile(f)
       setError('')
@@ -123,6 +123,13 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     }
   }, [broker, addToast])
 
+  const handleDropzoneKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      fileInputRef.current?.click()
+    }
+  }, [])
+
   const handleClose = useCallback(() => {
     setBroker('')
     setFile(null)
@@ -137,12 +144,13 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-bg-card rounded-2xl border border-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-bg-card rounded-2xl border border-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-label="Broker import dialog">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-lg text-text-heading">Import from Broker</h2>
           <button
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-colors cursor-pointer"
+            className="p-2 min-h-10 min-w-10 rounded-lg text-text-muted hover:text-text-heading hover:bg-bg-card-h transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            aria-label="Close import dialog"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,6 +200,10 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
+              onKeyDown={handleDropzoneKeyDown}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose CSV file"
               className={`
                 relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
                 ${file ? 'border-accent/40 bg-accent-faint/30' : 'border-border-strong hover:border-accent/40 hover:bg-accent-faint/10'}

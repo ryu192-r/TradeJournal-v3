@@ -40,10 +40,11 @@ export function ConvertToTradeModal({ open, onClose, onSubmit, symbol, direction
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-md my-8">
-        <div className="bg-card rounded-2xl border border-border p-6 relative">
+        <div className="bg-card rounded-2xl border border-border p-6 relative" role="dialog" aria-modal="true" aria-label="Convert to trade dialog">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-accent-faint text-text-muted hover:text-accent transition-colors cursor-pointer"
+            className="absolute top-4 right-4 p-2 min-h-10 min-w-10 rounded-md hover:bg-accent-faint text-text-muted hover:text-accent transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            aria-label="Close convert dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -62,10 +63,11 @@ export function ConvertToTradeModal({ open, onClose, onSubmit, symbol, direction
               <div className="w-full">
                 <label className="block text-xs font-medium text-text-muted mb-1.5">Entry Price *</label>
                 <input
-                  type="text"
+                  type="number"
                   value={entryPrice}
                   onChange={(e) => setEntryPrice(e.target.value)}
                   placeholder="2450.00"
+                  inputMode="decimal"
                   disabled={isPending}
                   className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-hover ease-out disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -73,10 +75,11 @@ export function ConvertToTradeModal({ open, onClose, onSubmit, symbol, direction
               <div className="w-full">
                 <label className="block text-xs font-medium text-text-muted mb-1.5">Exit Price</label>
                 <input
-                  type="text"
+                  type="number"
                   value={exitPrice}
                   onChange={(e) => setExitPrice(e.target.value)}
                   placeholder="Optional"
+                  inputMode="decimal"
                   disabled={isPending}
                   className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-hover ease-out disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -87,10 +90,11 @@ export function ConvertToTradeModal({ open, onClose, onSubmit, symbol, direction
               <div className="w-full">
                 <label className="block text-xs font-medium text-text-muted mb-1.5">Quantity *</label>
                 <input
-                  type="text"
+                  type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="100"
+                  inputMode="numeric"
                   disabled={isPending}
                   className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-hover ease-out disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -98,10 +102,11 @@ export function ConvertToTradeModal({ open, onClose, onSubmit, symbol, direction
               <div className="w-full">
                 <label className="block text-xs font-medium text-text-muted mb-1.5">Fees</label>
                 <input
-                  type="text"
+                  type="number"
                   value={fees}
                   onChange={(e) => setFees(e.target.value)}
                   placeholder="0"
+                  inputMode="decimal"
                   disabled={isPending}
                   className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-hover ease-out disabled:opacity-50 disabled:cursor-not-allowed"
                 />

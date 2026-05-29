@@ -40,6 +40,9 @@ export function Lightbox({ open, images, activeIndex, onClose, onPrev, onNext, o
       {open && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image viewer"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

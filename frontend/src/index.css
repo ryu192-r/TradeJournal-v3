@@ -92,6 +92,13 @@
     --text-xs: clamp(0.625rem, 0.9vw, 0.75rem);
     --cell-px: clamp(0.5rem, 1.5vw, 1.25rem);
     --cell-py: clamp(0.5rem, 1vw, 0.75rem);
+    --bottom-nav-height: 5rem;
+  }
+
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body {

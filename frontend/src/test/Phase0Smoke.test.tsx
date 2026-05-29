@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { ReactElement } from 'react'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PerformanceOSPage } from '@/pages/PerformanceOSPage'
 import { TradeDetailPage } from '@/pages/TradeDetailPage'
@@ -203,7 +204,7 @@ vi.mock('@/hooks/usePartialExitQuery', () => ({
   useDeletePartialExitMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
-function renderWithQueryClient(ui: React.ReactElement) {
+function renderWithQueryClient(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -247,8 +248,10 @@ describe('Phase 0 frontend smoke tests', () => {
 
   it('renders Trade Detail page', () => {
     renderWithQueryClient(<TradeDetailPage tradeId={1} />)
-    expect(screen.getByText('Back to trades')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'RELIANCE' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'RELIANCE' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Dynamic Chart' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Uploaded Images' })).toBeInTheDocument()
   })
 
   it('renders Performance OS daily workflow', () => {

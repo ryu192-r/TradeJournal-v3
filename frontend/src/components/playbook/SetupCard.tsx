@@ -1,4 +1,5 @@
 // SetupCard: 2-col grid card with expandable detail, mini bar chart, dark discipline palette
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { SetupPlaybookItem } from '@/types/setupPlaybook'
 import { cn } from '@/lib/utils'
 import { Pencil, Archive } from 'lucide-react'
@@ -128,6 +129,13 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
 
   const tactics = setup.tactics.length > 0 ? setup.tactics : []
 
+  const handleHeaderKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onToggle()
+    }
+  }
+
   return (
     <div
       className={cn(
@@ -140,7 +148,14 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
         animationDelay: `${staggerDelay}ms`,
       }}
     >
-      <div onClick={onToggle} className="px-5 pt-4 pb-3">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={onToggle}
+        onKeyDown={handleHeaderKeyDown}
+        className="px-5 pt-4 pb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-inset"
+      >
         {/* Header: name + tag + chevron */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -158,6 +173,7 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
               onClick={(e) => { e.stopPropagation(); onEdit(setup.id) }}
               className="p-1.5 rounded-md hover:bg-accent-muted/60 text-text-muted hover:text-accent transition-colors cursor-pointer"
               title="Edit"
+              aria-label={`Edit ${setup.name}`}
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -165,6 +181,7 @@ export function SetupCard({ setup, onEdit, onArchive, expanded, onToggle, stagge
               onClick={(e) => { e.stopPropagation(); onArchive(setup.id) }}
               className="p-1.5 rounded-md hover:bg-loss-muted/60 text-text-muted hover:text-loss transition-colors cursor-pointer"
               title="Archive"
+              aria-label={`${setup.is_active === 'active' ? 'Archive' : 'Restore'} ${setup.name}`}
             >
               <Archive className="w-3.5 h-3.5" />
             </button>

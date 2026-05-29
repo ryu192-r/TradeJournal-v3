@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import {
   TrendingUp, TrendingDown, Shield, Target, Layers, MessageSquare,
   Activity, Flame, CheckCircle2, BarChart3,
@@ -19,14 +19,14 @@ interface TimelineItem {
   id: string
   type: string
   timestamp: string
-  icon: React.ReactNode
+  icon: ReactNode
   label: string
   detail: string
   badge?: string
   badgeClass?: string
 }
 
-const EVENT_CONFIG: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+const EVENT_CONFIG: Record<string, { icon: ReactNode; label: string; color: string }> = {
   trade_opened: { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Opened', color: 'text-accent' },
   trade_closed: { icon: <CheckCircle2 className="w-3.5 h-3.5" />, label: 'Closed', color: 'text-profit' },
   stop_updated: { icon: <Shield className="w-3.5 h-3.5" />, label: 'Stop Updated', color: 'text-loss' },

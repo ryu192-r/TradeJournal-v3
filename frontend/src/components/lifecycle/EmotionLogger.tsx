@@ -97,14 +97,14 @@ export function EmotionLogger({ tradeId, onClose }: EmotionLoggerProps) {
       <div className="flex gap-2 justify-end">
         <button
           onClick={onClose}
-          className="text-sm px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+          className="text-sm min-h-10 px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-text-heading transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={!emotion || createMutation.isPending}
-          className="text-sm px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
+          className="text-sm min-h-10 px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {createMutation.isPending ? 'Saving...' : 'Log Emotion'}
         </button>

@@ -15,7 +15,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mark, measure } from '@/utils/performance'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
@@ -105,7 +105,7 @@ function WidgetShell({
   children,
 }: {
   pref: WidgetPreference
-  children: React.ReactNode
+  children: ReactNode
 }) {
   if (!pref.visible) return null
   return (
@@ -562,7 +562,7 @@ function WorkflowCard({ dashboard, onOpenPerformanceOS }: { dashboard?: DailyDas
         </div>
         <button
           onClick={onOpenPerformanceOS}
-          className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent cursor-pointer"
+          className="shrink-0 min-h-10 rounded-lg border border-border px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent cursor-pointer"
         >
           Open
         </button>
@@ -672,7 +672,7 @@ function WidgetControls({
           <SlidersHorizontal className="h-4 w-4 text-accent" />
           <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Dashboard Widgets</h2>
         </div>
-        <button onClick={onReset} className="text-xs text-text-muted hover:text-text-heading cursor-pointer">Reset</button>
+        <button onClick={onReset} className="min-h-10 px-3 text-xs text-text-muted hover:text-text-heading cursor-pointer">Reset</button>
       </div>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {prefs.map((pref, index) => (
@@ -680,7 +680,7 @@ function WidgetControls({
             <button
               onClick={() => onToggleVisible(pref.id)}
               className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border cursor-pointer',
+                'flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border cursor-pointer',
                 pref.visible ? 'border-accent/25 bg-accent-muted text-accent' : 'border-border text-text-faint'
               )}
               title={pref.visible ? 'Hide widget' : 'Show widget'}
@@ -694,14 +694,14 @@ function WidgetControls({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onDensity(pref.id, pref.density === 'compact' ? 'expanded' : 'compact')}
-                className="rounded-md border border-border px-2 py-1 text-[10px] font-data uppercase tracking-wider text-text-muted hover:text-text-heading cursor-pointer"
+                className="min-h-10 rounded-md border border-border px-3 py-2 text-[10px] font-data uppercase tracking-wider text-text-muted hover:text-text-heading cursor-pointer"
               >
                 {pref.density === 'compact' ? 'Full' : 'Compact'}
               </button>
               <button
                 onClick={() => onMove(pref.id, -1)}
                 disabled={index === 0}
-                className="rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 title="Move up"
               >
                 <ArrowUp className="h-4 w-4" />
@@ -709,7 +709,7 @@ function WidgetControls({
               <button
                 onClick={() => onMove(pref.id, 1)}
                 disabled={index === prefs.length - 1}
-                className="rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 title="Move down"
               >
                 <ArrowDown className="h-4 w-4" />
@@ -848,7 +848,7 @@ export function DashboardPage() {
 
   const dashboardData = operationalData as OperationalDashboardPayload
 
-  const widgetContent: Record<DashboardWidgetId, React.ReactNode> = {
+  const widgetContent: Record<DashboardWidgetId, ReactNode> = {
     alerts: <AlertZone alerts={dashboardAlerts} />,
     kpis: <KpiCards kpi={dashboardData.kpi} />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,
@@ -896,7 +896,7 @@ export function DashboardPage() {
               <button
                 onClick={() => setCustomizeOpen((open) => !open)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-data transition-all cursor-pointer',
+                  'inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] font-data transition-all cursor-pointer',
                   customizeOpen ? 'border-accent/30 bg-accent-muted text-accent' : 'border-border/60 text-text-muted hover:border-text-muted hover:text-text-heading'
                 )}
               >

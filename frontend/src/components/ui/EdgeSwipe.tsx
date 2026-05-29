@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useAppStore } from '@/store/appStore'
 
 interface EdgeSwipeProps {
-  children: React.ReactNode
+  children: ReactNode
   edgeWidth?: number
 }
 

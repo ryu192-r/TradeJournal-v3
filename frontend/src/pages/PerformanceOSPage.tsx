@@ -10,6 +10,9 @@ import { useWeeklyJournalStatsQuery, useWeeklyJournalsQuery } from '@/hooks/useJ
 import { formatCurrency, formatPrice, formatDate } from '@/utils/format'
 import { cn } from '@/lib/utils'
 import type { WorkflowPhase, DailyDashboard, ChecklistItem } from '@/types/performanceOs'
+import { PageShell } from '@/components/layout/PageShell'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { EmptyState, LoadingState } from '@/components/ui'
 
 type ViewTab = 'daily' | 'weekly' | 'monthly'
 
@@ -498,11 +501,8 @@ export function PerformanceOSPage() {
   const PhaseComponent = PHASE_COMPONENTS[phase]
 
   return (
-    <div className="px-[var(--page-px)] py-[var(--page-py)]">
-      {/* Header */}
-      <div className="mb-1">
-        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading tracking-tight">Performance OS</h1>
-      </div>
+    <PageShell>
+      <PageHeader title="Performance OS" subtitle="Daily workflow from pre-market to behavioral review." />
 
       {/* Command strip */}
       {dashboard && <CommandStrip dashboard={dashboard} selectedDate={selectedDate} onDateChange={setSelectedDate} />}
@@ -537,7 +537,7 @@ export function PerformanceOSPage() {
 
       {/* Daily: Phase content */}
       {viewTab === 'daily' && isLoading && (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-5 h-5 text-accent animate-spin" /></div>
+        <LoadingState variant="skeleton" />
       )}
       {viewTab === 'daily' && dashboard && (
         <div className="rounded-2xl border border-border bg-card p-[var(--page-px)]">
@@ -548,12 +548,12 @@ export function PerformanceOSPage() {
         </div>
       )}
       {viewTab === 'daily' && !dashboard && !isLoading && (
-        <div className="text-sm text-text-faint text-center py-12">No workflow data.</div>
+        <EmptyState title="No workflow data" message="Create today workflow and start with pre-market checklist." />
       )}
 
       {viewTab === 'weekly' && <WeeklyReviewSection selectedDate={selectedDate} onSelectDate={setSelectedDate} />}
       {viewTab === 'monthly' && <MonthlyReviewSection />}
-    </div>
+    </PageShell>
   )
 }
 

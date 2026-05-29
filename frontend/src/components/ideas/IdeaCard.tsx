@@ -127,6 +127,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
               onClick={() => onActivate(idea.id)}
               className="p-1.5 rounded-md hover:bg-accent-muted text-accent hover:text-accent-hover transition-colors cursor-pointer"
               title="Activate"
+              aria-label={`Activate ${idea.symbol} idea`}
             >
               <CheckCircle className="w-4 h-4" />
             </button>
@@ -136,6 +137,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
               onClick={() => onConvert(idea.id)}
               className="p-1.5 rounded-md hover:bg-profit-muted text-profit hover:text-profit transition-colors cursor-pointer"
               title="Convert to Trade"
+              aria-label={`Convert ${idea.symbol} to trade`}
             >
               <Briefcase className="w-4 h-4" />
             </button>
@@ -145,6 +147,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
               onClick={() => onRestore(idea.id)}
               className="p-1.5 rounded-md hover:bg-accent-muted text-accent hover:text-accent-hover transition-colors cursor-pointer"
               title="Restore"
+              aria-label={`Restore ${idea.symbol} idea`}
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -153,6 +156,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
             onClick={() => onEdit(idea.id)}
             className="p-1.5 rounded-md hover:bg-accent-muted text-accent hover:text-accent-hover transition-colors cursor-pointer"
             title="Edit"
+            aria-label={`Edit ${idea.symbol} idea`}
           >
             <Pencil className="w-4 h-4" />
           </button>
@@ -160,6 +164,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
             onClick={() => onArchive(idea.id)}
             className="p-1.5 rounded-md hover:bg-loss-muted text-text-muted hover:text-loss transition-colors cursor-pointer"
             title={idea.status === 'archived' ? 'Delete' : 'Archive'}
+            aria-label={idea.status === 'archived' ? `Delete ${idea.symbol} idea` : `Archive ${idea.symbol} idea`}
           >
             {idea.status === 'archived' ? <Trash2 className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
           </button>
@@ -167,6 +172,7 @@ export function IdeaCard({ idea, onEdit, onArchive, onActivate, onConvert, onRes
             onClick={() => setExpanded((v) => !v)}
             className="p-1.5 rounded-md hover:bg-bg-elevated/50 text-text-muted hover:text-text transition-colors cursor-pointer"
             title={expanded ? 'Collapse' : 'Expand'}
+            aria-label={expanded ? `Collapse ${idea.symbol} card` : `Expand ${idea.symbol} card`}
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>

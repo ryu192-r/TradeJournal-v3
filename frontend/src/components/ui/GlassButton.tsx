@@ -13,8 +13,9 @@ export const GlassButton = forwardRef<HTMLButtonElement, GlassButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-hover ease-out cursor-pointer',
+          'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg font-medium transition-all duration-hover ease-out cursor-pointer',
           'border border-border-strong backdrop-blur-sm',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
           variant === 'default' &&
             'bg-bg-card/70 text-text-heading hover:bg-bg-card-h/70 hover:text-text-heading/90',
           variant === 'accent' &&

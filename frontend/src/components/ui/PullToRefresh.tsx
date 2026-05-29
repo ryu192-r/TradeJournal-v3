@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, type ReactNode, type TouchEvent } from 'react'
 import { Loader2, ArrowDown } from 'lucide-react'
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>
-  children: React.ReactNode
+  children: ReactNode
   disabled?: boolean
   className?: string
 }
@@ -17,14 +17,14 @@ export function PullToRefresh({ onRefresh, children, disabled, className }: Pull
   const contentRef = useRef<HTMLDivElement>(null)
   const isScrolled = useRef(false)
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: TouchEvent) => {
     if (disabled || state === 'refreshing') return
     startY.current = e.touches[0].clientY
     pullY.current = 0
     isScrolled.current = e.currentTarget.scrollTop > 0
   }, [disabled, state])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  const handleTouchMove = useCallback((e: TouchEvent) => {
     if (disabled || state === 'refreshing') return
     if (isScrolled.current) return
     const dy = e.touches[0].clientY - startY.current

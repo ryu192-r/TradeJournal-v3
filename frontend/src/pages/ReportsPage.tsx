@@ -5,9 +5,10 @@ import { BarChart3, Download, FileText, NotebookPen, PieChart, TrendingUp } from
 import { getMonthlyReport, getWeeklyReport } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, formatDateTime, formatMetricPercent, parseDecimal } from '@/utils/format'
-import { ErrorState, SectionSkeleton } from '@/components/ui/StateComponents'
+import { ErrorState, LoadingState } from '@/components/ui'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { DeterministicReportPayload } from '@/types'
+import { PageShell } from '@/components/layout/PageShell'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
@@ -72,11 +73,11 @@ export function ReportsPage() {
   const report = reportQuery.data
   const fileStem = useMemo(() => report ? `tradingos-${report.period}-${report.start_date}` : `tradingos-report-${todayIso()}`, [report])
 
-  if (reportQuery.isLoading && !report) return <SectionSkeleton rows={6} />
-  if (reportQuery.isError) return <ErrorState title="Report unavailable" message="The deterministic report could not be loaded." onRetry={() => reportQuery.refetch()} />
+  if (reportQuery.isLoading && !report) return <PageShell><LoadingState variant="page" /></PageShell>
+  if (reportQuery.isError) return <PageShell><ErrorState title="Report unavailable" message="The deterministic report could not be loaded." onRetry={() => reportQuery.refetch()} /></PageShell>
 
   return (
-    <div className="min-h-screen p-[var(--page-px)]">
+    <PageShell>
       <PageHeader
         title="Reports"
         subtitle="Reproducible weekly and monthly reports built from deterministic analytics first."
@@ -194,7 +195,7 @@ export function ReportsPage() {
           </div>
         </>
       )}
-    </div>
+    </PageShell>
   )
 }
 

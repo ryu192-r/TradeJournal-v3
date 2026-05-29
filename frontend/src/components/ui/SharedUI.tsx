@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 import { RefreshCw, Clock, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
@@ -11,7 +12,7 @@ export function SyncBadge({ isSyncing, onClick }: { isSyncing: boolean; onClick?
     <button
       onClick={onClick}
       disabled={isSyncing}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2 py-1 text-[10px] font-data text-text-muted hover:border-text-muted hover:text-text-heading transition-all disabled:opacity-50 cursor-pointer"
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[10px] font-data text-text-muted hover:border-text-muted hover:text-text-heading transition-all disabled:opacity-50 cursor-pointer"
     >
       {isSyncing ? (
         <>
@@ -51,8 +52,8 @@ interface SectionHeaderProps {
   icon?: LucideIcon
   title?: string
   subtitle?: string
-  badge?: React.ReactNode
-  right?: React.ReactNode
+  badge?: ReactNode
+  right?: ReactNode
   className?: string
 }
 
@@ -106,7 +107,7 @@ export function SectionTitle({
 
 interface MetricCardProps {
   label: string
-  value: React.ReactNode
+  value: ReactNode
   detail?: string
   icon: LucideIcon
   tone?: 'neutral' | 'accent' | 'profit' | 'loss' | 'warning'
@@ -193,8 +194,8 @@ interface CollapsibleSectionProps {
   title: string
   icon: LucideIcon
   defaultOpen?: boolean
-  summary?: React.ReactNode
-  children: React.ReactNode
+  summary?: ReactNode
+  children: ReactNode
   className?: string
 }
 
@@ -250,8 +251,8 @@ export function PageHeader({
 }: {
   title: string
   subtitle?: string
-  left?: React.ReactNode
-  right?: React.ReactNode
+  left?: ReactNode
+  right?: ReactNode
 }) {
   return (
     <div className="flex items-end justify-between gap-3">
@@ -297,7 +298,7 @@ export function InlineBadge({
   children,
   tone = 'neutral',
 }: {
-  children: React.ReactNode
+  children: ReactNode
   tone?: 'profit' | 'loss' | 'neutral' | 'accent' | 'warning'
 }) {
   const map: Record<string, string> = {
@@ -333,7 +334,7 @@ export function Tabs({
   onChange: (id: string) => void
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
+    <div role="tablist" aria-label="Sections" className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
       {tabs.map((tab) => {
         const isActive = tab.id === active
         const Icon = tab.icon
@@ -341,8 +342,13 @@ export function Tabs({
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`${tab.id}-panel`}
+            id={`${tab.id}-tab`}
             className={cn(
-              'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium border transition-all cursor-pointer',
+              'shrink-0 inline-flex min-h-10 items-center gap-1.5 px-3 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium border transition-all cursor-pointer',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
               isActive
                 ? 'border-accent/30 bg-accent-muted text-accent'
                 : 'border-transparent text-text-muted hover:text-text-heading hover:bg-accent-faint'
@@ -385,7 +391,7 @@ export function AlertRow({
 
 /* ─── SafeAreaPadding ──────────────────────────────────────── */
 
-export function SafeAreaPadding({ children }: { children: React.ReactNode }) {
+export function SafeAreaPadding({ children }: { children: ReactNode }) {
   return (
     <div className="px-[var(--page-px)] py-[var(--page-py)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
       {children}

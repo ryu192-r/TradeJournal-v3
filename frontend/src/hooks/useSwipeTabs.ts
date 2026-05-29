@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, type TouchEvent } from 'react'
 
 interface SwipeTabsOptions {
   tabs: string[]
@@ -10,11 +10,11 @@ export function useSwipeTabs({ tabs, activeTab, onTabChange }: SwipeTabsOptions)
   const startX = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: TouchEvent) => {
     startX.current = e.touches[0].clientX
   }, [])
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
     const dx = e.changedTouches[0].clientX - startX.current
     const currentIdx = tabs.indexOf(activeTab)
     if (Math.abs(dx) < 50) return
