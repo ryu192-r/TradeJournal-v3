@@ -150,6 +150,7 @@ TradeJournal-v3/
 | `performance_os.py` | `/perf-os` | Workflow CRUD, weekly/monthly reviews |
 | `calendar.py` | `/calendar` | Month view with daily P&L |
 | `reports.py` | `/reports` | Weekly/monthly deterministic reports |
+| `charts.py` | `/trades/{id}/chart-data` | OHLCV candle data for TradeLightweightChart |
 
 ---
 
@@ -165,6 +166,14 @@ TradeJournal-v3/
 | `export_service.py` | CSV/XLSX export |
 | `live_quote_sync.py` | Background quote sync scheduler job |
 | `dhan_webhook_service.py` | Webhook trade closure from Dhan |
+| `chart_data_service.py` | Chart candle cache, provider routing (Tapetide/Dhan/mock) |
+
+### 5a. Chart Data Providers (`services/providers/`)
+
+| Provider | Supported Timeframes | Status |
+|----------|---------------------|--------|
+| `tapetide_market_data.py` | `1d`, `1w` | Active — daily/weekly OHLCV via Tapetide MCP |
+| `dhan_market_data.py` | `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `1d` | Stub — awaiting Dhan v2 API |
 
 ---
 
@@ -395,6 +404,10 @@ When activeView === 'trades':
 | `TELEGRAM_BOT_TOKEN` | — | Bot only |
 | `OLLAMA_BASE_URL` | — | AI Coach only |
 | `MARKET_DATA_API_URL` | — | Live quotes only |
+| `TAPETIDE_ENABLED` | false | Set `true` for daily OHLCV charts |
+| `TAPETIDE_API_KEY` | — | Tapetide MCP auth token |
+| `TAPETIDE_MCP_URL` | `https://mcp.tapetide.com/mcp` | Tapetide MCP endpoint |
+| `TAPETIDE_DEFAULT_EXCHANGE` | `NSE` | Exchange prefix for symbols |
 
 ---
 

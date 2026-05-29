@@ -22,9 +22,9 @@ router = APIRouter()
 @router.get("/trades/{trade_id}/chart-data", response_model=ChartDataResponse)
 def get_trade_chart_data(
     trade_id: int,
-    timeframe: str = Query("5m", description="Candle timeframe: 1m, 3m, 5m, 15m, 30m, 1h, 1d"),
+    timeframe: str = Query("1d", description="Candle timeframe: 1m, 3m, 5m, 15m, 30m, 1h, 1d, 1w"),
     range: str = Query("auto", description="Chart range: auto, 1d, 5d, 1mo, 3mo, 6mo, 1y"),
-    source: str = Query("auto", description="Data source: auto, cache, dhan, mock"),
+    source: str = Query("auto", description="Data source: auto, cache, tapetide, dhan, mock"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

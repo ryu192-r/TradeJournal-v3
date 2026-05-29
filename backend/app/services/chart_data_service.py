@@ -21,9 +21,9 @@ logger = get_logger(__name__)
 
 IST = ZoneInfo("Asia/Kolkata")
 
-VALID_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "1d"}
+VALID_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "1d", "1w"}
 VALID_RANGES = {"auto", "1d", "5d", "1mo", "3mo", "6mo", "1y"}
-VALID_SOURCES = {"auto", "cache", "dhan", "mock"}
+VALID_SOURCES = {"auto", "cache", "tapetide", "dhan", "mock"}
 
 MAX_CANDLES = 5000
 
@@ -46,8 +46,12 @@ def validate_source(source: str) -> str:
     return source
 
 
+def is_daily_timeframe(timeframe: str) -> bool:
+    return timeframe in {"1d", "1w"}
+
+
 def _timeframe_to_timedelta(tf: str) -> timedelta:
-    mapping = {
+    _mapping = {
         "1m": timedelta(minutes=1),
         "3m": timedelta(minutes=3),
         "5m": timedelta(minutes=5),
@@ -55,8 +59,9 @@ def _timeframe_to_timedelta(tf: str) -> timedelta:
         "30m": timedelta(minutes=30),
         "1h": timedelta(hours=1),
         "1d": timedelta(days=1),
+        "1w": timedelta(weeks=1),
     }
-    return mapping[tf]
+    return _mapping[tf]
 
 
 def _range_to_timedelta(range_: str) -> timedelta:
@@ -351,8 +356,65 @@ def get_chart_data_for_trade(
         candles_raw = cached
         source_used = "cache"
 
-    # Attempt Dhan provider if enabled and source allows
-    if source in ("auto", "dhan") and (not cached or source == "dhan"):
+    # Provider selection based on source and timeframe
+    if source in ("auto", "tapetide") and is_daily_timeframe(timeframe):
+        if not cached or source == "tapetide":
+            try:
+                from app.services.providers.tapetide_market_data import fetch_price_history
+                fetched = fetch_price_history(trade.symbol, timeframe, start, end)
+                if fetched:
+                    upserted = upsert_candles(db, fetched, _commit=True)
+                    logger.info("tapetide_candles_upserted", symbol=trade.symbol, count=upserted)
+                    cached = get_cached_candles(db, trade.symbol, timeframe, start, end)
+                    candles_raw = cached
+                    source_used = "tapetide"
+            except Exception as exc:
+                from app.services.providers.tapetide_market_data import (
+                    TapetideNotConfigured,
+                )
+                if isinstance(exc, TapetideNotConfigured):
+                    if source == "tapetide" and not cached:
+                        return ChartDataResponse(
+                            trade_id=trade.id,
+                            symbol=trade.symbol,
+                            timeframe=timeframe,
+                            range=range_,
+                            source="tapetide",
+                            meta=ChartMetaResponse(
+                                has_real_data=False,
+                                message="Tapetide is not configured. Add TAPETIDE_API_KEY to enable daily charts.",
+                            ),
+                        )
+                logger.warning("tapetide_fetch_failed", symbol=trade.symbol, error=str(exc))
+                if source == "tapetide" and not cached:
+                    return ChartDataResponse(
+                        trade_id=trade.id,
+                        symbol=trade.symbol,
+                        timeframe=timeframe,
+                        range=range_,
+                        source="tapetide",
+                        meta=ChartMetaResponse(
+                            has_real_data=False,
+                            message="Tapetide price history could not be loaded right now.",
+                        ),
+                    )
+
+    # Tapetide doesn't support intraday — friendly message
+    if source == "tapetide" and not is_daily_timeframe(timeframe):
+        return ChartDataResponse(
+            trade_id=trade.id,
+            symbol=trade.symbol,
+            timeframe=timeframe,
+            range=range_,
+            source="tapetide",
+            meta=ChartMetaResponse(
+                has_real_data=False,
+                message="Tapetide currently supports daily/weekly candles only. Use Dhan for intraday candles.",
+            ),
+        )
+
+    # Attempt Dhan provider if enabled and source allows (intraday only for auto)
+    if source in ("auto", "dhan") and (not candles_raw or source == "dhan") and not is_daily_timeframe(timeframe):
         try:
             from app.services.providers.dhan_market_data import fetch_historical_candles
             fetched = fetch_historical_candles(trade.symbol, timeframe, start, end)
@@ -395,7 +457,12 @@ def get_chart_data_for_trade(
     markers, price_lines, annotations = build_chart_markers(trade, partials, candle_times, timeframe)
 
     has_real = len(candles) > 0
-    message = None if has_real else "No candle data available yet. Configure a historical data provider or upload screenshots."
+    message = None
+    if not has_real:
+        if is_daily_timeframe(timeframe):
+            message = "No candle data available. Configure Tapetide (TAPETIDE_API_KEY) for daily charts, or upload screenshots."
+        else:
+            message = "No candle data available. Intraday candles require Dhan (not yet available). Switch to 1D for Tapetide daily charts."
 
     return ChartDataResponse(
         trade_id=trade.id,

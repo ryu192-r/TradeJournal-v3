@@ -147,6 +147,16 @@ cd frontend && npm run build           # production build
 ## Chart images
 - `POST|DELETE /trades/{id}/images`. Multipart upload, disk storage (`UPLOAD_DIR` env var), served via `/uploads/`. Gallery with nav + delete in trade detail modal.
 
+## Dynamic charts
+- `GET /trades/{id}/chart-data` — OHLCV candle data for TradingView Lightweight Charts
+- Default timeframe: `1d` (Tapetide supports daily/weekly only)
+- Source options: `auto` (cache → Tapetide for daily, cache → Dhan for intraday), `cache`, `tapetide`, `dhan` (stub), `mock` (DEBUG only)
+- Valid timeframes: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `1d`, `1w`
+- Tapetide provider (`tapetide_market_data.py`): daily/weekly OHLCV via MCP JSON-RPC. Config: `TAPETIDE_ENABLED`, `TAPETIDE_API_KEY`, `TAPETIDE_MCP_URL`, `TAPETIDE_DEFAULT_EXCHANGE`
+- Dhan provider (`dhan_market_data.py`): stub only. Intraday not yet available.
+- `MarketCandle` cache table with unique on `(symbol, timeframe, timestamp, source)`
+- Intraday timeframes show friendly "Switch to 1D" message when no provider configured
+
 ## Discipline rating
 - 1-5 field in daily journal post-market step (separate from mood). Stored in `DailyJournal.discipline_rating`.
 
@@ -212,6 +222,10 @@ cd frontend && npm run build           # production build
 - `DUCK_DOMAIN` — DuckDNS domain for Traefik HTTPS
 - `UPLOAD_DIR` — chart image upload directory, default `uploads/charts`
 - `MAX_UPLOAD_SIZE_MB` — max upload size in MB, default 10
+- `TAPETIDE_ENABLED` — set `true` to enable daily/weekly OHLCV charts
+- `TAPETIDE_API_KEY` — Tapetide MCP auth token
+- `TAPETIDE_MCP_URL` — Tapetide MCP endpoint, default `https://mcp.tapetide.com/mcp`
+- `TAPETIDE_DEFAULT_EXCHANGE` — exchange prefix, default `NSE`
 
 ## Services
 | Service | Port | Notes |
