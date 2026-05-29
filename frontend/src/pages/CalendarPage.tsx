@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Image, NotebookPen, TrendingUp } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Image, NotebookPen, TrendingUp } from 'lucide-react'
 import { getCalendarMonth } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, parseDecimal } from '@/utils/format'
@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { CalendarDay } from '@/types'
 import { PageShell } from '@/components/layout/PageShell'
+import { useAppStore } from '@/store/appStore'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
@@ -105,26 +106,27 @@ function DayCell({ day, selected, onClick }: { day: CalendarDay; selected: boole
     <button
       onClick={onClick}
       className={cn(
-        'min-h-[7rem] rounded-xl border p-2 text-left transition-all',
+        'min-h-[5rem] sm:min-h-[7rem] rounded-xl border p-1.5 sm:p-2 text-left transition-all',
         selected ? 'border-accent bg-accent-muted' : 'border-border bg-bg-elevated hover:border-text-muted',
-        !hasActivity && 'opacity-70'
+        !hasActivity && 'opacity-60 sm:opacity-70'
       )}
+      aria-label={`${new Date(`${day.date}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} — ${formatCurrency(day.net_pnl)}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-data text-xs text-text-heading">{new Date(`${day.date}T00:00:00`).getDate()}</span>
-        <div className="flex items-center gap-1">
-          {day.journal_done && <NotebookPen className="h-3 w-3 text-accent" />}
-          {day.warnings.length > 0 && <AlertTriangle className="h-3 w-3 text-gold" />}
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-data text-[10px] sm:text-xs text-text-heading">{new Date(`${day.date}T00:00:00`).getDate()}</span>
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          {day.journal_done && <NotebookPen className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-accent" />}
+          {day.warnings.length > 0 && <AlertTriangle className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gold" />}
         </div>
       </div>
-      <div className={cn('mt-3 font-data text-sm font-semibold tabular-nums', pnlTone(day.net_pnl))}>
+      <div className={cn('mt-1.5 sm:mt-3 font-data text-[10px] sm:text-sm font-semibold tabular-nums truncate', pnlTone(day.net_pnl))}>
         {formatCurrency(day.net_pnl)}
       </div>
-      <div className="mt-1 text-[10px] text-text-muted">
+      <div className="mt-0.5 text-[9px] sm:text-[10px] text-text-muted truncate">
         {day.trade_count} trades
       </div>
       {day.discipline_rating && (
-        <div className="mt-2 inline-flex rounded-md border border-border px-1.5 py-0.5 text-[10px] font-data text-text-muted">
+        <div className="mt-1 sm:mt-2 inline-flex rounded-md border border-border px-1 py-0.5 text-[8px] sm:text-[10px] font-data text-text-muted">
           D {day.discipline_rating}/5
         </div>
       )}
@@ -133,6 +135,7 @@ function DayCell({ day, selected, onClick }: { day: CalendarDay; selected: boole
 }
 
 function DayDetail({ day }: { day?: CalendarDay }) {
+  const setActiveView = useAppStore((s) => s.setActiveView)
   if (!day) {
     return (
       <aside className={CARD}>
@@ -197,8 +200,19 @@ function DayDetail({ day }: { day?: CalendarDay }) {
                 {day.journal.rules_violated && <p className="text-gold">Rules violated: {day.journal.rules_violated}</p>}
                 {day.journal.lessons_learned && <p>Lesson: {day.journal.lessons_learned}</p>}
               </div>
-            ) : 'No journal entry.'}
+            ) : (
+              <div className="py-2">
+                <p className="text-sm text-text-muted mb-2">No journal entry for this day.</p>
+              </div>
+            )}
           </div>
+          <button
+            onClick={() => setActiveView('sa-notes')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 transition-colors cursor-pointer"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open journal for {formatDate(day.date)}
+          </button>
         </div>
 
         <div>

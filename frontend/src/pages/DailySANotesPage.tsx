@@ -3,7 +3,9 @@ import {
   Calendar, Sunrise, Sunset, GitCompare, Loader2,
   ChevronLeft, ChevronRight, BookOpen,
 } from 'lucide-react'
-import { ErrorState } from '@/components/ui/StateComponents'
+import { ErrorState, CardSkeleton } from '@/components/ui/StateComponents'
+import { PageShell } from '@/components/layout/PageShell'
+import { PageHeader } from '@/components/ui/SharedUI'
 import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import {
   useJournalQuery,
@@ -146,7 +148,7 @@ export function DailySANotesPage() {
   const [activeTab, setActiveTab] = useState<TabId>('notes')
   const addToast = useToastStore((s) => s.addToast)
 
-  const { data: journal, isLoading, isError, error } = useJournalQuery(selectedDate)
+  const { data: journal, isLoading, isError, error, refetch } = useJournalQuery(selectedDate)
   const { data: tradesData } = useTradesQuery()
   const createMutation = useCreateJournalMutation()
   const updateMutation = useUpdateJournalMutation()
@@ -188,46 +190,48 @@ export function DailySANotesPage() {
   ]
 
   return (
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[length:var(--heading-size)] text-text-heading tracking-tight">Daily SA Notes</h1>
-          <p className="text-[length:var(--text-sm)] text-text-muted mt-0.5">Situational awareness — pre-market perception &amp; post-market reality</p>
-        </div>
-
-        {/* Date nav */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => shiftDate(-1)}
-            className="flex items-center justify-center w-7 h-7 rounded-lg border border-border text-text-muted hover:text-text-heading transition-all cursor-pointer"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-          <div className="relative">
-            <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-7 pl-7 pr-2 rounded-lg border border-border bg-bg-card text-[length:var(--text-xs)] text-text-heading font-data focus:outline-none focus:border-accent/40 cursor-pointer [color-scheme:dark]"
-            />
+    <PageShell>
+      <PageHeader
+        title="Daily SA Notes"
+        subtitle="Situational awareness — pre-market perception &amp; post-market reality"
+        right={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => shiftDate(-1)}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-border text-text-muted hover:text-text-heading transition-all cursor-pointer"
+              aria-label="Previous day"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-7 pl-7 pr-2 rounded-lg border border-border bg-bg-card text-[length:var(--text-xs)] text-text-heading font-data focus:outline-none focus:border-accent/40 cursor-pointer [color-scheme:dark]"
+                aria-label="Select date"
+              />
+            </div>
+            <button
+              onClick={() => shiftDate(1)}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-border text-text-muted hover:text-text-heading transition-all cursor-pointer"
+              aria-label="Next day"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <button
-            onClick={() => shiftDate(1)}
-            className="flex items-center justify-center w-7 h-7 rounded-lg border border-border text-text-muted hover:text-text-heading transition-all cursor-pointer"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Stats strip */}
-      <div className="flex items-center gap-4 text-sm font-data">
-        <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{summaryStats.tradeCount}</span></div>
-        <div><span className="text-[length:var(--text-xs)] text-text-muted block">P&L</span><span className={cn('font-medium', summaryStats.totalPnl >= 0 ? 'text-profit' : 'text-loss')}>{formatCurrency(summaryStats.totalPnl)}</span></div>
-        <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{summaryStats.winRate}%</span></div>
-        <div><span className="text-[length:var(--text-xs)] text-text-muted block">Avg R</span><span className="text-text-heading font-medium">{summaryStats.avgR}R</span></div>
+      <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] animate-card-in">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-data">
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Trades</span><span className="text-text-heading font-medium">{summaryStats.tradeCount}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">P&L</span><span className={cn('font-medium', summaryStats.totalPnl >= 0 ? 'text-profit' : 'text-loss')}>{summaryStats.totalPnl >= 0 ? '+' : ''}{formatCurrency(summaryStats.totalPnl)}</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Win Rate</span><span className="text-text-heading font-medium">{summaryStats.winRate}%</span></div>
+          <div><span className="text-[length:var(--text-xs)] text-text-muted block">Avg R</span><span className="text-text-heading font-medium">{summaryStats.avgR}R</span></div>
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -253,17 +257,15 @@ export function DailySANotesPage() {
 
       {/* Loading */}
       {isLoading && activeTab === 'notes' && (
-        <div className="rounded-2xl border border-border bg-card p-8 text-center">
-          <Loader2 className="w-5 h-5 text-accent animate-spin mx-auto" />
-          <p className="text-[length:var(--text-sm)] text-text-muted mt-3">Loading notes...</p>
-        </div>
+        <CardSkeleton height="h-64" />
       )}
 
       {/* Error */}
       {isError && activeTab === 'notes' && (
         <ErrorState
           title="Failed to load notes"
-          message={error instanceof Error ? error.message : 'Unknown error'}
+          message={error instanceof Error ? error.message : 'Could not load journal entry'}
+          onRetry={() => refetch()}
         />
       )}
 
@@ -283,6 +285,6 @@ export function DailySANotesPage() {
       {activeTab === 'weekly' && (
         <WeeklyView selectedDate={selectedDate} onSelectDate={(d) => { setSelectedDate(d); setActiveTab('notes') }} />
       )}
-    </div>
+    </PageShell>
   )
 }

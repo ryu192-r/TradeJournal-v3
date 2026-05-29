@@ -16,10 +16,6 @@ import {
 import type { DailyJournal } from '@/types'
 import { formatCurrency } from '@/utils/format'
 
-// ---------------------------------------------------------------------------
-// Inline schema (kept here so the component is self-contained)
-// ---------------------------------------------------------------------------
-
 const schema = z.object({
   preTradeNotes: z.string().max(5000).optional(),
   postTradeNotes: z.string().max(5000).optional(),
@@ -34,20 +30,12 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-// ---------------------------------------------------------------------------
-// Reusable input/textarea styles
-// ---------------------------------------------------------------------------
-
 const inputCls =
   'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-sm text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all duration-hover ease-out disabled:opacity-50 disabled:cursor-not-allowed'
 
-// ---------------------------------------------------------------------------
-// Step labels
-// ---------------------------------------------------------------------------
-
 const STEPS = [
-  { id: 0, label: 'Pre-market', icon: Sun },
-  { id: 1, label: 'Post-market', icon: Moon },
+  { id: 0, label: 'Plan', icon: Sun },
+  { id: 1, label: 'Reflect', icon: Moon },
   { id: 2, label: 'Summary', icon: TrendingUp },
 ] as const
 
@@ -120,7 +108,7 @@ function StepIndicators({
           <div className="flex flex-col items-center">
             <div
               className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all',
+                'w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-all',
                 index < current
                   ? 'bg-profit text-black'
                   : index === current
@@ -129,14 +117,14 @@ function StepIndicators({
               )}
             >
               {index < current ? (
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
               ) : (
                 <span>{index + 1}</span>
               )}
             </div>
             <span
               className={cn(
-                'mt-2 text-xs',
+                'mt-1 sm:mt-2 text-[10px] sm:text-xs',
                 index === current
                   ? 'text-accent font-medium'
                   : 'text-text-muted'
@@ -148,7 +136,7 @@ function StepIndicators({
           {index < labels.length - 1 && (
             <div
               className={cn(
-                'flex-1 h-[2px] mx-4',
+                'flex-1 h-[2px] mx-2 sm:mx-4',
                 index < current ? 'bg-profit' : 'bg-border'
               )}
             />
@@ -501,34 +489,34 @@ export function DailyJournalForm({
         labels={STEPS.map((s) => s.label)}
       />
 
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-5 sm:space-y-6">
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-4 sm:space-y-6">
         {step === 0 && renderPreMarket()}
         {step === 1 && renderPostMarket()}
         {step === 2 && renderSummary()}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="text-xs text-text-muted">
           {isDirty ? 'Unsaved changes' : journal ? 'All changes saved' : 'New entry'}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 self-end sm:self-auto">
           {step > 0 && (
             <button
               type="button"
               onClick={() => setStep((s) => s - 1)}
-              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </button>
           )}
           {!isLastStep && (
             <button
               type="button"
               onClick={() => setStep((s) => s + 1)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all duration-[150ms] ease-out cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
             >
-              Next
+              <span className="hidden sm:inline">Next</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
@@ -536,7 +524,7 @@ export function DailyJournalForm({
             <button
               type="submit"
               disabled={isSaving || !isDirty}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all duration-[150ms] ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
