@@ -9,10 +9,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 
-import app.models  # noqa: F401 — register all models on Base.metadata
 from app.core.security import get_password_hash
-from app.db.database import Base, SessionLocal
-from app.db.database import engine as real_engine
 from app.models.performance_os import DailyWorkflow, MonthlyReview, WeeklyReview
 from app.models.user import User
 from app.routers.performance_os import (
@@ -35,18 +32,6 @@ mig = importlib.util.module_from_spec(_mig_spec)
 _mig_spec.loader.exec_module(mig)
 
 _email_counter = count(1)
-
-
-@pytest.fixture
-def db_session():
-    Base.metadata.drop_all(bind=real_engine)
-    Base.metadata.create_all(bind=real_engine)
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=real_engine)
 
 
 def _make_user(db_session):
@@ -325,18 +310,18 @@ def _legacy_perf_os_sqlite_db(db_path: str) -> None:
     engine.dispose()
 
 
-def test_migration_upgrade_on_legacy_sqlite_tables(tmp_path):
+def test_migration_upgrade_on_legacy_sqlite_tables(tmp_path, monkeypatch):
     """Full upgrade() path on legacy SQLite perf-os tables."""
-    import os
     from alembic.config import Config
     from alembic import command
 
     db_path = tmp_path / "legacy.db"
     _legacy_perf_os_sqlite_db(str(db_path))
 
-    os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
+    db_url = f"sqlite:///{db_path}"
+    monkeypatch.setenv("DATABASE_URL", db_url)
     cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+    cfg.set_main_option("sqlalchemy.url", db_url)
     command.upgrade(cfg, "011_performance_os_user_ownership")
 
     engine = create_engine(f"sqlite:///{db_path}")

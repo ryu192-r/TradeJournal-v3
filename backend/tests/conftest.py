@@ -9,9 +9,20 @@ os.environ.setdefault("SECRET_KEY", "test-secret")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret")
 
 import pytest
+from sqlalchemy.orm import close_all_sessions
+
 from app.db.database import Base, get_db
 from app.db.database import engine as real_engine
 from app.main import app as _real_app
+
+
+def _reset_test_database() -> None:
+    """Fresh schema for each test — close sessions so SQLite drop_all is reliable."""
+    import app.models  # noqa: F401 — register all tables on Base.metadata
+
+    close_all_sessions()
+    Base.metadata.drop_all(bind=real_engine)
+    Base.metadata.create_all(bind=real_engine)
 
 
 def __get_db_test():
@@ -26,6 +37,15 @@ def __get_db_test():
 _real_app.dependency_overrides[get_db] = __get_db_test
 
 
+@pytest.fixture(scope="function", autouse=True)
+def _fresh_test_database():
+    """One schema reset per test — avoids stale test.db and fixture ordering bugs."""
+    _reset_test_database()
+    yield
+    close_all_sessions()
+    Base.metadata.drop_all(bind=real_engine)
+
+
 @pytest.fixture(scope="session")
 def app():
     return _real_app
@@ -33,15 +53,9 @@ def app():
 
 @pytest.fixture(scope="function") 
 def client(app):
-    """HTTPX sync client with fresh empty DB per test."""
-    Base.metadata.drop_all(bind=real_engine)
-    Base.metadata.create_all(bind=real_engine)
-
+    """HTTPX sync client backed by the per-test fresh DB (see _fresh_test_database)."""
     from starlette.testclient import TestClient
-    c = TestClient(app)
-    yield c
-
-    Base.metadata.drop_all(bind=real_engine)
+    yield TestClient(app)
 
 
 @pytest.fixture(scope="function")
@@ -57,8 +71,9 @@ def auth_user_token(client) -> str:
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Provide a direct DB session for asserting DB state in tests."""
+    """Direct DB session; schema reset handled by _fresh_test_database autouse."""
     from app.db.database import SessionLocal
+
     db = SessionLocal()
     try:
         yield db

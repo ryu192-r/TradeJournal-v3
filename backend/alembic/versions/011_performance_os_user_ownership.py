@@ -1,7 +1,7 @@
 """Performance OS user ownership — idempotent user_id + composite uniques.
 
 Revision ID: 011_performance_os_user_ownership
-Revises: 008_market_candles
+Revises: 009_performance_os_user_id
 
 Handles DBs where performance OS tables were created after migration 004
 (create_all path) and lack user_id / user-scoped uniqueness.
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 
 
 revision: str = "011_performance_os_user_ownership"
-down_revision: Union[str, None] = "008_market_candles"
+down_revision: Union[str, None] = "009_performance_os_user_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -7,8 +7,6 @@ from itertools import count
 import pytest
 
 from app.core.security import get_password_hash
-from app.db.database import Base, SessionLocal
-from app.db.database import engine as real_engine
 from app.models.daily_journal import DailyJournal
 from app.models.performance_os import MonthlyReview
 from app.models.trade import Trade
@@ -27,18 +25,6 @@ def _make_user(db_session):
     db_session.add(user)
     db_session.flush()
     return user
-
-
-@pytest.fixture
-def db_session():
-    Base.metadata.drop_all(bind=real_engine)
-    Base.metadata.create_all(bind=real_engine)
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=real_engine)
 
 
 def _trade(symbol: str, entry_time: str, user_id: int, pnl: str = "100.00"):
