@@ -389,6 +389,22 @@ def test_date_filters_respected(client, auth_user_token):
     assert "OldSetup" not in setups, "Old trades should be excluded by date filter"
 
 
+# ─── Test 12b: invalid date filters return 422 ─────────────────
+
+
+def test_invalid_date_filters_return_422(client, auth_user_token):
+    """Invalid ISO dates should fail fast instead of widening scope."""
+    paths = [
+        "/api/v1/coaching-intelligence/weekly-plan?week_start=not-a-date",
+        "/api/v1/coaching-intelligence/setup-scores?period_start=bad-date",
+        "/api/v1/coaching-intelligence/setup-scores?period_end=2025-13-99T99:99:99",
+    ]
+    for path in paths:
+        resp = client.get(path, headers={"Authorization": f"Bearer {auth_user_token}"})
+        assert resp.status_code == 422, f"{path} should return 422"
+        assert "Invalid" in resp.text
+
+
 # ─── Test 13: no DB mutation from endpoints ────────────────────
 
 

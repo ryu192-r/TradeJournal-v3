@@ -1,9 +1,9 @@
 """Coaching Intelligence Router — deterministic adaptive coaching endpoints."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -30,6 +30,26 @@ router = APIRouter(
 )
 
 
+def _parse_iso_date(value: str, field_name: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid {field_name}: '{value}'. Use ISO format (e.g. 2025-01-01).",
+        ) from exc
+
+
+def _parse_iso_datetime(value: str, field_name: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid {field_name}: '{value}'. Use ISO format (e.g. 2025-01-01T09:15:00).",
+        ) from exc
+
+
 @router.get("/dashboard", response_model=CoachingIntelligenceDashboard)
 def coaching_intelligence_dashboard(
     db: Session = Depends(get_db),
@@ -48,10 +68,7 @@ def weekly_coaching_plan(
     """Deterministic weekly coaching plan with priorities, rules, and size adjustments."""
     ws = None
     if week_start:
-        try:
-            ws = date.fromisoformat(week_start)
-        except ValueError:
-            pass
+        ws = _parse_iso_date(week_start, "week_start")
     return get_weekly_coaching_plan(db, current_user.id, ws)
 
 
@@ -66,17 +83,9 @@ def setup_confidence_scores(
     start = None
     end = None
     if period_start:
-        try:
-            from datetime import datetime
-            start = datetime.fromisoformat(period_start)
-        except ValueError:
-            pass
+        start = _parse_iso_datetime(period_start, "period_start")
     if period_end:
-        try:
-            from datetime import datetime
-            end = datetime.fromisoformat(period_end)
-        except ValueError:
-            pass
+        end = _parse_iso_datetime(period_end, "period_end")
     return get_setup_confidence_scores(db, current_user.id, start, end)
 
 
