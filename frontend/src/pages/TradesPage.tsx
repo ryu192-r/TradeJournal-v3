@@ -173,9 +173,10 @@ function matchesResearchFilters(trade: ApiTrade, filters: ResearchFilters) {
   if (filters.rMax && r > Number(filters.rMax)) return false
   if (filters.hasScreenshot && !(trade.chart_images?.length)) return false
   if (filters.hasJournalNote && !trade.notes && !trade.review_notes) return false
-  if (filters.hasStop && !trade.stop_price) return false
-  if (filters.noStop && trade.stop_price) return false
-  if (filters.hasPartialExit && !trade.partial_realized_pnl) return false
+  const hasStopPrice = trade.stop_price != null && trade.stop_price !== ''
+  if (filters.hasStop && !hasStopPrice) return false
+  if (filters.noStop && hasStopPrice) return false
+  if (filters.hasPartialExit && (trade.partial_realized_pnl == null || trade.partial_realized_pnl === '')) return false
   if (filters.unreviewed && (trade.review_notes || (trade.review_tags?.length ?? 0) > 0)) return false
   return true
 }
@@ -189,7 +190,15 @@ function downloadFilteredTradesCsv(trades: ApiTrade[], columns: TradeColumnId[])
       if (column === 'exit') return `${trade.exit_price ?? ''} ${trade.exit_time ?? ''}`
       if (column === 'ltp') return ''
       if (column === 'sl') return trade.stop_price ?? ''
-      if (column === 'maxRisk') return trade.stop_price ? String((Number(trade.entry_price) - Number(trade.stop_price)) * Number(trade.remaining_qty ?? trade.quantity)) : ''
+      if (column === 'maxRisk') {
+        if (!trade.stop_price) return ''
+        const entry = Number(trade.entry_price)
+        const stop = Number(trade.stop_price)
+        const qty = Number(trade.remaining_qty ?? trade.quantity)
+        const direction = String(trade.direction ?? '').toUpperCase()
+        const riskPerUnit = direction === 'SHORT' ? stop - entry : direction === 'LONG' ? entry - stop : Math.abs(entry - stop)
+        return Number.isFinite(riskPerUnit * qty) ? String(Math.max(0, riskPerUnit * qty)) : ''
+      }
       if (column === 'quantity') return trade.quantity
       if (column === 'remaining') return trade.remaining_qty ?? trade.quantity
       if (column === 'setup') return trade.setup ?? ''
@@ -441,7 +450,14 @@ export function TradesPage() {
     )
   }, [liveQuotesData])
 
-  const isMobile = useMemo(() => typeof window !== 'undefined' && window.innerWidth < 768, [])
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  )
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const showCards = listingMode === 'cards' || (listingMode === 'auto' && isMobile)
   const showTable = listingMode === 'table' || (listingMode === 'auto' && !isMobile)
 
