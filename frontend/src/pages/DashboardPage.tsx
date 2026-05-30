@@ -672,18 +672,19 @@ function WidgetControls({
           <SlidersHorizontal className="h-4 w-4 text-accent" />
           <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Dashboard Widgets</h2>
         </div>
-        <button onClick={onReset} className="min-h-10 px-3 text-xs text-text-muted hover:text-text-heading cursor-pointer">Reset</button>
+        <button type="button" onClick={onReset} className="min-h-10 px-3 text-xs text-text-muted hover:text-text-heading cursor-pointer">Reset</button>
       </div>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {prefs.map((pref, index) => (
           <div key={pref.id} className="flex items-center gap-2 rounded-xl border border-border bg-bg-elevated p-2">
             <button
+              type="button"
               onClick={() => onToggleVisible(pref.id)}
               className={cn(
                 'flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border cursor-pointer',
                 pref.visible ? 'border-accent/25 bg-accent-muted text-accent' : 'border-border text-text-faint'
               )}
-              title={pref.visible ? 'Hide widget' : 'Show widget'}
+              aria-label={pref.visible ? 'Hide widget' : 'Show widget'}
             >
               {pref.visible ? <PanelTopOpen className="h-4 w-4" /> : <PanelTopClose className="h-4 w-4" />}
             </button>
@@ -693,24 +694,27 @@ function WidgetControls({
             </div>
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => onDensity(pref.id, pref.density === 'compact' ? 'expanded' : 'compact')}
                 className="min-h-10 rounded-md border border-border px-3 py-2 text-[10px] font-data uppercase tracking-wider text-text-muted hover:text-text-heading cursor-pointer"
               >
                 {pref.density === 'compact' ? 'Full' : 'Compact'}
               </button>
               <button
+                type="button"
                 onClick={() => onMove(pref.id, -1)}
                 disabled={index === 0}
                 className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-                title="Move up"
+                aria-label={`Move ${WIDGET_LABELS[pref.id]} up`}
               >
                 <ArrowUp className="h-4 w-4" />
               </button>
               <button
+                type="button"
                 onClick={() => onMove(pref.id, 1)}
                 disabled={index === prefs.length - 1}
                 className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md p-1 text-text-muted hover:text-text-heading disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-                title="Move down"
+                aria-label={`Move ${WIDGET_LABELS[pref.id]} down`}
               >
                 <ArrowDown className="h-4 w-4" />
               </button>

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 import { User, Database, Palette, LogOut, Sun, Moon, Cpu, ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection, getAiMentors } from '@/lib/endpoints'
+import { ErrorState } from '@/components/ui/StateComponents'
 import type { AIProviderInfo } from '@/types/ai'
 
 const inputStyle = 'w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-[length:var(--text-sm)] text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all'
@@ -32,18 +33,21 @@ export function SettingsPage() {
   const [testResult, setTestResult] = useState<{ status: string; message: string } | null>(null)
   const [saved, setSaved] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [mentors, setMentors] = useState<{ key: string; name: string; description: string }[]>([])
   const [personality, setPersonality] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const init = async () => {
+      let hasError = false
       const [providersData, configData, mentorsData] = await Promise.all([
-        getAiProviders().catch(() => ({}) as Record<string, AIProviderInfo>),
-        getAiConfig().catch(() => null),
-        getAiMentors().catch(() => []),
+        getAiProviders().catch(() => { hasError = true; return {} as Record<string, AIProviderInfo> }),
+        getAiConfig().catch(() => { hasError = true; return null }),
+        getAiMentors().catch(() => { hasError = true; return [] }),
       ])
       setProviders(providersData)
       setMentors(mentorsData)
+      if (hasError) setLoadError('Failed to load AI configuration. Backend may be unreachable.')
 
       const providerKeys = Object.keys(providersData)
       const defaultProvider = providerKeys.length > 0 ? providerKeys[0] : ''
@@ -75,7 +79,7 @@ export function SettingsPage() {
       setLoaded(true)
     }
     init()
-  }, [])
+  }, [loadError])
 
   const currentProvider = providers[aiProvider]
 
@@ -171,8 +175,10 @@ export function SettingsPage() {
             </div>
             <div className="mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
               <button
+                type="button"
                 onClick={logout}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-loss text-white hover:bg-loss/80 transition-all duration-[150ms] ease-out cursor-pointer"
+                aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out
@@ -325,6 +331,7 @@ export function SettingsPage() {
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-muted hover:text-text-heading transition-colors cursor-pointer"
+                    aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
                   >
                     {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -480,8 +487,17 @@ export function SettingsPage() {
         )}
       </div>
 
+      {/* Load Error State */}
+      {loadError && (
+        <ErrorState
+          title="Configuration unavailable"
+          message={loadError}
+          onRetry={() => { setLoadError(null); setLoaded(false); /* re-trigger init via effect */ }}
+        />
+      )}
+
       {/* AI Coach Personality Section */}
-      {loaded && mentors.length > 0 && (
+      {loaded && !loadError && mentors.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-lg bg-accent-faint flex items-center justify-center">

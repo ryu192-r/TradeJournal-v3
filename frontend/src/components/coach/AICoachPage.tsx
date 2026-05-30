@@ -305,6 +305,7 @@ export function AICoachPage() {
           const Icon = t.icon
           return (
             <button
+              type="button"
               key={t.id}
               onClick={() => { setTab(t.id); setError(null) }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[length:var(--text-xs)] font-medium whitespace-nowrap transition-all cursor-pointer ${
@@ -337,7 +338,7 @@ export function AICoachPage() {
                 <input type="date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)}
                   className="rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
               </div>
-              <button onClick={handleDaily} disabled={loading}
+              <button type="button" onClick={handleDaily} disabled={loading}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 mt-5">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate</>}
               </button>
@@ -365,7 +366,7 @@ export function AICoachPage() {
                 <input type="date" value={weekEnd} onChange={(e) => setWeekEnd(e.target.value)}
                   className="rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
               </div>
-              <button onClick={handleWeekly} disabled={loading}
+              <button type="button" onClick={handleWeekly} disabled={loading}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 mt-5">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate</>}
               </button>
@@ -385,7 +386,7 @@ export function AICoachPage() {
             <textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={3} placeholder="e.g. Why do I tend to lose on reversal setups? or What can I improve about my exit timing?"
               className="w-full rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-[length:var(--text-sm)] text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all resize-none" />
             <div className="flex justify-end">
-              <button onClick={handleAsk} disabled={loading || !question.trim()}
+              <button type="button" onClick={handleAsk} disabled={loading || !question.trim()}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Thinking...</> : <><MessageSquare className="w-4 h-4" /> Ask Coach</>}
               </button>
@@ -408,7 +409,7 @@ export function AICoachPage() {
                 <input type="number" min={7} max={365} value={patternsLookback} onChange={(e) => setPatternsLookback(Number(e.target.value))}
                   className="w-24 rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
               </div>
-              <button onClick={handlePatterns} disabled={loading}
+              <button type="button" onClick={handlePatterns} disabled={loading}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 mt-5">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</> : <><Brain className="w-4 h-4" /> Detect</>}
               </button>
@@ -431,7 +432,7 @@ export function AICoachPage() {
                 <input type="number" min={1} max={90} value={rulesLookback} onChange={(e) => setRulesLookback(Number(e.target.value))}
                   className="w-24 rounded-lg border border-border-medium bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
               </div>
-              <button onClick={handleRules} disabled={loading}
+              <button type="button" onClick={handleRules} disabled={loading}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 mt-5">
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking...</> : <><CheckCircle2 className="w-4 h-4" /> Check</>}
               </button>
@@ -472,6 +473,7 @@ export function AICoachPage() {
                 </select>
               </div>
               <button
+                type="button"
                 onClick={() => reviewTradeId && reviewMutation.mutate(reviewTradeId)}
                 disabled={!reviewTradeId || reviewMutation.isPending}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50"

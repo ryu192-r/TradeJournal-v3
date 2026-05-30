@@ -394,12 +394,14 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
         <div className="flex gap-1.5">
           {[1, 2, 3, 4, 5].map(n => (
             <button
+              type="button"
               key={n}
               onClick={() => updateMut.mutate({ mood_rating: n })}
               className={cn(
                 'w-9 h-9 rounded-lg text-sm font-medium cursor-pointer transition-all',
                 wf.mood_rating === n ? 'bg-accent/15 text-accent' : 'bg-bg-elevated/30 text-text-muted hover:bg-bg-elevated/50',
               )}
+              aria-label={`Mood rating ${n}`}
             >{n}</button>
           ))}
         </div>
@@ -410,12 +412,14 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
         <div className="flex gap-1.5">
           {[1, 2, 3, 4, 5].map(n => (
             <button
+              type="button"
               key={n}
               onClick={() => updateMut.mutate({ discipline_rating: n })}
               className={cn(
                 'w-9 h-9 rounded-lg text-sm font-medium cursor-pointer transition-all',
                 wf.discipline_rating === n ? 'bg-accent/15 text-accent' : 'bg-bg-elevated/30 text-text-muted hover:bg-bg-elevated/50',
               )}
+              aria-label={`Discipline rating ${n}`}
             >{n}</button>
           ))}
         </div>
@@ -433,6 +437,7 @@ function ReviewPhase({ dashboard, dateStr }: { dashboard: DailyDashboard; dateSt
       </div>
 
       <button
+        type="button"
         onClick={() => advanceMut.mutate()}
         disabled={advanceMut.isPending}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-accent/10 text-accent hover:bg-accent/15 transition-all cursor-pointer disabled:opacity-30"
@@ -522,6 +527,7 @@ export function PerformanceOSPage() {
           { id: 'monthly' as ViewTab, label: 'Monthly' },
         ]).map(t => (
           <button
+            type="button"
             key={t.id}
             onClick={() => setViewTab(t.id)}
             className={cn(
@@ -534,6 +540,7 @@ export function PerformanceOSPage() {
         ))}
         {isToday && viewTab === 'daily' && (
           <button
+            type="button"
             onClick={() => { resetMut.mutate(); qc.invalidateQueries({ queryKey: ['daily-dashboard'] }) }}
             className="ml-auto text-[10px] text-text-faint hover:text-text-muted cursor-pointer"
             aria-label="Reset today's workflow"

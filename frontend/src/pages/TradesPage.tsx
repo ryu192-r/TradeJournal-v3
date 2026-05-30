@@ -523,6 +523,7 @@ export function TradesPage() {
             value={symbolFilter}
             onChange={(e) => { setSymbolFilter(e.target.value); setPage(1) }}
             className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 pl-8 pr-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all"
+            aria-label="Search symbol"
           />
         </div>
         <select
@@ -535,12 +536,14 @@ export function TradesPage() {
           <option value="closed">Closed</option>
         </select>
         <button
+          type="button"
           onClick={() => setFiltersOpen((open) => !open)}
           className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${filtersOpen || advancedFilterCount > 0 ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" /> Filters {advancedFilterCount > 0 ? `(${advancedFilterCount})` : ''}
         </button>
         <button
+          type="button"
           onClick={() => setTableConfigOpen((open) => !open)}
           className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${tableConfigOpen ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
         >
@@ -555,11 +558,12 @@ export function TradesPage() {
           {showCards ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
         </button>
         {hasFilters && (
-          <button onClick={clearFilters} className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer">
+          <button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer">
             <X className="w-3.5 h-3.5" /> Clear filters
           </button>
         )}
         <button
+          type="button"
           onClick={() => downloadFilteredTradesCsv(displayedTrades, activeColumns)}
           className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
           title="Export current filtered table"
@@ -613,8 +617,9 @@ export function TradesPage() {
               onChange={(e) => setSaveViewName(e.target.value)}
               placeholder="Saved view name"
             className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 sm:w-56"
+            aria-label="Saved view name"
             />
-            <button onClick={saveCurrentView} disabled={!saveViewName.trim()} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+            <button type="button" onClick={saveCurrentView} disabled={!saveViewName.trim()} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">
               <Save className="w-3.5 h-3.5" /> Save view
             </button>
           </div>
@@ -626,9 +631,11 @@ export function TradesPage() {
           <div className="mb-3 inline-flex rounded-xl border border-border bg-bg-elevated p-1">
             {(['comfortable', 'compact'] as const).map((option) => (
               <button
+                type="button"
                 key={option}
                 onClick={() => setDensity(option)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${density === option ? 'bg-card text-text-heading' : 'text-text-muted hover:text-text-heading'}`}
+                aria-label={`${option} density`}
               >
                 {option}
               </button>
@@ -652,8 +659,8 @@ export function TradesPage() {
                   />
                   <span className="truncate">{COLUMN_LABELS[column]}</span>
                 </label>
-                <button disabled={index === 0} onClick={() => moveColumn(column, -1)} className="px-1 text-xs text-text-muted disabled:opacity-30">Up</button>
-                <button disabled={index === columnOrder.length - 1} onClick={() => moveColumn(column, 1)} className="px-1 text-xs text-text-muted disabled:opacity-30">Down</button>
+                <button type="button" disabled={index === 0} onClick={() => moveColumn(column, -1)} className="px-1 text-xs text-text-muted disabled:opacity-30" aria-label={`Move ${COLUMN_LABELS[column]} up`}>Up</button>
+                <button type="button" disabled={index === columnOrder.length - 1} onClick={() => moveColumn(column, 1)} className="px-1 text-xs text-text-muted disabled:opacity-30" aria-label={`Move ${COLUMN_LABELS[column]} down`}>Down</button>
               </div>
             ))}
           </div>
@@ -728,10 +735,10 @@ export function TradesPage() {
               <div className="flex items-center justify-between mt-[var(--page-gap)] pt-[var(--page-gap)] border-t border-border">
                 <span className="text-xs text-text-muted font-data">Page {page} / {totalPages}</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer">Prev</button>
-                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer">Next</button>
+                  <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer" aria-label="Previous page">Prev</button>
+                  <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint disabled:opacity-30 cursor-pointer" aria-label="Next page">Next</button>
                 </div>
               </div>
             )}
@@ -790,13 +797,15 @@ export function TradesPage() {
                   {data.total === 0 ? '0 trades' : `${displayedTrades.length} shown from ${data.items.length} loaded · ${data.total} total · Page ${page} of ${totalPages}`}
                 </span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
-                    className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                  <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Previous page">
                     <ChevronLeft className="w-3.5 h-3.5" /> Previous
                   </button>
                   <span className="text-xs text-text-muted font-data px-2">{page} / {totalPages}</span>
-                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                    className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                  <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-text hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Next page">
                     Next <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -841,8 +850,8 @@ export function TradesPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={closePyramid} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
-          <button onClick={() => handlePyramid(pyramidingTradeId!)} disabled={pyramidSubmitting || !pyramidEntryPrice || !pyramidQty}
+          <button type="button" onClick={closePyramid} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+          <button type="button" onClick={() => handlePyramid(pyramidingTradeId!)} disabled={pyramidSubmitting || !pyramidEntryPrice || !pyramidQty}
             className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
             {pyramidSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Layers className="w-4 h-4" /> Pyramid</>}
           </button>
@@ -857,7 +866,7 @@ export function TradesPage() {
                 <h3 className="text-lg font-semibold text-text-heading font-display">Sell Position</h3>
                 <p className="mt-0.5 text-xs text-text-muted">{sellTrade?.symbol ?? 'Open trade'} · {isFullSell ? 'Full sell' : 'Partial sell'}</p>
               </div>
-              <button onClick={closeSellTrade} className="rounded-lg p-1 text-text-muted hover:bg-bg-elevated hover:text-text-heading transition-colors cursor-pointer">
+              <button type="button" onClick={closeSellTrade} className="rounded-lg p-1 text-text-muted hover:bg-bg-elevated hover:text-text-heading transition-colors cursor-pointer" aria-label="Close sell dialog">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -927,8 +936,8 @@ export function TradesPage() {
               </div>
             </div>
             <div className="flex items-center gap-3 border-t border-border px-5 py-4">
-              <button onClick={closeSellTrade} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
-              <button onClick={() => handleSellTrade(sellTradeId, sellMaxQty)} disabled={sellSubmitting || !sellQty || !sellPrice || isInvalidSellQty}
+              <button type="button" onClick={closeSellTrade} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+              <button type="button" onClick={() => handleSellTrade(sellTradeId, sellMaxQty)} disabled={sellSubmitting || !sellQty || !sellPrice || isInvalidSellQty}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
                 {sellSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Selling...</> : <><ArrowDownToLine className="w-4 h-4" /> {isFullSell ? 'Sell Full' : 'Sell Partial'}</>}
               </button>
@@ -1046,10 +1055,12 @@ function FilterInput({
   type?: string
   placeholder?: string
 }) {
+  const id = `filter-${label.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <div>
-      <label className="block text-[10px] font-data uppercase tracking-wider text-text-muted mb-1">{label}</label>
+      <label htmlFor={id} className="block text-[10px] font-data uppercase tracking-wider text-text-muted mb-1">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -1205,17 +1216,17 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
         <td key={column} className={cellClass}>
           {slEditing ? (
             <div className="flex items-center gap-1 min-w-[140px]">
-              <input ref={slRef} type="number" step="0.01" inputMode="decimal" value={slPrice} onChange={(e) => setSlPrice(e.target.value)} className="w-20 px-1.5 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading" placeholder="Price" />
-              <select value={slType} onChange={(e) => setSlType(e.target.value)} className="w-16 px-1 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading">
+              <input ref={slRef} type="number" step="0.01" inputMode="decimal" value={slPrice} onChange={(e) => setSlPrice(e.target.value)} className="w-20 px-1.5 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading" placeholder="Price" aria-label="Stop loss price" />
+              <select value={slType} onChange={(e) => setSlType(e.target.value)} className="w-16 px-1 py-1 rounded text-[10px] bg-bg-card border border-border text-text-heading" aria-label="Stop loss type">
                 {STOP_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              <button onClick={handleSlSave} disabled={!slPrice || createStopHistory.isPending} className="px-1.5 py-1 rounded text-[10px] font-medium bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors cursor-pointer">
+              <button type="button" onClick={handleSlSave} disabled={!slPrice || createStopHistory.isPending} className="px-1.5 py-1 rounded text-[10px] font-medium bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors cursor-pointer" aria-label="Save stop loss">
                 {createStopHistory.isPending ? '…' : 'Set'}
               </button>
-              <button onClick={() => setSlEditing(false)} className="px-1 py-1 rounded text-[10px] text-text-muted hover:text-text-heading transition-colors cursor-pointer">×</button>
+              <button type="button" onClick={() => setSlEditing(false)} className="px-1 py-1 rounded text-[10px] text-text-muted hover:text-text-heading transition-colors cursor-pointer" aria-label="Cancel stop loss edit">×</button>
             </div>
           ) : (
-            <button onClick={() => { setSlPrice(trade.stop_price ?? ''); setSlEditing(true) }} className={`font-data text-xs transition-colors cursor-pointer ${trade.stop_price ? 'text-text-heading hover:text-accent' : 'text-text-faint hover:text-text-muted'}`} title="Click to set trailing stop">
+            <button type="button" onClick={() => { setSlPrice(trade.stop_price ?? ''); setSlEditing(true) }} className={`font-data text-xs transition-colors cursor-pointer ${trade.stop_price ? 'text-text-heading hover:text-accent' : 'text-text-faint hover:text-text-muted'}`} title="Click to set trailing stop" aria-label="Edit stop loss">
               {trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—'}
             </button>
           )}

@@ -403,7 +403,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                   <><ArrowUpRight className="w-4 h-4 text-loss rotate-90" /> Add Withdrawal</>
                 )}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer">
+              <button type="button" onClick={() => setShowModal(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer" aria-label="Close modal">
                 <X className="w-4 h-4 text-text-muted" />
               </button>
             </div>
@@ -443,6 +443,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={createMutation.isPending || !amount}
                   className={`flex-1 rounded-lg px-4 py-2 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 ${
@@ -455,7 +456,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
                     <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
                   ) : modalType === 'deposit' ? 'Add Deposit' : modalType === 'fee' ? 'Add Fee' : 'Add Withdrawal'}
                 </button>
-                <button onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
               </div>
             </div>
           </div>
@@ -752,7 +753,7 @@ export function CapitalPage() {
               <h2 className="text-sm font-medium text-text-heading font-display flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-accent" /> Edit Account
               </h2>
-              <button onClick={() => setShowEditAccount(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer">
+              <button type="button" onClick={() => setShowEditAccount(false)} className="p-1 rounded-md hover:bg-bg-elevated transition-colors cursor-pointer" aria-label="Close edit account">
                 <X className="w-4 h-4 text-text-muted" />
               </button>
             </div>
@@ -799,13 +800,14 @@ export function CapitalPage() {
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
+                  type="button"
                   onClick={handleSaveAccount}
                   disabled={accountMutation.isPending || !editName}
                   className="flex-1 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {accountMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Save Changes'}
                 </button>
-                <button onClick={() => setShowEditAccount(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
+                <button type="button" onClick={() => setShowEditAccount(false)} className="rounded-lg border border-border px-4 py-2 text-xs text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">Cancel</button>
               </div>
             </div>
           </div>

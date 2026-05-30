@@ -66,6 +66,7 @@ export function CalendarPage() {
             value={month}
             onChange={(event) => setMonth(event.target.value)}
             className="min-w-[9rem] bg-transparent px-2 text-sm font-data text-text-heading outline-none"
+            aria-label="Select month"
           />
           <button className="rounded-lg p-2 text-text-muted hover:bg-card hover:text-text-heading" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
             <ChevronRight className="h-4 w-4" />

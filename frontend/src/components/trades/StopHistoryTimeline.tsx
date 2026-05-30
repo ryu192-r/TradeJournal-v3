@@ -61,6 +61,7 @@ export function StopHistoryTimeline({ tradeId }: StopHistoryTimelineProps) {
         <h3 className="text-sm font-medium text-text-heading">Stop History</h3>
         {canAdd && (
           <button
+            type="button"
             onClick={() => setShowForm(!showForm)}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-accent hover:bg-accent-muted transition-colors cursor-pointer"
           >
@@ -89,9 +90,11 @@ export function StopHistoryTimeline({ tradeId }: StopHistoryTimelineProps) {
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
             className="w-full px-2 py-1.5 rounded-lg text-sm bg-bg-card border border-border text-text-heading"
+            aria-label="Stop price"
           />
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={handleAdd}
               disabled={!newPrice || createMutation.isPending}
               className="px-3 py-1 rounded-lg text-xs font-medium bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors cursor-pointer"
@@ -99,6 +102,7 @@ export function StopHistoryTimeline({ tradeId }: StopHistoryTimelineProps) {
               {createMutation.isPending ? 'Saving...' : 'Save'}
             </button>
             <button
+              type="button"
               onClick={() => setShowForm(false)}
               className="px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-text-heading transition-colors cursor-pointer"
             >

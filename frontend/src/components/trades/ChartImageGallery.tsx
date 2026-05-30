@@ -114,14 +114,18 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
         {slides.length > 1 && (
           <>
             <button
+              type="button"
               onClick={goPrev}
               className="absolute left-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-bg-card/80 backdrop-blur-sm border border-border hover:bg-bg-elevated transition-colors cursor-pointer"
+              aria-label="Previous image"
             >
               <ChevronLeft className="w-3.5 h-3.5 text-text" />
             </button>
             <button
+              type="button"
               onClick={goNext}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-bg-card/80 backdrop-blur-sm border border-border hover:bg-bg-elevated transition-colors cursor-pointer"
+              aria-label="Next image"
             >
               <ChevronRight className="w-3.5 h-3.5 text-text" />
             </button>

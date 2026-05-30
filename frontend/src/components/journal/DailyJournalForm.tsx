@@ -71,6 +71,7 @@ function MoodRating({
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(null)}
             className="cursor-pointer transition-transform duration-150 hover:scale-110"
+            aria-label={`Rate ${n} out of 5`}
           >
             <Star
               className={
