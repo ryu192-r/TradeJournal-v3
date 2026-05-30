@@ -60,16 +60,9 @@ function App() {
   }, [fetchMe])
 
   useEffect(() => {
-    const syncViewFromPath = () => {
-      useAppStore.getState().setActiveView(
-        window.location.pathname === '/coaching-intelligence'
-          ? 'coaching-intelligence'
-          : 'dashboard'
-      )
+    if (window.location.pathname === '/coaching-intelligence') {
+      useAppStore.getState().setActiveView('coaching-intelligence')
     }
-    window.addEventListener('popstate', syncViewFromPath)
-    syncViewFromPath()
-    return () => window.removeEventListener('popstate', syncViewFromPath)
   }, [])
 
   /*

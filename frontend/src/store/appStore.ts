@@ -2,15 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ActiveView, NavMode } from '@/app/navigation'
 
-const COACHING_INTELLIGENCE_PATH = '/coaching-intelligence'
-
-const getInitialActiveView = (): ActiveView => {
-  if (typeof window !== 'undefined' && window.location.pathname === COACHING_INTELLIGENCE_PATH) {
-    return 'coaching-intelligence'
-  }
-  return 'dashboard'
-}
-
 interface Position {
   id: number
   symbol: string
@@ -80,17 +71,8 @@ export const useAppStore = create<AppState>()(
       navMode: 'simple',
       setNavMode: (mode) => set({ navMode: mode }),
 
-      activeView: getInitialActiveView(),
-      setActiveView: (view) => {
-        if (typeof window !== 'undefined') {
-          if (view === 'coaching-intelligence') {
-            window.history.pushState({}, '', COACHING_INTELLIGENCE_PATH)
-          } else if (window.location.pathname === COACHING_INTELLIGENCE_PATH) {
-            window.history.replaceState({}, '', '/')
-          }
-        }
-        set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null })
-      },
+      activeView: 'dashboard',
+      setActiveView: (view) => set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null }),
 
       tradeFormMode: 'list',
       selectedTradeId: null,
