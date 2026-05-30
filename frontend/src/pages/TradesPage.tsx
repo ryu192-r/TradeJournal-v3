@@ -191,7 +191,7 @@ function downloadFilteredTradesCsv(trades: ApiTrade[], columns: TradeColumnId[])
       if (column === 'ltp') return ''
       if (column === 'sl') return trade.stop_price ?? ''
       if (column === 'maxRisk') {
-        if (!trade.stop_price) return ''
+        if (trade.stop_price == null || trade.stop_price === '') return ''
         const entry = Number(trade.entry_price)
         const stop = Number(trade.stop_price)
         const qty = Number(trade.remaining_qty ?? trade.quantity)
