@@ -38,6 +38,7 @@ export type ActiveView =
   | 'lifecycle'
   | 'risk'
   | 'market'
+  | 'recommendations'
 
 export type NavigationItem = {
   id: string
@@ -191,6 +192,13 @@ export const navigationSections: NavigationSection[] = [
         icon: Globe,
         view: 'market',
         purpose: 'Compare your performance with regime, breadth, sector strength, and live quotes.',
+      },
+      {
+        id: 'recommendations',
+        label: 'Intelligence',
+        icon: Brain,
+        view: 'recommendations',
+        purpose: 'Get actionable recommendations from your trading data.',
       },
     ],
   },

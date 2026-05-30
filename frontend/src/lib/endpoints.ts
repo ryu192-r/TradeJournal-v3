@@ -535,6 +535,20 @@ export function seedMarketSnapshots(snapshots: Record<string, unknown>[]) {
   return apiClient.post<{ added: number; skipped: number; errors: string[]; total: number }>('/market/seed', { snapshots }).then(r => r.data)
 }
 
+// ────────────────────────── Recommendations ──────────────────────────
+
+export function getRecommendationDashboard(params?: { period_start?: string; period_end?: string }) {
+  return apiClient
+    .get<import('@/types/recommendations').RecommendationDashboardResponse>('/recommendations/dashboard', { params })
+    .then(r => r.data)
+}
+
+export function getRecommendationSummary(params?: { period_start?: string; period_end?: string }) {
+  return apiClient
+    .get<import('@/types/recommendations').RecommendationSummary>('/recommendations/summary', { params })
+    .then(r => r.data)
+}
+
 export function getMarketPerformanceCorrelation(fromDate?: string, toDate?: string) {
   const params = new URLSearchParams()
   if (fromDate) params.append('from_date', fromDate)

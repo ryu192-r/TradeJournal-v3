@@ -14,6 +14,7 @@ import {
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
+import { RecommendationSummaryStrip } from '@/components/recommendations/RecommendationSummaryStrip'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mark, measure } from '@/utils/performance'
@@ -34,7 +35,7 @@ const MarketContext = lazy(() => import('@/components/market/MarketContext').the
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 const DASHBOARD_WIDGET_PREF_KEY = 'tjv3-dashboard-widgets-v1'
 
-type DashboardWidgetId = 'alerts' | 'kpis' | 'equity' | 'live' | 'workflow' | 'risk' | 'intelligence' | 'deep'
+type DashboardWidgetId = 'alerts' | 'kpis' | 'equity' | 'live' | 'workflow' | 'risk' | 'intelstrip' | 'intelligence' | 'deep'
 type WidgetDensity = 'compact' | 'expanded'
 
 type WidgetPreference = {
@@ -46,6 +47,7 @@ type WidgetPreference = {
 const DEFAULT_WIDGET_PREFS: WidgetPreference[] = [
   { id: 'alerts', visible: true, density: 'expanded' },
   { id: 'kpis', visible: true, density: 'compact' },
+  { id: 'intelstrip', visible: true, density: 'compact' },
   { id: 'equity', visible: true, density: 'expanded' },
   { id: 'live', visible: true, density: 'expanded' },
   { id: 'workflow', visible: true, density: 'compact' },
@@ -57,6 +59,7 @@ const DEFAULT_WIDGET_PREFS: WidgetPreference[] = [
 const WIDGET_LABELS: Record<DashboardWidgetId, string> = {
   alerts: 'Alert Zone',
   kpis: 'KPI Cards',
+  intelstrip: 'Intelligence Summary',
   equity: 'Equity',
   live: 'Live Positions',
   workflow: 'Daily Workflow',
@@ -855,6 +858,7 @@ export function DashboardPage() {
   const widgetContent: Record<DashboardWidgetId, ReactNode> = {
     alerts: <AlertZone alerts={dashboardAlerts} />,
     kpis: <KpiCards kpi={dashboardData.kpi} />,
+    intelstrip: <RecommendationSummaryStrip />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,
     live: <LiveDashboard trades={openTrades} quoteMap={quoteMap} />,
     workflow: <WorkflowCard dashboard={dailyDashboard} onOpenPerformanceOS={() => setActiveView('perf-os')} />,

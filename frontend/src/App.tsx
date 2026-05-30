@@ -36,6 +36,7 @@ const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ defa
 const LifecyclePage = lazy(() => import('@/pages/LifecyclePage').then((m) => ({ default: m.LifecyclePage })))
 const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m.RiskPage })))
 const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })))
+const RecommendationsPage = lazy(() => import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })))
 
 // queryClient is shared from src/lib/queryClient.ts — imported by App.tsx and authStore.ts
 // so logout() can clear the cache to prevent stale user data leaks.
@@ -146,6 +147,7 @@ function App() {
                 {activeView === 'lifecycle' && <ErrorBoundary name="Lifecycle"><LifecyclePage /></ErrorBoundary>}
                 {activeView === 'risk' && <ErrorBoundary name="Risk"><RiskPage /></ErrorBoundary>}
                 {activeView === 'market' && <ErrorBoundary name="MarketContext"><MarketContextPage /></ErrorBoundary>}
+                {activeView === 'recommendations' && <ErrorBoundary name="Recommendations"><RecommendationsPage /></ErrorBoundary>}
                 {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
                 {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
               </Suspense>
