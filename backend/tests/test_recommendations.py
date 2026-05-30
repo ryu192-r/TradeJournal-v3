@@ -124,6 +124,44 @@ def test_negative_setup_recommendation(client, auth_user_token):
     assert any("Reduce or pause" in t for t in titles), f"No pause rec found in {titles}"
 
 
+def test_historical_negative_setup_still_pauses_in_period(client, auth_user_token):
+    """Historically negative setup should still pause even if no current-period closed trades."""
+    # Historical bad setup outside selected period (builds edge_map sample >= 20)
+    for i in range(20):
+        _create_trade(
+            client, auth_user_token,
+            setup="HistoricalLoser",
+            symbol=f"HIST{i}",
+            entry_price=200,
+            exit_price=180,  # losing
+            quantity=10,
+            stop_price=190,
+            entry_time=f"2025-01-{(i % 20) + 1:02d}T09:30:00",
+        )
+
+    # Current period has closed trades, but not for HistoricalLoser
+    _create_trade(
+        client, auth_user_token,
+        setup="CurrentSetup",
+        symbol="CURR1",
+        entry_price=100,
+        exit_price=120,
+        quantity=10,
+        stop_price=95,
+        entry_time="2025-06-15T09:30:00",
+    )
+
+    resp = client.get(
+        "/api/v1/recommendations/dashboard",
+        params={"period_start": "2025-06-01", "period_end": "2025-06-30"},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    titles = [r["title"] for r in data["recommendations"]]
+    assert any(t == "Pause HistoricalLoser" for t in titles), f"No historical pause rec in {titles}"
+
+
 # ── 5. low sample warning ──
 
 

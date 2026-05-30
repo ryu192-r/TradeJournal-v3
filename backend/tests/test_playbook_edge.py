@@ -8,10 +8,12 @@ from app.services.setup_edge_service import (
     _expectancy_from_r_vals,
     _profit_factor_r,
     calculate_setup_edge,
+    compute_playbook_score,
     get_top_setup_edge,
     get_weakest_setup_edge,
 )
-from app.schemas.playbook_edge import SetupEdgeConfidence, SetupEdgeStatus
+from app.models.user import User
+from app.schemas.playbook_edge import SetupEdgeConfidence, SetupEdgeMetrics, SetupEdgeStatus
 
 
 def _create_trade(client, token, symbol, entry, exit, setup="Breakout", stop=95, entry_time=None):
@@ -75,6 +77,21 @@ def test_confidence_sample_thresholds():
 def test_confidence_downgrade_on_recent_negative_expectancy():
     assert _compute_confidence(55, -0.2) == SetupEdgeConfidence.MEDIUM
     assert _compute_confidence(25, -0.1) == SetupEdgeConfidence.LOW
+
+
+def test_negative_expectancy_playbook_score_capped():
+    """Consistently losing setup must not score high from consistency/win-rate alone."""
+    metrics = SetupEdgeMetrics(
+        setup_name="Loser",
+        sample_size=25,
+        win_rate=40.0,
+        expectancy_r=-0.15,
+        avg_r=-0.15,
+        recent_30d_r=-0.12,
+    )
+    r_vals = [-0.2] * 25
+    score = compute_playbook_score(metrics, r_vals)
+    assert score.score <= 45
 
 
 def test_status_focus_pause_watch():
@@ -146,26 +163,23 @@ def test_single_setup_detail(client, auth_user_token):
 
 
 def test_service_user_scoped(db_session, client, auth_user_token):
+    """User A trade data must not appear in User B edge calculations."""
     _create_trade(client, auth_user_token, "SVC1", 100, 120, setup="SvcSetup")
-    user_id = db_session.query(
-        __import__("app.models.user", fromlist=["User"]).User
-    ).filter_by(email="pytest@example.com").first().id
+    user1 = db_session.query(User).filter_by(email="pytest@example.com").first()
+    assert user1 is not None
 
-    detail = calculate_setup_edge(db_session, "SvcSetup", user_id)
+    detail = calculate_setup_edge(db_session, "SvcSetup", user1.id)
     assert detail.metrics.sample_size == 1
     assert detail.metrics.expectancy_r is not None
-
-    other = db_session.query(
-        __import__("app.models.user", fromlist=["User"]).User
-    ).filter_by(email="pytest@example.com").first()
-    assert calculate_setup_edge(db_session, "SvcSetup", other.id).metrics.sample_size == 1
 
     resp = client.post(
         "/api/v1/auth/register",
         json={"email": "svciso@test.com", "full_name": "Iso", "password": "pass12345"},
     )
-    user2_id = db_session.query(
-        __import__("app.models.user", fromlist=["User"]).User
-    ).filter_by(email="svciso@test.com").first().id
-    assert calculate_setup_edge(db_session, "SvcSetup", user2_id).metrics.sample_size == 0
-    assert get_top_setup_edge(db_session, user2_id) is None
+    assert resp.status_code == 201
+    user2 = db_session.query(User).filter_by(email="svciso@test.com").first()
+    assert user2 is not None
+    assert user2.id != user1.id
+
+    assert calculate_setup_edge(db_session, "SvcSetup", user2.id).metrics.sample_size == 0
+    assert get_top_setup_edge(db_session, user2.id) is None

@@ -209,6 +209,8 @@ def compute_playbook_score(metrics: SetupEdgeMetrics, r_vals: list[float]) -> Pl
 
     total = int(round(expectancy_component + win_rate_component + consistency_component + recent_component))
     total = min(100, max(0, total))
+    if metrics.expectancy_r is not None and metrics.expectancy_r < 0:
+        total = min(total, 45)
 
     return PlaybookScore(
         setup_name=metrics.setup_name,
@@ -304,6 +306,7 @@ def _compute_condition_breakdowns(
 
 
 def _setup_names_for_user(db: Session, user_id: int, trades: list[Trade]) -> list[str]:
+    # SetupPlaybook is global today; filter by user_id here if playbooks become per-user.
     names: set[str] = set()
     for sp in db.query(SetupPlaybook).filter(SetupPlaybook.is_active == "active").all():
         names.add(sp.name)
@@ -368,6 +371,7 @@ def get_all_setup_edges(db: Session, user_id: int) -> PlaybookEdgeListResponse:
     trades = _base_trades(db, user_id)
     names = _setup_names_for_user(db, user_id, trades)
 
+    # Per-setup calculate_setup_edge reloads trades; batch if setup count grows large.
     metrics_list: list[SetupEdgeMetrics] = []
     for name in names:
         detail = calculate_setup_edge(db, name, user_id, now)

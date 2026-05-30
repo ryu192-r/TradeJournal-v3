@@ -315,6 +315,39 @@ def _setup_recommendations(
                 priority_score=score,
             ))
 
+    # Backstop: still emit pause rec for historically negative setups
+    # even when they have no closed trades in this selected period.
+    for edge_metrics in edge_map.values():
+        setup_name = edge_metrics.setup_name
+        if (
+            edge_metrics.sample_size >= MIN_CLOSED_FOR_EDGE_PAUSE
+            and edge_metrics.expectancy_r is not None
+            and edge_metrics.expectancy_r < 0
+            and not any(
+                r.related_setup == setup_name and r.action_type == RecommendationActionType.pause_setup
+                for r in recs
+            )
+        ):
+            score = min(95, 70 + int(abs(edge_metrics.expectancy_r) * 20))
+            recs.append(TradingRecommendation(
+                id=_make_rec_id("setup-edge-pause", len(recs)),
+                category=RecommendationCategory.setup,
+                severity=RecommendationSeverity.warning,
+                action_type=RecommendationActionType.pause_setup,
+                title=f"Pause {setup_name}",
+                summary=f"{setup_name} expectancy {edge_metrics.expectancy_r:.2f}R across {edge_metrics.sample_size} trades.",
+                why=f"Negative R expectancy ({edge_metrics.expectancy_r:.2f}R) with {edge_metrics.sample_size} closed trades. Edge not confirmed.",
+                suggested_action=f"Pause {setup_name}. Review losing trades and re-demo before live size.",
+                confidence=_confidence_from_sample(edge_metrics.sample_size),
+                evidence=[
+                    RecommendationEvidence(metric="expectancy_r", value=edge_metrics.expectancy_r, benchmark=0, sample_size=edge_metrics.sample_size),
+                    RecommendationEvidence(metric="avg_r", value=edge_metrics.avg_r, sample_size=edge_metrics.sample_size),
+                    RecommendationEvidence(metric="status", value=edge_metrics.status.value, sample_size=edge_metrics.sample_size),
+                ],
+                related_setup=setup_name,
+                priority_score=score,
+            ))
+
     return recs
 
 
