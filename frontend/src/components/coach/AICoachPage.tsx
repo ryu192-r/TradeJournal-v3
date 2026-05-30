@@ -6,7 +6,9 @@ import {
   askCoach, detectPatterns, checkRuleReminders, listCoachReviews, deleteCoachReview,
 } from '@/lib/endpoints'
 import { useTradeReviewMutation } from '@/hooks/useTradeReviewMutation'
+import { useTradeReviewV2Query } from '@/hooks/useTradeReviewV2Query'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
+import { TradeReviewV2Card } from '@/components/trade-review-v2/TradeReviewV2Card'
 import { Loader2, Sparkles, MessageSquare, AlertTriangle, CheckCircle2, History, Trash2, Brain, Calendar, Clock, Lightbulb, TrendingUp, Target } from 'lucide-react'
 import type { PatternResult, CoachReviewListItem, TradeReviewResponse } from '@/types/coach'
 import { formatCurrency } from '@/utils/format'
@@ -229,6 +231,7 @@ export function AICoachPage() {
   // Trade Review state
   const [reviewTradeId, setReviewTradeId] = useState<number | null>(null)
   const reviewMutation = useTradeReviewMutation()
+  const reviewV2Query = useTradeReviewV2Query(reviewTradeId)
   const { data: tradesData } = useTradesQuery({ limit: 100 })
   const { data: coachingData } = useCoachingIntelligenceDashboardQuery()
 
@@ -525,6 +528,24 @@ export function AICoachPage() {
               <div className="flex items-center gap-2 py-8 justify-center">
                 <Loader2 className="w-5 h-5 text-accent animate-spin" />
                 <span className="text-[length:var(--text-sm)] text-text-muted">Analyzing trade execution, emotions, and playbook...</span>
+              </div>
+            )}
+
+            {reviewTradeId && (
+              <div className="rounded-2xl border border-border bg-bg-elevated/20 p-[var(--page-px)] space-y-2 min-w-0">
+                <h4 className="text-[length:var(--text-xs)] font-medium text-text-heading uppercase tracking-wider">
+                  Deterministic Review Context
+                </h4>
+                <p className="text-[10px] text-text-muted">
+                  Evidence-based V2 score — use alongside AI review (no extra API call for AI).
+                </p>
+                {reviewV2Query.isLoading && (
+                  <div className="flex items-center gap-2 py-4 justify-center">
+                    <Loader2 className="w-4 h-4 text-accent animate-spin" />
+                    <span className="text-[length:var(--text-xs)] text-text-muted">Loading V2 review...</span>
+                  </div>
+                )}
+                {reviewV2Query.data && <TradeReviewV2Card review={reviewV2Query.data} />}
               </div>
             )}
 

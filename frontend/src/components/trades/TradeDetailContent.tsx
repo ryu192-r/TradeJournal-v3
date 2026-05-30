@@ -1,18 +1,21 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import {
   Target, Loader2, Edit3, Trash2, ShieldAlert, Info,
-  CalendarClock, NotebookPen, Tag, AlertTriangle, BarChart3, Image,
+  CalendarClock, NotebookPen, Tag, AlertTriangle, BarChart3, Image, ClipboardCheck,
 } from 'lucide-react'
 import { ChartImageGallery } from '@/components/trades/ChartImageGallery'
 import { TradeLightweightChart } from '@/components/charts/TradeLightweightChart'
 import { LifecycleReviewPanel } from '@/components/lifecycle/LifecycleReviewPanel'
 import { useTradeReviewMutation } from '@/hooks/useTradeReviewMutation'
+import { useTradeReviewV2Query } from '@/hooks/useTradeReviewV2Query'
+import { TradeReviewV2Card } from '@/components/trade-review-v2/TradeReviewV2Card'
 import { useDeleteTradeMutation } from '@/hooks/useTradeMutation'
 import { useAppStore } from '@/store/appStore'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
 import { calculateTradeMetrics } from '@/utils/calculations'
 import { StatusBadge, SectionHeader, ResponsiveTabs, EmptyState } from '@/components/ui'
+import { ErrorState } from '@/components/ui/StateComponents'
 import type { ApiTrade } from '@/types'
 import type { TradeReviewResponse } from '@/types/coach'
 
@@ -363,6 +366,7 @@ interface TradeDetailContentProps {
 export function TradeDetailContent({ trade }: TradeDetailContentProps) {
   const [inlineReview, setInlineReview] = useState<TradeReviewResponse | null>(null)
   const reviewMut = useTradeReviewMutation()
+  const reviewV2 = useTradeReviewV2Query(trade.id)
   const deleteMut = useDeleteTradeMutation()
   const openEditTrade = useAppStore((s) => s.openEditTrade)
   const closeTradeForm = useAppStore((s) => s.closeTradeForm)
@@ -471,6 +475,30 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
           <TagsRow tags={trade.tags} />
         </div>
       )}
+
+      <div className={CARD}>
+        <SectionHeader title="Review V2" icon={ClipboardCheck} />
+        {reviewV2.isLoading && (
+          <div className="flex items-center justify-center py-6 mt-3">
+            <Loader2 className="w-5 h-5 text-accent animate-spin" />
+            <span className="ml-2 text-xs text-text-muted">Loading deterministic review...</span>
+          </div>
+        )}
+        {reviewV2.isError && (
+          <div className="mt-3">
+            <ErrorState
+              title="Review unavailable"
+              message="Deterministic review could not load. Other trade details are unaffected."
+              compact
+            />
+          </div>
+        )}
+        {reviewV2.data && (
+          <div className="mt-3 min-w-0 overflow-x-hidden">
+            <TradeReviewV2Card review={reviewV2.data} />
+          </div>
+        )}
+      </div>
 
       {!isOpen && (
         <div className={CARD}>

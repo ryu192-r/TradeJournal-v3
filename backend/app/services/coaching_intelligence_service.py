@@ -554,11 +554,23 @@ def get_trade_review_prompts(
             questions.append("What went well in this trade?")
             questions.append("What would you do differently?")
 
+        prompt_text = f"Review {t.symbol}: {why}"
+        try:
+            from app.services.trade_review_v2_service import review_trade_v2
+
+            v2 = review_trade_v2(db, user_id, t.id)
+            prompt_text += f" [Deterministic V2: {v2.overall_score}/100 — {v2.verdict.replace('_', ' ')}]"
+            if v2.mistake_tags:
+                top_tag = v2.mistake_tags[0].tag.replace("_", " ")
+                questions.append(f"V2 flagged '{top_tag}' — what would you do differently?")
+        except Exception:
+            pass
+
         prompts.append(TradeReviewPrompt(
             trade_id=t.id,
             symbol=t.symbol,
             setup=t.setup,
-            prompt=f"Review {t.symbol}: {why}",
+            prompt=prompt_text,
             focus_area=focus_area,
             why_this_trade=why,
             related_patterns=reasons,

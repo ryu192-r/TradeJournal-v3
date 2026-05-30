@@ -657,6 +657,20 @@ export function getTradeReviewPrompts(limit?: number) {
   return apiClient.get<TradeReviewPrompt[]>('/coaching-intelligence/trade-review-prompts', { params }).then(r => r.data)
 }
 
+// ────────────────────────── Trade Review V2 ──────────────────────────
+
+export function getTradeReviewV2(tradeId: number) {
+  return apiClient
+    .get<import('@/types/tradeReviewV2').TradeReviewV2Response>(`/trade-review-v2/${tradeId}`)
+    .then((r) => r.data)
+}
+
+export function getTradeReviewBatchV2(params?: { limit?: number; only_closed?: boolean }) {
+  return apiClient
+    .get<import('@/types/tradeReviewV2').TradeReviewBatchResponse>('/trade-review-v2/batch', { params })
+    .then((r) => r.data)
+}
+
 // ────────────────────────── Chart Data ──────────────────────────
 
 export function getTradeChartData(tradeId: number, params?: { timeframe?: string; range?: string; source?: string }) {
