@@ -7,6 +7,13 @@ from decimal import Decimal
 
 import pytest
 
+# Drift windows anchor at datetime.utcnow() in the service — use offsets from "now" in tests.
+
+
+def _utc_offset_iso(*, days: int = 0, hours: int = 0) -> str:
+    """UTC ISO entry_time offset from now (matches behavioral drift anchor)."""
+    return (datetime.utcnow() - timedelta(days=days, hours=hours)).isoformat()
+
 
 def _create_trade(client, token: str, symbol: str, entry_price: float, exit_price: float | None,
                   quantity: float = 10, pnl: float | None = None, setup: str = "Breakout",
@@ -131,14 +138,18 @@ def test_empty_data_returns_starter_plan(client, auth_user_token):
 
 def test_setup_confidence_labels(client, auth_user_token):
     """Setup confidence labels should be valid."""
-    # Create 10+ profitable trades for one setup
+    # 10+ closed winners with stop → positive avg_r (scoring needs r_multiple)
     for i in range(12):
-        _create_trade(client, auth_user_token, f"STOCK{i}", 100, 110, quantity=10,
-                      pnl=(10 * (i + 1)), setup="Breakout")
+        _create_trade(
+            client, auth_user_token, f"STOCK{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", stop_price=95,
+        )
 
-    # Create 1 losing trade for another setup (small sample)
-    _create_trade(client, auth_user_token, "LOSER", 100, 90, quantity=10,
-                  pnl=-100, setup="Reversal")
+    # Small-sample loser setup (n=1 caps score)
+    _create_trade(
+        client, auth_user_token, "LOSER", 100, 90, quantity=10,
+        pnl=-100, setup="Reversal", stop_price=95,
+    )
 
     resp = client.get(
         "/api/v1/coaching-intelligence/setup-scores",
@@ -156,11 +167,11 @@ def test_setup_confidence_labels(client, auth_user_token):
     assert reversal["score"] <= 49  # Small sample caps
 
 
-# ─── Test 4b: open partial exits only affect realized P&L ──────
+# ─── Test 4b: open partial exits excluded from setup scores ────
 
 
-def test_open_partial_exits_only_affect_realized_pnl(client, auth_user_token):
-    """Open trades with partial exits should not change sample size or closed expectancy."""
+def test_open_partial_exits_excluded_from_setup_scores(client, auth_user_token):
+    """Open trades with partial exits must not affect setup confidence metrics."""
     closed = _create_trade(
         client,
         auth_user_token,
@@ -202,8 +213,8 @@ def test_open_partial_exits_only_affect_realized_pnl(client, auth_user_token):
     breakout = [s for s in scores if s["setup"] == "Breakout"][0]
 
     assert breakout["sample_size"] == 1
-    assert breakout["total_pnl"] == 140.0
-    assert "open trade" in (breakout["notes"] or "").lower()
+    assert breakout["total_pnl"] == 100.0
+    assert breakout["notes"] is None or "partial" not in (breakout["notes"] or "").lower()
 
 
 # ─── Test 5: tiny sample cannot be priority ────────────────────
@@ -248,21 +259,25 @@ def test_negative_expectancy_cannot_be_trusted(client, auth_user_token):
 
 
 def test_behavioral_drift_detects_overtrading(client, auth_user_token):
-    """Create many recent trades, few baseline trades — drift should fire."""
-    # Baseline: a few trades 100 days ago
-    old_time = (datetime.utcnow() - timedelta(days=100)).isoformat()
+    """Many trades in recent UTC window vs sparse baseline — frequency drift fires."""
+    lookback, baseline = 30, 90
+    # Inside baseline window only: [now-120d, now-30d)
     for i in range(5):
-        _create_trade(client, auth_user_token, f"OLD{i}", 100, 110, quantity=10,
-                      pnl=100, setup="Breakout", entry_time=old_time)
+        _create_trade(
+            client, auth_user_token, f"OLD{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=100),
+        )
 
-    # Recent: many trades
+    # Inside recent window: [now-30d, now]
     for i in range(20):
-        recent = (datetime.utcnow() - timedelta(hours=i)).isoformat()
-        _create_trade(client, auth_user_token, f"NEW{i}", 100, 105, quantity=10,
-                      pnl=50, setup="Breakout", entry_time=recent)
+        _create_trade(
+            client, auth_user_token, f"NEW{i}", 100, 105, quantity=10,
+            pnl=50, setup="Breakout", entry_time=_utc_offset_iso(hours=i),
+        )
 
     resp = client.get(
-        "/api/v1/coaching-intelligence/behavioral-drift",
+        f"/api/v1/coaching-intelligence/behavioral-drift"
+        f"?lookback_days={lookback}&baseline_days={baseline}",
         headers={"Authorization": f"Bearer {auth_user_token}"},
     )
     assert resp.status_code == 200
@@ -276,15 +291,15 @@ def test_behavioral_drift_detects_overtrading(client, auth_user_token):
 
 def test_behavioral_drift_avoids_tiny_sample_noise(client, auth_user_token):
     """Very few trades should not trigger drift warnings."""
-    _create_trade(client, auth_user_token, "ONLY1", 100, 110, quantity=10,
-                  pnl=100, setup="Breakout")
-    _create_trade(client, auth_user_token, "ONLY2", 100, 90, quantity=10,
-                  pnl=-100, setup="Breakout")
-    _create_trade(client, auth_user_token, "ONLY3", 100, 105, quantity=10,
-                  pnl=50, setup="Breakout")
+    for sym, pnl in [("ONLY1", 100), ("ONLY2", -100), ("ONLY3", 50)]:
+        _create_trade(
+            client, auth_user_token, sym, 100, 110 if pnl > 0 else 90,
+            quantity=10, pnl=pnl, setup="Breakout",
+            entry_time=_utc_offset_iso(days=1),
+        )
 
     resp = client.get(
-        "/api/v1/coaching-intelligence/behavioral-drift",
+        "/api/v1/coaching-intelligence/behavioral-drift?lookback_days=30&baseline_days=90",
         headers={"Authorization": f"Bearer {auth_user_token}"},
     )
     assert resp.status_code == 200
@@ -295,7 +310,106 @@ def test_behavioral_drift_avoids_tiny_sample_noise(client, auth_user_token):
     assert "drift-frequency" not in drift_metrics, "Should not fire with tiny sample"
 
 
-# ─── Test 9: weekly plan includes recommendations ──────────────
+def test_behavioral_drift_execution_grades_use_baseline_window(client, auth_user_token):
+    """Grade drift compares recent vs prior baseline window, not all-time grades."""
+    lookback, baseline = 7, 30
+    for i in range(5):
+        t = _create_trade(
+            client, auth_user_token, f"BASEG{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=20),
+        )
+        _add_grade(client, auth_user_token, t["id"], grade="A")
+
+    for i in range(6):
+        t = _create_trade(
+            client, auth_user_token, f"RECENTG{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=1),
+        )
+        _add_grade(client, auth_user_token, t["id"], grade="D")
+
+    resp = client.get(
+        f"/api/v1/coaching-intelligence/behavioral-drift"
+        f"?lookback_days={lookback}&baseline_days={baseline}",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    grade_signals = [s for s in resp.json() if s["id"] == "drift-execution-grades"]
+    assert len(grade_signals) == 1
+    assert grade_signals[0]["current_value"] == 2.0
+    assert grade_signals[0]["baseline_value"] == 5.0
+
+
+def test_behavioral_drift_execution_grades_vs_baseline_not_diluted(client, auth_user_token):
+    """Large recent sample still compared to prior baseline window (not all-time pool)."""
+    lookback, baseline = 7, 30
+    for i in range(5):
+        t = _create_trade(
+            client, auth_user_token, f"STRONG{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=20),
+        )
+        _add_grade(client, auth_user_token, t["id"], grade="A")
+
+    for i in range(30):
+        t = _create_trade(
+            client, auth_user_token, f"MED{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=1),
+        )
+        _add_grade(client, auth_user_token, t["id"], grade="C")
+
+    resp = client.get(
+        f"/api/v1/coaching-intelligence/behavioral-drift"
+        f"?lookback_days={lookback}&baseline_days={baseline}",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    grade_signals = [s for s in resp.json() if s["id"] == "drift-execution-grades"]
+    assert len(grade_signals) == 1, "C recent vs A baseline should exceed 1.0 grade drop"
+
+
+def test_behavioral_drift_excludes_trades_outside_utc_windows(client, auth_user_token):
+    """Trades older than lookback+baseline must not count as recent or baseline."""
+    lookback, baseline = 30, 90
+    # Outside total span (120d): only these exist
+    for i in range(8):
+        _create_trade(
+            client, auth_user_token, f"ANCIENT{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", entry_time=_utc_offset_iso(days=200),
+        )
+
+    resp = client.get(
+        f"/api/v1/coaching-intelligence/behavioral-drift"
+        f"?lookback_days={lookback}&baseline_days={baseline}",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == [], "No trades in recent window → no drift signals"
+
+
+# ─── Test 9: weekly plan setup scores use historical window ─────
+
+
+def test_weekly_plan_setup_scores_use_historical_window_not_current_week(client, auth_user_token):
+    """Setup scores in weekly plan use 90d history even with no trades entered this week."""
+    for i in range(12):
+        _create_trade(
+            client, auth_user_token, f"HIST{i}", 100, 110, quantity=10,
+            pnl=100, setup="Breakout", stop_price=95,
+            entry_time=_utc_offset_iso(days=60),
+        )
+
+    resp = client.get(
+        "/api/v1/coaching-intelligence/weekly-plan",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["setup_scores"]) >= 1
+    breakout = [s for s in data["setup_scores"] if s["setup"] == "Breakout"][0]
+    assert breakout["sample_size"] == 12
+    assert "No closed trades" in data["headline"]
+
+
+# ─── Test 9b: weekly plan includes recommendations ─────────────
 
 
 def test_weekly_plan_includes_recommendations(client, auth_user_token):
@@ -391,14 +505,15 @@ def test_deleted_trades_excluded(client, auth_user_token):
 
 def test_date_filters_respected(client, auth_user_token):
     """Setup scores with date filters should only return trades in range."""
-    old_time = (datetime.utcnow() - timedelta(days=30)).isoformat()
-    _create_trade(client, auth_user_token, "OLD", 100, 110, quantity=10,
-                  pnl=100, setup="OldSetup", entry_time=old_time)
+    _create_trade(
+        client, auth_user_token, "OLD", 100, 110, quantity=10,
+        pnl=100, setup="OldSetup", entry_time=_utc_offset_iso(days=30),
+    )
     _create_trade(client, auth_user_token, "NEW", 100, 110, quantity=10,
                   pnl=100, setup="NewSetup")
 
     # Filter to recent period only
-    recent_start = (datetime.utcnow() - timedelta(days=7)).isoformat()
+    recent_start = _utc_offset_iso(days=7)
     resp = client.get(
         f"/api/v1/coaching-intelligence/setup-scores?period_start={recent_start}",
         headers={"Authorization": f"Bearer {auth_user_token}"},

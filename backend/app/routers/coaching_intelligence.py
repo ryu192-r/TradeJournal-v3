@@ -55,7 +55,10 @@ def coaching_intelligence_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Full coaching intelligence dashboard with weekly plan, scores, drift, and prompts."""
+    """Full coaching intelligence dashboard with weekly plan, scores, drift, and prompts.
+
+    behavioral_drift uses rolling UTC windows (see GET /behavioral-drift), not setup date filters.
+    """
     return get_coaching_intelligence_dashboard(db, current_user.id)
 
 
@@ -65,7 +68,11 @@ def weekly_coaching_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Deterministic weekly coaching plan with priorities, rules, and size adjustments."""
+    """Deterministic weekly coaching plan with priorities, rules, and size adjustments.
+
+    Week-specific: headline, review prompts, recommendation cross-check (plan_start–plan_end).
+    setup_scores: last 90 days of closed trades (all-time if none in window), not this week only.
+    """
     ws = None
     if week_start:
         ws = _parse_iso_date(week_start, "week_start")
@@ -91,12 +98,33 @@ def setup_confidence_scores(
 
 @router.get("/behavioral-drift", response_model=list[BehavioralDriftSignal])
 def behavioral_drift(
-    lookback_days: int = Query(30, ge=7, le=365, description="Recent window in days"),
-    baseline_days: int = Query(90, ge=14, le=730, description="Baseline window in days"),
+    lookback_days: int = Query(
+        30,
+        ge=7,
+        le=365,
+        description=(
+            "Recent comparison window length in days. Window ends at server UTC now "
+            "(not period_start/period_end from setup-scores)."
+        ),
+    ),
+    baseline_days: int = Query(
+        90,
+        ge=14,
+        le=730,
+        description=(
+            "Baseline window length in days immediately before the recent window. "
+            "Also anchored at server UTC now."
+        ),
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Detect behavioral drift: frequency, avg R, win rate, loss size, emotion, grades."""
+    """Detect current behavioral drift vs your prior baseline (rolling UTC windows).
+
+    Recent trades: entry_time in [utc_now - lookback_days, utc_now].
+    Baseline trades: entry_time in [utc_now - lookback_days - baseline_days, utc_now - lookback_days).
+    Does not use setup-scores period filters or weekly-plan week_start.
+    """
     return get_behavioral_drift_signals(db, current_user.id, lookback_days, baseline_days)
 
 

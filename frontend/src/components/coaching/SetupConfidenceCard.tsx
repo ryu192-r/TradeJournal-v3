@@ -45,7 +45,7 @@ export function SetupConfidenceCard({ scores }: { scores: SetupConfidenceScore[]
               </div>
               <ScoreBar score={s.score} />
               <div className="flex items-center gap-3 mt-1.5 text-[10px] text-text-muted font-data">
-                <span>{s.sample_size} trades</span>
+                <span>{s.sample_size} closed</span>
                 {s.win_rate != null && <span>{s.win_rate}% WR</span>}
                 {s.avg_r != null && <span>{s.avg_r}R avg</span>}
                 {s.total_pnl != null && <span>₹{s.total_pnl.toLocaleString('en-IN')}</span>}

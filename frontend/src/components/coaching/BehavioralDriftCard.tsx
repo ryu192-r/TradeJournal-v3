@@ -13,10 +13,13 @@ export function BehavioralDriftCard({ signals }: { signals: BehavioralDriftSigna
 
   return (
     <Card>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1">
         <Activity className="w-4 h-4 text-accent" />
         <h3 className="text-sm font-medium text-text-heading">Behavioral Drift</h3>
       </div>
+      <p className="text-[10px] text-text-faint mb-3">
+        Recent vs baseline from server UTC now (default 30d / 90d). Not setup date filters.
+      </p>
 
       <div className="space-y-2">
         {signals.slice(0, 5).map((s) => {

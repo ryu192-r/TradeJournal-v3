@@ -33,6 +33,8 @@ GRADE_ORDER_MAP = {"A": 5, "B": 4, "C": 3, "D": 2, "F": 1}
 GRADE_LABELS = {"entry_quality", "sizing_quality", "stop_quality", "patience", "rule_adherence", "exit_quality", "overall_grade"}
 MIN_CLOSED_FOR_JUDGEMENT = 5
 MIN_SAMPLE_FOR_DRIFT = 5
+# Setup confidence embedded in weekly plan (not limited to trades entered that week)
+SETUP_SCORE_LOOKBACK_DAYS = 90
 
 
 def _has_positive_stop(stop_price) -> bool:
@@ -86,6 +88,12 @@ def get_setup_confidence_scores(
     period_start: Optional[datetime] = None,
     period_end: Optional[datetime] = None,
 ) -> list[SetupConfidenceScore]:
+    """Score setups from fully closed trades only (exit_price + pnl set).
+
+    Open positions and partial-exit legs are excluded — sample_size, win_rate,
+    avg_r, and score dimensions all use closed trades only. total_pnl is the sum
+    of those closed-trade P&Ls.
+    """
     trades = _base_trades(db, user_id, period_start, period_end).all()
     closed = [t for t in trades if t.exit_price is not None and t.pnl is not None]
     if not closed:
@@ -95,17 +103,6 @@ def get_setup_confidence_scores(
     for t in closed:
         s = t.setup or "Uncategorised"
         setup_trades[s].append(t)
-
-    open_trades = [t for t in trades if t.exit_price is None]
-    open_partial_pnl_by_setup: dict[str, Decimal] = defaultdict(Decimal)
-    open_partial_trade_counts: dict[str, int] = defaultdict(int)
-    for t in open_trades:
-        setup_name = t.setup or "Uncategorised"
-        if t.partial_exits:
-            partial_realized = sum((pe.realized_pnl or Decimal("0")) for pe in t.partial_exits if pe.realized_pnl is not None)
-            if partial_realized:
-                open_partial_pnl_by_setup[setup_name] += partial_realized
-                open_partial_trade_counts[setup_name] += 1
 
     # Load execution grades for stop discipline check
     trade_ids = [t.id for t in closed]
@@ -121,8 +118,6 @@ def get_setup_confidence_scores(
         if not pnls:
             continue
         gross_pnl = sum(pnls, Decimal("0"))
-        partial_realized_open = open_partial_pnl_by_setup.get(setup_name, Decimal("0"))
-        gross_pnl += partial_realized_open
 
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p < 0]
@@ -223,15 +218,7 @@ def get_setup_confidence_scores(
             total_pnl=round(float(gross_pnl), 2),
             consistency_score=round(consistency_score, 1),
             risk_score=round(risk_score_dim, 1),
-            notes=(
-                f"{notes} Open partial exits added to realized P&L from {open_partial_trade_counts.get(setup_name, 0)} open trade(s)."
-                if notes and open_partial_trade_counts.get(setup_name, 0)
-                else (
-                    f"Open partial exits added to realized P&L from {open_partial_trade_counts.get(setup_name, 0)} open trade(s)."
-                    if open_partial_trade_counts.get(setup_name, 0)
-                    else notes
-                )
-            ),
+            notes=notes,
         ))
 
     results.sort(key=lambda x: x.score, reverse=True)
@@ -247,6 +234,12 @@ def get_behavioral_drift_signals(
     lookback_days: int = 30,
     baseline_days: int = 90,
 ) -> list[BehavioralDriftSignal]:
+    """Compare recent vs baseline trade behavior using rolling UTC windows.
+
+    Windows anchor at server ``datetime.utcnow()`` (not user-selected periods):
+    recent = [now - lookback_days, now], baseline = [now - lookback - baseline, now - lookback).
+    Ignores setup-scores date filters and weekly-plan week_start.
+    """
     now = datetime.utcnow()
     recent_start = now - timedelta(days=lookback_days)
     baseline_start = recent_start - timedelta(days=baseline_days)
@@ -258,6 +251,7 @@ def get_behavioral_drift_signals(
     baseline_closed = [t for t in baseline_trades if t.exit_price is not None and t.pnl is not None]
 
     recent_ids = [t.id for t in recent_trades]
+    baseline_ids = [t.id for t in baseline_trades]
     signals: list[BehavioralDriftSignal] = []
 
     if not recent_trades:
@@ -370,33 +364,35 @@ def get_behavioral_drift_signals(
                 related_trade_ids=[r.id for r in recent_trades if r.id in recent_ids][:5],
             ))
 
-    # 6. Execution grade decline
-    if recent_ids:
+    # 6. Execution grade decline (recent window vs baseline window, not all-time)
+    if recent_ids and baseline_ids:
         recent_grades = db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(recent_ids)).all()
-        grade_vals = [_grade_numeric(g.overall_grade) for g in recent_grades if g.overall_grade]
-        if len(grade_vals) >= MIN_SAMPLE_FOR_DRIFT:
-            recent_avg_grade = sum(grade_vals) / len(grade_vals)
-            # Compare to all grades (broader baseline)
-            all_grade_vals = [_grade_numeric(g.overall_grade) for g in
-                             db.query(ExecutionGrade).join(Trade).filter(
-                                 Trade.user_id == user_id,
-                                Trade.status != "deleted",
-                            ).all() if g.overall_grade]
-            if all_grade_vals:
-                baseline_avg_grade = sum(all_grade_vals) / len(all_grade_vals)
-                if recent_avg_grade < baseline_avg_grade - 1.0:
-                    signals.append(BehavioralDriftSignal(
-                        id="drift-execution-grades",
-                        title="Execution grades declining",
-                        severity="warning",
-                        metric="avg_grade",
-                        current_value=round(recent_avg_grade, 2),
-                        baseline_value=round(baseline_avg_grade, 2),
-                        change=round(recent_avg_grade - baseline_avg_grade, 2),
-                        explanation=f"Recent avg grade {round(recent_avg_grade, 2)}/5 vs baseline {round(baseline_avg_grade, 2)}/5. Execution quality degrading.",
-                        suggested_action="Focus on pre-trial routine. Check each setup condition before entry.",
-                        related_trade_ids=[g.trade_id for g in recent_grades[:5]],
-                    ))
+        recent_grade_vals = [_grade_numeric(g.overall_grade) for g in recent_grades if g.overall_grade]
+        baseline_grades = db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(baseline_ids)).all()
+        baseline_grade_vals = [_grade_numeric(g.overall_grade) for g in baseline_grades if g.overall_grade]
+        if (
+            len(recent_grade_vals) >= MIN_SAMPLE_FOR_DRIFT
+            and len(baseline_grade_vals) >= MIN_SAMPLE_FOR_DRIFT
+        ):
+            recent_avg_grade = sum(recent_grade_vals) / len(recent_grade_vals)
+            baseline_avg_grade = sum(baseline_grade_vals) / len(baseline_grade_vals)
+            if recent_avg_grade < baseline_avg_grade - 1.0:
+                signals.append(BehavioralDriftSignal(
+                    id="drift-execution-grades",
+                    title="Execution grades declining",
+                    severity="warning",
+                    metric="avg_grade",
+                    current_value=round(recent_avg_grade, 2),
+                    baseline_value=round(baseline_avg_grade, 2),
+                    change=round(recent_avg_grade - baseline_avg_grade, 2),
+                    explanation=(
+                        f"Recent avg grade {round(recent_avg_grade, 2)}/5 vs "
+                        f"{round(baseline_avg_grade, 2)}/5 in the prior baseline window. "
+                        "Execution quality degrading."
+                    ),
+                    suggested_action="Focus on pre-trial routine. Check each setup condition before entry.",
+                    related_trade_ids=[g.trade_id for g in recent_grades[:5]],
+                ))
 
     # 7. Journaling consistency
     recent_journal_days = _count_journal_days(db, user_id, recent_start, now)
@@ -585,8 +581,12 @@ def get_weekly_coaching_plan(
     plan_end = datetime.combine(fri, datetime.max.time())
     now_str = datetime.utcnow().isoformat()
 
-    # Get setup scores
-    scores = get_setup_confidence_scores(db, user_id, plan_start, plan_end)
+    # Setup confidence: rolling history (not only trades entered this week)
+    setup_score_end = datetime.utcnow()
+    setup_score_start = setup_score_end - timedelta(days=SETUP_SCORE_LOOKBACK_DAYS)
+    scores = get_setup_confidence_scores(db, user_id, setup_score_start, setup_score_end)
+    if not scores:
+        scores = get_setup_confidence_scores(db, user_id)
 
     # Get behavioral drift (longer lookback)
     drift = get_behavioral_drift_signals(db, user_id, lookback_days=30, baseline_days=90)

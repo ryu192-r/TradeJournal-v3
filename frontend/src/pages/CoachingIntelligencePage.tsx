@@ -123,7 +123,7 @@ export function CoachingIntelligencePage() {
             <EmptyState
               compact
               title="No drift signals"
-              message="Current sample does not show a clear behavior change."
+              message="Rolling windows from server UTC now (last 30d vs prior 90d). Not tied to setup date filters."
             />
           )}
         </div>
