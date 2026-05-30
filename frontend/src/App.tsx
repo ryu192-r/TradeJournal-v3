@@ -37,6 +37,7 @@ const LifecyclePage = lazy(() => import('@/pages/LifecyclePage').then((m) => ({ 
 const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m.RiskPage })))
 const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })))
 const RecommendationsPage = lazy(() => import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })))
+const CoachingIntelligencePage = lazy(() => import('@/pages/CoachingIntelligencePage').then((m) => ({ default: m.CoachingIntelligencePage })))
 
 // queryClient is shared from src/lib/queryClient.ts — imported by App.tsx and authStore.ts
 // so logout() can clear the cache to prevent stale user data leaks.
@@ -57,6 +58,19 @@ function App() {
   useEffect(() => {
     fetchMe()
   }, [fetchMe])
+
+  useEffect(() => {
+    const syncViewFromPath = () => {
+      useAppStore.getState().setActiveView(
+        window.location.pathname === '/coaching-intelligence'
+          ? 'coaching-intelligence'
+          : 'dashboard'
+      )
+    }
+    window.addEventListener('popstate', syncViewFromPath)
+    syncViewFromPath()
+    return () => window.removeEventListener('popstate', syncViewFromPath)
+  }, [])
 
   /*
     Global Performance Listener:
@@ -148,6 +162,7 @@ function App() {
                 {activeView === 'risk' && <ErrorBoundary name="Risk"><RiskPage /></ErrorBoundary>}
                 {activeView === 'market' && <ErrorBoundary name="MarketContext"><MarketContextPage /></ErrorBoundary>}
                 {activeView === 'recommendations' && <ErrorBoundary name="Recommendations"><RecommendationsPage /></ErrorBoundary>}
+                {activeView === 'coaching-intelligence' && <ErrorBoundary name="CoachingIntelligence"><CoachingIntelligencePage /></ErrorBoundary>}
                 {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
                 {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
               </Suspense>

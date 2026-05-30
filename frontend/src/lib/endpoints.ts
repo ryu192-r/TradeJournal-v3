@@ -21,6 +21,13 @@ import type {
   AskCoachRequest, PatternDetectionResponse, RuleReminderResponse,
 } from '@/types/coach'
 import type { CalendarMonthPayload, DeterministicReportPayload } from '@/types'
+import type {
+  CoachingIntelligenceDashboard,
+  WeeklyCoachingPlan,
+  SetupConfidenceScore,
+  BehavioralDriftSignal,
+  TradeReviewPrompt,
+} from '@/types/coachingIntelligence'
 
 // ────────────────────────── Trades ──────────────────────────
 
@@ -624,6 +631,30 @@ export function getMonthlyReview(month: string) {
 
 export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
   return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
+}
+
+// ────────────────────────── Coaching Intelligence ──────────────────────────
+
+export function getCoachingIntelligenceDashboard() {
+  return apiClient.get<CoachingIntelligenceDashboard>('/coaching-intelligence/dashboard').then(r => r.data)
+}
+
+export function getWeeklyCoachingPlan(weekStart?: string) {
+  const params = weekStart ? { week_start: weekStart } : undefined
+  return apiClient.get<WeeklyCoachingPlan>('/coaching-intelligence/weekly-plan', { params }).then(r => r.data)
+}
+
+export function getSetupConfidenceScores(params?: { period_start?: string; period_end?: string }) {
+  return apiClient.get<SetupConfidenceScore[]>('/coaching-intelligence/setup-scores', { params }).then(r => r.data)
+}
+
+export function getBehavioralDrift(params?: { lookback_days?: number; baseline_days?: number }) {
+  return apiClient.get<BehavioralDriftSignal[]>('/coaching-intelligence/behavioral-drift', { params }).then(r => r.data)
+}
+
+export function getTradeReviewPrompts(limit?: number) {
+  const params = limit ? { limit } : undefined
+  return apiClient.get<TradeReviewPrompt[]>('/coaching-intelligence/trade-review-prompts', { params }).then(r => r.data)
 }
 
 // ────────────────────────── Chart Data ──────────────────────────

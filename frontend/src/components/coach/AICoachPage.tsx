@@ -1,5 +1,6 @@
 import { useState, type ComponentType } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useCoachingIntelligenceDashboardQuery } from '@/hooks/useCoachingIntelligenceQuery'
 import {
   generateDailyReview, generateWeeklyReview,
   askCoach, detectPatterns, checkRuleReminders, listCoachReviews, deleteCoachReview,
@@ -229,6 +230,7 @@ export function AICoachPage() {
   const [reviewTradeId, setReviewTradeId] = useState<number | null>(null)
   const reviewMutation = useTradeReviewMutation()
   const { data: tradesData } = useTradesQuery({ limit: 100 })
+  const { data: coachingData } = useCoachingIntelligenceDashboardQuery()
 
   // History
   const [historyFilter, setHistoryFilter] = useState('')
@@ -298,6 +300,43 @@ export function AICoachPage() {
           <p className="text-[length:var(--text-sm)] text-text-muted mt-0.5">Personalized trading insights powered by AI</p>
         </div>
       </div>
+
+      {coachingData?.weekly_plan && (
+        <div className="bg-card rounded-2xl border border-border p-[var(--page-px)]">
+          <div className="flex items-center gap-2 mb-2">
+            <Brain className="w-4 h-4 text-accent" />
+            <h2 className="text-sm font-medium text-text-heading">Current Coaching Context</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-border bg-bg-elevated/50 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Primary focus</div>
+              <div className="text-sm text-text-heading">{coachingData.weekly_plan.primary_focus}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-bg-elevated/50 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Top setup</div>
+              <div className="text-sm text-text-heading">
+                {coachingData.setup_scores[0]
+                  ? `${coachingData.setup_scores[0].setup} (${coachingData.setup_scores[0].label}, ${coachingData.setup_scores[0].score}/100)`
+                  : 'No setup score yet'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-bg-elevated/50 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Top drift</div>
+              <div className="text-sm text-text-heading">
+                {coachingData.behavioral_drift[0]?.title ?? 'No drift signal'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-bg-elevated/50 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Top review</div>
+              <div className="text-sm text-text-heading">
+                {coachingData.top_trade_review_prompts[0]
+                  ? `${coachingData.top_trade_review_prompts[0].symbol} · ${coachingData.top_trade_review_prompts[0].focus_area}`
+                  : 'No review prompts yet'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">

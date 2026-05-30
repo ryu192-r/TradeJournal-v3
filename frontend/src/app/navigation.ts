@@ -39,6 +39,7 @@ export type ActiveView =
   | 'risk'
   | 'market'
   | 'recommendations'
+  | 'coaching-intelligence'
 
 export type NavigationItem = {
   id: string
@@ -199,6 +200,13 @@ export const navigationSections: NavigationSection[] = [
         icon: Brain,
         view: 'recommendations',
         purpose: 'Get actionable recommendations from your trading data.',
+      },
+      {
+        id: 'coaching-intelligence',
+        label: 'Coaching Intel',
+        icon: Sparkles,
+        view: 'coaching-intelligence',
+        purpose: 'Turn recommendations, journals, and trade history into weekly coaching.',
       },
     ],
   },

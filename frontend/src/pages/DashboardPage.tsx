@@ -1,5 +1,6 @@
 import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
 import { useIntelligenceDashboardQuery } from '@/hooks/useIntelligenceDashboardQuery'
+import { useCoachingIntelligenceDashboardQuery } from '@/hooks/useCoachingIntelligenceQuery'
 import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { useDailyDashboard } from '@/hooks/usePerformanceOS'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
@@ -7,7 +8,7 @@ import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
 import { formatCurrency, formatPercent, parseDecimal } from '@/utils/format'
 import {
   TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle,
-  Brain, Shield, BookOpen, BarChart3, Eye, LineChart as LineChartIcon,
+  Brain, Shield, BookOpen, BarChart3, Eye, LineChart as LineChartIcon, Sparkles,
   CheckCircle2, ListChecks, SlidersHorizontal, ArrowUp,
   ArrowDown, PanelTopClose, PanelTopOpen, X,
 } from 'lucide-react'
@@ -593,7 +594,7 @@ function WorkflowCard({ dashboard, onOpenPerformanceOS }: { dashboard?: DailyDas
   )
 }
 
-function IntelligenceCards({ intelligence }: { intelligence?: IntelligenceDashboardPayload }) {
+function IntelligenceCards({ intelligence, coaching }: { intelligence?: IntelligenceDashboardPayload; coaching?: import('@/types/coachingIntelligence').CoachingIntelligenceDashboard }) {
   const setups = getPlaybookSetups(intelligence)
   const bestSetup = setups[0]
   const behavioral = intelligence?.behavioral
@@ -634,10 +635,17 @@ function IntelligenceCards({ intelligence }: { intelligence?: IntelligenceDashbo
       icon: Brain,
       tone: lifecycle?.avg_grade_score != null && lifecycle.avg_grade_score >= 3.5 ? 'text-profit' : 'text-text-heading',
     },
+    {
+      label: 'Weekly Coaching Focus',
+      value: coaching?.weekly_plan?.primary_focus ?? coaching?.next_best_actions[0] ?? 'No coaching data',
+      detail: coaching?.weekly_plan?.headline ?? 'Open coaching intelligence for a weekly plan',
+      icon: Sparkles,
+      tone: coaching?.weekly_plan?.primary_focus ? 'text-accent' : 'text-text-heading',
+    },
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
       {cards.map((card) => {
         const Icon = card.icon
         return (
@@ -734,6 +742,7 @@ function WidgetControls({
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: intelligenceData } = useIntelligenceDashboardQuery()
+  const { data: coachingData } = useCoachingIntelligenceDashboardQuery()
   const { data: dailyDashboard } = useDailyDashboard()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
   const syncQuotes = useSyncLiveQuotesMutation()
@@ -863,7 +872,7 @@ export function DashboardPage() {
     live: <LiveDashboard trades={openTrades} quoteMap={quoteMap} />,
     workflow: <WorkflowCard dashboard={dailyDashboard} onOpenPerformanceOS={() => setActiveView('perf-os')} />,
     risk: riskPayload ? <RiskCommandCenter data={riskPayload} /> : <RiskSkeleton />,
-    intelligence: <IntelligenceCards intelligence={intelligenceData} />,
+    intelligence: <IntelligenceCards intelligence={intelligenceData} coaching={coachingData} />,
     deep: (
       <div className="space-y-[var(--page-gap)]">
         <CollapsibleSection title="Lifecycle Intelligence" icon={Brain} summary={lifecycleSummary(intelligenceData)}>
