@@ -370,10 +370,10 @@ def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyRev
     base = WeeklyReviewResponse.model_validate(review).model_dump()
     return WeeklyReviewDetailResponse(
         **{**base, "total_trades": len(trades), "total_pnl": f"{total_pnl:.2f}",
-           "win_rate": f"{win_rate:.1%}" if closed else None},
+           "win_rate": f"{win_rate:.1%}" if closed else None,
+           "top_setup": top_setup or base.get("top_setup")},
         best_trade=best_trade,
         worst_trade=worst_trade,
-        top_setup=top_setup,
         daily_breakdown=daily_breakdown,
         setup_breakdown=[],
     )
