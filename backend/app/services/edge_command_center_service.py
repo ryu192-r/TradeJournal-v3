@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -39,6 +40,10 @@ from app.services.trade_review_v2_service import review_trades_batch_v2
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+def _stable_id(text: str, prefix: str) -> str:
+    return f"{prefix}-{hashlib.sha1(text.encode('utf-8')).hexdigest()[:8]}"
 
 CRITICAL_MISTAKE_TAGS = frozenset({
     "no_stop", "invalid_stop_side", "rule_break", "revenge_trade", "fomo_trade", "large_negative_r",
@@ -293,7 +298,7 @@ def _build_priorities(
             ))
         for risk in recs.summary.risks[:2]:
             raw.append(EdgePriority(
-                id=f"rec-risk-{hash(risk) % 10_000}",
+                id=_stable_id(risk, "rec-risk"),
                 title="Risk watch",
                 category="risk",
                 severity="warning",
