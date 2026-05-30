@@ -38,6 +38,7 @@ const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m
 const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })))
 const RecommendationsPage = lazy(() => import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })))
 const CoachingIntelligencePage = lazy(() => import('@/pages/CoachingIntelligencePage').then((m) => ({ default: m.CoachingIntelligencePage })))
+const EdgeCommandCenterPage = lazy(() => import('@/pages/EdgeCommandCenterPage').then((m) => ({ default: m.EdgeCommandCenterPage })))
 
 // queryClient is shared from src/lib/queryClient.ts — imported by App.tsx and authStore.ts
 // so logout() can clear the cache to prevent stale user data leaks.
@@ -150,6 +151,7 @@ function App() {
                 {activeView === 'market' && <ErrorBoundary name="MarketContext"><MarketContextPage /></ErrorBoundary>}
                 {activeView === 'recommendations' && <ErrorBoundary name="Recommendations"><RecommendationsPage /></ErrorBoundary>}
                 {activeView === 'coaching-intelligence' && <ErrorBoundary name="CoachingIntelligence"><CoachingIntelligencePage /></ErrorBoundary>}
+                {activeView === 'edge-center' && <ErrorBoundary name="EdgeCenter"><EdgeCommandCenterPage /></ErrorBoundary>}
                 {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
                 {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
               </Suspense>

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, market_context, performance_os, operational_dashboard, calendar, reports, charts, recommendations, coaching_intelligence, trade_review_v2
+from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, trade_ideas, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, market_context, performance_os, operational_dashboard, calendar, reports, charts, recommendations, coaching_intelligence, trade_review_v2, edge_command_center
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, tags=["auth"])
@@ -35,3 +35,4 @@ api_router.include_router(charts.router, tags=["charts"])
 api_router.include_router(recommendations.router, tags=["recommendations"])
 api_router.include_router(coaching_intelligence.router, tags=["coaching-intelligence"])
 api_router.include_router(trade_review_v2.router, tags=["trade-review-v2"])
+api_router.include_router(edge_command_center.router, tags=["edge-command-center"])

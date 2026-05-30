@@ -16,6 +16,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { RecommendationSummaryStrip } from '@/components/recommendations/RecommendationSummaryStrip'
+import { EdgeCommandCenterCompact } from '@/components/edge/EdgeCommandCenterCompact'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mark, measure } from '@/utils/performance'
@@ -36,7 +37,7 @@ const MarketContext = lazy(() => import('@/components/market/MarketContext').the
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 const DASHBOARD_WIDGET_PREF_KEY = 'tjv3-dashboard-widgets-v1'
 
-type DashboardWidgetId = 'alerts' | 'kpis' | 'equity' | 'live' | 'workflow' | 'risk' | 'intelstrip' | 'intelligence' | 'deep'
+type DashboardWidgetId = 'alerts' | 'edge' | 'kpis' | 'equity' | 'live' | 'workflow' | 'risk' | 'intelstrip' | 'intelligence' | 'deep'
 type WidgetDensity = 'compact' | 'expanded'
 
 type WidgetPreference = {
@@ -47,6 +48,7 @@ type WidgetPreference = {
 
 const DEFAULT_WIDGET_PREFS: WidgetPreference[] = [
   { id: 'alerts', visible: true, density: 'expanded' },
+  { id: 'edge', visible: true, density: 'compact' },
   { id: 'kpis', visible: true, density: 'compact' },
   { id: 'intelstrip', visible: true, density: 'compact' },
   { id: 'equity', visible: true, density: 'expanded' },
@@ -59,6 +61,7 @@ const DEFAULT_WIDGET_PREFS: WidgetPreference[] = [
 
 const WIDGET_LABELS: Record<DashboardWidgetId, string> = {
   alerts: 'Alert Zone',
+  edge: 'Edge Command',
   kpis: 'KPI Cards',
   intelstrip: 'Intelligence Summary',
   equity: 'Equity',
@@ -866,6 +869,7 @@ export function DashboardPage() {
 
   const widgetContent: Record<DashboardWidgetId, ReactNode> = {
     alerts: <AlertZone alerts={dashboardAlerts} />,
+    edge: <EdgeCommandCenterCompact />,
     kpis: <KpiCards kpi={dashboardData.kpi} />,
     intelstrip: <RecommendationSummaryStrip />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,

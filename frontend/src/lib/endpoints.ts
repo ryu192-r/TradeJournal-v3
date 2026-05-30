@@ -671,6 +671,14 @@ export function getTradeReviewBatchV2(params?: { limit?: number; only_closed?: b
     .then((r) => r.data)
 }
 
+// ────────────────────────── Edge Command Center ──────────────────────────
+
+export function getEdgeCommandCenter(params?: { period_start?: string; period_end?: string }) {
+  return apiClient
+    .get<import('@/types/edgeCommandCenter').EdgeCommandCenterResponse>('/edge-command-center', { params })
+    .then((r) => r.data)
+}
+
 // ────────────────────────── Chart Data ──────────────────────────
 
 export function getTradeChartData(tradeId: number, params?: { timeframe?: string; range?: string; source?: string }) {

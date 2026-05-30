@@ -9,6 +9,7 @@ import {
   Cpu,
   LayoutDashboard,
   Lightbulb,
+  Radar,
   Shield,
   Sparkles,
   TrendingUp,
@@ -40,6 +41,7 @@ export type ActiveView =
   | 'market'
   | 'recommendations'
   | 'coaching-intelligence'
+  | 'edge-center'
 
 export type NavigationItem = {
   id: string
@@ -71,6 +73,13 @@ export const navigationSections: NavigationSection[] = [
         simple: true,
         mobile: true,
         purpose: 'See what is open, what is risky, and what needs your attention first.',
+      },
+      {
+        id: 'edge-center',
+        label: 'Edge Center',
+        icon: Radar,
+        view: 'edge-center',
+        purpose: 'Unified command surface: focus, avoid, review queue, and next best action.',
       },
       {
         id: 'calendar',
