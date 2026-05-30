@@ -35,6 +35,15 @@ MIN_CLOSED_FOR_JUDGEMENT = 5
 MIN_SAMPLE_FOR_DRIFT = 5
 
 
+def _has_positive_stop(stop_price) -> bool:
+    if stop_price is None:
+        return False
+    try:
+        return Decimal(str(stop_price)) > 0
+    except Exception:
+        return False
+
+
 def _base_trades(db: Session, user_id: int, start: Optional[datetime], end: Optional[datetime]):
     q = db.query(Trade).filter(Trade.status != "deleted", Trade.user_id == user_id)
     if start:
@@ -472,7 +481,7 @@ def get_trade_review_prompts(
             reasons.append("poor-grade")
 
         # Missing stop
-        if not t.stop_price or (hasattr(t.stop_price, '__float__') and float(t.stop_price) <= 0):
+        if not _has_positive_stop(t.stop_price):
             score += 20
             reasons.append("no-stop")
 

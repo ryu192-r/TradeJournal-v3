@@ -10,7 +10,7 @@ import pytest
 
 def _create_trade(client, token: str, symbol: str, entry_price: float, exit_price: float | None,
                   quantity: float = 10, pnl: float | None = None, setup: str = "Breakout",
-                  entry_time: str | None = None) -> dict:
+                  entry_time: str | None = None, stop_price: float | None = None) -> dict:
     """Helper: create a trade via API."""
     now = datetime.utcnow().isoformat()
     payload = {
@@ -25,6 +25,8 @@ def _create_trade(client, token: str, symbol: str, entry_price: float, exit_pric
         payload["exit_price"] = str(exit_price)
     if pnl is not None:
         payload["pnl"] = str(pnl)
+    if stop_price is not None:
+        payload["stop_price"] = str(stop_price)
     resp = client.post(
         "/api/v1/trades/",
         json=payload,
@@ -339,6 +341,24 @@ def test_trade_review_prompts_include_largest_loss(client, auth_user_token):
     # The top prompt should reference the big loser
     top_prompt = prompts[0]
     assert "LOSER" in top_prompt["symbol"] or "loss" in top_prompt.get("related_patterns", [])
+
+
+def test_trade_review_prompts_use_explicit_stop_check(client, auth_user_token):
+    """Zero stop should count as missing stop, None should too, positive stop should not."""
+    _create_trade(client, auth_user_token, "ZERO", 100, 90, quantity=10, pnl=-100, setup="Breakout", stop_price=0)
+    _create_trade(client, auth_user_token, "NONE", 100, 90, quantity=10, pnl=-100, setup="Breakout")
+    _create_trade(client, auth_user_token, "OK", 100, 110, quantity=10, pnl=100, setup="Breakout", stop_price=95)
+
+    resp = client.get(
+        "/api/v1/coaching-intelligence/trade-review-prompts?limit=10",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    prompts = resp.json()
+    no_stop_symbols = {p["symbol"] for p in prompts if "no-stop" in p.get("related_patterns", [])}
+    assert "ZERO" in no_stop_symbols
+    assert "NONE" in no_stop_symbols
+    assert "OK" not in no_stop_symbols
 
 
 # ─── Test 11: deleted trades excluded ──────────────────────────
