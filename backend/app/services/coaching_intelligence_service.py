@@ -13,7 +13,6 @@ from app.models.trade import Trade
 from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.daily_journal import DailyJournal
-from app.models.partial_exit import PartialExit
 from app.utils.calculations import compute_aggregate_kpis
 from app.services.recommendation_service import (
     get_recommendation_dashboard,
@@ -88,18 +87,20 @@ def get_setup_confidence_scores(
         s = t.setup or "Uncategorised"
         setup_trades[s].append(t)
 
+    open_trades = [t for t in trades if t.exit_price is None]
+    open_partial_pnl_by_setup: dict[str, Decimal] = defaultdict(Decimal)
+    open_partial_trade_counts: dict[str, int] = defaultdict(int)
+    for t in open_trades:
+        setup_name = t.setup or "Uncategorised"
+        if t.partial_exits:
+            partial_realized = sum((pe.realized_pnl or Decimal("0")) for pe in t.partial_exits if pe.realized_pnl is not None)
+            if partial_realized:
+                open_partial_pnl_by_setup[setup_name] += partial_realized
+                open_partial_trade_counts[setup_name] += 1
+
     # Load execution grades for stop discipline check
     trade_ids = [t.id for t in closed]
     all_grades = {g.trade_id: g for g in db.query(ExecutionGrade).filter(ExecutionGrade.trade_id.in_(trade_ids)).all()}
-
-    # Load partial exits for all trades
-    all_partials = db.query(PartialExit).filter(
-        PartialExit.trade_id.in_(trade_ids),
-        PartialExit.realized_pnl.isnot(None),
-    ).all()
-    partial_pnl_by_trade: dict[int, Decimal] = defaultdict(Decimal)
-    for pe in all_partials:
-        partial_pnl_by_trade[pe.trade_id] += pe.realized_pnl or Decimal("0")
 
     results: list[SetupConfidenceScore] = []
     for setup_name, tlist in setup_trades.items():
@@ -111,10 +112,8 @@ def get_setup_confidence_scores(
         if not pnls:
             continue
         gross_pnl = sum(pnls, Decimal("0"))
-        # Additional partial exit PnL for open trades with same setup
-        for t in tlist:
-            if t.exit_price is None:
-                gross_pnl += partial_pnl_by_trade.get(t.id, Decimal("0"))
+        partial_realized_open = open_partial_pnl_by_setup.get(setup_name, Decimal("0"))
+        gross_pnl += partial_realized_open
 
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p < 0]
@@ -215,7 +214,15 @@ def get_setup_confidence_scores(
             total_pnl=round(float(gross_pnl), 2),
             consistency_score=round(consistency_score, 1),
             risk_score=round(risk_score_dim, 1),
-            notes=notes,
+            notes=(
+                f"{notes} Open partial exits added to realized P&L from {open_partial_trade_counts.get(setup_name, 0)} open trade(s)."
+                if notes and open_partial_trade_counts.get(setup_name, 0)
+                else (
+                    f"Open partial exits added to realized P&L from {open_partial_trade_counts.get(setup_name, 0)} open trade(s)."
+                    if open_partial_trade_counts.get(setup_name, 0)
+                    else notes
+                )
+            ),
         ))
 
     results.sort(key=lambda x: x.score, reverse=True)

@@ -154,6 +154,56 @@ def test_setup_confidence_labels(client, auth_user_token):
     assert reversal["score"] <= 49  # Small sample caps
 
 
+# ─── Test 4b: open partial exits only affect realized P&L ──────
+
+
+def test_open_partial_exits_only_affect_realized_pnl(client, auth_user_token):
+    """Open trades with partial exits should not change sample size or closed expectancy."""
+    closed = _create_trade(
+        client,
+        auth_user_token,
+        "CLOSED",
+        100,
+        110,
+        quantity=10,
+        pnl=100,
+        setup="Breakout",
+    )
+    open_trade = _create_trade(
+        client,
+        auth_user_token,
+        "OPENPART",
+        100,
+        None,
+        quantity=10,
+        setup="Breakout",
+    )
+
+    resp = client.post(
+        f"/api/v1/trades/{open_trade['id']}/partial-exits",
+        json={
+            "qty": "5",
+            "exit_price": "108",
+            "exit_time": datetime.utcnow().isoformat(),
+            "realized_pnl": "40",
+        },
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code in (200, 201), resp.text
+
+    resp = client.get(
+        "/api/v1/coaching-intelligence/setup-scores",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    scores = resp.json()
+    breakout = [s for s in scores if s["setup"] == "Breakout"][0]
+
+    assert breakout["sample_size"] == 1
+    assert breakout["total_pnl"] == 140.0
+    assert "open trade" in (breakout["notes"] or "").lower()
+
+
 # ─── Test 5: tiny sample cannot be priority ────────────────────
 
 
