@@ -39,9 +39,11 @@ describe('MarketRegimePanel', () => {
 
   it('RegimePerformanceTable empty state is clean', () => {
     const data: RegimePerformanceResponse = {
+      generated_at: '2025-07-01T00:00:00Z',
       matched_trades: 0,
-      unmatched_trades: 0,
       regimes: [],
+      favorable_regimes: [],
+      unfavorable_regimes: [],
     }
     render(<RegimePerformanceTable data={data} />)
     expect(screen.getByText('No regime data yet')).toBeTruthy()
@@ -49,13 +51,14 @@ describe('MarketRegimePanel', () => {
   })
 
   it('SetupRegimeMatrix empty state is clean', () => {
-    const data: SetupRegimeMatrixData = { regimes: [], rows: [] }
+    const data: SetupRegimeMatrixData = { generated_at: '2025-07-01T00:00:00Z', regimes: [], rows: [] }
     render(<SetupRegimeMatrix data={data} />)
     expect(screen.getByText('No setup-regime data')).toBeTruthy()
   })
 
   it('SetupRegimeMatrix renders cells without NaN display', () => {
     const data: SetupRegimeMatrixData = {
+      generated_at: '2025-07-01T00:00:00Z',
       regimes: ['TRENDING_BULL', 'RANGE_BOUND'],
       rows: [
         {
@@ -66,23 +69,17 @@ describe('MarketRegimePanel', () => {
             {
               regime: 'TRENDING_BULL',
               sample_size: 22,
-              wins: 18,
-              losses: 4,
               win_rate: 81.8,
               avg_r: 1.1,
               expectancy_r: 0.95,
-              profit_factor: 3.2,
               confidence: 'MEDIUM',
             },
             {
               regime: 'RANGE_BOUND',
               sample_size: 22,
-              wins: 4,
-              losses: 18,
               win_rate: 18.2,
               avg_r: -0.8,
               expectancy_r: -0.72,
-              profit_factor: 0.3,
               confidence: 'MEDIUM',
             },
           ],
