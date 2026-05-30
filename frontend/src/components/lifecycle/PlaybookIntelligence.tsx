@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { usePlaybookOverviewQuery, useSetupIntelligenceQuery } from '@/hooks/usePlaybookIntelligenceQuery'
 import { formatCurrency } from '@/utils/format'
-import { BookOpen, ChevronRight, Clock, TrendingUp, TrendingDown, AlertTriangle, Target, Brain, Shield, X } from 'lucide-react'
+import { BookOpen, ChevronRight, Clock, TrendingUp, TrendingDown, AlertTriangle, Target, Brain, Shield, X, Activity } from 'lucide-react'
 import { EmptyState, CardSkeleton, SectionTitle, SectionHeader } from '@/components/ui'
+import { SetupRegimePerformanceSection } from '@/components/playbook/SetupRegimePerformanceSection'
 import type { PlaybookOverviewSetup, SetupIntelligenceResponse, TacticPerformance, RecentTrade } from '@/types'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
@@ -294,6 +295,13 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
         <SectionHeader icon={TrendingUp} title="Market Conditions" />
         <MarketConditionsSection conditions={data.market_conditions} />
       </div>
+
+      {data.regime_performance && (
+        <div className={CARD}>
+          <SectionHeader icon={Activity} title="Setup × Regime" />
+          <SetupRegimePerformanceSection regimePerf={data.regime_performance} />
+        </div>
+      )}
 
       <div className={CARD}>
         <SectionHeader icon={AlertTriangle} title="Failure Patterns" />

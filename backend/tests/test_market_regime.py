@@ -85,8 +85,21 @@ def test_classify_reversal():
 
 
 def test_classify_unknown_on_no_data():
-    assert classify_market_regime(_snap(nifty_close=0, nifty_change_pct=0, india_vix=0, nifty_trend="")) == MarketRegimeType.UNKNOWN
+    assert classify_market_regime(_snap(
+        nifty_close=0,
+        nifty_change_pct=None,
+        india_vix=None,
+        atr_pct=None,
+        advance_decline_ratio=None,
+        nifty_trend="",
+    )) == MarketRegimeType.UNKNOWN
     assert classify_market_regime(None) == MarketRegimeType.UNKNOWN
+
+
+def test_classify_unknown_on_sparse_snapshot():
+    """nifty_close alone must not fall through to RANGE_BOUND via missing→0 coercion."""
+    assert classify_market_regime(SimpleNamespace(nifty_close=22000)) == MarketRegimeType.UNKNOWN
+    assert classify_market_regime(SimpleNamespace(nifty_close=22000, nifty_trend="unknown")) == MarketRegimeType.UNKNOWN
 
 
 # ─── Phase 6: confidence ────────────────────────────────────────

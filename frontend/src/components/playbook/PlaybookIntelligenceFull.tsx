@@ -12,11 +12,12 @@ import {
   PlaybookFocusCard,
   PlaybookPauseCard,
 } from './PlaybookEdgePanels'
+import { SetupRegimePerformanceSection } from './SetupRegimePerformanceSection'
 import { formatCurrency } from '@/utils/format'
 import {
   BookOpen, ChevronRight, Clock, TrendingUp, TrendingDown,
   AlertTriangle, Target, Brain, Shield, X, BarChart3,
-  ArrowUpRight, ArrowDownRight, Minus,
+  ArrowUpRight, ArrowDownRight, Minus, Activity,
 } from 'lucide-react'
 import type {
   PlaybookOverviewSetup, SetupIntelligenceResponse, TacticPerformance, RecentTrade,
@@ -436,6 +437,16 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
           </div>
           <MarketConditionsSection conditions={data.market_conditions} />
         </div>
+
+        {data.regime_performance && (
+          <div className={CARD}>
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="w-4 h-4 text-accent" />
+              <h4 className="text-xs font-medium text-text-heading">Setup × Regime</h4>
+            </div>
+            <SetupRegimePerformanceSection regimePerf={data.regime_performance} />
+          </div>
+        )}
 
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">

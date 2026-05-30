@@ -81,47 +81,64 @@ def classify_market_regime(snapshot) -> MarketRegimeType:
     """Classify one daily snapshot into a MarketRegimeType.
 
     Uses only existing snapshot fields: nifty_trend, nifty_change_pct,
-    india_vix, atr_pct, advance_decline_ratio, nifty_close. Returns UNKNOWN
-    when there is insufficient data — never invents signals.
+    india_vix, atr_pct, advance_decline_ratio. Returns UNKNOWN when there
+    is insufficient data — never treats missing fields as zero.
     """
     if snapshot is None:
         return MarketRegimeType.UNKNOWN
 
     trend = (getattr(snapshot, "nifty_trend", None) or "").lower()
-    change = _f(getattr(snapshot, "nifty_change_pct", None)) or 0.0
-    vix = _f(getattr(snapshot, "india_vix", None)) or 0.0
-    atr_pct = _f(getattr(snapshot, "atr_pct", None)) or 0.0
-    adr = _f(getattr(snapshot, "advance_decline_ratio", None)) or 0.0
-    nifty_close = _f(getattr(snapshot, "nifty_close", None)) or 0.0
+    has_trend = bool(trend and trend != "unknown")
 
-    # Insufficient data → UNKNOWN
-    if nifty_close == 0 and not trend and change == 0 and vix == 0:
+    change = _f(getattr(snapshot, "nifty_change_pct", None))
+    has_change = change is not None
+
+    vix = _f(getattr(snapshot, "india_vix", None))
+    has_vix = vix is not None
+
+    atr_pct = _f(getattr(snapshot, "atr_pct", None))
+    has_atr = atr_pct is not None
+
+    adr = _f(getattr(snapshot, "advance_decline_ratio", None))
+    has_breadth = adr is not None
+
+    if not any([has_trend, has_change, has_vix, has_atr, has_breadth]):
         return MarketRegimeType.UNKNOWN
 
     # Volatility extreme dominates regardless of direction
-    if vix >= HIGH_VIX or atr_pct >= HIGH_ATR_PCT:
+    if (has_vix and vix >= HIGH_VIX) or (has_atr and atr_pct >= HIGH_ATR_PCT):
         return MarketRegimeType.HIGH_VOLATILITY
 
     # Breakout: strong directional thrust + broad participation
-    if change >= BREAKOUT_CHANGE_PCT and adr >= BREAKOUT_BREADTH:
+    if (
+        has_change
+        and has_breadth
+        and change >= BREAKOUT_CHANGE_PCT
+        and adr >= BREAKOUT_BREADTH
+    ):
         return MarketRegimeType.BREAKOUT
 
     # Reversal: sharp drop with narrow/weak breadth (washout-style)
-    if change <= REVERSAL_CHANGE_PCT and 0 < adr < REVERSAL_BREADTH:
+    if (
+        has_change
+        and has_breadth
+        and change <= REVERSAL_CHANGE_PCT
+        and 0 < adr < REVERSAL_BREADTH
+    ):
         return MarketRegimeType.REVERSAL
 
     # Directional trend
-    if trend == "uptrend" or change >= TREND_CHANGE_PCT:
+    if trend == "uptrend" or (has_change and change >= TREND_CHANGE_PCT):
         return MarketRegimeType.TRENDING_BULL
-    if trend == "downtrend" or change <= -TREND_CHANGE_PCT:
+    if trend == "downtrend" or (has_change and change <= -TREND_CHANGE_PCT):
         return MarketRegimeType.TRENDING_BEAR
 
     # Quiet, compressed tape
-    if 0 < vix <= LOW_VIX and abs(change) < QUIET_CHANGE_PCT:
+    if has_vix and has_change and 0 < vix <= LOW_VIX and abs(change) < QUIET_CHANGE_PCT:
         return MarketRegimeType.LOW_VOLATILITY
 
-    # Sideways / muted move
-    if trend == "sideways" or abs(change) < TREND_CHANGE_PCT:
+    # Sideways / muted move (only when trend or change is actually present)
+    if trend == "sideways" or (has_change and abs(change) < TREND_CHANGE_PCT):
         return MarketRegimeType.RANGE_BOUND
 
     return MarketRegimeType.UNKNOWN

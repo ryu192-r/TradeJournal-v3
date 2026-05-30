@@ -973,6 +973,21 @@ export interface RecentTrade {
   entry_time: string | null
 }
 
+export interface SetupRegimePerformanceCell {
+  regime: string
+  sample_size: number
+  avg_r: number | null
+  expectancy_r: number | null
+  win_rate: number | null
+  confidence: string
+}
+
+export interface SetupRegimePerformance {
+  best_regime: string | null
+  worst_regime: string | null
+  by_regime: SetupRegimePerformanceCell[]
+}
+
 export interface SetupIntelligenceResponse {
   setup_name: string
   description: string | null
@@ -980,6 +995,7 @@ export interface SetupIntelligenceResponse {
   risk_profile: Record<string, unknown>
   rules: string[]
   performance: SetupPerformance
+  regime_performance: SetupRegimePerformance | null
   hold_time: SetupHoldTime
   market_conditions: SetupMarketConditions
   failure_patterns: SetupFailurePatterns
