@@ -11,6 +11,7 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.pnl_helpers import get_realized_pnl_events
+from app.services.setup_edge_service import get_all_setup_edges
 from app.schemas.recommendations import (
     RecommendationDashboardResponse,
     RecommendationSummary,
@@ -25,6 +26,7 @@ GRADE_MAP = {"A": 5, "B": 4, "C": 3, "D": 2, "F": 1}
 GRADE_ORDER = ["A", "B", "C", "D", "F"]
 MAX_RECOMMENDATIONS = 12
 MIN_CLOSED_FOR_SETUP_JUDGEMENT = 5
+MIN_CLOSED_FOR_EDGE_PAUSE = 20
 
 
 def _base_trades(db: Session, user_id: int, start: Optional[datetime], end: Optional[datetime]):
@@ -171,6 +173,13 @@ def _setup_recommendations(
     if not closed_trades:
         return recs
 
+    edge_map: dict[str, object] = {}
+    try:
+        edge_data = get_all_setup_edges(db, user_id)
+        edge_map = {m.setup_name: m for m in edge_data.setups}
+    except Exception:
+        edge_map = {}
+
     # Group by setup
     setup_trades: dict[str, list[Trade]] = defaultdict(list)
     for t in all_trades:
@@ -270,6 +279,37 @@ def _setup_recommendations(
                     RecommendationEvidence(metric="total_pnl", value=str(round(float(total_pnl), 2)), benchmark=">0", sample_size=n),
                     RecommendationEvidence(metric="avg_r", value=round(float(avg_r), 2), benchmark=0, sample_size=n),
                     RecommendationEvidence(metric="win_rate", value=round(win_rate * 100, 1), sample_size=n),
+                ],
+                related_setup=setup_name,
+                priority_score=score,
+            ))
+
+        edge_metrics = edge_map.get(setup_name)
+        if (
+            edge_metrics
+            and edge_metrics.sample_size >= MIN_CLOSED_FOR_EDGE_PAUSE
+            and edge_metrics.expectancy_r is not None
+            and edge_metrics.expectancy_r < 0
+            and not any(
+                r.related_setup == setup_name and r.action_type == RecommendationActionType.pause_setup
+                for r in recs
+            )
+        ):
+            score = min(95, 70 + int(abs(edge_metrics.expectancy_r) * 20))
+            recs.append(TradingRecommendation(
+                id=_make_rec_id("setup-edge-pause", len(recs)),
+                category=RecommendationCategory.setup,
+                severity=RecommendationSeverity.warning,
+                action_type=RecommendationActionType.pause_setup,
+                title=f"Pause {setup_name}",
+                summary=f"{setup_name} expectancy {edge_metrics.expectancy_r:.2f}R across {edge_metrics.sample_size} trades.",
+                why=f"Negative R expectancy ({edge_metrics.expectancy_r:.2f}R) with {edge_metrics.sample_size} closed trades. Edge not confirmed.",
+                suggested_action=f"Pause {setup_name}. Review losing trades and re-demo before live size.",
+                confidence=_confidence_from_sample(edge_metrics.sample_size),
+                evidence=[
+                    RecommendationEvidence(metric="expectancy_r", value=edge_metrics.expectancy_r, benchmark=0, sample_size=edge_metrics.sample_size),
+                    RecommendationEvidence(metric="avg_r", value=edge_metrics.avg_r, sample_size=edge_metrics.sample_size),
+                    RecommendationEvidence(metric="status", value=edge_metrics.status.value, sample_size=edge_metrics.sample_size),
                 ],
                 related_setup=setup_name,
                 priority_score=score,

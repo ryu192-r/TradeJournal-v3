@@ -4,6 +4,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.playbook_edge import SetupEdgeSummaryItem
+
 EdgePriorityCategory = Literal[
     "focus", "avoid", "risk", "review", "setup", "psychology", "workflow"
 ]
@@ -73,6 +75,13 @@ class EdgeDataQuality(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class PlaybookEdgeCommandCenter(BaseModel):
+    focus_setups: list[str] = Field(default_factory=list)
+    pause_setups: list[str] = Field(default_factory=list)
+    highest_expectancy: Optional[SetupEdgeSummaryItem] = None
+    lowest_expectancy: Optional[SetupEdgeSummaryItem] = None
+
+
 class EdgeCommandCenterResponse(BaseModel):
     generated_at: str
     period_start: str
@@ -86,3 +95,4 @@ class EdgeCommandCenterResponse(BaseModel):
     workflow: Optional[EdgeWorkflowStatus] = None
     summary: EdgeCommandCenterSummary = Field(default_factory=EdgeCommandCenterSummary)
     data_quality: EdgeDataQuality = Field(default_factory=EdgeDataQuality)
+    playbook_edge: Optional[PlaybookEdgeCommandCenter] = None

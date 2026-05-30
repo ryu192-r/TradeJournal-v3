@@ -77,4 +77,12 @@ export interface EdgeCommandCenterResponse {
   workflow: EdgeWorkflowStatus | null
   summary: EdgeCommandCenterSummary
   data_quality: EdgeDataQuality
+  playbook_edge?: PlaybookEdgeCommandCenter | null
+}
+
+export interface PlaybookEdgeCommandCenter {
+  focus_setups: string[]
+  pause_setups: string[]
+  highest_expectancy: import('@/types/playbookEdge').PlaybookEdgeSummaryItem | null
+  lowest_expectancy: import('@/types/playbookEdge').PlaybookEdgeSummaryItem | null
 }

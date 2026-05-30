@@ -518,6 +518,26 @@ export function getSetupIntelligence(setupName: string, fromDate?: string, toDat
   return apiClient.get<import('@/types').SetupIntelligenceResponse>(`/playbook/intelligence/${encodeURIComponent(setupName)}` + (qs ? `?${qs}` : '')).then(r => r.data)
 }
 
+// ───────────────────────── Playbook Edge ─────────────────────────
+
+export function getPlaybookEdgeList() {
+  return apiClient.get<import('@/types/playbookEdge').PlaybookEdgeListResponse>('/playbook-edge').then(r => r.data)
+}
+
+export function getPlaybookEdge(setupName: string) {
+  return apiClient.get<import('@/types/playbookEdge').SetupEdgeDetailResponse>(
+    `/playbook-edge/${encodeURIComponent(setupName)}`,
+  ).then(r => r.data)
+}
+
+export function getPlaybookEdgeTop() {
+  return apiClient.get<import('@/types/playbookEdge').PlaybookEdgeSummaryItem>('/playbook-edge/top').then(r => r.data)
+}
+
+export function getPlaybookEdgeWeakest() {
+  return apiClient.get<import('@/types/playbookEdge').PlaybookEdgeSummaryItem>('/playbook-edge/weakest').then(r => r.data)
+}
+
 // ───────────────────────── Market Context ─────────────────────────
 
 export function getMarketSnapshots(days?: number) {

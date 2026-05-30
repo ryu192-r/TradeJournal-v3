@@ -20,6 +20,7 @@ from app.services.recommendation_service import (
     STD_DECIMAL,
     GRADE_MAP,
 )
+from app.services.setup_edge_service import get_all_setup_edges
 from app.schemas.coaching_intelligence import (
     CoachingPriority,
     SetupConfidenceScore,
@@ -35,6 +36,33 @@ MIN_CLOSED_FOR_JUDGEMENT = 5
 MIN_SAMPLE_FOR_DRIFT = 5
 # Setup confidence embedded in weekly plan (not limited to trades entered that week)
 SETUP_SCORE_LOOKBACK_DAYS = 90
+
+
+def _edge_expectancy_map(db: Session, user_id: int) -> dict[str, float]:
+    try:
+        data = get_all_setup_edges(db, user_id)
+        return {m.setup_name: m.expectancy_r for m in data.setups if m.expectancy_r is not None}
+    except Exception:
+        return {}
+
+
+def _setup_evidence_line(
+    score: SetupConfidenceScore,
+    edge_map: dict[str, float],
+    include_pnl: bool = False,
+) -> str:
+    parts = [
+        f"Win rate: {score.win_rate}%",
+        f"Avg R: {score.avg_r}",
+    ]
+    exp = edge_map.get(score.setup)
+    if exp is not None:
+        sign = "+" if exp >= 0 else ""
+        parts.append(f"Expectancy: {sign}{exp:.2f}R")
+    parts.append(f"Sample: {score.sample_size} trades")
+    if include_pnl and score.total_pnl is not None:
+        parts.append(f"Total P&L: ₹{score.total_pnl}")
+    return ", ".join(parts)
 
 
 def _has_positive_stop(stop_price) -> bool:
@@ -599,6 +627,7 @@ def get_weekly_coaching_plan(
     scores = get_setup_confidence_scores(db, user_id, setup_score_start, setup_score_end)
     if not scores:
         scores = get_setup_confidence_scores(db, user_id)
+    edge_map = _edge_expectancy_map(db, user_id)
 
     # Get behavioral drift (longer lookback)
     drift = get_behavioral_drift_signals(db, user_id, lookback_days=30, baseline_days=90)
@@ -622,7 +651,7 @@ def get_weekly_coaching_plan(
             category="setup",
             severity="info" if s.label == "watch" else "warning",
             reason=f"{s.setup} has a confidence score of {s.score} ({s.label}).",
-            evidence=f"Win rate: {s.win_rate}%, Avg R: {s.avg_r}, Sample: {s.sample_size} trades",
+            evidence=_setup_evidence_line(s, edge_map),
             action=f"Review {s.sample_size} {s.setup} trades. {s.notes or ''}",
             due_context="This week",
         ))
@@ -635,7 +664,7 @@ def get_weekly_coaching_plan(
             category="setup",
             severity="positive",
             reason=f"{s.setup} scored {s.score} ({s.label}). Positive edge confirmed.",
-            evidence=f"Win rate: {s.win_rate}%, Avg R: {s.avg_r}, Sample: {s.sample_size} trades, Total P&L: ₹{s.total_pnl}",
+            evidence=_setup_evidence_line(s, edge_map, include_pnl=True),
             action=f"Increase allocation to {s.setup}. Track over next 20 trades.",
             due_context="Ongoing",
         ))
@@ -741,7 +770,14 @@ def get_weekly_coaching_plan(
     if scores:
         summary_lines.append("### Setup Confidence")
         for s in scores[:5]:
-            summary_lines.append(f"- {s.setup}: {s.score}/100 ({s.label}) — {s.sample_size} trades, {s.win_rate}% WR, {s.avg_r}R avg")
+            exp = edge_map.get(s.setup)
+            exp_part = ""
+            if exp is not None:
+                sign = "+" if exp >= 0 else ""
+                exp_part = f", {sign}{exp:.2f}R expectancy"
+            summary_lines.append(
+                f"- {s.setup}: {s.score}/100 ({s.label}) — {s.sample_size} trades, {s.win_rate}% WR, {s.avg_r}R avg{exp_part}"
+            )
         summary_lines.append("")
     if rules:
         summary_lines.append("### Rules for Next Week")

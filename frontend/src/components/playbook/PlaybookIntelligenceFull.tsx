@@ -1,5 +1,17 @@
 import { useState } from 'react'
 import { usePlaybookOverviewQuery, useSetupIntelligenceQuery } from '@/hooks/usePlaybookIntelligenceQuery'
+import {
+  usePlaybookEdgeListQuery,
+  usePlaybookEdgeQuery,
+  usePlaybookEdgeTopQuery,
+  usePlaybookEdgeWeakestQuery,
+} from '@/hooks/usePlaybookEdgeQuery'
+import {
+  PlaybookEdgeCard,
+  PlaybookConditionBreakdown,
+  PlaybookFocusCard,
+  PlaybookPauseCard,
+} from './PlaybookEdgePanels'
 import { formatCurrency } from '@/utils/format'
 import {
   BookOpen, ChevronRight, Clock, TrendingUp, TrendingDown,
@@ -343,6 +355,7 @@ function RecentTradesSection({ trades }: { trades: RecentTrade[] }) {
 
 function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: () => void }) {
   const { data, isLoading } = useSetupIntelligenceQuery(setupName)
+  const { data: edgeData } = usePlaybookEdgeQuery(setupName)
 
   if (isLoading) {
     return (
@@ -384,6 +397,19 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
             <span key={i} className="text-[10px] text-accent bg-accent-muted/30 px-2 py-0.5 rounded-full">{c}</span>
           ))}
         </div>
+      )}
+
+      {edgeData && edgeData.metrics.sample_size > 0 && (
+        <>
+          <PlaybookEdgeCard metrics={edgeData.metrics} />
+          <div className={CARD}>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-accent" />
+              <h4 className="text-xs font-medium text-text-heading">Condition Breakdown (R expectancy)</h4>
+            </div>
+            <PlaybookConditionBreakdown conditions={edgeData.conditions} />
+          </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -472,6 +498,9 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
 
 export function PlaybookIntelligenceFull() {
   const { data, isLoading } = usePlaybookOverviewQuery()
+  const { data: edgeList } = usePlaybookEdgeListQuery()
+  const { data: topEdge } = usePlaybookEdgeTopQuery()
+  const { data: weakestEdge } = usePlaybookEdgeWeakestQuery()
   const [selectedSetup, setSelectedSetup] = useState<string | null>(null)
 
   if (isLoading) {
@@ -507,7 +536,59 @@ export function PlaybookIntelligenceFull() {
 
   return (
     <div className="space-y-6">
-      {/* Top performers banner */}
+      {edgeList && edgeList.setups.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={CARD}>
+              <p className="text-[10px] uppercase tracking-wider text-text-faint mb-2">Best setup (R expectancy)</p>
+              {topEdge ? (
+                <button onClick={() => setSelectedSetup(topEdge.setup_name)} className="text-left w-full">
+                  <div className="text-sm font-bold text-text-heading">{topEdge.setup_name}</div>
+                  <div className="text-xs font-data text-profit">
+                    {topEdge.expectancy_r != null ? `${topEdge.expectancy_r >= 0 ? '+' : ''}${topEdge.expectancy_r.toFixed(2)}R` : '—'}
+                  </div>
+                </button>
+              ) : (
+                <p className="text-[length:var(--text-sm)] text-text-muted">Not enough data</p>
+              )}
+            </div>
+            <div className={CARD}>
+              <p className="text-[10px] uppercase tracking-wider text-text-faint mb-2">Weakest setup</p>
+              {weakestEdge ? (
+                <button onClick={() => setSelectedSetup(weakestEdge.setup_name)} className="text-left w-full">
+                  <div className="text-sm font-bold text-text-heading">{weakestEdge.setup_name}</div>
+                  <div className="text-xs font-data text-loss">
+                    {weakestEdge.expectancy_r != null ? `${weakestEdge.expectancy_r.toFixed(2)}R` : '—'}
+                  </div>
+                </button>
+              ) : (
+                <p className="text-[length:var(--text-sm)] text-text-muted">Not enough data</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PlaybookFocusCard setups={edgeList.setups} />
+            <PlaybookPauseCard setups={edgeList.setups} />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-accent" />
+              <h3 className="text-xs font-medium text-text-heading">Setup Rankings (edge score)</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {edgeList.setups.map((metrics) => (
+                <button key={metrics.setup_name} onClick={() => setSelectedSetup(metrics.setup_name)} className="text-left">
+                  <PlaybookEdgeCard metrics={metrics} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Top performers banner — legacy ₹ expectancy view */}
       {setupsWithData.length > 0 && (data.best_by_expectancy || data.best_by_win_rate || data.best_by_pnl) && (
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">

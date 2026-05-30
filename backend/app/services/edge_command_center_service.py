@@ -26,6 +26,7 @@ from app.schemas.edge_command_center import (
     EdgeReviewQueueItem,
     EdgeSetupFocus,
     EdgeWorkflowStatus,
+    PlaybookEdgeCommandCenter,
 )
 from app.schemas.recommendations import RecommendationDashboardResponse, TradingRecommendation
 from app.schemas.trade_review_v2 import TradeReviewBatchResponse, TradeReviewV2Response
@@ -35,6 +36,7 @@ from app.services.coaching_intelligence_service import (
     get_trade_review_prompts,
 )
 from app.services.recommendation_service import get_recommendation_dashboard
+from app.services.setup_edge_service import get_all_setup_edges, get_top_setup_edge, get_weakest_setup_edge
 from app.services.trade_review_v2_service import review_trades_batch_v2
 
 logger = logging.getLogger(__name__)
@@ -119,7 +121,11 @@ def _setup_action_sort_key(action: str) -> int:
     return {"focus": 0, "avoid": 1, "watch": 2, "develop": 3}.get(action, 4)
 
 
-def _build_setup_focus(scores: list[SetupConfidenceScore]) -> list[EdgeSetupFocus]:
+def _build_setup_focus(
+    scores: list[SetupConfidenceScore],
+    edge_by_setup: Optional[dict[str, float]] = None,
+) -> list[EdgeSetupFocus]:
+    edge_by_setup = edge_by_setup or {}
     cards: list[EdgeSetupFocus] = []
     for s in scores[:12]:
         action = _label_to_setup_action(s.label)
@@ -127,11 +133,18 @@ def _build_setup_focus(scores: list[SetupConfidenceScore]) -> list[EdgeSetupFocu
             f"Confidence score {s.score}/100 ({s.label}).",
             f"Sample size: {s.sample_size} closed trade(s).",
         ]
+        exp_r = edge_by_setup.get(s.setup)
+        if exp_r is not None:
+            sign = "+" if exp_r >= 0 else ""
+            evidence.append(f"Expectancy: {sign}{exp_r:.2f}R.")
         if s.win_rate is not None:
             evidence.append(f"Win rate: {s.win_rate:.1f}%.")
         if s.avg_r is not None:
             evidence.append(f"Avg R: {s.avg_r:.2f}.")
         reason = s.notes or f"Setup '{s.setup}' is rated {s.label} from recent closed trades."
+        if exp_r is not None:
+            sign = "+" if exp_r >= 0 else ""
+            reason = f"{s.setup} expectancy {sign}{exp_r:.2f}R — {reason}"
         cards.append(EdgeSetupFocus(
             setup=s.setup,
             score=s.score,
@@ -457,6 +470,7 @@ def _build_summary(
     coaching: Optional[CoachingIntelligenceDashboard],
     review_queue: list[EdgeReviewQueueItem],
     setup_focus: list[EdgeSetupFocus],
+    playbook_edge: Optional[PlaybookEdgeCommandCenter] = None,
 ) -> EdgeCommandCenterSummary:
     focus: list[str] = []
     avoid: list[str] = []
@@ -485,6 +499,20 @@ def _build_summary(
             focus.append(f"{s.setup}: {s.reason}")
         elif s.action == "avoid":
             avoid.append(f"Stop trading {s.setup} until reviewed.")
+
+    if playbook_edge:
+        for name in playbook_edge.focus_setups[:3]:
+            focus.append(f"{name}: focus setup — positive R expectancy")
+        for name in playbook_edge.pause_setups[:3]:
+            avoid.append(f"Pause {name} — negative R expectancy (20+ trades)")
+
+    if playbook_edge and playbook_edge.highest_expectancy and playbook_edge.highest_expectancy.expectancy_r is not None:
+        h = playbook_edge.highest_expectancy
+        sign = "+" if h.expectancy_r >= 0 else ""
+        strengths.append(f"Best edge: {h.setup_name} ({sign}{h.expectancy_r:.2f}R expectancy)")
+    if playbook_edge and playbook_edge.lowest_expectancy and playbook_edge.lowest_expectancy.expectancy_r is not None:
+        w = playbook_edge.lowest_expectancy
+        risks.append(f"Weakest edge: {w.setup_name} ({w.expectancy_r:.2f}R expectancy)")
 
     for item in review_queue[:4]:
         review.append(f"{item.symbol}: {item.reason}")
@@ -591,6 +619,24 @@ def get_edge_command_center(
         if setup_err:
             notes.append(setup_err)
 
+    edge_by_setup: dict[str, float] = {}
+    playbook_edge: Optional[PlaybookEdgeCommandCenter] = None
+    edge_data, edge_err = _safe_call("playbook_edge", get_all_setup_edges, db, user_id)
+    if edge_data:
+        edge_by_setup = {
+            m.setup_name: m.expectancy_r for m in edge_data.setups if m.expectancy_r is not None
+        }
+        top, _ = _safe_call("playbook_edge_top", get_top_setup_edge, db, user_id)
+        weakest, _ = _safe_call("playbook_edge_weakest", get_weakest_setup_edge, db, user_id)
+        playbook_edge = PlaybookEdgeCommandCenter(
+            focus_setups=edge_data.focus_setups,
+            pause_setups=edge_data.pause_setups,
+            highest_expectancy=top,
+            lowest_expectancy=weakest,
+        )
+    elif edge_err:
+        notes.append(edge_err)
+
     prompts: list[TradeReviewPrompt] = []
     if coaching and coaching.top_trade_review_prompts:
         prompts = coaching.top_trade_review_prompts
@@ -600,12 +646,12 @@ def get_edge_command_center(
             notes.append(prompt_err)
         prompts = prompts or []
 
-    setup_focus = _build_setup_focus(setup_scores)
+    setup_focus = _build_setup_focus(setup_scores, edge_by_setup)
     workflow_status = _build_workflow_status(wf)
     seen_trades: set[int] = set()
     review_queue = _build_review_queue(batch, prompts, seen_trades)
     priorities = _build_priorities(recs, coaching, batch, review_queue, workflow_status)
-    summary = _build_summary(priorities, recs, coaching, review_queue, setup_focus)
+    summary = _build_summary(priorities, recs, coaching, review_queue, setup_focus, playbook_edge)
 
     if closed < 5:
         notes.append("Fewer than 5 closed trades in period — guidance is directional, not statistical.")
@@ -636,4 +682,5 @@ def get_edge_command_center(
         workflow=workflow_status,
         summary=summary,
         data_quality=data_quality,
+        playbook_edge=playbook_edge,
     )

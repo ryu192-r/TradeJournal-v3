@@ -92,6 +92,34 @@ export function EdgeCommandCenter() {
         </section>
       )}
 
+      {data.playbook_edge && (data.playbook_edge.highest_expectancy || data.playbook_edge.lowest_expectancy) && (
+        <section className="min-w-0">
+          <SectionTitle title="Playbook edge" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            {data.playbook_edge.highest_expectancy && (
+              <div className="rounded-xl border border-profit/20 bg-profit-muted/5 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-profit mb-1">Highest expectancy</p>
+                <p className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.playbook_edge.highest_expectancy.setup_name}</p>
+                <p className="text-xs font-data text-profit">
+                  {data.playbook_edge.highest_expectancy.expectancy_r != null
+                    ? `${data.playbook_edge.highest_expectancy.expectancy_r >= 0 ? '+' : ''}${data.playbook_edge.highest_expectancy.expectancy_r.toFixed(2)}R`
+                    : '—'}
+                </p>
+              </div>
+            )}
+            {data.playbook_edge.lowest_expectancy && (
+              <div className="rounded-xl border border-loss/20 bg-loss-muted/5 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-loss mb-1">Lowest expectancy</p>
+                <p className="text-[length:var(--text-sm)] font-medium text-text-heading">{data.playbook_edge.lowest_expectancy.setup_name}</p>
+                <p className="text-xs font-data text-loss">
+                  {data.playbook_edge.lowest_expectancy.expectancy_r?.toFixed(2) ?? '—'}R
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       <section className="min-w-0">
         <SectionTitle title="Review queue" />
         <div className="mt-2">
