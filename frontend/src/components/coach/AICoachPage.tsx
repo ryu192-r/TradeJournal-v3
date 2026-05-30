@@ -506,7 +506,7 @@ export function AICoachPage() {
                 >
                   <option value="">Choose a trade...</option>
                   {(tradesData?.items ?? [])
-                    .filter(t => t.exit_price)
+                    .filter(t => t.exit_price != null)
                     .map(t => (
                       <option key={t.id} value={t.id}>
                         #{t.id} {t.symbol} — {formatCurrency(Number(t.pnl ?? 0))} ({t.setup ?? 'No setup'})

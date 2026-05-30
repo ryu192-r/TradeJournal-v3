@@ -86,6 +86,27 @@ def _trade_evidence_bundle(db: Session, trade: Trade) -> dict:
     }
 
 
+def _stop_validity(trade: Trade) -> tuple[bool, bool]:
+    """Return (has_positive_stop, stop_on_valid_side).
+
+    LONG: stop must be below entry. SHORT: stop must be above entry.
+    """
+    has_stop = _has_positive_stop(trade.stop_price)
+    if not has_stop:
+        return False, False
+    try:
+        entry_d = Decimal(str(trade.entry_price))
+        stop_d = Decimal(str(trade.stop_price))
+    except Exception:
+        return True, False
+    if entry_d <= 0:
+        return True, False
+    direction = (trade.direction or "LONG").upper()
+    if direction == "LONG":
+        return True, stop_d < entry_d
+    return True, stop_d > entry_d
+
+
 def _risk_per_share(trade: Trade) -> Optional[Decimal]:
     entry = trade.entry_price
     stop = trade.stop_price
@@ -100,8 +121,13 @@ def _risk_per_share(trade: Trade) -> Optional[Decimal]:
         return None
     direction = (trade.direction or "LONG").upper()
     if direction == "LONG":
-        return entry_d - stop_d
-    return stop_d - entry_d
+        risk = entry_d - stop_d
+    else:
+        risk = stop_d - entry_d
+    # Wrong-side stop yields negative risk — treat as invalid, not oversized.
+    if risk <= 0:
+        return None
+    return risk
 
 
 def _setup_confidence_map(db: Session, user_id: int) -> dict[str, dict]:
@@ -160,6 +186,11 @@ def _score_setup_adherence(
     elif trade.exit_price is not None:
         evidence.append("No review notes recorded post-exit.")
 
+    if not trade.setup:
+        score = min(score, 50)
+    elif not playbook:
+        score = min(score, 70)
+
     return ReviewDimensionScore(
         dimension="setup_adherence",
         score=_clamp(score),
@@ -174,6 +205,7 @@ def _score_entry_quality(
     trade: Trade,
     grade: Optional[ExecutionGrade],
     timeline: list[TradeTimeline],
+    has_valid_stop: bool,
     has_stop: bool,
 ) -> ReviewDimensionScore:
     evidence: list[str] = []
@@ -191,6 +223,12 @@ def _score_entry_quality(
         score = _clamp(score - 20)
         evidence.append("No stop defined — entry lacked a risk anchor.")
         improvement = "Define stop before entry; entry without stop is a process violation."
+    elif not has_valid_stop:
+        score = _clamp(score - 25)
+        direction = (trade.direction or "LONG").upper()
+        side = "below entry (LONG)" if direction == "LONG" else "above entry (SHORT)"
+        evidence.append(f"Stop is on the wrong side — must be {side}.")
+        improvement = improvement or "Place stop on the loss side of entry before entering."
 
     risk = _risk_per_share(trade)
     entry_d = Decimal(str(trade.entry_price)) if trade.entry_price else None
@@ -291,6 +329,7 @@ def _score_risk_discipline(
     grade: Optional[ExecutionGrade],
     stop_history: list[StopHistory],
     partials: list[PartialExit],
+    has_valid_stop: bool,
     has_stop: bool,
 ) -> ReviewDimensionScore:
     evidence: list[str] = []
@@ -301,6 +340,21 @@ def _score_risk_discipline(
         score = 25
         evidence.append("No stop price defined — critical risk violation.")
         improvement = "Always define stop before entry."
+        return ReviewDimensionScore(
+            dimension="risk_discipline",
+            score=score,
+            label="critical",
+            reason="Stop, sizing, and stop-management discipline.",
+            evidence=evidence,
+            improvement=improvement,
+        )
+
+    if not has_valid_stop:
+        direction = (trade.direction or "LONG").upper()
+        side = "below entry" if direction == "LONG" else "above entry"
+        score = 28
+        evidence.append(f"Stop is on the wrong side for {direction} — must be {side}.")
+        improvement = "Fix stop placement: loss-side only."
         return ReviewDimensionScore(
             dimension="risk_discipline",
             score=score,
@@ -466,7 +520,11 @@ def _determine_verdict(
     if is_open:
         return "incomplete_open_trade"
     critical_tags = {t.tag for t in mistake_tags if t.severity == "critical"}
-    if "no_stop" in critical_tags or (risk_dim and risk_dim.score < 40):
+    if (
+        "no_stop" in critical_tags
+        or "invalid_stop_side" in critical_tags
+        or (risk_dim and risk_dim.score < 40)
+    ):
         return "risk_violation_trade"
     if "rule_break" in critical_tags:
         return "rule_break_trade"
@@ -513,7 +571,7 @@ def _build_mistake_tags(
     grade: Optional[ExecutionGrade] = bundle["execution_grade"]
     emotions = bundle["emotion_logs"]
     stop_history = bundle["stop_history"]
-    has_stop = _has_positive_stop(trade.stop_price)
+    has_stop, valid_stop = _stop_validity(trade)
 
     if not trade.setup:
         add("no_setup", "warning", "setup", "Trade has no setup tag.", "Tag setup before entry.")
@@ -525,10 +583,20 @@ def _build_mistake_tags(
             "This was a risk violation: no stop was defined.",
             "Define stop before entry on every trade.",
         )
+    elif not valid_stop:
+        direction = (trade.direction or "LONG").upper()
+        side = "below entry" if direction == "LONG" else "above entry"
+        add(
+            "invalid_stop_side",
+            "critical",
+            "risk",
+            f"Stop is on the wrong side for {direction} (must be {side}).",
+            f"Place stop {side} before entry.",
+        )
 
     risk = _risk_per_share(trade)
     entry_d = Decimal(str(trade.entry_price)) if trade.entry_price else None
-    if risk is not None and entry_d and entry_d > 0 and abs(risk) / entry_d > MAX_RISK_PCT_OF_ENTRY:
+    if valid_stop and risk is not None and entry_d and entry_d > 0 and risk / entry_d > MAX_RISK_PCT_OF_ENTRY:
         add(
             "oversized_risk",
             "warning",
@@ -603,7 +671,7 @@ def _build_mistake_tags(
 
     dim_by_name = {d.dimension: d for d in dimensions}
     for dim_name, dim in dim_by_name.items():
-        if dim.score < 40 and dim_name == "risk_discipline" and "no_stop" not in seen:
+        if dim.score < 40 and dim_name == "risk_discipline" and "no_stop" not in seen and "invalid_stop_side" not in seen:
             add(
                 f"weak_{dim_name}",
                 "critical",
@@ -632,6 +700,9 @@ def _build_guidance(
     if "no_stop" in tag_set:
         what.append("Define stop before entry.")
         rules.append("No entry without a written stop price.")
+    if "invalid_stop_side" in tag_set:
+        what.append("Place stop on the loss side of entry (below for LONG, above for SHORT).")
+        rules.append("Never set stop on the profit side of entry.")
     if "no_setup" in tag_set:
         what.append("Skip trade if setup is missing.")
         rules.append("Every trade must map to one playbook setup.")
@@ -691,14 +762,14 @@ def review_trade_v2(db: Session, user_id: int, trade_id: int) -> TradeReviewV2Re
     setup_conf = setup_conf_map.get(trade.setup or "") or setup_conf_map.get("Uncategorised")
 
     is_open = trade.exit_price is None
-    has_stop = _has_positive_stop(trade.stop_price)
+    has_stop, valid_stop = _stop_validity(trade)
     grade = bundle["execution_grade"]
 
     dimensions = [
         _score_setup_adherence(trade, grade, setup_conf, bundle["playbook"]),
-        _score_entry_quality(trade, grade, bundle["timeline"], has_stop),
+        _score_entry_quality(trade, grade, bundle["timeline"], valid_stop, has_stop),
         _score_exit_quality(trade, grade, bundle["partial_exits"], is_open),
-        _score_risk_discipline(trade, grade, bundle["stop_history"], bundle["partial_exits"], has_stop),
+        _score_risk_discipline(trade, grade, bundle["stop_history"], bundle["partial_exits"], valid_stop, has_stop),
         _score_psychology(trade, grade, bundle["emotion_logs"]),
         _score_playbook_alignment(trade, bundle["playbook"], setup_conf, is_open),
     ]

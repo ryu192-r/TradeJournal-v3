@@ -130,6 +130,15 @@ def test_no_setup_caps_setup_score(client, auth_user_token):
     assert any(m["tag"] == "no_setup" for m in data["mistake_tags"])
 
 
+def test_no_setup_cap_survives_ab_rule_grade(client, auth_user_token):
+    """A/B rule_adherence must not boost setup_adherence above 50 when setup is missing."""
+    t = _create_trade(client, auth_user_token, "NOSETUPAB", 100, 110, setup=None, stop_price=95)
+    _add_grade(client, auth_user_token, t["id"], "A", rule_adherence="A")
+    data = _review(client, auth_user_token, t["id"]).json()
+    setup_dim = next(d for d in data["dimension_scores"] if d["dimension"] == "setup_adherence")
+    assert setup_dim["score"] <= 50
+
+
 # ─── 6–7. Emotion tags ─────────────────────────────────────────
 
 
@@ -220,7 +229,7 @@ def test_batch_summary_common_mistakes(client, auth_user_token):
         headers={"Authorization": f"Bearer {auth_user_token}"},
     )
     data = resp.json()
-    assert "no_stop" in data["summary"]["common_mistakes"] or len(data["summary"]["common_mistakes"]) >= 0
+    assert "no_stop" in data["summary"]["common_mistakes"]
 
 
 # ─── 15. No DB mutation ────────────────────────────────────────
@@ -236,6 +245,27 @@ def test_review_no_db_mutation(client, auth_user_token, db_session: Session):
 
 
 # ─── 16. SHORT risk safe ───────────────────────────────────────
+
+
+def test_invalid_stop_side_long(client, auth_user_token):
+    """LONG with stop above entry should tag invalid_stop_side, not oversized_risk."""
+    t = _create_trade(client, auth_user_token, "BADSL", 100, 90, stop_price=110, setup="Breakout")
+    data = _review(client, auth_user_token, t["id"]).json()
+    tags = {m["tag"] for m in data["mistake_tags"]}
+    assert "invalid_stop_side" in tags
+    assert "no_stop" not in tags
+    assert "oversized_risk" not in tags
+    assert data["verdict"] == "risk_violation_trade"
+
+
+def test_invalid_stop_side_short(client, auth_user_token, db_session: Session):
+    t = _create_trade(client, auth_user_token, "BADSH", 100, 90, stop_price=90, setup="Breakout")
+    trade = db_session.query(Trade).filter(Trade.id == t["id"]).first()
+    trade.direction = "SHORT"
+    trade.stop_price = Decimal("90")  # below entry for SHORT
+    db_session.commit()
+    data = _review(client, auth_user_token, t["id"]).json()
+    assert any(m["tag"] == "invalid_stop_side" for m in data["mistake_tags"])
 
 
 def test_short_trade_risk_calculation(client, auth_user_token, db_session: Session):
