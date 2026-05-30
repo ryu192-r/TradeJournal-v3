@@ -3,6 +3,7 @@
 import importlib.util
 from datetime import date
 from itertools import count
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
@@ -28,12 +29,7 @@ from app.routers.performance_os import (
     update_workflow,
 )
 
-_MIG_PATH = (
-    __import__("pathlib").Path(__file__).resolve().parents[1]
-    / "alembic"
-    / "versions"
-    / "011_performance_os_user_ownership.py"
-)
+_MIG_PATH = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "011_performance_os_user_ownership.py"
 _mig_spec = importlib.util.spec_from_file_location("migration_011", _MIG_PATH)
 mig = importlib.util.module_from_spec(_mig_spec)
 _mig_spec.loader.exec_module(mig)
@@ -278,3 +274,82 @@ def test_migration_zero_users_with_rows_raises():
     with pytest.raises(RuntimeError, match="no users exist"):
         mig.backfill_user_id(conn, "daily_workflows")
     conn.close()
+
+
+def _legacy_perf_os_sqlite_db(db_path: str) -> None:
+    """Legacy perf-os tables without user_id — simulates create_all-after-004 path."""
+    engine = create_engine(f"sqlite:///{db_path}")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE users ("
+            "id INTEGER PRIMARY KEY, email VARCHAR NOT NULL, "
+            "full_name VARCHAR, hashed_password VARCHAR NOT NULL)"
+        ))
+        conn.execute(text(
+            "INSERT INTO users (email, full_name, hashed_password) "
+            "VALUES ('solo@example.com', 'Solo', 'hash')"
+        ))
+        conn.execute(text(
+            "CREATE TABLE daily_workflows ("
+            "id INTEGER PRIMARY KEY, date DATE NOT NULL, phase VARCHAR(20) DEFAULT 'pre_market')"
+        ))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX ix_daily_workflows_date ON daily_workflows (date)"
+        ))
+        conn.execute(text(
+            "INSERT INTO daily_workflows (date, phase) VALUES ('2025-01-01', 'pre_market')"
+        ))
+        conn.execute(text(
+            "CREATE TABLE weekly_reviews ("
+            "id INTEGER PRIMARY KEY, week_start DATE NOT NULL, week_end DATE NOT NULL)"
+        ))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX ix_weekly_reviews_week_start ON weekly_reviews (week_start)"
+        ))
+        conn.execute(text(
+            "INSERT INTO weekly_reviews (week_start, week_end) "
+            "VALUES ('2025-01-01', '2025-01-05')"
+        ))
+        conn.execute(text(
+            "CREATE TABLE monthly_reviews ("
+            "id INTEGER PRIMARY KEY, month VARCHAR(7) NOT NULL)"
+        ))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX ix_monthly_reviews_month ON monthly_reviews (month)"
+        ))
+        conn.execute(text("INSERT INTO monthly_reviews (month) VALUES ('2025-01')"))
+        conn.execute(text(
+            "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"
+        ))
+        conn.execute(text("INSERT INTO alembic_version VALUES ('008_market_candles')"))
+    engine.dispose()
+
+
+def test_migration_upgrade_on_legacy_sqlite_tables(tmp_path):
+    """Full upgrade() path on legacy SQLite perf-os tables."""
+    import os
+    from alembic.config import Config
+    from alembic import command
+
+    db_path = tmp_path / "legacy.db"
+    _legacy_perf_os_sqlite_db(str(db_path))
+
+    os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
+    cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+    command.upgrade(cfg, "011_performance_os_user_ownership")
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    with engine.connect() as conn:
+        for table, uq_name in (
+            ("daily_workflows", "uq_daily_workflows_user_date"),
+            ("weekly_reviews", "uq_weekly_reviews_user_week"),
+            ("monthly_reviews", "uq_monthly_reviews_user_month"),
+        ):
+            assert mig.column_exists(conn, table, "user_id")
+            assert conn.execute(text(f"SELECT user_id FROM {table}")).scalar() == 1
+            assert mig.index_exists(conn, table, uq_name), f"missing unique index {uq_name}"
+            assert conn.execute(text(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND name=:name"
+            ), {"name": uq_name}).scalar() is not None
+    engine.dispose()

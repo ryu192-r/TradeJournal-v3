@@ -175,23 +175,21 @@ def _drop_old_uniques(conn, table: str, old_names: tuple[str, ...]) -> None:
             op.drop_index(name, table_name=table)
 
 
-def _create_unique_constraint(conn, table: str, name: str, columns: list[str]) -> None:
+def _create_user_scoped_unique(conn, table: str, name: str, columns: list[str]) -> None:
     if constraint_exists(conn, name) or index_exists(conn, table, name):
         return
     if _dialect(conn) == "sqlite":
-        with op.batch_alter_table(table) as batch_op:
-            batch_op.create_unique_constraint(name, columns)
+        op.create_index(name, table, columns, unique=True)
     else:
         op.create_unique_constraint(name, table, columns)
 
 
-def _drop_unique_constraint(conn, table: str, name: str) -> None:
+def _drop_user_scoped_unique(conn, table: str, name: str) -> None:
     if constraint_exists(conn, name):
         op.drop_constraint(name, table, type_="unique")
         return
-    if _dialect(conn) == "sqlite" and index_exists(conn, table, name):
-        with op.batch_alter_table(table) as batch_op:
-            batch_op.drop_constraint(name, type_="unique")
+    if index_exists(conn, table, name):
+        op.drop_index(name, table_name=table)
 
 
 def _ensure_user_scoped_uniques(conn, spec: dict) -> None:
@@ -200,7 +198,7 @@ def _ensure_user_scoped_uniques(conn, spec: dict) -> None:
     if constraint_exists(conn, new_unique) or index_exists(conn, table, new_unique):
         return
     _drop_old_uniques(conn, table, spec["old_unique_names"])
-    _create_unique_constraint(conn, table, new_unique, list(spec["unique_columns"]))
+    _create_user_scoped_unique(conn, table, new_unique, list(spec["unique_columns"]))
     if not index_exists(conn, table, spec["date_index"]):
         op.create_index(spec["date_index"], table, [spec["date_column"]])
 
@@ -258,7 +256,7 @@ def downgrade() -> None:
         if not table_exists(conn, table) or not column_exists(conn, table, "user_id"):
             continue
 
-        _drop_unique_constraint(conn, table, spec["new_unique"])
+        _drop_user_scoped_unique(conn, table, spec["new_unique"])
 
         date_idx = spec["date_index"]
         if index_exists(conn, table, date_idx):
