@@ -82,6 +82,18 @@ class PlaybookEdgeCommandCenter(BaseModel):
     lowest_expectancy: Optional[SetupEdgeSummaryItem] = None
 
 
+class RegimeCommandCenter(BaseModel):
+    regime: str
+    confidence: str
+    status: str
+    as_of_date: Optional[str] = None
+    reasoning: list[str] = Field(default_factory=list)
+    best_setup: Optional[str] = None
+    best_setup_expectancy_r: Optional[float] = None
+    worst_setup: Optional[str] = None
+    worst_setup_expectancy_r: Optional[float] = None
+
+
 class EdgeCommandCenterResponse(BaseModel):
     generated_at: str
     period_start: str
@@ -96,3 +108,4 @@ class EdgeCommandCenterResponse(BaseModel):
     summary: EdgeCommandCenterSummary = Field(default_factory=EdgeCommandCenterSummary)
     data_quality: EdgeDataQuality = Field(default_factory=EdgeDataQuality)
     playbook_edge: Optional[PlaybookEdgeCommandCenter] = None
+    market_regime: Optional[RegimeCommandCenter] = None

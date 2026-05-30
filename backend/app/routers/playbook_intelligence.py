@@ -390,6 +390,39 @@ def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) ->
     return results
 
 
+def _compute_setup_regime(db: Session, user_id: int, setup_name: str) -> Optional[dict]:
+    """Per-setup market regime breakdown: best/worst regime + per-regime expectancy.
+
+    Uses market_regime_service (existing snapshot fields + closed-trade R-multiples).
+    Returns None when this setup has no regime-matched trades.
+    """
+    try:
+        from app.services.market_regime_service import calculate_setup_regime_matrix
+        matrix = calculate_setup_regime_matrix(db, user_id)
+    except Exception:
+        return None
+
+    row = next((r for r in matrix.rows if r.setup == setup_name), None)
+    if row is None or not row.cells:
+        return None
+
+    return {
+        "best_regime": row.best_regime.value if row.best_regime else None,
+        "worst_regime": row.worst_regime.value if row.worst_regime else None,
+        "by_regime": [
+            {
+                "regime": c.regime.value,
+                "sample_size": c.sample_size,
+                "avg_r": c.avg_r,
+                "expectancy_r": c.expectancy_r,
+                "win_rate": c.win_rate,
+                "confidence": c.confidence.value,
+            }
+            for c in row.cells
+        ],
+    }
+
+
 # ─────────────────────── overview endpoint ───────────────────────
 
 @router.get("/intelligence/overview")
@@ -505,6 +538,7 @@ def setup_intelligence(
             "risk_profile": playbook.risk_profile,
             "rules": playbook.rules,
             "performance": _compute_performance([]),
+            "regime_performance": None,
             "hold_time": _compute_hold_time([]),
             "market_conditions": _compute_market_conditions([]),
             "failure_patterns": _compute_failure_patterns([]),
@@ -521,6 +555,8 @@ def setup_intelligence(
         perf["total_pnl"] = total_pnl_val
         perf["closed_count"] = perf["closed_count"] + len(partial_events)
 
+    regime_perf = _compute_setup_regime(db, current_user.id, setup_name)
+
     closed_trades = [t for t in trades if t.exit_price is not None]
     recent = sorted(closed_trades, key=lambda t: t.entry_time or datetime.min, reverse=True)[:10]
 
@@ -531,6 +567,7 @@ def setup_intelligence(
         "risk_profile": playbook.risk_profile,
         "rules": playbook.rules,
         "performance": perf,
+        "regime_performance": regime_perf,
         "hold_time": _compute_hold_time(trades),
         "market_conditions": _compute_market_conditions(trades),
         "failure_patterns": _compute_failure_patterns(trades),

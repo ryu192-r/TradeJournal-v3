@@ -78,6 +78,19 @@ export interface EdgeCommandCenterResponse {
   summary: EdgeCommandCenterSummary
   data_quality: EdgeDataQuality
   playbook_edge?: PlaybookEdgeCommandCenter | null
+  market_regime?: RegimeCommandCenter | null
+}
+
+export interface RegimeCommandCenter {
+  regime: string
+  confidence: string
+  status: string
+  as_of_date: string | null
+  reasoning: string[]
+  best_setup: string | null
+  best_setup_expectancy_r: number | null
+  worst_setup: string | null
+  worst_setup_expectancy_r: number | null
 }
 
 export interface PlaybookEdgeCommandCenter {

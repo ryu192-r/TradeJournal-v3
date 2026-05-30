@@ -606,6 +606,24 @@ export function syncLiveQuotes() {
   return apiClient.post<{ symbols: string[]; count: number; fetched?: number; upserted?: number; errors?: string[]; message?: string; provider_status?: string; stale_after_seconds?: number }>('/market/sync-quotes').then(r => r.data)
 }
 
+// ────────────────────────── Market Regime ──────────────────────────
+
+export function getMarketRegimeDashboard() {
+  return apiClient.get<import('@/types/marketRegime').MarketRegimeDashboard>('/market-regime').then(r => r.data)
+}
+
+export function getCurrentRegime() {
+  return apiClient.get<import('@/types/marketRegime').CurrentRegime>('/market-regime/current').then(r => r.data)
+}
+
+export function getRegimePerformance() {
+  return apiClient.get<import('@/types/marketRegime').RegimePerformanceResponse>('/market-regime/performance').then(r => r.data)
+}
+
+export function getRegimeMatrix() {
+  return apiClient.get<import('@/types/marketRegime').SetupRegimeMatrix>('/market-regime/matrix').then(r => r.data)
+}
+
 // ────────────────────────── Performance OS ──────────────────────────
 
 export function ensureWorkflow(date?: string) {

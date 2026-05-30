@@ -115,6 +115,10 @@ def get_recommendation_dashboard(
     recs = _continue_recommendations(closed_trades, all_trades)
     recommendations.extend(recs)
 
+    # --- 9. Market regime recommendations (data-only, sample >= 20) ---
+    recs = _regime_recommendations(db, user_id)
+    recommendations.extend(recs)
+
     # Sort by priority_score descending, cap at MAX_RECOMMENDATIONS
     recommendations.sort(key=lambda r: r.priority_score, reverse=True)
     recommendations = recommendations[:MAX_RECOMMENDATIONS]
@@ -744,6 +748,66 @@ def _continue_recommendations(
             priority_score=60,
         ))
 
+    return recs
+
+
+# ────────── Market regime recommendations ──────────
+
+
+def _regime_recommendations(db: Session, user_id: int) -> list[TradingRecommendation]:
+    """Setup × regime recommendations. Only emitted when sample >= 20 (statistical).
+
+    Pure data evidence — no AI wording. Sources from market_regime_service.
+    """
+    recs: list[TradingRecommendation] = []
+    try:
+        from app.services.market_regime_service import get_regime_recommendations
+        regime_recs = get_regime_recommendations(db, user_id, min_sample=MIN_CLOSED_FOR_EDGE_PAUSE)
+    except Exception:
+        return recs
+
+    for r in regime_recs:
+        regime_label = r["regime"].replace("_", " ").lower()
+        exp = r["expectancy_r"]
+        n = r["sample_size"]
+        if r["action"] == "pause":
+            score = min(90, 65 + int(abs(exp) * 20))
+            recs.append(TradingRecommendation(
+                id=_make_rec_id("regime-pause", len(recs)),
+                category=RecommendationCategory.market_context,
+                severity=RecommendationSeverity.warning,
+                action_type=RecommendationActionType.pause_setup,
+                title=f"Pause {r['setup']} in {regime_label} markets",
+                summary=f"{r['setup']} expectancy {exp:+.2f}R across {n} trades in {regime_label} markets.",
+                why=f"Negative regime expectancy ({exp:+.2f}R) over {n} closed trades. Edge does not hold in this regime.",
+                suggested_action=r["message"],
+                confidence=_confidence_from_sample(n),
+                evidence=[
+                    RecommendationEvidence(metric="expectancy_r", value=exp, benchmark=0, sample_size=n),
+                    RecommendationEvidence(metric="regime", value=r["regime"], sample_size=n),
+                ],
+                related_setup=r["setup"],
+                priority_score=score,
+            ))
+        else:  # focus
+            score = min(88, 60 + int(exp * 15))
+            recs.append(TradingRecommendation(
+                id=_make_rec_id("regime-focus", len(recs)),
+                category=RecommendationCategory.market_context,
+                severity=RecommendationSeverity.positive,
+                action_type=RecommendationActionType.increase_focus,
+                title=f"Favor {r['setup']} in {regime_label} markets",
+                summary=f"{r['setup']} expectancy {exp:+.2f}R across {n} trades in {regime_label} markets.",
+                why=f"Positive regime expectancy ({exp:+.2f}R) over {n} closed trades. Edge is regime-specific.",
+                suggested_action=r["message"],
+                confidence=_confidence_from_sample(n),
+                evidence=[
+                    RecommendationEvidence(metric="expectancy_r", value=exp, benchmark=0.25, sample_size=n),
+                    RecommendationEvidence(metric="regime", value=r["regime"], sample_size=n),
+                ],
+                related_setup=r["setup"],
+                priority_score=score,
+            ))
     return recs
 
 

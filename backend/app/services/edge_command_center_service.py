@@ -27,6 +27,7 @@ from app.schemas.edge_command_center import (
     EdgeSetupFocus,
     EdgeWorkflowStatus,
     PlaybookEdgeCommandCenter,
+    RegimeCommandCenter,
 )
 from app.schemas.recommendations import RecommendationDashboardResponse, TradingRecommendation
 from app.schemas.trade_review_v2 import TradeReviewBatchResponse, TradeReviewV2Response
@@ -411,6 +412,47 @@ def _build_priorities(
     return deduped[:8]
 
 
+def _inject_regime_priority(
+    priorities: list[EdgePriority],
+    market_regime: Optional[RegimeCommandCenter],
+) -> list[EdgePriority]:
+    """Surface the active market regime + best/worst setup as a command-center priority."""
+    if market_regime is None:
+        return priorities
+
+    regime_label = market_regime.regime.replace("_", " ").title()
+    sev = "warning" if market_regime.status == "UNFAVORABLE" else "info"
+    evidence = list(market_regime.reasoning[:2])
+    if market_regime.best_setup and market_regime.best_setup_expectancy_r is not None:
+        evidence.append(
+            f"Best: {market_regime.best_setup} ({market_regime.best_setup_expectancy_r:+.2f}R)"
+        )
+    if market_regime.worst_setup and market_regime.worst_setup_expectancy_r is not None:
+        evidence.append(
+            f"Avoid: {market_regime.worst_setup} ({market_regime.worst_setup_expectancy_r:+.2f}R)"
+        )
+
+    action = "Trade with the regime — lean into your best regime setup."
+    if market_regime.best_setup:
+        action = f"Favor {market_regime.best_setup} while {regime_label} persists."
+
+    regime_priority = EdgePriority(
+        id="market-regime-current",
+        title=f"Current regime: {regime_label}",
+        category="focus",
+        severity=sev,
+        summary=(
+            f"Market is {regime_label} ({market_regime.confidence} confidence, "
+            f"{market_regime.status.lower()} for your edge)."
+        ),
+        action=action,
+        evidence=evidence,
+        related_setup=market_regime.best_setup,
+        source="derived",
+    )
+    return [regime_priority] + priorities
+
+
 def _build_workflow_status(wf: Optional[DailyWorkflow]) -> EdgeWorkflowStatus:
     today_str = date.today().isoformat()
     if wf is None:
@@ -637,6 +679,25 @@ def get_edge_command_center(
     elif edge_err:
         notes.append(edge_err)
 
+    # Market regime intelligence (current regime + best/worst setup for it)
+    market_regime: Optional[RegimeCommandCenter] = None
+    from app.services.market_regime_service import get_current_regime
+    current_regime, regime_err = _safe_call("market_regime", get_current_regime, db, user_id)
+    if current_regime is not None:
+        market_regime = RegimeCommandCenter(
+            regime=current_regime.regime.value,
+            confidence=current_regime.confidence.value,
+            status=current_regime.status.value,
+            as_of_date=current_regime.as_of_date,
+            reasoning=current_regime.reasoning,
+            best_setup=current_regime.best_setup,
+            best_setup_expectancy_r=current_regime.best_setup_expectancy_r,
+            worst_setup=current_regime.worst_setup,
+            worst_setup_expectancy_r=current_regime.worst_setup_expectancy_r,
+        )
+    elif regime_err:
+        notes.append(regime_err)
+
     prompts: list[TradeReviewPrompt] = []
     if coaching and coaching.top_trade_review_prompts:
         prompts = coaching.top_trade_review_prompts
@@ -651,6 +712,7 @@ def get_edge_command_center(
     seen_trades: set[int] = set()
     review_queue = _build_review_queue(batch, prompts, seen_trades)
     priorities = _build_priorities(recs, coaching, batch, review_queue, workflow_status)
+    priorities = _inject_regime_priority(priorities, market_regime)
     summary = _build_summary(priorities, recs, coaching, review_queue, setup_focus, playbook_edge)
 
     if closed < 5:
@@ -683,4 +745,5 @@ def get_edge_command_center(
         summary=summary,
         data_quality=data_quality,
         playbook_edge=playbook_edge,
+        market_regime=market_regime,
     )
