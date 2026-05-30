@@ -1253,7 +1253,7 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
       return (
         <td key={column} className={cellClass}>
           {trade.stop_price ? (() => {
-            const risk = computeMaxRisk(Number(trade.entry_price), Number(trade.stop_price), remainingQty)
+            const risk = computeMaxRisk(Number(trade.entry_price), Number(trade.stop_price), remainingQty, trade.direction)
             return <span className={`font-data text-xs ${risk == null ? 'text-text-faint' : risk < 0 ? 'text-profit' : risk > 0 ? 'text-loss' : 'text-text-muted'}`}>{risk == null ? '—' : risk < 0 ? '-' : ''}{risk != null ? formatCurrency(Math.abs(risk)) : ''}</span>
           })() : <span className="text-text-faint text-xs">—</span>}
         </td>

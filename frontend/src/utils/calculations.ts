@@ -132,13 +132,14 @@ export function computeLivePnlPct(investedValue: number, livePnl: number): numbe
   return (livePnl / investedValue) * 100
 }
 
-export function computeMaxRisk(entryPrice: number, stopPrice: number, remainingQty: number): number | null {
+export function computeMaxRisk(entryPrice: number, stopPrice: number, remainingQty: number, direction?: string): number | null {
   const entry = toNum(entryPrice)
   const stop = toNum(stopPrice)
   const qty = toNum(remainingQty)
   if (entry == null || stop == null || qty == null) return null
-  const risk = (entry - stop) * qty
-  return risk < 0 ? 0 : risk
+  const riskPerUnit = direction === 'SHORT' ? stop - entry : entry - stop
+  const risk = riskPerUnit * qty
+  return Math.max(0, risk)
 }
 
 export function computeCapPct(pnlValue: number, netEquity: number): number | null {
