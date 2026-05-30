@@ -59,9 +59,11 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
         <div className="flex items-center gap-1">
           {images.length > 0 && (
             <button
+              type="button"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
               className="p-1.5 rounded-lg text-text-muted hover:text-loss hover:bg-loss-muted/20 transition-colors cursor-pointer disabled:opacity-50"
+              aria-label="Delete current chart image"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -135,12 +137,14 @@ export function ChartImageGallery({ tradeId, images }: ChartImageGalleryProps) {
         {slides.length > 1 && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
             {slides.map((_, idx) => (
-              <div
+              <button
+                type="button"
                 key={idx}
+                onClick={() => setActiveIndex(idx)}
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-hover cursor-pointer ${
                   idx === current ? 'bg-accent w-3' : 'bg-text-muted/40'
                 }`}
-                onClick={() => setActiveIndex(idx)}
+                aria-label={`Go to image ${idx + 1}`}
               />
             ))}
           </div>
