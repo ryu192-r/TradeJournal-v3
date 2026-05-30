@@ -59,12 +59,6 @@ function App() {
     fetchMe()
   }, [fetchMe])
 
-  useEffect(() => {
-    if (window.location.pathname === '/coaching-intelligence') {
-      useAppStore.getState().setActiveView('coaching-intelligence')
-    }
-  }, [])
-
   /*
     Global Performance Listener:
     * Logs query success/fetch durations
