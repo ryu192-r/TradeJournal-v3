@@ -761,7 +761,7 @@ export function TradesPage() {
           </div>
         )}
         {!isLoading && !error && displayedTrades.length > 0 && showTable && (
-          <div className="overflow-x-auto scrollbar-thin">
+          <div className="table-scroll">
             <table className="min-w-full text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-bg-low text-left">

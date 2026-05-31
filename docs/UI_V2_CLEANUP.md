@@ -84,6 +84,53 @@ Navigation source: `frontend/src/app/navigation.ts`.
 - Pro-only `activeView` in Simple Mode → **ProModeGate** with enable / go-back actions (`ProModeGate.tsx`).
 - Sidebar mode toggle removed; single control in Settings.
 
+## Mobile responsiveness (2026-05-31)
+
+Hardening pass — layout only, no new features.
+
+### Global
+
+- **`index.html`**: `viewport-fit=cover` on viewport meta (notch / home-indicator safe areas).
+- **`index.css`**: `100dvh` min-height, `overflow-x: clip`, iOS 16px input rule (prevents focus zoom), utility classes:
+  - `.app-shell`, `.main-content`, `.page-container`
+  - `.scroll-tabs`, `.table-scroll`, `.chart-container`
+  - Recharts `min-width: 0` guard
+- **`frontend/src/lib/mobileLayout.ts`**: shared class constants + QA viewport list (360×740 … 1280 desktop).
+
+### Shell
+
+- **`App.tsx`**: `app-shell` + `main-content` + scroll region with bottom-nav + safe-area padding.
+- **`PageShell`**: uses `PAGE_CONTAINER_CLASS` — `min-w-0`, `max-w-[1400px]`, mobile bottom padding.
+- **`Sidebar` / `TopBar`**: safe-area offsets for hamburger, top bar, bottom nav.
+- **`ActionsInbox`**: bell `right` respects `safe-area-inset-right`.
+
+### Components
+
+- **`SharedUI` PageHeader**: stacks title/actions on narrow screens; tab bar uses `.scroll-tabs`.
+- **`ResponsiveTabs`**, **`BottomSheet`**, **`PullToRefresh`**: width/overflow guards.
+- **`layoutTokens`**: `CARD` / `PAGE_STACK` include `min-w-0 max-w-full`.
+- **Tables**: `.table-scroll` on Trades table; Reports already scrollable.
+- **Charts**: `.chart-container` + Recharts global fix; trade chart uses `dvh` + responsive min-height.
+- **Forms**: submit buttons full-width on mobile (`FormComponents`).
+- **Settings**: wrapped in `PageShell`; long email truncates.
+
+### Tests
+
+- `frontend/src/test/mobileLayout.test.tsx` — viewport meta, PageShell classes, token guards, QA sizes.
+
+### Manual QA viewports
+
+| Size | Device class |
+|------|----------------|
+| 360×740 | small Android |
+| 390×844 | iPhone 14 |
+| 412×915 | Pixel-class Android |
+| 430×932 | iPhone 14 Pro Max |
+| 768×1024 | tablet |
+| 1280×800 | desktop |
+
+Checklist: no horizontal scroll at `initial-scale=1`, bottom nav + FAB + bell non-overlapping, modals/sheets fit height, tabs scroll horizontally.
+
 ## Follow-up (not done)
 
 - [ ] URL routes / deep links per tab (e.g. `?tab=equity`).

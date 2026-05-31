@@ -268,7 +268,7 @@ export function ActionsInbox() {
         className={cn(
           'fixed z-[45] inline-flex min-h-11 min-w-11 items-center justify-center rounded-full',
           'bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover transition-colors cursor-pointer',
-          'bottom-[var(--actions-bell-bottom-mobile)] right-4',
+          'bottom-[var(--actions-bell-bottom-mobile)] right-[calc(1rem+env(safe-area-inset-right,0px))]',
           'lg:bottom-6 lg:right-6 lg:z-[90] lg:min-h-12 lg:min-w-12'
         )}
         aria-label={badgeCount > 0 ? `Actions, ${badgeCount} pending` : 'Open actions'}

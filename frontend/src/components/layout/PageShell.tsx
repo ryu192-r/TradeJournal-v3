@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { PAGE_CONTAINER_CLASS } from '@/lib/mobileLayout'
 import type { ReactNode } from 'react'
 
 interface PageShellProps {
@@ -8,12 +9,7 @@ interface PageShellProps {
 
 export function PageShell({ children, className }: PageShellProps) {
   return (
-    <div
-      className={cn(
-        'mx-auto w-full max-w-[1400px] px-[var(--page-px)] py-[var(--page-py)] pb-[calc(var(--page-py)+var(--bottom-nav-height))] lg:pb-[var(--page-py)]',
-        className
-      )}
-    >
+    <div data-testid="page-shell" className={cn(PAGE_CONTAINER_CLASS, className)}>
       {children}
     </div>
   )

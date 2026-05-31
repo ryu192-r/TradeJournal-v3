@@ -33,6 +33,7 @@ import {
 } from '@/app/reviewAnalytics'
 import { reviewTabsForMode } from '@/app/interfaceMode'
 import { useAppStore } from '@/store/appStore'
+import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
 const TAB_ICONS: Record<ReviewAnalyticsTabId, LucideIcon> = {
@@ -173,7 +174,7 @@ export function ReviewAnalyticsPage({ defaultTab = 'queue' }: ReviewAnalyticsPag
         }
       />
 
-      <div className={CARD}>
+      <div className={cn(CARD, 'min-w-0 overflow-hidden')}>
         <Tabs tabs={tabs} active={activeTab} onChange={handleTabChange} />
       </div>
 

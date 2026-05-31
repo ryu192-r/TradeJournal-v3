@@ -138,14 +138,14 @@ export function Sidebar() {
 
       <button
         onClick={toggleSidebar}
-        className="fixed top-3 left-3 z-50 lg:hidden inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
+        className="fixed top-[calc(0.75rem+env(safe-area-inset-top,0px))] left-[calc(0.75rem+env(safe-area-inset-left,0px))] z-50 lg:hidden inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg bg-bg-card border border-border text-text hover:bg-bg-elevated cursor-pointer"
         aria-label="Open navigation"
       >
         <PanelLeft className="w-5 h-5" />
       </button>
 
       {/* ── Bottom nav (mobile) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-low/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-sm lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-low/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-sm lg:hidden max-w-full overflow-x-clip">
         <div className="flex items-end justify-around gap-0.5">
           <MobileNavButton
             icon={mobileNavigationItems.find(i => i.id === 'dashboard')?.icon}
@@ -238,8 +238,8 @@ function MobileNavButton({ icon: Icon, label, isActive, onClick }: { icon: any; 
 
 export function TopBar({ children }: { children?: ReactNode }) {
   return (
-    <header className="min-h-14 flex items-center px-4 border-b border-border bg-bg-low/60 backdrop-blur-sm">
-      <div className="flex-1 ml-2">{children}</div>
+    <header className="min-h-14 flex items-center border-b border-border bg-bg-low/60 backdrop-blur-sm px-4 pl-14 pt-[env(safe-area-inset-top,0px)] lg:pl-4">
+      <div className="flex-1 min-w-0 ml-0 lg:ml-2">{children}</div>
     </header>
   )
 }

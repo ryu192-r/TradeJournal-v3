@@ -16,7 +16,7 @@ interface ResponsiveTabsProps {
 
 export function ResponsiveTabs({ value, onChange, items, className }: ResponsiveTabsProps) {
   return (
-    <div className={cn('flex gap-2 overflow-x-auto pb-1 scrollbar-thin', className)}>
+    <div className={cn('scroll-tabs gap-2', className)}>
       {items.map((item) => {
         const Icon = item.icon
         const active = value === item.id

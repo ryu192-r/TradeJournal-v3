@@ -904,7 +904,7 @@ export function DashboardPage() {
 
   if (error && !data) {
     return (
-      <div className="px-[var(--page-px)] py-[var(--page-py)]">
+      <div className="px-[var(--page-px)] py-[var(--page-py)] page-container min-w-0">
         <ErrorState
           title="Dashboard failed to load"
           message={(error as Error)?.message || 'Something went wrong loading your dashboard.'}
@@ -916,7 +916,7 @@ export function DashboardPage() {
 
   if (!data) {
     return (
-      <div className="px-[var(--page-px)] py-[var(--page-py)]">
+      <div className="px-[var(--page-px)] py-[var(--page-py)] page-container min-w-0">
         <EmptyState title="No data" message="Your dashboard is empty. Add trades to see performance metrics." />
       </div>
     )
@@ -976,7 +976,7 @@ export function DashboardPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
+      <div className="page-container min-w-0 space-y-[var(--page-gap)] px-[var(--page-px)] py-[var(--page-py)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
         {/* ── HEADER: Today + Sync ── */}
         <PageHeader
           title="Command Center"

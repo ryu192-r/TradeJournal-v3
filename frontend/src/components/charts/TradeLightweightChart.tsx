@@ -319,7 +319,11 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
             </div>
           </div>
         )}
-        <div ref={containerRef} className="w-full" style={{ minHeight: isFullscreen ? 'calc(100vh - 120px)' : '360px' }} />
+        <div
+          ref={containerRef}
+          className="chart-container w-full min-h-[240px] sm:min-h-[360px]"
+          style={{ minHeight: isFullscreen ? 'calc(100dvh - 120px)' : undefined }}
+        />
       </div>
 
       {/* Meta info */}

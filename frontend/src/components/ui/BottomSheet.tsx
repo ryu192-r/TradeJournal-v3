@@ -38,9 +38,9 @@ export function BottomSheet({ open, onClose, children, title, flush = false }: B
             onClick={onClose}
           />
           <motion.div
-            className={`fixed bottom-0 left-0 right-0 z-[101] bg-bg-card rounded-t-2xl border border-border shadow-xl max-h-[min(85dvh,640px)] flex flex-col ${
+            className={`fixed bottom-0 left-0 right-0 z-[101] bg-bg-card rounded-t-2xl border border-border shadow-xl max-h-[min(85dvh,640px)] flex flex-col max-w-full ${
               flush ? 'overflow-hidden' : 'overflow-y-auto'
-            }`}
+            } pb-[env(safe-area-inset-bottom,0px)]`}
             role="dialog"
             aria-modal="true"
             aria-label={title ?? 'Bottom sheet'}

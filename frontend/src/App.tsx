@@ -2,6 +2,7 @@ import { AppNavigation, TopBar } from '@/components/layout/AppNavigation'
 import { ToastContainer } from '@/store/toastStore'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
+import { APP_SHELL_CLASS, MAIN_CONTENT_CLASS, MAIN_SCROLL_CLASS } from '@/lib/mobileLayout'
 import { cn } from '@/lib/utils'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
@@ -105,34 +106,34 @@ function App() {
           <LoginPage />
         </Suspense>
       ) : (
-        <div className="min-h-screen bg-bg flex">
+        <div className={cn(APP_SHELL_CLASS)}>
           <AppNavigation />
           <div
             className={cn(
-              'flex-1 flex flex-col min-h-screen transition-all duration-300',
+              MAIN_CONTENT_CLASS,
               sidebarOpen && 'lg:ml-60'
             )}
           >
             <EdgeSwipe>
             <OfflineIndicator />
             <TopBar>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[10px] font-data uppercase tracking-wider text-accent">
-                    <Globe2 className="h-3 w-3" />
+                    <Globe2 className="h-3 w-3 shrink-0" />
                     {activeMeta.section}
                   </div>
                   <div className="mt-0.5 text-sm text-text-muted truncate">
                     {activeMeta.purpose}
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-[.375rem] rounded-md px-2 py-[.1875rem] text-[.5rem] font-semibold font-data uppercase tracking-wider bg-text-muted text-text-muted md:gap-[.4375rem] md:px-2.5 md:py-1 md:text-[.625rem]">
+                <div className="inline-flex shrink-0 items-center gap-[.375rem] rounded-md px-2 py-[.1875rem] text-[.5rem] font-semibold font-data uppercase tracking-wider bg-text-muted text-text-muted md:gap-[.4375rem] md:px-2.5 md:py-1 md:text-[.625rem]">
                   <div className="w-[4px] h-[4px] rounded-full bg-accent animate-pulse md:w-[6px] md:h-[6px]" />
                   <span className="hidden xs:inline">Closed · Opens 9:15 AM IST</span>
                 </div>
               </div>
             </TopBar>
-            <main className="flex-1 overflow-auto pb-20 scrollbar-thin lg:pb-0">
+            <main className={MAIN_SCROLL_CLASS}>
               {viewBlocked ? (
                 <ProModeGate view={activeView} />
               ) : (

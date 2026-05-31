@@ -255,8 +255,8 @@ export function PageHeader({
   right?: ReactNode
 }) {
   return (
-    <div className="flex items-end justify-between gap-3">
-      <div className="min-w-0">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between min-w-0 w-full">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
           {left}
           <h1 className="font-display text-[length:var(--heading-size)] text-text-heading truncate">{title}</h1>
@@ -265,7 +265,7 @@ export function PageHeader({
           <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
         ) : null}
       </div>
-      {right && <div className="shrink-0 flex items-center gap-2">{right}</div>}
+      {right && <div className="flex shrink-0 flex-wrap items-center gap-2">{right}</div>}
     </div>
   )
 }
@@ -334,7 +334,7 @@ export function Tabs({
   onChange: (id: string) => void
 }) {
   return (
-    <div role="tablist" aria-label="Sections" className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
+    <div role="tablist" aria-label="Sections" className="scroll-tabs">
       {tabs.map((tab) => {
         const isActive = tab.id === active
         const Icon = tab.icon

@@ -40,7 +40,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+    <div className="min-h-dvh w-full bg-bg flex items-center justify-center p-4">
       {/* Noise texture overlay */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.015]"

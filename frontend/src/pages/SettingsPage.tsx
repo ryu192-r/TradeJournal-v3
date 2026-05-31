@@ -1,4 +1,4 @@
-// Settings page — account info, preferences, connection status
+import { PageShell } from '@/components/layout/PageShell'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
@@ -140,7 +140,7 @@ export function SettingsPage() {
   }, [aiProvider, aiBaseUrl, aiApiKey, aiModel, aiTimeout, aiMaxRetries, aiTemperature, isCustomProvider, currentProvider, needsApiKey, personality])
 
   return (
-    <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+    <PageShell className="space-y-[var(--page-gap)]">
       <div>
         <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Settings</h1>
         <p className="text-[length:var(--text-sm)] text-text-muted mt-1">Your profile, connection, and display preferences</p>
@@ -161,9 +161,9 @@ export function SettingsPage() {
         {user ? (
           <>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-text-muted">Email</span>
-                <span className="text-text-heading">{user.email}</span>
+              <div className="flex flex-col gap-2 py-2 border-b border-border sm:flex-row sm:justify-between sm:items-center min-w-0">
+                <span className="text-text-muted shrink-0">Email</span>
+                <span className="text-text-heading truncate text-right">{user.email}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-text-muted">Name</span>
@@ -587,6 +587,6 @@ export function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

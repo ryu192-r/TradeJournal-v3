@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, type ReactNode, type TouchEvent } from 'react'
 import { Loader2, ArrowDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>
@@ -60,7 +61,7 @@ export function PullToRefresh({ onRefresh, children, disabled, className }: Pull
   }, [disabled, state, onRefresh])
 
   return (
-    <div className={`relative overflow-auto overscroll-none ${className ?? ''}`}>
+    <div className="relative w-full min-w-0 overflow-x-clip overscroll-none">
       {/* Pull indicator */}
       <div
         className="flex items-center justify-center pointer-events-none"
@@ -88,7 +89,7 @@ export function PullToRefresh({ onRefresh, children, disabled, className }: Pull
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="will-change-transform"
+        className={cn('will-change-transform min-w-0 w-full', className)}
       >
         {children}
       </div>

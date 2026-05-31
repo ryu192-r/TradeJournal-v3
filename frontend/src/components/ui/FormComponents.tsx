@@ -119,7 +119,7 @@ export function SubmitButton({
       size="md"
       type="submit"
       disabled={disabled || isSubmitting}
-      className={cn('min-w-[140px]', className)}
+      className={cn('w-full sm:min-w-[140px] sm:w-auto', className)}
     >
       {isSubmitting ? (
         <Loader2 className="w-4 h-4 animate-spin" />

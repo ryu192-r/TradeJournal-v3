@@ -29,7 +29,7 @@ export function PageHeader({ title, subtitle, icon: Icon, actions, onBack }: Lay
         </div>
         {subtitle ? <p className="text-[length:var(--text-sm)] text-text-muted">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">{actions}</div> : null}
     </div>
   )
 }
