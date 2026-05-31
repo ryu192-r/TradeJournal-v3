@@ -69,6 +69,11 @@ class AIProviderClient:
             api_format=self.api_format,
         )
 
+    def _provider_url(self, path: str) -> str:
+        """Revalidate the provider host immediately before an outbound request."""
+        self.base_url = validate_ai_base_url(self.base_url)
+        return f"{self.base_url}{path}"
+
     # ─── Public API ────────────────────────────────────────────────
 
     async def chat(
@@ -96,7 +101,6 @@ class AIProviderClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        url = f"{self.base_url}/v1/chat/completions"
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -112,6 +116,7 @@ class AIProviderClient:
         last_err: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                url = self._provider_url("/v1/chat/completions")
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 ) as client:
@@ -157,7 +162,6 @@ class AIProviderClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        url = f"{self.base_url}/api/chat"
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -174,6 +178,7 @@ class AIProviderClient:
         last_err: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                url = self._provider_url("/api/chat")
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 ) as client:
@@ -214,7 +219,6 @@ class AIProviderClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        url = f"{self.base_url}/v1/messages"
         headers: dict[str, str] = {
             "Content-Type": "application/json",
             "x-api-key": self.api_key or "",
@@ -245,6 +249,7 @@ class AIProviderClient:
         last_err: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                url = self._provider_url("/v1/messages")
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 ) as client:
@@ -290,10 +295,6 @@ class AIProviderClient:
         max_tokens: int,
     ) -> str:
         api_key = self.api_key or ""
-        url = (
-            f"{self.base_url}/v1beta/models/{self.model}:generateContent"
-            f"?key={api_key}"
-        )
 
         system_instructions = ""
         contents: list[dict[str, Any]] = []
@@ -323,6 +324,10 @@ class AIProviderClient:
         last_err: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                url = (
+                    f"{self._provider_url(f'/v1beta/models/{self.model}:generateContent')}"
+                    f"?key={api_key}"
+                )
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 ) as client:

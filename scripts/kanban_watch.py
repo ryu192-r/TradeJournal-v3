@@ -26,6 +26,17 @@ BOARD = sys.argv[1] if len(sys.argv) > 1 else "tjv3"
 POLL_INTERVAL = 10
 MANUAL_ONLY = "--manual" in sys.argv
 
+
+def _postgres_database_answer() -> str:
+    db_url = os.environ.get("KANBAN_POSTGRES_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if db_url:
+        return db_url
+    return (
+        "Set KANBAN_POSTGRES_DATABASE_URL or DATABASE_URL; "
+        "no default PostgreSQL credentials are stored."
+    )
+
+
 # Known answer mappings — built from Phase 1-2 experience
 KNOWN_ANSWERS = {
     "sqlite file": "/root/Trading Journal v2/data/trading.db",
@@ -39,7 +50,7 @@ KNOWN_ANSWERS = {
     "workspace path": "/root/projects/Trading Journal v3",
     "frontend workspace": "/root/projects/Trading Journal v3/frontend",
     "backend workspace": "/root/projects/Trading Journal v3/backend",
-    "postgres database": "postgresql://trading_journal:securepassword@postgres:5432/trading_journal",
+    "postgres database": _postgres_database_answer(),
     "telegram": "/root/.hermes/config.yaml",
 }
 

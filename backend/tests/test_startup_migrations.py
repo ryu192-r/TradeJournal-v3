@@ -1,6 +1,54 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 import app.main as main_module
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _fresh_db_env(db_path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATABASE_URL": f"sqlite:///{db_path}",
+            "SECRET_KEY": "test-startup-secret",
+            "JWT_SECRET_KEY": "test-startup-jwt-secret",
+            "DEBUG": "false",
+            "RATE_LIMIT_OFF": "true",
+        }
+    )
+    return env
+
+
+def test_fresh_empty_database_alembic_upgrade_head(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND_ROOT,
+        env=_fresh_db_env(tmp_path / "fresh-alembic.db"),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_debug_false_startup_runs_migrations_on_fresh_database(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-c", "import app.main; print('startup-ok')"],
+        cwd=BACKEND_ROOT,
+        env=_fresh_db_env(tmp_path / "fresh-startup.db"),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "startup-ok" in result.stdout
 
 
 def test_run_migrations_raises_on_prod_migration_failure(monkeypatch):

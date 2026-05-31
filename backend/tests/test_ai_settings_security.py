@@ -1,7 +1,10 @@
 """Security regressions for user-scoped AI provider settings."""
 
+import socket
+
 import pytest
 
+from app.core.ai_provider_client import AIProviderClient
 from app.core.config import settings
 from app.models.ai_provider_setting import AIProviderSetting
 
@@ -79,6 +82,53 @@ def test_ai_config_allows_local_url_when_explicitly_enabled(client, monkeypatch)
 
     assert resp.status_code == 200, resp.text
     assert resp.json()["base_url"] == "http://localhost:11434"
+
+
+def test_ai_config_blocks_hostname_that_resolves_to_private_ip(client, monkeypatch):
+    monkeypatch.setattr(settings, "DEBUG", False)
+    monkeypatch.setattr(settings, "ALLOW_LOCAL_AI_URLS", False)
+
+    def fake_getaddrinfo(hostname, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.2", port or 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    token = _register(client, "private-dns")
+
+    resp = client.put(
+        "/api/v1/ai/config",
+        json=_payload("https://rebind.example.com"),
+        headers=_headers(token),
+    )
+
+    assert resp.status_code == 400
+    assert "base_url" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_ai_provider_client_revalidates_hostname_immediately_before_request(monkeypatch):
+    monkeypatch.setattr(settings, "DEBUG", False)
+    monkeypatch.setattr(settings, "ALLOW_LOCAL_AI_URLS", False)
+    resolved_ips = iter(["93.184.216.34", "127.0.0.1"])
+
+    def fake_getaddrinfo(hostname, port, *args, **kwargs):
+        ip = next(resolved_ips)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port or 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    client = AIProviderClient(
+        {
+            "provider": "custom",
+            "base_url": "https://rebind.example.com",
+            "api_key": "",
+            "model": "secure-model",
+            "timeout": 1,
+            "max_retries": 1,
+            "temperature": 0.3,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="base_url"):
+        await client.chat([{"role": "user", "content": "hello"}])
 
 
 def test_ai_config_is_user_scoped_and_never_exposes_api_key(client):

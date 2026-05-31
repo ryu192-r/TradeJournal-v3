@@ -206,22 +206,6 @@ def list_trades(
     items = [_enrich_response(t, db, partials_by_trade_id.get(t.id, [])) for t in trades]
     return {"total": total, "items": items}
 
-
-@router.get("/brokers")
-def list_brokers(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Return list of supported brokers for import."""
-    from app.services.broker_import import BROKER_DISPLAY
-    return {
-        "brokers": [
-            {"id": k, "name": v}
-            for k, v in BROKER_DISPLAY.items()
-        ]
-    }
-
-
 @router.get("/open-live", response_model=List[OpenLiveTradeResponse])
 def list_open_live_trades(
     db: Session = Depends(get_db),

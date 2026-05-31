@@ -28,6 +28,57 @@ def _get_first_user_id():
     return None
 
 
+def _table_exists(conn, table: str) -> bool:
+    if conn.dialect.name == "sqlite":
+        row = conn.execute(
+            sa.text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:table"),
+            {"table": table},
+        ).fetchone()
+        return row is not None
+    row = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :table"
+        ),
+        {"table": table},
+    ).fetchone()
+    return row is not None
+
+
+def _column_exists(conn, table: str, column: str) -> bool:
+    if conn.dialect.name == "sqlite":
+        rows = conn.execute(sa.text(f"PRAGMA table_info('{table}')")).fetchall()
+        return any(row[1] == column for row in rows)
+    row = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = current_schema() "
+            "AND table_name = :table AND column_name = :column"
+        ),
+        {"table": table, "column": column},
+    ).fetchone()
+    return row is not None
+
+
+def _user_ownership_already_present() -> bool:
+    conn = op.get_bind()
+    required_columns = {
+        "trades": "user_id",
+        "accounts": "user_id",
+        "coach_reviews": "user_id",
+        "trade_ideas": "user_id",
+        "daily_journals": "user_id",
+        "daily_workflows": "user_id",
+        "weekly_reviews": "user_id",
+        "monthly_reviews": "user_id",
+        "market_snapshots": "user_id",
+    }
+    return all(
+        _table_exists(conn, table) and _column_exists(conn, table, column)
+        for table, column in required_columns.items()
+    )
+
+
 def _backfill_or_fail(table: str, user_id: int | None):
     conn = op.get_bind()
     result = conn.execute(sa.text(f"SELECT COUNT(*) FROM {table} WHERE user_id IS NULL"))
@@ -45,7 +96,9 @@ def _backfill_or_fail(table: str, user_id: int | None):
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
+    if _user_ownership_already_present():
+        return
+
     first_user_id = _get_first_user_id()
 
     # ── TRADES ──

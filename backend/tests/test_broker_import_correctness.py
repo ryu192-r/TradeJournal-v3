@@ -37,6 +37,17 @@ def _make_account(db, user_id):
     return acc
 
 
+def test_broker_list_route_uses_canonical_import_router(client, auth_user_token):
+    response = client.get(
+        "/api/v1/trades/brokers",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    broker_ids = {broker["id"] for broker in response.json()["brokers"]}
+    assert {"zerodha", "dhan", "generic"}.issubset(broker_ids)
+
+
 @pytest.fixture
 def db_session():
     Base.metadata.drop_all(bind=real_engine)

@@ -5,11 +5,13 @@ from decimal import Decimal
 from itertools import count
 
 import pytest
+from sqlalchemy import event
 
 from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
 from app.db.database import engine as real_engine
 from app.models.account import Account
+from app.models.live_quote import LiveQuote
 from app.models.trade import Trade
 from app.models.user import User
 from app.routers.operational_dashboard import operational_dashboard
@@ -64,6 +66,19 @@ def _trade(symbol: str, pnl: str, user_id: int):
     )
 
 
+def _open_trade(symbol: str, user_id: int):
+    return Trade(
+        symbol=symbol,
+        direction="LONG",
+        entry_price=Decimal("100.00"),
+        quantity=Decimal("10"),
+        entry_time=datetime.fromisoformat("2025-01-13T09:30:00"),
+        status="open",
+        fees=Decimal("0"),
+        user_id=user_id,
+    )
+
+
 def _dashboard_for_pnls(db_session, pnls: list[str]):
     user = _make_user(db_session)
     db_session.add(_account(user.id))
@@ -98,3 +113,36 @@ def test_operational_dashboard_expectancy_no_trades(db_session):
 
     assert data.kpi.trade_count == 0
     assert data.kpi.expectancy is None
+
+
+def test_operational_dashboard_queries_live_quotes_for_open_symbols_only(db_session):
+    user = _make_user(db_session)
+    db_session.add(_account(user.id))
+    db_session.add(_open_trade("OPENONLY", user.id))
+    db_session.add(_trade("CLOSED", "100.00", user.id))
+    db_session.add_all(
+        [
+            LiveQuote(symbol="OPENONLY", ltp=Decimal("150.00")),
+            LiveQuote(symbol="CLOSED", ltp=Decimal("999.00")),
+        ]
+    )
+    db_session.commit()
+
+    live_quote_queries: list[tuple[str, object]] = []
+
+    def capture_live_quote_query(conn, cursor, statement, parameters, context, executemany):
+        if "FROM live_quotes" in statement:
+            live_quote_queries.append((statement, parameters))
+
+    event.listen(real_engine, "before_cursor_execute", capture_live_quote_query)
+    try:
+        data = operational_dashboard(db_session, current_user=user)
+    finally:
+        event.remove(real_engine, "before_cursor_execute", capture_live_quote_query)
+
+    assert len(live_quote_queries) == 1
+    query_params = str(live_quote_queries[0][1])
+    assert "OPENONLY" in query_params
+    assert "CLOSED" not in query_params
+    assert [trade.symbol for trade in data.open_trades] == ["OPENONLY"]
+    assert Decimal(data.capital.unrealized_pnl) == Decimal("500.00")
