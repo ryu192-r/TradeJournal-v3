@@ -188,7 +188,7 @@ export function TradeReviewStream() {
             </button>
           )}
           <div>
-            <h1 className="font-display text-2xl text-text-heading">Review</h1>
+            <h2 className="font-display text-xl text-text-heading">Trade review</h2>
             <div className="text-sm text-text-muted font-data mt-0.5">
               {currentIndex + 1} of {trades.length}{filter === 'unreviewed' ? ' unreviewed' : ''}
               {bulkMode && ` (${selectedIds.size} selected)`}

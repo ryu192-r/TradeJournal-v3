@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
+import { ActionsInbox } from '@/components/actions/ActionsInbox'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
 import { InstallPrompt } from '@/components/ui/InstallPrompt'
 import { EdgeSwipe } from '@/components/ui/EdgeSwipe'
@@ -12,12 +13,14 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { lazy, Suspense, useEffect } from 'react'
 import { mark } from '@/utils/performance'
 import { viewMeta } from '@/app/navigation'
+import { canAccessView } from '@/app/interfaceMode'
+import { ProModeGate } from '@/components/layout/ProModeGate'
 import { Globe2 } from 'lucide-react'
 import { LoadingState } from '@/components/ui'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
-const AnalyticsDashboardPage = lazy(() => import('@/pages/AnalyticsDashboardPage').then((m) => ({ default: m.AnalyticsDashboardPage })))
+const ReviewAnalyticsPage = lazy(() => import('@/pages/ReviewAnalyticsPage').then((m) => ({ default: m.ReviewAnalyticsPage })))
 const TradesPage = lazy(() => import('@/pages/TradesPage').then((m) => ({ default: m.TradesPage })))
 const CreateTradePage = lazy(() => import('@/pages/CreateTradePage').then((m) => ({ default: m.CreateTradePage })))
 const EditTradePage = lazy(() => import('@/pages/EditTradePage').then((m) => ({ default: m.EditTradePage })))
@@ -25,7 +28,6 @@ const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) =>
 const SetupPlaybookPage = lazy(() => import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })))
 const TradeIdeasPage = lazy(() => import('@/components/ideas/TradeIdeasPage').then((m) => ({ default: m.TradeIdeasPage })))
 const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
-const TradeReviewStream = lazy(() => import('@/components/review/TradeReviewStream').then((m) => ({ default: m.TradeReviewStream })))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const AICoachPage = lazy(() => import('@/components/coach/AICoachPage').then((m) => ({ default: m.AICoachPage })))
 const PerformanceOSPage = lazy(() => import('@/pages/PerformanceOSPage').then((m) => ({ default: m.PerformanceOSPage })))
@@ -52,7 +54,8 @@ function ViewFallback() {
 }
 
 function App() {
-  const { sidebarOpen, activeView, tradeFormMode, selectedTradeId } = useAppStore()
+  const { sidebarOpen, activeView, tradeFormMode, selectedTradeId, navMode } = useAppStore()
+  const viewBlocked = !canAccessView(activeView, navMode)
   const { isAuthenticated, fetchMe } = useAuthStore()
   const activeMeta = viewMeta[activeView]
 
@@ -130,9 +133,11 @@ function App() {
               </div>
             </TopBar>
             <main className="flex-1 overflow-auto pb-20 scrollbar-thin lg:pb-0">
+              {viewBlocked ? (
+                <ProModeGate view={activeView} />
+              ) : (
               <Suspense fallback={<ViewFallback />}>
                 {activeView === 'dashboard' && <ErrorBoundary name="Dashboard"><DashboardPage /></ErrorBoundary>}
-                {activeView === 'analytics' && <ErrorBoundary name="Analytics"><AnalyticsDashboardPage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'list' && <ErrorBoundary name="Trades"><TradesPage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'create' && <ErrorBoundary name="CreateTrade"><CreateTradePage /></ErrorBoundary>}
                 {activeView === 'trades' && tradeFormMode === 'edit' && <ErrorBoundary name="EditTrade"><EditTradePage tradeId={selectedTradeId ?? undefined} /></ErrorBoundary>}
@@ -140,7 +145,11 @@ function App() {
                 {activeView === 'playbook' && <ErrorBoundary name="Playbook"><SetupPlaybookPage /></ErrorBoundary>}
                 {activeView === 'ideas' && <ErrorBoundary name="Ideas"><TradeIdeasPage /></ErrorBoundary>}
                 {activeView === 'capital' && <ErrorBoundary name="Capital"><CapitalPage /></ErrorBoundary>}
-                {activeView === 'review' && <ErrorBoundary name="Review"><TradeReviewStream /></ErrorBoundary>}
+                {(activeView === 'review' || activeView === 'analytics') && (
+                  <ErrorBoundary name="ReviewAnalytics">
+                    <ReviewAnalyticsPage defaultTab={activeView === 'analytics' ? 'overview' : 'queue'} />
+                  </ErrorBoundary>
+                )}
                 {activeView === 'perf-os' && <ErrorBoundary name="PerfOS"><PerformanceOSPage /></ErrorBoundary>}
                 {activeView === 'journal' && <ErrorBoundary name="Journal"><JournalPage /></ErrorBoundary>}
                 {activeView === 'calendar' && <ErrorBoundary name="Calendar"><CalendarPage /></ErrorBoundary>}
@@ -155,9 +164,11 @@ function App() {
                 {activeView === 'settings' && <ErrorBoundary name="Settings"><SettingsPage /></ErrorBoundary>}
                 {activeView === 'coach' && <ErrorBoundary name="AICoach"><AICoachPage /></ErrorBoundary>}
               </Suspense>
+              )}
             </main>
             </EdgeSwipe>
           </div>
+          <ActionsInbox />
           <ToastContainer />
           <InstallPrompt />
         </div>

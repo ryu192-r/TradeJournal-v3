@@ -171,6 +171,16 @@
     letter-spacing: 0.08em;
     color: var(--text-muted);
   }
+
+  .dashboard-widget-compact .kpi-value,
+  .dashboard-widget-compact [class*='text-3xl'],
+  .dashboard-widget-compact [class*='text-4xl'] {
+    font-size: clamp(1.125rem, 2.5vw, 1.5rem) !important;
+  }
+
+  .dashboard-widget-compact .recharts-responsive-container {
+    max-height: 180px;
+  }
 }
 
 @layer utilities {

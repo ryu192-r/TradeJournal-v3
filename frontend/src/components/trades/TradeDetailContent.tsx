@@ -16,10 +16,27 @@ import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/u
 import { calculateTradeMetrics } from '@/utils/calculations'
 import { StatusBadge, SectionHeader, ResponsiveTabs, EmptyState } from '@/components/ui'
 import { ErrorState } from '@/components/ui/StateComponents'
+import { CARD, SECTION_LABEL } from '@/components/layout/layoutTokens'
 import type { ApiTrade } from '@/types'
 import type { TradeReviewResponse } from '@/types/coach'
+import type { LucideIcon } from 'lucide-react'
 
-const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
+function DetailSection({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  icon: LucideIcon
+  children: ReactNode
+}) {
+  return (
+    <section className={CARD}>
+      <SectionHeader title={title} icon={Icon} />
+      <div className="mt-3 min-w-0">{children}</div>
+    </section>
+  )
+}
 
 /* ── helpers ── */
 
@@ -180,12 +197,7 @@ function MetricGrid({
   calc: ReturnType<typeof calculateTradeMetrics>
 }) {
   return (
-    <div className={CARD}>
-      <h3 className="text-[length:var(--text-xs)] text-accent uppercase tracking-wider font-display mb-3 flex items-center gap-1.5">
-        <Target className="w-3.5 h-3.5" />
-        Metrics
-      </h3>
-
+    <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
         <MetricRow label="Gross P&amp;L" value={calc.isValidForPnl ? fmtMoney(calc.grossPnl) : null} tone={calc.isValidForPnl ? (calc.grossPnl! >= 0 ? 'profit' : 'loss') : null} />
         <MetricRow label="Net P&amp;L" value={calc.isValidForPnl ? fmtMoney(calc.netPnl) : null} tone={calc.isValidForPnl ? (calc.netPnl! >= 0 ? 'profit' : 'loss') : null} />
@@ -236,10 +248,10 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
   remainingQty: number | null
 }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-[var(--page-gap)]">
-      <StatCard label="Entry" value={formatPrice(Number(trade.entry_price))} detail={formatDateTime(trade.entry_time)} />
-      <StatCard label="Exit" value={trade.exit_price ? formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price)) : 'Open'} detail={isOpen ? '—' : (trade.exit_time ? formatDateTime(trade.exit_time) : '—')} />
-      <StatCard
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <StatCell label="Entry" value={formatPrice(Number(trade.entry_price))} detail={formatDateTime(trade.entry_time)} />
+      <StatCell label="Exit" value={trade.exit_price ? formatPrice(Number(trade.weighted_avg_exit_price ?? trade.exit_price)) : 'Open'} detail={isOpen ? '—' : (trade.exit_time ? formatDateTime(trade.exit_time) : '—')} />
+      <StatCell
         label={`Quantity${showPartialInfo ? ' (rem.)' : ''}`}
         value={
           showPartialInfo
@@ -248,11 +260,11 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
         }
         detail={null}
       />
-      <StatCard label="Duration" value={duration} detail={trade.exit_reason ? trade.exit_reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null} />
-      <StatCard label="Stop Loss" value={trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—'} detail={null} />
-      <StatCard label="Target" value={trade.target_price ? formatPrice(Number(trade.target_price)) : '—'} detail={null} />
-      <StatCard label="Fees" value={trade.fees != null && Number(trade.fees) > 0 ? formatCurrency(Number(trade.fees)) : '—'} detail={null} />
-      <StatCard
+      <StatCell label="Duration" value={duration} detail={trade.exit_reason ? trade.exit_reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null} />
+      <StatCell label="Stop Loss" value={trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—'} detail={null} />
+      <StatCell label="Target" value={trade.target_price ? formatPrice(Number(trade.target_price)) : '—'} detail={null} />
+      <StatCell label="Fees" value={trade.fees != null && Number(trade.fees) > 0 ? formatCurrency(Number(trade.fees)) : '—'} detail={null} />
+      <StatCell
         label="Setup / Tactic"
         value={
           <div className="flex items-center gap-1 flex-wrap text-[length:var(--text-sm)]">
@@ -269,27 +281,12 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
   )
 }
 
-function StatCard({ label, value, detail }: { label: string; value: ReactNode; detail: ReactNode }) {
+function StatCell({ label, value, detail }: { label: string; value: ReactNode; detail: ReactNode }) {
   return (
-    <div className={CARD}>
+    <div className="rounded-xl border border-border/60 bg-bg-elevated/20 p-3">
       <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider font-display mb-1">{label}</div>
-      <div className="font-data text-lg sm:text-xl font-semibold text-text-heading">{value}</div>
+      <div className="font-data text-base sm:text-lg font-semibold text-text-heading">{value}</div>
       {detail && <div className="text-[length:var(--text-xs)] text-text-muted mt-1 font-data">{detail}</div>}
-    </div>
-  )
-}
-
-/* ── Notes + Review Notes ── */
-
-function NotesCard({ title, icon: Icon, content }: { title: string; icon: import('lucide-react').LucideIcon; content: string | null }) {
-  return (
-    <div className={CARD}>
-      <SectionHeader title={title} icon={Icon} />
-      {content ? (
-        <p className="text-[length:var(--text-sm)] text-text-heading whitespace-pre-wrap leading-relaxed mt-1">{content}</p>
-      ) : (
-        <p className="text-[length:var(--text-sm)] text-text-faint italic mt-1">No notes recorded</p>
-      )}
     </div>
   )
 }
@@ -419,6 +416,8 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
     })
   }
 
+  const mistakeTags = reviewV2.data?.mistake_tags ?? []
+
   return (
     <div className="space-y-[var(--page-gap)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
       <TradeSummaryHeader
@@ -438,13 +437,7 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
         isOpen={isOpen}
       />
 
-      <MetricGrid calc={calc} />
-
-      <div>
-        <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider font-display mb-2 flex items-center gap-1.5">
-          <CalendarClock className="w-3.5 h-3.5" />
-          Details
-        </div>
+      <DetailSection title="Entry &amp; Exit" icon={CalendarClock}>
         <StatCards
           trade={trade}
           isOpen={isOpen}
@@ -452,83 +445,117 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
           showPartialInfo={showPartialInfo}
           remainingQty={remainingQty}
         />
-      </div>
+      </DetailSection>
 
-      <div>
+      <DetailSection title="Risk &amp; Reward" icon={Target}>
+        <MetricGrid calc={calc} />
+      </DetailSection>
+
+      <DetailSection title="Chart" icon={BarChart3}>
         <ChartTabs trade={trade} />
-      </div>
+      </DetailSection>
 
-      {trade.notes && (
-        <NotesCard title="Trade Notes / Thesis" icon={NotebookPen} content={trade.notes} />
-      )}
-
-      {trade.review_notes && (
-        <NotesCard title="Review &amp; Reflection" icon={AlertTriangle} content={trade.review_notes} />
-      )}
-
-      {trade.tags && trade.tags.length > 0 && (
-        <div>
-          <div className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider font-display mb-2 flex items-center gap-1.5">
-            <Tag className="w-3.5 h-3.5" />
-            Tags
+      <DetailSection title="Notes, Tags &amp; Mistakes" icon={NotebookPen}>
+        <div className="space-y-4">
+          <div>
+            <div className={SECTION_LABEL}>
+              <NotebookPen className="w-3.5 h-3.5" />
+              Trade notes
+            </div>
+            <p className="text-[length:var(--text-sm)] text-text-heading whitespace-pre-wrap leading-relaxed">
+              {trade.notes || <span className="text-text-faint italic">No notes recorded</span>}
+            </p>
           </div>
-          <TagsRow tags={trade.tags} />
+          <div>
+            <div className={SECTION_LABEL}>
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Review reflection
+            </div>
+            <p className="text-[length:var(--text-sm)] text-text-heading whitespace-pre-wrap leading-relaxed">
+              {trade.review_notes || <span className="text-text-faint italic">No review notes yet</span>}
+            </p>
+          </div>
+          {mistakeTags.length > 0 && (
+            <div>
+              <div className={SECTION_LABEL}>
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Mistakes
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {mistakeTags.map((t) => (
+                  <span key={t.tag} className="text-[length:var(--text-xs)] px-2.5 py-1 rounded-full bg-loss-muted/30 text-loss">
+                    {t.tag.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className={SECTION_LABEL}>
+              <Tag className="w-3.5 h-3.5" />
+              Tags
+            </div>
+            {trade.tags && trade.tags.length > 0 ? (
+              <div className="mt-1">
+                <TagsRow tags={trade.tags} />
+              </div>
+            ) : (
+              <p className="text-[length:var(--text-sm)] text-text-faint italic mt-1">No tags</p>
+            )}
+          </div>
         </div>
-      )}
+      </DetailSection>
 
-      <div className={CARD}>
-        <SectionHeader title="Review V2" icon={ClipboardCheck} />
+      <DetailSection title="Review" icon={ClipboardCheck}>
         {reviewV2.isLoading && (
-          <div className="flex items-center justify-center py-6 mt-3">
+          <div className="flex items-center justify-center py-6">
             <Loader2 className="w-5 h-5 text-accent animate-spin" />
-            <span className="ml-2 text-xs text-text-muted">Loading deterministic review...</span>
+            <span className="ml-2 text-xs text-text-muted">Loading review...</span>
           </div>
         )}
         {reviewV2.isError && (
-          <div className="mt-3">
-            <ErrorState
-              title="Review unavailable"
-              message="Deterministic review could not load. Other trade details are unaffected."
-              compact
-            />
-          </div>
+          <ErrorState
+            title="Review unavailable"
+            message="Deterministic review could not load."
+            compact
+          />
         )}
         {reviewV2.data && (
-          <div className="mt-3 min-w-0 overflow-x-hidden">
+          <div className="min-w-0 overflow-x-hidden">
             <TradeReviewV2Card review={reviewV2.data} />
           </div>
         )}
-      </div>
 
-      {!isOpen && (
-        <div className={CARD}>
-          <div className="flex items-center justify-between">
-            <SectionHeader title="AI Trade Review" icon={Target} />
-            <button
-              onClick={handleTradeReview}
-              disabled={reviewMut.isPending}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[length:var(--text-xs)] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {reviewMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
-              Generate
-            </button>
-          </div>
-          {inlineReview ? (
-            <div className="mt-3"><AiReviewCard review={inlineReview} /></div>
-          ) : reviewMut.isPending ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 text-accent animate-spin" />
-                <span className="ml-2 text-xs text-text-muted">Generating review...</span>
-              </div>
-          ) : (
-            <div className="mt-3">
-              <EmptyState title="No AI review yet" message="Generate structured coaching feedback for this closed trade." compact />
+        {!isOpen && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[length:var(--text-xs)] text-text-muted uppercase tracking-wider font-display">AI coaching</span>
+              <button
+                onClick={handleTradeReview}
+                disabled={reviewMut.isPending}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[length:var(--text-xs)] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {reviewMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
+                Generate
+              </button>
             </div>
-          )}
-        </div>
-      )}
+            {inlineReview ? (
+              <AiReviewCard review={inlineReview} />
+            ) : reviewMut.isPending ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                <span className="ml-2 text-xs text-text-muted">Generating...</span>
+              </div>
+            ) : (
+              <EmptyState title="No AI review yet" message="Generate coaching feedback for this closed trade." compact />
+            )}
+          </div>
+        )}
 
-      <LifecycleReviewPanel trade={trade} />
+        <div className="mt-4 pt-4 border-t border-border">
+          <LifecycleReviewPanel trade={trade} />
+        </div>
+      </DetailSection>
     </div>
   )
 }

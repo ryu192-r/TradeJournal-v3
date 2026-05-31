@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ActiveView, NavMode } from '@/app/navigation'
+import { canAccessView, getSimpleFallbackView, normalizeNavMode } from '@/app/interfaceMode'
+import { storeReviewTab } from '@/app/reviewAnalytics'
 
 interface Position {
   id: number
@@ -69,10 +71,26 @@ export const useAppStore = create<AppState>()(
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
       navMode: 'simple',
-      setNavMode: (mode) => set({ navMode: mode }),
+      setNavMode: (mode) => {
+        const normalized = normalizeNavMode(mode)
+        let { activeView } = get()
+        if (normalized === 'simple' && !canAccessView(activeView, 'simple')) {
+          activeView = getSimpleFallbackView(activeView)
+        }
+        set({ navMode: normalized, activeView, tradeFormMode: 'list', selectedTradeId: null })
+      },
 
       activeView: 'dashboard',
-      setActiveView: (view) => set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null }),
+      setActiveView: (view) => {
+        const { navMode } = get()
+        let resolved: ActiveView = view === 'analytics' ? 'review' : view
+        if (view === 'analytics') storeReviewTab('overview')
+        else if (view === 'review') storeReviewTab('queue')
+        if (!canAccessView(resolved, navMode)) {
+          resolved = getSimpleFallbackView(resolved)
+        }
+        set({ activeView: resolved, tradeFormMode: 'list', selectedTradeId: null })
+      },
 
       tradeFormMode: 'list',
       selectedTradeId: null,
@@ -98,6 +116,10 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme)
+          state.navMode = normalizeNavMode(state.navMode)
+          if (state.navMode === 'simple' && !canAccessView(state.activeView, 'simple')) {
+            state.activeView = getSimpleFallbackView(state.activeView)
+          }
         }
       },
     }

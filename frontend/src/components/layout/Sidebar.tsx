@@ -2,30 +2,37 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
-import { mobileNavigationItems, navigationSections, type ActiveView } from '@/app/navigation'
-import { PanelLeft, Sparkles, Plus, BarChart3, TrendingUp } from 'lucide-react'
+import {
+  filterNavigationSections,
+  isViewVisibleInMode,
+  mobileNavigationItems,
+  type ActiveView,
+} from '@/app/navigation'
+import { interfaceModeLabel, isProMode } from '@/app/interfaceMode'
+import { PanelLeft, Sparkles, Plus, TrendingUp } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 
 function isSelectableView(value: string): value is ActiveView {
-  return navigationSections
+  return filterNavigationSections('pro')
     .flatMap((section) => section.items)
     .some((item) => item.view === value)
 }
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, setNavMode, openCreateTrade } = useAppStore()
+  const { sidebarOpen, toggleSidebar, activeView, setActiveView, navMode, openCreateTrade } = useAppStore()
   const user = useAuthStore((s) => s.user)
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
-  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'analytics']
+  const coreMobileViews: ActiveView[] = ['dashboard', 'trades', 'review']
   const moreActive = !coreMobileViews.includes(activeView)
+  const sections = filterNavigationSections(navMode)
 
   const selectView = (view: ActiveView) => {
     setActiveView(view)
     if (window.innerWidth < 1024 && sidebarOpen) toggleSidebar()
   }
 
-  const moreItems = navigationSections
+  const moreItems = sections
     .flatMap((s) => s.items)
     .filter((item) => item.view && !coreMobileViews.includes(item.view))
 
@@ -53,48 +60,23 @@ export function Sidebar() {
           </div>
           <div className="min-w-0">
             <div className="font-display font-medium text-[1.1rem] tracking-[-0.025rem] leading-none text-text-heading">TradeJournal</div>
-            <div className="mt-1 text-[10px] font-data uppercase tracking-wider text-text-faint">Trading OS</div>
+            <div className="mt-1 text-[10px] font-data uppercase tracking-wider text-text-faint">
+              {interfaceModeLabel(navMode)}
+            </div>
           </div>
-        </div>
-
-        <div className="px-3 py-2 border-b border-border">
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-bg-elevated/35 p-1">
-            {(['simple', 'advanced'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setNavMode(mode)}
-                className={cn(
-                  'rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer',
-                  navMode === mode ? 'bg-bg-card text-text-heading shadow-sm' : 'text-text-faint hover:text-text-muted'
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 px-1 text-[11px] leading-4 text-text-faint">
-            {navMode === 'simple'
-              ? 'Simple mode keeps the core daily workflow visible.'
-              : 'Pro mode unlocks analytics, lifecycle, risk, and market surfaces.'}
-          </p>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 pt-2.5 pb-4">
-          {navigationSections.map((section) => {
-            const items = navMode === 'simple'
-              ? section.items.filter((item) => item.simple || item.view === activeView || item.comingSoon)
-              : section.items
-            if (items.length === 0) return null
-
-            return (
+          {sections.map((section) => (
               <div key={section.id} className="mb-3 last:mb-0">
                 <div className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-faint">{section.label}</div>
                 <div className="flex flex-col gap-0.5">
-                  {items.map((item) => {
+                  {section.items.map((item) => {
                     const Icon = item.icon
                     const isActive = item.view === activeView
                     const isComingSoon = item.comingSoon || !item.view
                     const isSelectable = item.view && isSelectableView(item.view)
+                    const showProBadge = item.view && isProMode(navMode) && !item.simple
 
                     return (
                       <button
@@ -116,7 +98,7 @@ export function Sidebar() {
                         <Icon className="w-[15px] h-[15px] shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="truncate">{item.label}</div>
-                          {item.purpose && (
+                          {item.purpose && isProMode(navMode) && (
                             <div className="mt-0.5 truncate text-[10px] font-data text-current/70">
                               {item.purpose}
                             </div>
@@ -126,7 +108,7 @@ export function Sidebar() {
                           <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-text-faint">
                             Soon
                           </span>
-                        ) : !item.simple ? (
+                        ) : showProBadge ? (
                           <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-accent/15 bg-accent-faint px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-accent">
                             <Sparkles className="h-2.5 w-2.5" />
                             Pro
@@ -137,8 +119,7 @@ export function Sidebar() {
                   })}
                 </div>
               </div>
-            )
-          })}
+            ))}
         </nav>
 
         <div className="flex items-center gap-3 px-5 pt-3.5 pb-[.875rem] border-t border-border">
@@ -187,10 +168,10 @@ export function Sidebar() {
             <Plus className="w-6 h-6" />
           </button>
           <MobileNavButton
-            icon={BarChart3}
-            label="Reports"
-            isActive={activeView === 'analytics'}
-            onClick={() => selectView('analytics')}
+            icon={mobileNavigationItems.find(i => i.id === 'review')?.icon ?? TrendingUp}
+            label="Review"
+            isActive={activeView === 'review'}
+            onClick={() => selectView('review')}
           />
           <MobileNavButton
             icon={TrendingUp}
@@ -203,28 +184,37 @@ export function Sidebar() {
 
       <BottomSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} title="More">
         <div className="flex flex-col gap-1">
-          {moreItems.map((item) => {
-            const Icon = item.icon
-            const isActive = item.view === activeView
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.view) selectView(item.view)
-                  setMoreSheetOpen(false)
-                }}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer',
-                  isActive
-                    ? 'bg-accent-muted text-accent'
-                    : 'text-text hover:bg-accent-faint'
-                )}
-              >
-                {Icon && <Icon className="w-4 h-4 shrink-0" />}
-                <span className="truncate">{item.label}</span>
-              </button>
-            )
-          })}
+          {moreItems.length === 0 ? (
+            <p className="px-3 py-4 text-[length:var(--text-sm)] text-text-muted">
+              Enable Pro Mode in Settings for Playbook, Capital, Edge Lab, and more.
+            </p>
+          ) : (
+            moreItems.map((item) => {
+              const Icon = item.icon
+              const isActive = item.view === activeView
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.view) selectView(item.view)
+                    setMoreSheetOpen(false)
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors cursor-pointer',
+                    isActive
+                      ? 'bg-accent-muted text-accent'
+                      : 'text-text hover:bg-accent-faint'
+                  )}
+                >
+                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                  <span className="truncate flex-1">{item.label}</span>
+                  {item.view && !isViewVisibleInMode(item.view, 'simple') && navMode === 'pro' && (
+                    <span className="text-[9px] font-data uppercase text-accent">Pro</span>
+                  )}
+                </button>
+              )
+            })
+          )}
         </div>
       </BottomSheet>
     </>

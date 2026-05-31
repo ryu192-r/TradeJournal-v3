@@ -140,6 +140,35 @@ vi.mock('@/hooks/usePerformanceOS', () => ({
   useResetWorkflow: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
+vi.mock('@/hooks/useEdgeCommandCenterQuery', () => ({
+  useEdgeCommandCenterQuery: () => ({
+    data: {
+      review_queue: [],
+      priorities: [],
+      summary: { risk_warnings: [] },
+      workflow: { is_complete: true, missing_items: [], next_step: '' },
+      next_best_action: '',
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}))
+
+vi.mock('@/hooks/useTradesQuery', () => ({
+  useTradesQuery: () => ({
+    data: { total: 0, items: [] },
+    isLoading: false,
+  }),
+}))
+
+vi.mock('@/hooks/useCoachingIntelligenceQuery', () => ({
+  useCoachingIntelligenceDashboardQuery: () => ({ data: null }),
+}))
+
+vi.mock('@/hooks/useTradeReviewV2Query', () => ({
+  useTradeReviewV2Query: () => ({ data: null, isLoading: false, isError: false }),
+}))
+
 vi.mock('@/hooks/useJournalMutation', () => ({
   useWeeklyJournalStatsQuery: () => ({ data: null }),
   useWeeklyJournalsQuery: () => ({ data: [] }),
@@ -225,8 +254,8 @@ describe('Phase 0 frontend smoke tests', () => {
     }
 
     renderWithQueryClient(<DashboardPage />)
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(screen.getByText('Live Now')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Command Center' })).toBeInTheDocument()
+    expect(screen.getByText('Recent trades')).toBeInTheDocument()
 
     operationalDashboardMock = {
       ...operationalDashboardMock,
@@ -242,8 +271,8 @@ describe('Phase 0 frontend smoke tests', () => {
 
   it('renders Dashboard with empty operational data', () => {
     renderWithQueryClient(<DashboardPage />)
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(screen.getByText('Live Now')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Command Center' })).toBeInTheDocument()
+    expect(screen.getByText('Recent trades')).toBeInTheDocument()
   })
 
   it('renders Trade Detail page', () => {

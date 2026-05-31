@@ -17,6 +17,13 @@ import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from 
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { RecommendationSummaryStrip } from '@/components/recommendations/RecommendationSummaryStrip'
 import { EdgeCommandCenterCompact } from '@/components/edge/EdgeCommandCenterCompact'
+import {
+  CompactKpiRow,
+  CompactOpenPositions,
+  OpenActionsPreview,
+  QuickPerformanceOverview,
+  RecentTradesCard,
+} from '@/components/dashboard/DashboardV2Sections'
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mark, measure } from '@/utils/performance'
@@ -24,6 +31,7 @@ import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
 import type { DailyDashboard, WorkflowPhase } from '@/types/performanceOs'
 import { useAppStore } from '@/store/appStore'
+import { isProDashboardWidget } from '@/app/interfaceMode'
 import { cn } from '@/lib/utils'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -35,9 +43,23 @@ const PlaybookIntelligence = lazy(() => import('@/components/lifecycle/PlaybookI
 const MarketContext = lazy(() => import('@/components/market/MarketContext').then(m => ({ default: m.MarketContext })))
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
-const DASHBOARD_WIDGET_PREF_KEY = 'tjv3-dashboard-widgets-v1'
+const DASHBOARD_WIDGET_PREF_KEY = 'tjv3-dashboard-widgets-v2'
 
-type DashboardWidgetId = 'alerts' | 'edge' | 'kpis' | 'equity' | 'live' | 'workflow' | 'risk' | 'intelstrip' | 'intelligence' | 'deep'
+type DashboardWidgetId =
+  | 'kpis'
+  | 'performance'
+  | 'actions'
+  | 'recent'
+  | 'open'
+  | 'alerts'
+  | 'edge'
+  | 'equity'
+  | 'live'
+  | 'workflow'
+  | 'risk'
+  | 'intelstrip'
+  | 'intelligence'
+  | 'deep'
 type WidgetDensity = 'compact' | 'expanded'
 
 type WidgetPreference = {
@@ -47,25 +69,33 @@ type WidgetPreference = {
 }
 
 const DEFAULT_WIDGET_PREFS: WidgetPreference[] = [
-  { id: 'alerts', visible: true, density: 'expanded' },
-  { id: 'edge', visible: true, density: 'compact' },
   { id: 'kpis', visible: true, density: 'compact' },
-  { id: 'intelstrip', visible: true, density: 'compact' },
-  { id: 'equity', visible: true, density: 'expanded' },
-  { id: 'live', visible: true, density: 'expanded' },
-  { id: 'workflow', visible: true, density: 'compact' },
-  { id: 'risk', visible: true, density: 'expanded' },
-  { id: 'intelligence', visible: true, density: 'compact' },
-  { id: 'deep', visible: true, density: 'expanded' },
+  { id: 'performance', visible: true, density: 'compact' },
+  { id: 'actions', visible: true, density: 'compact' },
+  { id: 'recent', visible: true, density: 'compact' },
+  { id: 'open', visible: true, density: 'compact' },
+  { id: 'alerts', visible: false, density: 'compact' },
+  { id: 'edge', visible: false, density: 'compact' },
+  { id: 'intelstrip', visible: false, density: 'compact' },
+  { id: 'equity', visible: false, density: 'expanded' },
+  { id: 'live', visible: false, density: 'expanded' },
+  { id: 'workflow', visible: false, density: 'compact' },
+  { id: 'risk', visible: false, density: 'expanded' },
+  { id: 'intelligence', visible: false, density: 'compact' },
+  { id: 'deep', visible: false, density: 'expanded' },
 ]
 
 const WIDGET_LABELS: Record<DashboardWidgetId, string> = {
+  kpis: 'P&L Summary',
+  performance: 'Quick Performance',
+  actions: 'Open Actions',
+  recent: 'Recent Trades',
+  open: 'Open Positions',
   alerts: 'Alert Zone',
   edge: 'Edge Command',
-  kpis: 'KPI Cards',
   intelstrip: 'Intelligence Summary',
   equity: 'Equity',
-  live: 'Live Positions',
+  live: 'Live Positions (full)',
   workflow: 'Daily Workflow',
   risk: 'Risk Center',
   intelligence: 'Intelligence Cards',
@@ -672,12 +702,14 @@ function WidgetControls({
   onMove,
   onDensity,
   onReset,
+  isPro,
 }: {
   prefs: WidgetPreference[]
   onToggleVisible: (id: DashboardWidgetId) => void
   onMove: (id: DashboardWidgetId, direction: -1 | 1) => void
   onDensity: (id: DashboardWidgetId, density: WidgetDensity) => void
   onReset: () => void
+  isPro: boolean
 }) {
   return (
     <div className={CARD}>
@@ -688,22 +720,45 @@ function WidgetControls({
         </div>
         <button type="button" onClick={onReset} className="min-h-10 px-3 text-xs text-text-muted hover:text-text-heading cursor-pointer">Reset</button>
       </div>
+      {!isPro && (
+        <p className="mb-3 text-[length:var(--text-xs)] text-text-muted">
+          Pro widgets are hidden in Simple Mode. Enable Pro Mode in Settings to show Edge, intelligence, and deep sections.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        {prefs.map((pref, index) => (
-          <div key={pref.id} className="flex items-center gap-2 rounded-xl border border-border bg-bg-elevated p-2">
+        {prefs.map((pref, index) => {
+          const proWidget = isProDashboardWidget(pref.id)
+          const locked = proWidget && !isPro
+          return (
+          <div
+            key={pref.id}
+            className={cn(
+              'flex items-center gap-2 rounded-xl border border-border bg-bg-elevated p-2',
+              locked && 'opacity-60'
+            )}
+          >
             <button
               type="button"
-              onClick={() => onToggleVisible(pref.id)}
+              onClick={() => !locked && onToggleVisible(pref.id)}
+              disabled={locked}
               className={cn(
                 'flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border cursor-pointer',
-                pref.visible ? 'border-accent/25 bg-accent-muted text-accent' : 'border-border text-text-faint'
+                pref.visible ? 'border-accent/25 bg-accent-muted text-accent' : 'border-border text-text-faint',
+                locked && 'cursor-not-allowed'
               )}
               aria-label={pref.visible ? 'Hide widget' : 'Show widget'}
             >
               {pref.visible ? <PanelTopOpen className="h-4 w-4" /> : <PanelTopClose className="h-4 w-4" />}
             </button>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-text-heading">{WIDGET_LABELS[pref.id]}</div>
+              <div className="flex items-center gap-2">
+                <div className="truncate text-sm font-medium text-text-heading">{WIDGET_LABELS[pref.id]}</div>
+                {proWidget && (
+                  <span className="shrink-0 rounded-full border border-accent/15 bg-accent-faint px-1.5 py-px text-[9px] font-data uppercase text-accent">
+                    Pro
+                  </span>
+                )}
+              </div>
               <div className="text-[10px] font-data uppercase tracking-wider text-text-faint">{pref.density}</div>
             </div>
             <div className="flex items-center gap-1">
@@ -734,7 +789,7 @@ function WidgetControls({
               </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   )
@@ -751,6 +806,8 @@ export function DashboardPage() {
   const syncQuotes = useSyncLiveQuotesMutation()
   const queryClient = useQueryClient()
   const setActiveView = useAppStore((s) => s.setActiveView)
+  const navMode = useAppStore((s) => s.navMode)
+  const isPro = navMode === 'pro'
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<WidgetPreference[]>(getInitialWidgetPrefs)
 
@@ -868,9 +925,20 @@ export function DashboardPage() {
   const dashboardData = operationalData as OperationalDashboardPayload
 
   const widgetContent: Record<DashboardWidgetId, ReactNode> = {
+    kpis:
+      widgetPrefs.find((p) => p.id === 'kpis')?.density === 'expanded' ? (
+        <KpiCards kpi={dashboardData.kpi} />
+      ) : (
+        <CompactKpiRow kpi={dashboardData.kpi} />
+      ),
+    performance: (
+      <QuickPerformanceOverview streaks={dashboardData.streaks} capital={dashboardData.capital} />
+    ),
+    actions: <OpenActionsPreview />,
+    recent: <RecentTradesCard />,
+    open: <CompactOpenPositions trades={openTrades} quoteMap={quoteMap} />,
     alerts: <AlertZone alerts={dashboardAlerts} />,
     edge: <EdgeCommandCenterCompact />,
-    kpis: <KpiCards kpi={dashboardData.kpi} />,
     intelstrip: <RecommendationSummaryStrip />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,
     live: <LiveDashboard trades={openTrades} quoteMap={quoteMap} />,
@@ -911,7 +979,7 @@ export function DashboardPage() {
       <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
         {/* ── HEADER: Today + Sync ── */}
         <PageHeader
-          title="Dashboard"
+          title="Command Center"
           right={
             <div className="flex items-center gap-2">
               <button
@@ -937,14 +1005,19 @@ export function DashboardPage() {
             onMove={moveWidget}
             onDensity={setWidgetDensity}
             onReset={resetWidgets}
+            isPro={isPro}
           />
         )}
 
-        {widgetPrefs.map((pref) => (
-          <WidgetShell key={pref.id} pref={pref}>
-            {widgetContent[pref.id]}
-          </WidgetShell>
-        ))}
+        {widgetPrefs.map((pref) => {
+          const effectivePref =
+            !isPro && isProDashboardWidget(pref.id) ? { ...pref, visible: false } : pref
+          return (
+            <WidgetShell key={pref.id} pref={effectivePref}>
+              {widgetContent[pref.id]}
+            </WidgetShell>
+          )
+        })}
       </div>
     </PullToRefresh>
   )
