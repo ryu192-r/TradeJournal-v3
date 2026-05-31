@@ -245,10 +245,12 @@ cd frontend && npm run dev             # dev server
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | SQLite | PostgreSQL connection string |
-| `SECRET_KEY` | — | Auth secret |
-| `JWT_SECRET_KEY` | — | JWT signing key |
+| `POSTGRES_PASSWORD` | — | Required for Docker Compose; no production default |
+| `SECRET_KEY` | — | Auth secret; no production default |
+| `JWT_SECRET_KEY` | — | JWT signing key; no production default |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | Token expiry |
 | `RATE_LIMIT_OFF` | false | Disable rate limiting only when set in `.env` |
+| `ALLOW_LOCAL_AI_URLS` | false | Allows local/private AI provider URLs only for trusted local setups; `DEBUG=true` also allows local URLs |
 | `VITE_API_URL` | `/api/v1` | API base URL (build-time) |
 | `SENTRY_DSN` | — | Optional Sentry |
 | `UPLOAD_DIR` | `uploads/charts` | Chart image storage |

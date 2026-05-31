@@ -6,12 +6,16 @@ connectivity.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Optional
 
 from app.core.ai_config import AI_PROVIDERS, MENTORS, get_ai_config, save_ai_config
+from app.core.ai_url_security import AIBaseURLValidationError
 from app.core.ai_provider_client import AIProviderClient
+from app.db.database import get_db
+from app.models.user import User
 from app.utils.logging import get_logger
 from app.core.dependencies import get_current_user
+from sqlalchemy.orm import Session
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/ai", tags=["ai-settings"])
 logger = get_logger(__name__)
@@ -23,7 +27,7 @@ logger = get_logger(__name__)
 class AIConfigUpdate(BaseModel):
     provider: str = Field(default="ollama_local")
     base_url: str = Field(default="")
-    api_key: str = Field(default="", repr=False)
+    api_key: Optional[str] = Field(default=None, repr=False)
     model: str = Field(default="qwen2.5:latest")
     timeout: float = Field(default=60.0, ge=1.0, le=300.0)
     max_retries: int = Field(default=3, ge=1, le=10)
@@ -75,9 +79,12 @@ class AITestResponse(BaseModel):
     response_model=AIConfigResponse,
     summary="Get current AI provider configuration",
 )
-def get_config():
+def get_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Return the active AI provider config (api_key masked)."""
-    cfg = get_ai_config()
+    cfg = get_ai_config(db=db, user_id=current_user.id)
     return AIConfigResponse(
         provider=cfg["provider"],
         base_url=cfg["base_url"],
@@ -120,15 +127,25 @@ def get_providers():
     response_model=AIConfigResponse,
     summary="Save new AI provider configuration",
 )
-async def update_config(body: AIConfigUpdate):
-    """Persist the new configuration and refresh all singleton services."""
+async def update_config(
+    body: AIConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist the new user-scoped configuration."""
     if not body.base_url and body.provider in AI_PROVIDERS:
         body.base_url = AI_PROVIDERS[body.provider].get("default_url", "")
 
-    merged = save_ai_config(body.model_dump())
-    await _refresh_singletons()
+    try:
+        merged = save_ai_config(body.model_dump(), db=db, user_id=current_user.id)
+    except (AIBaseURLValidationError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     logger.info(
         "ai_config_updated",
+        user_id=current_user.id,
         provider=merged["provider"],
         model=merged["model"],
         base_url=merged["base_url"],
@@ -150,15 +167,18 @@ async def update_config(body: AIConfigUpdate):
     response_model=AITestResponse,
     summary="Test the configured AI provider connection",
 )
-async def test_ai_provider():
+async def test_ai_provider(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Send a minimal chat completion to verify connectivity.
 
     Returns ``{"status": "ok", ...}`` on success or
     ``{"status": "error", "message": "..."}`` on failure.
     """
-    cfg = get_ai_config()
-    client = AIProviderClient(cfg)
+    cfg = get_ai_config(db=db, user_id=current_user.id)
     try:
+        client = AIProviderClient(cfg)
         response = await client.chat(
             messages=[
                 {
@@ -181,26 +201,12 @@ async def test_ai_provider():
     except Exception as exc:
         logger.error(
             "ai_provider_test_failed",
-            provider=cfg["provider"],
-            model=cfg["model"],
+            provider=cfg.get("provider", "unknown"),
+            model=cfg.get("model", "unknown"),
             error=str(exc),
         )
         return AITestResponse(
             status="error",
-            model=cfg["model"],
+            model=cfg.get("model", "unknown"),
             message=str(exc),
         )
-
-
-# ─── Singleton refresh ─────────────────────────────────────────────────
-
-
-async def _refresh_singletons():
-    """Reload config in all live singleton services."""
-    from app.services.ai_coach import ai_coach
-
-    try:
-        await ai_coach.refresh()
-        logger.info("ai_coach_refreshed")
-    except Exception as exc:
-        logger.warning("ai_coach_refresh_failed", error=str(exc))

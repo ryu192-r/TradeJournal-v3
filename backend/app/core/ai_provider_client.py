@@ -14,6 +14,7 @@ import httpx
 import structlog
 
 import app.core.ai_config as _ai_config
+from app.core.ai_url_security import validate_ai_base_url
 
 logger = structlog.get_logger(__name__)
 
@@ -38,7 +39,7 @@ class AIProviderClient:
     def __init__(self, cfg: dict[str, Any] | None = None) -> None:
         if cfg is None:
             cfg = _ai_config.get_ai_config()
-        self.base_url = cfg["base_url"].rstrip("/")
+        self.base_url = validate_ai_base_url(cfg["base_url"])
         self.api_key = cfg.get("api_key") or ""
         self.model = cfg["model"]
         self.timeout = float(cfg.get("timeout", 60.0))
@@ -52,7 +53,7 @@ class AIProviderClient:
     async def refresh(self) -> None:
         """Reload every field from the on-disk config (env fallback included)."""
         cfg = _ai_config.get_ai_config()
-        self.base_url = cfg["base_url"].rstrip("/")
+        self.base_url = validate_ai_base_url(cfg["base_url"])
         self.api_key = cfg.get("api_key") or ""
         self.model = cfg["model"]
         self.timeout = float(cfg.get("timeout", 60.0))

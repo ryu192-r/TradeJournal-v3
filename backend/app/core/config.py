@@ -35,6 +35,7 @@ class Settings:
     OLLAMA_MODEL: str = config("OLLAMA_MODEL", default="mistral")
     OLLAMA_TIMEOUT: float = config("OLLAMA_TIMEOUT", default=60.0, cast=float)
     OLLAMA_MAX_RETRIES: int = config("OLLAMA_MAX_RETRIES", default=3, cast=int)
+    ALLOW_LOCAL_AI_URLS: bool = config("ALLOW_LOCAL_AI_URLS", default=False, cast=bool)
     
     # Logging
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO")

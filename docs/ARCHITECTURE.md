@@ -393,10 +393,12 @@ When activeView === 'trades':
 | Variable | Default | Required |
 |----------|---------|----------|
 | `DATABASE_URL` | SQLite | Prod: PostgreSQL URL |
-| `SECRET_KEY` | — | Yes |
-| `JWT_SECRET_KEY` | — | Yes |
+| `POSTGRES_PASSWORD` | — | Required for Docker Compose; no production default |
+| `SECRET_KEY` | — | Yes; no production default |
+| `JWT_SECRET_KEY` | — | Yes; no production default |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | No |
 | `RATE_LIMIT_OFF` | false | Set `true` in `.env` only when intentionally disabling rate limits |
+| `ALLOW_LOCAL_AI_URLS` | false | Allows local/private AI provider URLs only for trusted local setups; `DEBUG=true` also allows local URLs |
 | `VITE_API_URL` | `/api/v1` | Frontend build-time |
 | `SENTRY_DSN` | — | Optional |
 | `UPLOAD_DIR` | `uploads/charts` | Chart image storage |

@@ -24,6 +24,7 @@ export function SettingsPage() {
   const [aiProvider, setAiProvider] = useState('')
   const [aiBaseUrl, setAiBaseUrl] = useState('')
   const [aiApiKey, setAiApiKey] = useState('')
+  const [aiHasApiKey, setAiHasApiKey] = useState(false)
   const [aiModel, setAiModel] = useState('')
   const [aiCustomModels, setAiCustomModels] = useState('')
   const [aiTimeout, setAiTimeout] = useState(60)
@@ -58,7 +59,8 @@ export function SettingsPage() {
       if (configData) {
         setAiProvider(configData.provider || defaultProvider)
         setAiBaseUrl(configData.base_url || '')
-        setAiApiKey(configData.api_key || '')
+        setAiApiKey('')
+        setAiHasApiKey(Boolean(configData.has_api_key))
         setAiModel(configData.model || '')
         setAiTimeout(configData.timeout ?? 60)
         setAiMaxRetries(configData.max_retries ?? 3)
@@ -123,13 +125,14 @@ export function SettingsPage() {
       await saveAiConfig({
         provider: aiProvider,
         base_url: effectiveUrl,
-        api_key: needsApiKey ? aiApiKey || null : null,
+        api_key: needsApiKey && aiApiKey.trim() ? aiApiKey.trim() : undefined,
         model: effectiveModel,
         timeout: aiTimeout,
         max_retries: aiMaxRetries,
         temperature: aiTemperature,
         personality,
       })
+      if (needsApiKey && aiApiKey.trim()) setAiHasApiKey(true)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -371,7 +374,7 @@ export function SettingsPage() {
                     type={showApiKey ? 'text' : 'password'}
                     value={aiApiKey}
                     onChange={(e) => setAiApiKey(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder={aiHasApiKey ? 'Stored key will be kept' : 'sk-...'}
                     className={`${inputStyle} pr-10`}
                   />
                   <button

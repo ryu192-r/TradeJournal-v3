@@ -101,22 +101,22 @@ OllamaClient = _LegacyClientWrapper
 class AICoachService:
     """Service for generating AI-powered trading insights."""
 
-    def __init__(self, client: Optional[AIProviderClient] = None) -> None:
+    def __init__(self, client: Optional[AIProviderClient] = None, cfg: Optional[dict] = None) -> None:
         self._client: AIProviderClient
+        self._config = cfg or get_ai_config()
         if client is not None:
             self._client = client
         else:
-            cfg = get_ai_config()
-            self._client = AIProviderClient(cfg)
+            self._client = AIProviderClient(self._config)
 
     @property
     def client(self) -> AIProviderClient:
         return self._client
 
-    async def refresh(self) -> None:
+    async def refresh(self, cfg: Optional[dict] = None) -> None:
         """Reload the provider config from disk and re-use it."""
-        cfg = get_ai_config()
-        self._client = AIProviderClient(cfg)
+        self._config = cfg or get_ai_config()
+        self._client = AIProviderClient(self._config)
         logger.info("ai_coach_service_refreshed")
 
     async def _chat(
@@ -125,10 +125,9 @@ class AICoachService:
         max_tokens: int = 2000,
     ) -> str:
         """Internal helper that reads temperature from config."""
-        cfg = get_ai_config()
         return await self._client.chat(
             messages,
-            temperature=cfg.get("temperature", 0.3),
+            temperature=self._config.get("temperature", 0.3),
             max_tokens=max_tokens,
         )
 

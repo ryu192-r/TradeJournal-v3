@@ -1,0 +1,6 @@
+.env
+app/core/ai_config.json
+*.db
+__pycache__/
+.pytest_cache/
+uploads/

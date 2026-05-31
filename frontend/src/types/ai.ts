@@ -1,7 +1,7 @@
 export interface AiConfigResponse {
   provider: string
   base_url: string
-  api_key: string | null
+  has_api_key: boolean
   model: string
   timeout: number
   max_retries: number

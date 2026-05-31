@@ -28,7 +28,7 @@ from app.schemas.coach import (
     RuleReminderRequest,
     RuleReminderResponse,
 )
-from app.services.ai_coach import ai_coach, review_cache, review_cache_key, trade_to_dict, compute_summary_stats, compute_setup_performance
+from app.services.ai_coach import AICoachService, review_cache, review_cache_key, trade_to_dict, compute_summary_stats, compute_setup_performance
 from app.core.ai_config import get_ai_config
 from app.db.database import get_db
 from app.models.coach_review import CoachReview
@@ -89,6 +89,11 @@ def _enrich_trades_with_lifecycle(trades: list[Trade], db: Session) -> list[dict
     return [trade_to_dict(t, lifecycle=lifecycle_map.get(t.id)) for t in trades]
 
 
+def _coach_for_user(db: Session, user_id: int) -> tuple[AICoachService, dict]:
+    cfg = get_ai_config(db=db, user_id=user_id)
+    return AICoachService(cfg=cfg), cfg
+
+
 # ──────────────────────── endpoints ────────────────────────
 
 
@@ -119,7 +124,7 @@ async def generate_daily_review(
     # Cache check
     trade_ids_str = ",".join(str(i) for i in (request.trade_ids or []))
     cache_key = review_cache_key(
-        "daily", period_start.isoformat(), period_end.isoformat(), trade_ids_str
+        f"user:{current_user.id}:daily", period_start.isoformat(), period_end.isoformat(), trade_ids_str
     )
 
     cached = review_cache.get(cache_key)
@@ -151,9 +156,10 @@ async def generate_daily_review(
 
     trade_data = _enrich_trades_with_lifecycle(trades, db)
     summary_stats = compute_summary_stats(trades)
+    coach_service, cfg = _coach_for_user(db, current_user.id)
 
     try:
-        insight = await ai_coach.generate_daily_review(
+        insight = await coach_service.generate_daily_review(
             trades=trade_data,
             summary_stats=summary_stats,
         )
@@ -175,7 +181,7 @@ async def generate_daily_review(
         period_end=period_end,
         trade_ids=[t.id for t in trades],
         summary_stats=summary_stats,
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         prompt_template="daily_review",
     )
     db.add(db_review)
@@ -188,7 +194,7 @@ async def generate_daily_review(
         insight=insight,
         review_type="daily",
         trades_analyzed=len(trades),
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=(
             db_review.created_at.isoformat()
             if db_review.created_at
@@ -228,7 +234,7 @@ async def generate_weekly_review(
     setup_performance = compute_setup_performance(trades)
 
     cache_key = review_cache_key(
-        "weekly", period_start.isoformat(), period_end.isoformat()
+        f"user:{current_user.id}:weekly", period_start.isoformat(), period_end.isoformat()
     )
     cached = review_cache.get(cache_key)
     if cached:
@@ -242,7 +248,8 @@ async def generate_weekly_review(
         )
 
     try:
-        insight = await ai_coach.generate_weekly_review(
+        coach_service, cfg = _coach_for_user(db, current_user.id)
+        insight = await coach_service.generate_weekly_review(
             trades=trade_data,
             summary_stats=summary_stats,
             setup_performance=setup_performance,
@@ -264,7 +271,7 @@ async def generate_weekly_review(
         period_end=period_end,
         trade_ids=[t.id for t in trades],
         summary_stats=summary_stats,
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         prompt_template="weekly_review",
     )
     db.add(db_review)
@@ -275,7 +282,7 @@ async def generate_weekly_review(
         insight=insight,
         review_type="weekly",
         trades_analyzed=len(trades),
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=(
             db_review.created_at.isoformat()
             if db_review.created_at
@@ -316,9 +323,10 @@ async def generate_trade_insight(
         )
 
     trade_data = _enrich_trades_with_lifecycle(trades, db)
+    coach_service, cfg = _coach_for_user(db, current_user.id)
 
     try:
-        insight = await ai_coach.generate_trade_insight(
+        insight = await coach_service.generate_trade_insight(
             trades=trade_data,
             context=request.context or "",
         )
@@ -334,7 +342,7 @@ async def generate_trade_insight(
         review_type="insight",
         content=insight,
         trade_ids=request.trade_ids,
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         prompt_template="trade_insight",
     )
     db.add(db_review)
@@ -345,7 +353,7 @@ async def generate_trade_insight(
         insight=insight,
         review_type="insight",
         trades_analyzed=len(trades),
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=(
             db_review.created_at.isoformat()
             if db_review.created_at
@@ -381,8 +389,9 @@ async def ask_coach(
         trade_data = _enrich_trades_with_lifecycle(trades, db)
         summary_stats = compute_summary_stats(trades)
 
+    coach_service, cfg = _coach_for_user(db, current_user.id)
     try:
-        answer = await ai_coach.ask_coach(
+        answer = await coach_service.ask_coach(
             question=request.question,
             trade_data=trade_data if trade_data else None,
             summary_stats=summary_stats if summary_stats else None,
@@ -399,7 +408,7 @@ async def ask_coach(
         review_type="answer",
         content=answer,
         trade_ids=request.trade_ids or [t["id"] for t in trade_data],
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         prompt_template="ask_coach",
     )
     db.add(db_review)
@@ -410,7 +419,7 @@ async def ask_coach(
         insight=answer,
         review_type="answer",
         trades_analyzed=len(trade_data),
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=(
             db_review.created_at.isoformat()
             if db_review.created_at
@@ -447,9 +456,10 @@ async def detect_patterns(
 
     trade_data = _enrich_trades_with_lifecycle(trades, db)
     summary_stats = compute_summary_stats(trades)
+    coach_service, cfg = _coach_for_user(db, current_user.id)
 
     try:
-        raw_patterns = await ai_coach.detect_patterns(
+        raw_patterns = await coach_service.detect_patterns(
             trades=trade_data,
             summary_stats=summary_stats,
             lookback_days=request.lookback_days,
@@ -481,7 +491,7 @@ async def detect_patterns(
         patterns=patterns,
         trades_analyzed=len(trades),
         lookback_days=request.lookback_days,
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=_now().isoformat(),
     )
 
@@ -513,9 +523,10 @@ async def check_rule_reminders(
         )
 
     trade_data = _enrich_trades_with_lifecycle(trades, db)
+    coach_service, cfg = _coach_for_user(db, current_user.id)
 
     try:
-        reminder = await ai_coach.check_rule_reminders(
+        reminder = await coach_service.check_rule_reminders(
             trades=trade_data,
             rules=request.rules,
         )
@@ -532,7 +543,7 @@ async def check_rule_reminders(
         reminder=reminder,
         trades_analyzed=len(trades),
         rules_checked=rules_count,
-        model_used="ollama",
+        model_used=cfg.get("model", "unknown"),
         generated_at=_now().isoformat(),
     )
 
@@ -707,12 +718,14 @@ async def behavioral_score(
         "no markdown, no explanation outside the JSON structure."
     )
 
+    cfg = {"model": "unknown"}
     try:
         messages = [
             {"role": "system", "content": system_msg},
             {"role": "user", "content": prompt},
         ]
-        result = await ai_coach._chat(messages, max_tokens=1500)
+        coach_service, cfg = _coach_for_user(db, current_user.id)
+        result = await coach_service._chat(messages, max_tokens=1500)
         import json
         try:
             parsed = json.loads(result)
@@ -741,7 +754,7 @@ async def behavioral_score(
         "ai_assessment": parsed,
         "lookback_days": lookback_days,
         "trades_analyzed": len(trades),
-        "model_used": "ollama",
+        "model_used": cfg.get("model", "unknown"),
         "generated_at": _now().isoformat(),
     }
 
@@ -798,11 +811,11 @@ async def generate_trade_review(
 
     trade_dict = trade_to_dict(trade, lifecycle=lifecycle, partial_exits=partial_exits, playbook=playbook)
 
-    cfg = get_ai_config()
+    coach_service, cfg = _coach_for_user(db, current_user.id)
     model_used = cfg.get("model", "unknown")
 
     try:
-        result = await ai_coach.generate_trade_review(trade_dict)
+        result = await coach_service.generate_trade_review(trade_dict)
     except Exception as e:
         logger.error("trade_review_failed", trade_id=trade.id, error=str(e))
         result = {

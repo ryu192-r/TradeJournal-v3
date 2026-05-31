@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     container_name: tjv3_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-trading_journal}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
-      POSTGRES_DB: ${POSTGRES_DB:-trading_journal}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading_journal}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,9 +23,9 @@ services:
       dockerfile: Dockerfile
     container_name: tjv3_backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-trading_journal}:${POSTGRES_PASSWORD:-securepassword}@postgres:5432/${POSTGRES_DB:-trading_journal}
-      SECRET_KEY: ${SECRET_KEY:-tjv3-secret-key-change-in-production}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-tjv3-jwt-secret-change-in-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       RATE_LIMIT_OFF: ${RATE_LIMIT_OFF:-false}
@@ -33,6 +33,7 @@ services:
       TAPETIDE_API_KEY: ${TAPETIDE_API_KEY:-}
       TAPETIDE_MCP_URL: ${TAPETIDE_MCP_URL:-https://mcp.tapetide.com/mcp}
       TAPETIDE_DEFAULT_EXCHANGE: ${TAPETIDE_DEFAULT_EXCHANGE:-NSE}
+      ALLOW_LOCAL_AI_URLS: ${ALLOW_LOCAL_AI_URLS:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +83,7 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-trading_journal}:${POSTGRES_PASSWORD:-securepassword}@postgres:5432/${POSTGRES_DB:-trading_journal}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
     depends_on:
       postgres:
         condition: service_healthy

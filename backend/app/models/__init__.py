@@ -20,6 +20,7 @@ from .performance_os import DailyWorkflow, WeeklyReview, MonthlyReview
 from .refresh_token import RefreshToken
 from .webhook_event import WebhookEvent
 from .market_candle import MarketCandle
+from .ai_provider_setting import AIProviderSetting
 
 __all__ = [
     'Base',
@@ -46,4 +47,5 @@ __all__ = [
     'RefreshToken',
     'WebhookEvent',
     'MarketCandle',
+    'AIProviderSetting',
 ]
