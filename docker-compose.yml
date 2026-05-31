@@ -28,9 +28,9 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-tjv3-jwt-secret-change-in-production}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      RATE_LIMIT_OFF: "true"
+      RATE_LIMIT_OFF: ${RATE_LIMIT_OFF:-false}
       TAPETIDE_ENABLED: ${TAPETIDE_ENABLED:-true}
-      TAPETIDE_API_KEY: ${TAPETIDE_API_KEY:-tpt_rt_d274b475b87e6bf41fa10b856eca10e32ccdee40e7edf629295774c0}
+      TAPETIDE_API_KEY: ${TAPETIDE_API_KEY:-}
       TAPETIDE_MCP_URL: ${TAPETIDE_MCP_URL:-https://mcp.tapetide.com/mcp}
       TAPETIDE_DEFAULT_EXCHANGE: ${TAPETIDE_DEFAULT_EXCHANGE:-NSE}
     depends_on:

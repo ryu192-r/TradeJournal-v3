@@ -214,6 +214,39 @@ class TestZeroRisk:
 
 
 class TestPlannedVsCurrentStopLoss:
+    def test_requested_long_breakeven_scenario_keeps_one_to_three_rr(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            quantity=10,
+            planned_stop_price=90,
+            current_stop_price=100,
+            target_price=130,
+            direction="LONG",
+        )
+        assert result.risk_per_unit == Decimal("10")
+        assert result.risk_amount == Decimal("100")
+        assert result.risk_reward_ratio == Decimal("3")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.current_protection_status == "breakeven"
+        assert result.current_is_risk_free is True
+        assert result.warnings == []
+
+    def test_requested_long_profit_lock_scenario_keeps_one_to_three_rr(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            quantity=10,
+            planned_stop_price=90,
+            current_stop_price=105,
+            target_price=130,
+            direction="LONG",
+        )
+        assert result.risk_reward_ratio == Decimal("3")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.locked_profit_per_unit == Decimal("5")
+        assert result.locked_profit_amount == Decimal("50")
+        assert result.current_protection_status == "profit_locked"
+        assert result.warnings == []
+
     def test_long_planned_risk_kept_when_current_breakeven(self):
         result = calculate_trade_metrics(
             entry_price=100,

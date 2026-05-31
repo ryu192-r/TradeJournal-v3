@@ -47,11 +47,8 @@ cd frontend && npm run build           # production build
 - **Schemas**: Pydantic v2 in `backend/app/schemas/`
 - **Monetary values**: All returned as **strings** from backend (Decimal serialization)
 - **Currency display**: `formatCurrency()` — ₹1.2k, ₹1.50L, ₹1.25Cr (PnL amounts). `formatPrice()` — ₹2,650.50 (entry/exit prices, 2 decimals). `formatQuantity()` — integer without decimals. All in `frontend/src/utils/format.ts`
-- **Datetime handling**: Backend stores **naive UTC** (no timezone suffix). Frontend must append `Z` before parsing to prevent JavaScript interpreting naive strings as local time. Two conversion paths:
-  - `formatDate()` / `formatDateTime()` in `format.ts` — for display only. Both call `normalizeTimestring()` to add `Z` to naive strings, then convert UTC→IST via `toISTInternal()`.
-  - `isoToDatetimeLocal()` / `datetimeLocalToIso()` in `schemas/tradeForm.ts` — for form inputs. Display: UTC→IST. Save: IST→UTC with `+05:30` suffix. Form defaults use `nowIST()`.
-  - **Bug fix**: Without `normalizeTimestring()`, `new Date("2025-05-20T09:16:00")` treats it as local time, then `toIST()` adds +5:30 again — double-converting. Always use `normalizeTimestring()` before `new Date()` on backend timestamps.
-- **DB**: Tables created via alembic on startup (`main.py:19-28`). Falls back to `create_all` if migration fails. Prod = PostgreSQL, tests override to SQLite (`conftest.py:6-9`). Engine uses `pool_pre_ping=True`.
+- **Datetime handling**: Backend stores trade datetimes as **naive IST wall-clock** strings (no timezone suffix). Frontend must not parse `YYYY-MM-DD` or naive backend timestamps with browser timezone rules. `formatDate()` / `formatDateTime()` and `isoToDatetimeLocal()` extract components directly; `datetimeLocalToIso()` sends the entered naive IST value with seconds. Calendar placement must use `tradeDates.ts` / `backend/app/utils/trade_dates.py` helpers.
+- **DB**: Alembic runs on startup (`main.py:19-28`). `create_all` fallback only runs in DEBUG/test mode if migrations fail. Prod migration drift fails loudly. Tests override to SQLite (`conftest.py:6-9`). Engine uses `pool_pre_ping=True`.
 - **Theme**: CSS variables via `data-theme="dark"|"light"` attr on root. Fonts: Newsreader (display), Inter (body), JetBrains Mono (data/mono)
 - **Fluid layout**: Page containers use `clamp()` CSS variables (`--page-px`, `--page-py`, `--page-gap`, `--heading-size`, `--cell-px`, `--cell-py`, `--text-sm`, `--text-xs`) defined in `index.css`. Use `text-[length:var(--x)]` not `text-[var(--x)]` (Tailwind treats `var()` as color by default).
 - **Standard card**: `const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
@@ -96,7 +93,7 @@ cd frontend && npm run build           # production build
 - **Always use these** instead of creating ad-hoc styles.
 
 ## Rate limiter
-- `RateLimiter` middleware in `main.py`. Disabled in Docker via `RATE_LIMIT_OFF=true` env var. Tests also set this.
+- `RateLimiter` middleware in `main.py`. Enabled by default in Docker; set `RATE_LIMIT_OFF=true` in `.env` only when intentionally disabling it. Tests set this.
 
 ## Sentry
 - Frontend has `@sentry/vite-plugin` + `@sentry/react`. Conditionally loaded if `SENTRY_DSN` env var is set.
@@ -216,14 +213,14 @@ cd frontend && npm run build           # production build
 - `DATABASE_URL` — PostgreSQL connection string (or SQLite for tests)
 - `SECRET_KEY`, `JWT_SECRET_KEY` — auth secrets
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` — default 30
-- `RATE_LIMIT_OFF` — set `true` to disable rate limiting (Docker, tests)
+- `RATE_LIMIT_OFF` — default `false`; set `true` in `.env` only for local/test bypass
 - `VITE_API_URL` — API base URL, default `/api/v1` (build-time)
 - `SENTRY_DSN` — optional, enables Sentry error tracking
 - `DUCK_DOMAIN` — DuckDNS domain for Traefik HTTPS
 - `UPLOAD_DIR` — chart image upload directory, default `uploads/charts`
 - `MAX_UPLOAD_SIZE_MB` — max upload size in MB, default 10
 - `TAPETIDE_ENABLED` — set `true` to enable daily/weekly OHLCV charts
-- `TAPETIDE_API_KEY` — Tapetide MCP auth token
+- `TAPETIDE_API_KEY` — optional Tapetide MCP auth token; blank disables Tapetide calls gracefully
 - `TAPETIDE_MCP_URL` — Tapetide MCP endpoint, default `https://mcp.tapetide.com/mcp`
 - `TAPETIDE_DEFAULT_EXCHANGE` — exchange prefix, default `NSE`
 

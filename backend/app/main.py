@@ -23,19 +23,27 @@ import os
 configure_logging()
 logger = get_logger(__name__)
 
+def _is_test_mode() -> bool:
+    return "pytest" in sys.modules
+
+
+def _allow_create_all_fallback() -> bool:
+    return settings.DEBUG or _is_test_mode()
+
+
 def run_migrations():
     alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
     try:
         command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations applied successfully")
+        logger.info("database_migrations_applied", mode="alembic")
     except Exception as e:
-        logger.error(f"Alembic migration failed: {e}")
-        if not settings.DEBUG:
+        logger.error("database_migrations_failed", error=str(e))
+        if not _allow_create_all_fallback():
             raise
-        logger.warning("Running in DEBUG mode — create_all fallback, schema may be stale")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables ensured via create_all")
+        logger.warning("database_schema_dev_fallback", mode="create_all", reason="alembic_failed")
+        Base.metadata.create_all(bind=engine)
+        logger.info("database_tables_ensured", mode="create_all_dev_fallback")
 
 run_migrations()
 

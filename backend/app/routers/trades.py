@@ -87,6 +87,12 @@ def _update_pnl(trade: Trade):
     trade.compute_pnl()
 
 
+def _preserve_original_stop_before_current_change(trade: Trade) -> None:
+    """Legacy rows may lack original_stop_price; preserve old current SL before mutation."""
+    if trade.original_stop_price is None and trade.stop_price is not None:
+        trade.original_stop_price = trade.stop_price
+
+
 def _auto_detect_exit_reason(trade: Trade) -> str:
     if trade.exit_price is None:
         return "system"
@@ -251,11 +257,18 @@ def update_trade(
     old_setup = db_trade.setup
     old_stop = db_trade.stop_price
     old_target = db_trade.target_price
+    requested_stop_status = update_data.get("stop_loss_status")
+
+    if "stop_price" in update_data:
+        _preserve_original_stop_before_current_change(db_trade)
 
     for field, value in update_data.items():
         setattr(db_trade, field, value)
 
-    if any(k in update_data for k in ("entry_price", "exit_price", "quantity", "fees", "original_stop_price")):
+    if "stop_price" in update_data or "stop_loss_status" in update_data or "entry_price" in update_data:
+        db_trade.sync_stop_loss_state(requested_stop_status)
+
+    if any(k in update_data for k in ("entry_price", "exit_price", "quantity", "fees", "original_stop_price", "stop_price")):
         _update_pnl(db_trade)
 
     if "exit_price" in update_data:
@@ -279,12 +292,12 @@ def update_trade(
         )
         db.add(timeline)
     if "stop_price" in update_data:
-        db_trade.stop_loss_status = "manual"
         timeline = TradeTimeline(
             trade_id=db_trade.id,
             event_type="stop_updated",
             old_value=str(old_stop) if old_stop else None,
             new_value=str(update_data["stop_price"]),
+            note=f"status={db_trade.stop_loss_status}",
         )
         db.add(timeline)
     if "target_price" in update_data:
@@ -381,14 +394,16 @@ def create_stop_history(
     )
     db.add(entry)
     old_stop = str(trade.stop_price) if trade.stop_price else None
+    _preserve_original_stop_before_current_change(trade)
     trade.stop_price = payload.price
-    trade.stop_loss_status = payload.stop_type
+    trade.sync_stop_loss_state(payload.stop_type)
+    trade.compute_pnl()
     timeline = TradeTimeline(
         trade_id=trade_id,
         event_type="stop_updated",
         old_value=old_stop,
         new_value=str(payload.price),
-        note=f"type={payload.stop_type}",
+        note=f"type={payload.stop_type}; status={trade.stop_loss_status}",
     )
     db.add(timeline)
     _auto_reconcile(db, user_id=current_user.id)

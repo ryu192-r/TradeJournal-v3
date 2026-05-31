@@ -255,6 +255,11 @@ class TradeService:
         new_qty = Decimal(str(quantity))
         total_qty = old_qty + new_qty
 
+        # Original SL is planned-risk truth. Pyramiding changes weighted entry/qty,
+        # not the original risk plan unless user explicitly edits that separate field.
+        if trade.original_stop_price is None and trade.stop_price is not None:
+            trade.original_stop_price = trade.stop_price
+
         trade.entry_price = (trade.entry_price * old_qty + entry_price * new_qty) / total_qty
         trade.quantity = total_qty
         if entry_time and entry_time < trade.entry_time:
@@ -263,6 +268,8 @@ class TradeService:
             trade.fees = (trade.fees or Decimal("0")) + fees
         if stop_price is not None:
             trade.stop_price = stop_price
+        trade.sync_stop_loss_state()
+        trade.compute_pnl()
 
         self.db.commit()
         self.db.refresh(trade)

@@ -15,7 +15,6 @@ from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
 from app.models.trade import Trade
 from app.models.user import User
-from app.utils.calculations import compute_aggregate_kpis
 from app.utils.pnl_helpers import get_realized_pnl_events
 from app.utils.trade_dates import (
     get_realized_session_date,
@@ -48,6 +47,31 @@ def _date_range(start: date, end: date):
 
 def _money(value: Decimal | int | float | None) -> str:
     return f"{Decimal(value or 0):.2f}"
+
+
+def _event_win_rate(events) -> float | None:
+    if not events:
+        return None
+    wins = sum(1 for event in events if event.pnl > 0)
+    return round(wins / len(events) * 100, 1)
+
+
+def _serialize_realized_event(event) -> dict:
+    realized_day = get_realized_session_date(event.timestamp)
+    return {
+        "source": event.source,
+        "trade_id": event.trade_id,
+        "symbol": event.symbol,
+        "setup": event.setup,
+        "realized_date": realized_day.isoformat() if realized_day else None,
+        "timestamp": event.timestamp.isoformat() if event.timestamp else None,
+        "pnl": _money(event.pnl),
+        "quantity": str(event.quantity),
+        "exit_price": str(event.exit_price) if event.exit_price is not None else None,
+        "r_multiple": str(event.r_multiple) if event.r_multiple is not None else None,
+        "entry_time": event.entry_time.isoformat() if event.entry_time else None,
+        "exit_time": event.exit_time.isoformat() if event.exit_time else None,
+    }
 
 
 def _journal_done(journal: DailyJournal | None) -> bool:
@@ -114,7 +138,14 @@ def get_calendar_month(
     journals = db.query(DailyJournal).filter(DailyJournal.date >= month_start, DailyJournal.date <= month_end, DailyJournal.user_id == current_user.id).all()
     workflows = db.query(DailyWorkflow).filter(DailyWorkflow.date >= month_start, DailyWorkflow.date <= month_end, DailyWorkflow.user_id == current_user.id).all()
 
-    # Bucket by entry_time session date in Asia/Kolkata — never created_at / imported_at / UTC .date()
+    realized_events = get_realized_pnl_events(db, current_user.id, start_dt, end_dt)
+    realized_by_day: dict[date, list] = defaultdict(list)
+    for event in realized_events:
+        realized_day = get_realized_session_date(event.timestamp)
+        if realized_day and month_start <= realized_day <= month_end:
+            realized_by_day[realized_day].append(event)
+
+    # Bucket activity by entry_time session date in Asia/Kolkata — never created_at/imported_at.
     trades_by_day: dict[date, list[Trade]] = defaultdict(list)
     for trade in trades:
         session = get_trade_session_date(trade)
@@ -131,8 +162,8 @@ def get_calendar_month(
 
     for current in _date_range(month_start, month_end):
         day_trades = trades_by_day.get(current, [])
-        kpis = compute_aggregate_kpis(day_trades)
-        net_pnl = sum((Decimal(t.pnl or 0) for t in day_trades), Decimal("0"))
+        day_realized_events = realized_by_day.get(current, [])
+        net_pnl = sum((event.pnl for event in day_realized_events), Decimal("0"))
         day_emotions = [emotion for trade in day_trades for emotion in emotions_by_trade.get(trade.id, [])]
         journal = journals_by_day.get(current)
         workflow = workflows_by_day.get(current)
@@ -140,9 +171,9 @@ def get_calendar_month(
         days.append({
             "date": current.isoformat(),
             "trade_count": len(day_trades),
-            "closed_count": kpis["trade_count"],
+            "closed_count": sum(1 for event in day_realized_events if event.source == "closed"),
             "net_pnl": _money(net_pnl),
-            "win_rate": kpis["win_rate"],
+            "win_rate": _event_win_rate(day_realized_events),
             "discipline_rating": journal.discipline_rating if journal else workflow.discipline_rating if workflow else None,
             "discipline_score": (journal.discipline_rating * 20) if journal and journal.discipline_rating else None,
             "journal_done": _journal_done(journal),
@@ -165,6 +196,7 @@ def get_calendar_month(
                 }
                 for t in day_trades
             ],
+            "realized_events": [_serialize_realized_event(event) for event in day_realized_events],
             "journal": {
                 "pre_trade_notes": journal.pre_trade_notes,
                 "post_trade_notes": journal.post_trade_notes,
@@ -189,28 +221,8 @@ def get_calendar_month(
             "ai_summary": None,
         })
 
-    closed_month_trades = [t for t in trades if t.exit_price is not None]
-    month_pnl = sum((Decimal(t.pnl or 0) for t in closed_month_trades), Decimal("0"))
-
-    # Include partial exit realized PnL from still-open trades
-    realized_events = get_realized_pnl_events(db, current_user.id, start_dt, end_dt)
-    partial_pnl_by_day: dict[date, Decimal] = defaultdict(Decimal)
-    partial_pnl_by_trade: dict[int, Decimal] = defaultdict(Decimal)
-    for ev in realized_events:
-        if ev.source == "partial_exit":
-            ev_day = get_realized_session_date(ev.timestamp)
-            if ev_day is None:
-                continue
-            partial_pnl_by_day[ev_day] += ev.pnl
-            partial_pnl_by_trade[ev.trade_id] += ev.pnl
-            month_pnl += ev.pnl
-
-    # Patch per-day net_pnl with partial exits
-    for day_data in days:
-        day_date = date.fromisoformat(day_data["date"])
-        pe_pnl = partial_pnl_by_day.get(day_date, Decimal("0"))
-        if pe_pnl:
-            day_data["net_pnl"] = _money(Decimal(day_data["net_pnl"]) + pe_pnl)
+    month_pnl = sum((event.pnl for event in realized_events), Decimal("0"))
+    closed_count = sum(1 for event in realized_events if event.source == "closed")
     journal_days = sum(1 for day in days if day["journal_done"])
     warning_days = sum(1 for day in days if day["warnings"])
 
@@ -218,7 +230,7 @@ def get_calendar_month(
         "month": month,
         "summary": {
             "trade_count": len(trades),
-            "closed_count": len(closed_month_trades),
+            "closed_count": closed_count,
             "net_pnl": _money(month_pnl),
             "journal_days": journal_days,
             "warning_days": warning_days,

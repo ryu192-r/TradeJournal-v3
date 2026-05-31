@@ -6,6 +6,9 @@ from app.utils.decimal_utils import TagsList
 from app.utils.calculations import calculate_trade_metrics
 from decimal import Decimal
 
+STOP_LOSS_STATUSES = {"original", "breakeven", "trailing", "manual", "risk_free", "profit_locked"}
+PROTECTIVE_STOP_STATUSES = {"breakeven", "risk_free", "profit_locked"}
+
 
 class Trade(Base):
     __tablename__ = 'trades'
@@ -33,7 +36,7 @@ class Trade(Base):
     stop_price = Column(Numeric(precision=18, scale=8))
     # original_stop_price = planned/original stop used for risk/R-multiple truth
     original_stop_price = Column(Numeric(precision=18, scale=8))
-    stop_loss_status = Column(String(20), default="original")  # original, breakeven, trailing, manual, risk_free
+    stop_loss_status = Column(String(20), default="original")  # original/manual/trailing vs breakeven/profit_locked protection
     target_price = Column(Numeric(precision=18, scale=8))
     r_multiple = Column(Numeric(precision=10, scale=4))
     
@@ -81,24 +84,42 @@ class Trade(Base):
         """Risk truth: original planned stop. Falls back to current stop for legacy rows."""
         return self.original_stop_price if self.original_stop_price is not None else self.stop_price
 
-    def _is_risk_free_stop(self) -> bool:
+    def _stop_protection_delta(self):
         if self.stop_price is None or self.entry_price is None:
-            return False
+            return None
         direction = (self.direction or "LONG").upper()
         if direction == "LONG":
-            return self.stop_price >= self.entry_price
-        return self.stop_price <= self.entry_price
+            return Decimal(str(self.stop_price)) - Decimal(str(self.entry_price))
+        return Decimal(str(self.entry_price)) - Decimal(str(self.stop_price))
 
-    def _sync_stop_loss_state(self):
-        # Backfill planned stop for legacy rows / old payloads.
+    def _is_risk_free_stop(self) -> bool:
+        delta = self._stop_protection_delta()
+        return delta is not None and delta >= Decimal("0")
+
+    def _derive_stop_loss_status(self, requested_status: str | None = None) -> str | None:
+        """Derive protection state from current stop, keeping planned stop separate."""
+        requested = requested_status or self.stop_loss_status
+        delta = self._stop_protection_delta()
+        if delta is None:
+            return requested
+        if delta == Decimal("0"):
+            return "breakeven"
+        if delta > Decimal("0"):
+            return "profit_locked"
+        if requested in STOP_LOSS_STATUSES and requested not in PROTECTIVE_STOP_STATUSES:
+            return requested
+        return "original"
+
+    def sync_stop_loss_state(self, requested_status: str | None = None):
+        """Sync current-stop protection state without changing planned risk truth."""
+        # Backfill only when no planned stop exists; callers changing current SL should
+        # preserve old stop before assignment so original risk truth is not overwritten.
         if self.original_stop_price is None and self.stop_price is not None:
             self.original_stop_price = self.stop_price
-        if self.stop_price is None:
-            return
-        if self._is_risk_free_stop():
-            self.stop_loss_status = "risk_free"
-        elif not self.stop_loss_status:
-            self.stop_loss_status = "original"
+        self.stop_loss_status = self._derive_stop_loss_status(requested_status)
+
+    def _sync_stop_loss_state(self):
+        self.sync_stop_loss_state()
 
     def compute_pnl(self):
         """Auto-compute PnL and R-multiple. Direction-aware. Handles partial exits

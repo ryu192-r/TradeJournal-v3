@@ -396,7 +396,7 @@ When activeView === 'trades':
 | `SECRET_KEY` | — | Yes |
 | `JWT_SECRET_KEY` | — | Yes |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | No |
-| `RATE_LIMIT_OFF` | false | Set `true` for Docker |
+| `RATE_LIMIT_OFF` | false | Set `true` in `.env` only when intentionally disabling rate limits |
 | `VITE_API_URL` | `/api/v1` | Frontend build-time |
 | `SENTRY_DSN` | — | Optional |
 | `UPLOAD_DIR` | `uploads/charts` | Chart image storage |
@@ -405,7 +405,7 @@ When activeView === 'trades':
 | `OLLAMA_BASE_URL` | — | AI Coach only |
 | `MARKET_DATA_API_URL` | — | Live quotes only |
 | `TAPETIDE_ENABLED` | false | Set `true` for daily OHLCV charts |
-| `TAPETIDE_API_KEY` | — | Tapetide MCP auth token |
+| `TAPETIDE_API_KEY` | — | Optional Tapetide MCP auth token; blank disables Tapetide calls gracefully |
 | `TAPETIDE_MCP_URL` | `https://mcp.tapetide.com/mcp` | Tapetide MCP endpoint |
 | `TAPETIDE_DEFAULT_EXCHANGE` | `NSE` | Exchange prefix for symbols |
 

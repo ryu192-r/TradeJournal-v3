@@ -28,6 +28,11 @@ describe('getTradeSessionDate', () => {
     const sunday = '2025-11-23'
     expect(tradeMatchesSessionDate({ entry_time: '2025-11-24T09:30:00' }, sunday)).toBe(false)
   })
+
+  it('2026-05-24 Sunday stays empty when no entry session exists', () => {
+    expect(weekdayFromSessionDate('2026-05-24')).toBe(0)
+    expect(tradeMatchesSessionDate({ entry_time: '2026-05-25T09:30:00' }, '2026-05-24')).toBe(false)
+  })
 })
 
 describe('getRealizedSessionDate', () => {

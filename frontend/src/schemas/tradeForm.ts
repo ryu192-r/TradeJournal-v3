@@ -80,16 +80,22 @@ export function formDataToApiPayload(
     fees: data.fees || '0',
     setup: data.setup || null,
     tactic: data.tactic || null,
-    original_stop_price: stopPrice,
     target_price: data.target_price || null,
     tags: tagsList,
     notes: data.notes || null,
   }
   if (options?.mode === 'edit') {
-    return basePayload
+    // Single SL field edits current/live stop only. Original risk plan stays stable
+    // unless a future explicit original-risk editor sends original_stop_price.
+    return {
+      ...basePayload,
+      stop_price: stopPrice,
+    }
   }
   return {
     ...basePayload,
+    // On create, single SL field seeds both planned-risk truth and current SL.
+    original_stop_price: stopPrice,
     stop_price: stopPrice,
     stop_loss_status: stopPrice ? 'original' : null,
   }

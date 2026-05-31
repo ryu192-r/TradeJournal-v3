@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, E
 import { getCalendarMonth } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, parseDecimal } from '@/utils/format'
-import { weekdayFromSessionDate } from '@/utils/tradeDates'
+import { todaySessionDate, weekdayFromSessionDate } from '@/utils/tradeDates'
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { CalendarDay } from '@/types'
@@ -13,13 +13,23 @@ import { useAppStore } from '@/store/appStore'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function monthKeyFromSessionDate(sessionDate: string) {
+  return sessionDate.slice(0, 7)
 }
 
 function shiftMonth(month: string, offset: number) {
   const [year, mon] = month.split('-').map(Number)
-  return monthKey(new Date(year, mon - 1 + offset, 1))
+  const monthIndex = year * 12 + (mon - 1) + offset
+  const shiftedYear = Math.floor(monthIndex / 12)
+  const shiftedMonth = (monthIndex % 12) + 1
+  return `${shiftedYear}-${String(shiftedMonth).padStart(2, '0')}`
+}
+
+function sessionDateLabel(isoDate: string) {
+  const [, month, day] = isoDate.split('-').map(Number)
+  return `${MONTH_LABELS[month - 1]} ${day}`
 }
 
 function pnlTone(value: string) {
@@ -30,7 +40,7 @@ function pnlTone(value: string) {
 }
 
 export function CalendarPage() {
-  const [month, setMonth] = useState(monthKey(new Date()))
+  const [month, setMonth] = useState(monthKeyFromSessionDate(todaySessionDate()))
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['calendar-month', month],
     queryFn: () => getCalendarMonth(month),
@@ -38,7 +48,7 @@ export function CalendarPage() {
   })
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const selectedDay = useMemo(
-    () => data?.days.find((day) => day.date === (selectedDate ?? data.days.find((d) => d.trade_count > 0 || d.journal_done)?.date)),
+    () => data?.days.find((day) => day.date === (selectedDate ?? data.days.find((d) => d.trade_count > 0 || (d.realized_events?.length ?? 0) > 0 || parseDecimal(d.net_pnl) !== 0 || d.journal_done)?.date)),
     [data, selectedDate]
   )
 
@@ -103,7 +113,8 @@ export function CalendarPage() {
 }
 
 function DayCell({ day, selected, onClick }: { day: CalendarDay; selected: boolean; onClick: () => void }) {
-  const hasActivity = day.trade_count > 0 || day.journal_done || day.workflow_done
+  const realizedEvents = day.realized_events ?? []
+  const hasActivity = day.trade_count > 0 || realizedEvents.length > 0 || day.journal_done || day.workflow_done
   return (
     <button
       onClick={onClick}
@@ -112,7 +123,7 @@ function DayCell({ day, selected, onClick }: { day: CalendarDay; selected: boole
         selected ? 'border-accent bg-accent-muted' : 'border-border bg-bg-elevated hover:border-text-muted',
         !hasActivity && 'opacity-60 sm:opacity-70'
       )}
-      aria-label={`${new Date(`${day.date}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} — ${formatCurrency(day.net_pnl)}`}
+      aria-label={`${sessionDateLabel(day.date)} — ${formatCurrency(day.net_pnl)}`}
     >
       <div className="flex items-center justify-between gap-1">
         <span className="font-data text-[10px] sm:text-xs text-text-heading">{Number(day.date.slice(8, 10))}</span>
@@ -145,6 +156,7 @@ function DayDetail({ day }: { day?: CalendarDay }) {
       </aside>
     )
   }
+  const realizedEvents = day.realized_events ?? []
 
   return (
     <aside className={CARD}>
@@ -166,6 +178,27 @@ function DayDetail({ day }: { day?: CalendarDay }) {
             </div>
           </div>
         )}
+
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Realized P&L</h3>
+          <div className="mt-2 space-y-2">
+            {realizedEvents.length === 0 ? (
+              <div className="text-sm text-text-muted">No realized P&L on this day.</div>
+            ) : realizedEvents.map((event) => (
+              <div key={`${event.source}-${event.trade_id}-${event.timestamp}`} className="rounded-xl border border-border bg-bg-elevated p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-text-heading">{event.symbol}</div>
+                    <div className="text-[10px] text-text-muted">
+                      {event.source === 'partial_exit' ? 'Partial exit' : 'Closed trade'} · {event.setup ?? 'Unassigned setup'}
+                    </div>
+                  </div>
+                  <div className={cn('font-data text-sm tabular-nums', pnlTone(event.pnl))}>{formatCurrency(event.pnl)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Trades</h3>

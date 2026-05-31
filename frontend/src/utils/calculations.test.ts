@@ -165,6 +165,41 @@ describe('calculateTradeMetrics — zero risk (stop = entry)', () => {
 })
 
 describe('calculateTradeMetrics — planned vs current stop split', () => {
+  it('requested long breakeven scenario keeps 1:3 R:R', () => {
+    const result = r({
+      entryPrice: 100,
+      quantity: 10,
+      plannedStopPrice: 90,
+      currentStopPrice: 100,
+      targetPrice: 130,
+      direction: 'LONG',
+    })
+    expect(result.riskPerUnit).toBe(10)
+    expect(result.riskAmount).toBe(100)
+    expect(result.riskRewardRatio).toBe(3)
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.currentProtectionStatus).toBe('breakeven')
+    expect(result.currentIsRiskFree).toBe(true)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('requested long profit-lock scenario keeps 1:3 R:R', () => {
+    const result = r({
+      entryPrice: 100,
+      quantity: 10,
+      plannedStopPrice: 90,
+      currentStopPrice: 105,
+      targetPrice: 130,
+      direction: 'LONG',
+    })
+    expect(result.riskRewardRatio).toBe(3)
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.lockedProfitPerUnit).toBe(5)
+    expect(result.lockedProfitAmount).toBe(50)
+    expect(result.currentProtectionStatus).toBe('profit_locked')
+    expect(result.warnings).toEqual([])
+  })
+
   it('long breakeven current stop keeps planned risk and no invalid warning', () => {
     const result = r({
       entryPrice: 100,

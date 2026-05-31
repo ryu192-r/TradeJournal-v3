@@ -10,6 +10,7 @@ from app.db.database import engine as real_engine
 from app.models.daily_journal import DailyJournal
 from app.models.emotion_log import EmotionLog
 from app.models.performance_os import DailyWorkflow
+from app.models.partial_exit import PartialExit
 from app.models.trade import Trade
 from app.models.user import User
 from app.routers.calendar import get_calendar_month
@@ -73,6 +74,87 @@ def test_calendar_month_returns_day_rollups(db_session):
     assert "rule-violation" in day["warnings"]
 
 
+def test_calendar_realized_pnl_uses_exit_date_not_entry_date(db_session):
+    user = _make_user(db_session)
+    trade = Trade(
+        symbol="TCS",
+        entry_price=Decimal("100"),
+        exit_price=Decimal("110"),
+        quantity=Decimal("10"),
+        entry_time=datetime(2026, 5, 4, 9, 30),
+        exit_time=datetime(2026, 5, 5, 15, 15),
+        pnl=Decimal("100"),
+        status="closed",
+        user_id=user.id,
+    )
+    db_session.add(trade)
+    db_session.commit()
+
+    payload = get_calendar_month(month="2026-05", db=db_session, current_user=user)
+    entry_day = next(d for d in payload["days"] if d["date"] == "2026-05-04")
+    exit_day = next(d for d in payload["days"] if d["date"] == "2026-05-05")
+
+    assert entry_day["trade_count"] == 1
+    assert entry_day["net_pnl"] == "0.00"
+    assert entry_day["realized_events"] == []
+    assert exit_day["trade_count"] == 0
+    assert exit_day["net_pnl"] == "100.00"
+    assert exit_day["realized_events"][0]["source"] == "closed"
+    assert exit_day["realized_events"][0]["trade_id"] == trade.id
+
+
+def test_calendar_partial_exit_realized_on_different_day_is_visible(db_session):
+    user = _make_user(db_session)
+    trade = Trade(
+        symbol="INFY",
+        entry_price=Decimal("100"),
+        quantity=Decimal("10"),
+        entry_time=datetime(2026, 5, 20, 9, 30),
+        fees=Decimal("0"),
+        status="open",
+        user_id=user.id,
+    )
+    db_session.add(trade)
+    db_session.flush()
+    db_session.add(
+        PartialExit(
+            trade_id=trade.id,
+            qty=Decimal("4"),
+            exit_price=Decimal("115"),
+            exit_time=datetime(2026, 5, 22, 10, 0),
+            realized_pnl=Decimal("60"),
+            exit_reason="manual",
+        )
+    )
+    db_session.commit()
+
+    payload = get_calendar_month(month="2026-05", db=db_session, current_user=user)
+    entry_day = next(d for d in payload["days"] if d["date"] == "2026-05-20")
+    realized_day = next(d for d in payload["days"] if d["date"] == "2026-05-22")
+
+    assert payload["summary"]["net_pnl"] == "60.00"
+    assert entry_day["trade_count"] == 1
+    assert entry_day["net_pnl"] == "0.00"
+    assert realized_day["trade_count"] == 0
+    assert realized_day["net_pnl"] == "60.00"
+    assert realized_day["realized_events"] == [
+        {
+            "source": "partial_exit",
+            "trade_id": trade.id,
+            "symbol": "INFY",
+            "setup": None,
+            "realized_date": "2026-05-22",
+            "timestamp": "2026-05-22T10:00:00",
+            "pnl": "60.00",
+            "quantity": "4",
+            "exit_price": "115",
+            "r_multiple": None,
+            "entry_time": "2026-05-20T09:30:00",
+            "exit_time": "2026-05-22T10:00:00",
+        }
+    ]
+
+
 def test_calendar_monday_trade_not_on_prior_sunday(db_session):
     """Regression: entry on Monday must not appear on previous Sunday."""
     user = _make_user(db_session)
@@ -101,6 +183,29 @@ def test_calendar_monday_trade_not_on_prior_sunday(db_session):
     assert sunday["trade_count"] == 0
     assert monday["trade_count"] == 1
     assert len(monday["trades"]) == 1
+
+
+def test_calendar_2026_05_24_sunday_has_zero_trades_without_entry_session(db_session):
+    user = _make_user(db_session)
+    trade = Trade(
+        symbol="RELIANCE",
+        entry_price=Decimal("100"),
+        quantity=Decimal("10"),
+        entry_time=datetime(2026, 5, 25, 9, 30),
+        status="open",
+        user_id=user.id,
+    )
+    db_session.add(trade)
+    db_session.commit()
+
+    payload = get_calendar_month(month="2026-05", db=db_session, current_user=user)
+    sunday = next(d for d in payload["days"] if d["date"] == "2026-05-24")
+    monday = next(d for d in payload["days"] if d["date"] == "2026-05-25")
+
+    assert weekday_from_session_date(date(2026, 5, 24)) == 0
+    assert sunday["trade_count"] == 0
+    assert sunday["net_pnl"] == "0.00"
+    assert monday["trade_count"] == 1
 
 
 def test_reports_weekly_returns_deterministic_sections(db_session):

@@ -39,7 +39,7 @@ interface TradeEntryFormProps {
 
 function apiTradeToFormData(trade: ApiTrade): TradeFormData {
   const tagsStr = trade.tags ? trade.tags.join(', ') : undefined
-  const plannedStop = trade.original_stop_price ?? trade.stop_price
+  const currentStop = trade.current_stop_price ?? trade.stop_price ?? trade.original_stop_price
   return {
     symbol: trade.symbol,
     entry_price: String(trade.entry_price),
@@ -50,7 +50,7 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     fees: String(trade.fees ?? 0),
     setup: trade.setup || undefined,
     tactic: trade.tactic || undefined,
-    stop_price: plannedStop != null ? String(plannedStop) : undefined,
+    stop_price: currentStop != null ? String(currentStop) : undefined,
     target_price: trade.target_price != null ? String(trade.target_price) : undefined,
     tags: tagsStr,
     notes: trade.notes || undefined,
@@ -146,16 +146,21 @@ export function TradeEntryForm({
   })
 
   const liveMetrics = useMemo(() => {
+    const currentStop = parseInput(stopPrice as string | undefined)
+    const plannedStop = mode === 'edit'
+      ? parseInput(initialData?.original_stop_price ?? initialData?.stop_price ?? undefined) ?? currentStop
+      : currentStop
     return calculateTradeMetrics({
       entryPrice: parseInput(entryPrice as string | undefined),
       exitPrice: parseInput(exitPrice as string | undefined),
       quantity: parseInput(quantity as string | undefined),
       fees: parseInput(fees as string | undefined),
-      stopPrice: parseInput(stopPrice as string | undefined),
+      plannedStopPrice: plannedStop,
+      currentStopPrice: currentStop,
       targetPrice: parseInput(targetPrice as string | undefined),
       direction: 'LONG',
     })
-  }, [entryPrice, exitPrice, quantity, fees, stopPrice, targetPrice])
+  }, [entryPrice, exitPrice, quantity, fees, stopPrice, targetPrice, mode, initialData])
 
   const hasEntry = parseInput(entryPrice as string | undefined) != null
   const hasQty = parseInput(quantity as string | undefined) != null

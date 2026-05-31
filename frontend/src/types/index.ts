@@ -63,7 +63,7 @@ export interface ApiTrade {
   tactic: string | null
   original_stop_price?: string | null
   current_stop_price?: string | null
-  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | 'profit_locked' | null
   stop_price: string | null
   target_price: string | null
   r_multiple: string | null
@@ -94,7 +94,7 @@ export interface OpenLiveTrade {
   remaining_qty: string
   original_stop_price?: string | null
   current_stop_price?: string | null
-  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | 'profit_locked' | null
   stop_price: string | null
   fees: string
 }
@@ -114,7 +114,7 @@ export interface ApiTradeUpdatePayload {
   tactic?: string | null
   stop_price?: string | null
   original_stop_price?: string | null
-  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | 'profit_locked' | null
   target_price?: string | null
   r_multiple?: string | null
   status?: BackendTradeStatus
@@ -222,6 +222,21 @@ export interface CalendarEmotion {
   timestamp: string | null
 }
 
+export interface CalendarRealizedEvent {
+  source: 'closed' | 'partial_exit'
+  trade_id: number
+  symbol: string
+  setup: string | null
+  realized_date: string | null
+  timestamp: string | null
+  pnl: string
+  quantity: string
+  exit_price: string | null
+  r_multiple: string | null
+  entry_time: string | null
+  exit_time: string | null
+}
+
 export interface CalendarDay {
   date: string
   trade_count: number
@@ -245,6 +260,7 @@ export interface CalendarDay {
     lessons_learned: string | null
   } | null
   emotions: CalendarEmotion[]
+  realized_events: CalendarRealizedEvent[]
   ai_summary: string | null
 }
 

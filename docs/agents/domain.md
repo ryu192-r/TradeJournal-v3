@@ -52,4 +52,4 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 | 012 | Trade status lifecycle | Before touching trade status handling |
 | 019 | Partial exits and remaining quantity | Before touching partial exit logic |
 | 020 | Live quote cache | Before touching market data |
-| 021 | Naive UTC datetime display fix | Before touching any datetime handling |
+| 021 | Naive IST datetime display fix | Before touching any datetime handling |

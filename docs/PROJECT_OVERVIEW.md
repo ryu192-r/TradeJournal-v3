@@ -248,10 +248,11 @@ cd frontend && npm run dev             # dev server
 | `SECRET_KEY` | — | Auth secret |
 | `JWT_SECRET_KEY` | — | JWT signing key |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | Token expiry |
-| `RATE_LIMIT_OFF` | false | Disable rate limiting |
+| `RATE_LIMIT_OFF` | false | Disable rate limiting only when set in `.env` |
 | `VITE_API_URL` | `/api/v1` | API base URL (build-time) |
 | `SENTRY_DSN` | — | Optional Sentry |
 | `UPLOAD_DIR` | `uploads/charts` | Chart image storage |
+| `TAPETIDE_API_KEY` | — | Optional Tapetide MCP token; blank disables Tapetide calls gracefully |
 
 ### Service Ports
 | Service | Port |

@@ -33,7 +33,7 @@ class TradeBase(BaseModel):
     tactic: Optional[str] = Field(None, description="Trading tactic used")
     stop_price: Optional[Decimal] = Field(None, description="Current/live stop loss price")
     original_stop_price: Optional[Decimal] = Field(None, description="Original planned stop loss (risk truth)")
-    stop_loss_status: Optional[str] = Field(None, description="original, breakeven, trailing, manual, risk_free")
+    stop_loss_status: Optional[str] = Field(None, description="original, breakeven, trailing, manual, risk_free, profit_locked")
     target_price: Optional[Decimal] = Field(None, description="Target profit price")
     r_multiple: Optional[Decimal] = Field(None, description="Risk multiple")
     exit_reason: Optional[str] = Field(None, description="Exit reason: stop_loss, target, manual, trailing, system")
@@ -53,7 +53,7 @@ class TradeBase(BaseModel):
     def validate_stop_loss_status(cls, v):
         if v is None:
             return v
-        allowed = {"original", "breakeven", "trailing", "manual", "risk_free"}
+        allowed = {"original", "breakeven", "trailing", "manual", "risk_free", "profit_locked"}
         if v not in allowed:
             raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
         return v
@@ -114,7 +114,7 @@ class TradeUpdate(BaseModel):
     def validate_stop_loss_status_update(cls, v):
         if v is None:
             return v
-        allowed = {"original", "breakeven", "trailing", "manual", "risk_free"}
+        allowed = {"original", "breakeven", "trailing", "manual", "risk_free", "profit_locked"}
         if v not in allowed:
             raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
         return v

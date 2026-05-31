@@ -21,6 +21,16 @@ from app.utils.decimal_utils import ensure_decimal
 from app.utils.trade_dates import get_realized_session_date
 
 
+def _ensure_datetime(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return value
+
+
 @dataclass
 class RealizedPnlEvent:
     source: str          # "closed" | "partial_exit"
@@ -71,15 +81,15 @@ def get_realized_pnl_events(
     )
     params: dict = {"user_id": user_id}
     if start:
-        closed_q += " AND t.exit_time >= :start"
+        closed_q += " AND COALESCE(t.exit_time, t.entry_time) >= :start"
         params["start"] = start
     if end:
-        closed_q += " AND t.exit_time <= :end"
+        closed_q += " AND COALESCE(t.exit_time, t.entry_time) <= :end"
         params["end"] = end
 
     rows = db.execute(text(closed_q), params).fetchall()
     for r in rows:
-        ts = r.realized_time if r.realized_time else r.entry_time
+        ts = _ensure_datetime(r.realized_time) or _ensure_datetime(r.entry_time)
         events.append(RealizedPnlEvent(
             source="closed",
             trade_id=r.id,
@@ -89,8 +99,8 @@ def get_realized_pnl_events(
             pnl=ensure_decimal(r.pnl),
             r_multiple=ensure_decimal(r.r_multiple) if r.r_multiple is not None else None,
             timestamp=ts,
-            entry_time=r.entry_time,
-            exit_time=r.exit_time,
+            entry_time=_ensure_datetime(r.entry_time),
+            exit_time=_ensure_datetime(r.exit_time),
             fees=ensure_decimal(r.fees or 0),
             quantity=ensure_decimal(r.quantity),
             entry_price=ensure_decimal(r.entry_price),
@@ -112,15 +122,15 @@ def get_realized_pnl_events(
     )
     pe_params: dict = {"user_id": user_id}
     if start:
-        pe_q += " AND pe.exit_time >= :start"
+        pe_q += " AND COALESCE(pe.exit_time, pe.created_at, t.entry_time) >= :start"
         pe_params["start"] = start
     if end:
-        pe_q += " AND pe.exit_time <= :end"
+        pe_q += " AND COALESCE(pe.exit_time, pe.created_at, t.entry_time) <= :end"
         pe_params["end"] = end
 
     pe_rows = db.execute(text(pe_q), pe_params).fetchall()
     for r in pe_rows:
-        ts = r.exit_time if r.exit_time else (r.created_at if r.created_at else r.entry_time)
+        ts = _ensure_datetime(r.exit_time) or _ensure_datetime(r.created_at) or _ensure_datetime(r.entry_time)
         events.append(RealizedPnlEvent(
             source="partial_exit",
             trade_id=r.trade_id,
@@ -130,8 +140,8 @@ def get_realized_pnl_events(
             pnl=ensure_decimal(r.realized_pnl),
             r_multiple=ensure_decimal(r.r_captured) if r.r_captured is not None else None,
             timestamp=ts,
-            entry_time=r.entry_time,
-            exit_time=r.exit_time,
+            entry_time=_ensure_datetime(r.entry_time),
+            exit_time=_ensure_datetime(r.exit_time),
             fees=Decimal("0"),  # fees allocated to the parent trade, not the partial
             quantity=ensure_decimal(r.qty),
             entry_price=ensure_decimal(r.entry_price),

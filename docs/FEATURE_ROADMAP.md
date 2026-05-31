@@ -13,7 +13,7 @@
 - Backend regression tests: operational dashboard, lifecycle analytics, market context, partial exits, timeline, chart images, Performance OS
 - Frontend smoke tests: Dashboard, Trade Detail, Performance OS, Partial Exit flows
 - ADRs 016–021 documented
-- Fixed naive-UTC datetime double-conversion bug (ADR-021): `formatDate()`, `formatDateTime()`, `isoToDatetimeLocal()` now append `Z` to naive timestamps before parsing
+- Fixed naive IST datetime handling (ADR-021): `formatDate()`, `formatDateTime()`, `isoToDatetimeLocal()`, and calendar helpers extract IST components without browser timezone parsing
 
 ### Phase 1: Core Trading ✅
 - [x] Trade CRUD (all LONG — Indian equities)
