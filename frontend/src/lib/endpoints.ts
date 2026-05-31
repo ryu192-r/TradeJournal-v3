@@ -717,6 +717,14 @@ export function getEdgeCommandCenter(params?: { period_start?: string; period_en
     .then((r) => r.data)
 }
 
+// ────────────────────────── Actions Inbox ──────────────────────────
+
+export function getActionsInbox(params?: { interface_mode?: 'simple' | 'pro' }) {
+  return apiClient
+    .get<import('@/types/actionsInbox').ActionsInboxResponse>('/actions/inbox', { params })
+    .then((r) => r.data)
+}
+
 // ────────────────────────── Chart Data ──────────────────────────
 
 export function getTradeChartData(tradeId: number, params?: { timeframe?: string; range?: string; source?: string }) {

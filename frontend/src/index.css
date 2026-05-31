@@ -93,6 +93,11 @@
     --cell-px: clamp(0.5rem, 1.5vw, 1.25rem);
     --cell-py: clamp(0.5rem, 1vw, 0.75rem);
     --bottom-nav-height: 5rem;
+    /* FAB (-mt-2 + h-14) rises above the nav bar — keep bell above that stack */
+    --bottom-nav-fab-rise: 3.75rem;
+    --actions-bell-bottom-mobile: calc(
+      var(--bottom-nav-height) + var(--bottom-nav-fab-rise) + 0.75rem + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   html, body, #root {

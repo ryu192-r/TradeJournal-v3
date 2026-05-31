@@ -154,6 +154,22 @@ vi.mock('@/hooks/useEdgeCommandCenterQuery', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useActionsInboxQuery', () => ({
+  useActionsInboxQuery: () => ({
+    data: {
+      generated_at: '2025-05-31T00:00:00Z',
+      interface_mode: 'simple',
+      open_count: 0,
+      items: [],
+      sections: [],
+    },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}))
+
 vi.mock('@/hooks/useTradesQuery', () => ({
   useTradesQuery: () => ({
     data: { total: 0, items: [] },

@@ -1,33 +1,39 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
+  AlertTriangle,
   Bell,
   BookOpen,
   ChevronRight,
   ClipboardList,
   ListChecks,
+  Loader2,
   ShieldAlert,
   Sparkles,
   X,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useEdgeCommandCenterQuery } from '@/hooks/useEdgeCommandCenterQuery'
-import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
+import { useActionsInboxQuery } from '@/hooks/useActionsInboxQuery'
 import { useAppStore } from '@/store/appStore'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { CARD_COMPACT } from '@/components/layout/layoutTokens'
-import type { EdgePriority, EdgeReviewQueueItem } from '@/types/edgeCommandCenter'
+import { EmptyState, ErrorState } from '@/components/ui/StateComponents'
+import type { ActionItem, ActionInboxSection } from '@/types/actionsInbox'
+import { navigateActionTarget } from '@/components/actions/navigateActionTarget'
 
-type ActionSection = {
-  id: string
-  title: string
-  icon: typeof Bell
-  items: Array<{
-    id: string
-    title: string
-    subtitle?: string
-    severity?: 'info' | 'warning' | 'critical'
-    onClick: () => void
-  }>
+const EMPTY_TITLE = "You're all set"
+const EMPTY_MESSAGE =
+  'No pending reviews, journal steps, or risk alerts. Check back after your next session.'
+
+const SECTION_ICONS: Record<string, LucideIcon> = {
+  trade_review: ListChecks,
+  workflow: BookOpen,
+  journal: BookOpen,
+  risk: ShieldAlert,
+  rule_violation: AlertTriangle,
+  suggestion: Sparkles,
+  notification: ClipboardList,
+  system: Bell,
 }
 
 function severityClass(severity?: string) {
@@ -37,14 +43,10 @@ function severityClass(severity?: string) {
 }
 
 function ActionRow({
-  title,
-  subtitle,
-  severity,
+  item,
   onClick,
 }: {
-  title: string
-  subtitle?: string
-  severity?: string
+  item: ActionItem
   onClick: () => void
 }) {
   return (
@@ -53,13 +55,15 @@ function ActionRow({
       onClick={onClick}
       className={cn(
         'w-full flex items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer hover:border-accent/30',
-        severityClass(severity)
+        severityClass(item.severity)
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-text-heading truncate">{title}</div>
-        {subtitle && (
-          <div className="mt-0.5 text-[length:var(--text-xs)] text-text-muted line-clamp-2">{subtitle}</div>
+        <div className="text-sm font-medium text-text-heading truncate">{item.title}</div>
+        {item.description && (
+          <div className="mt-0.5 text-[length:var(--text-xs)] text-text-muted line-clamp-2">
+            {item.description}
+          </div>
         )}
       </div>
       <ChevronRight className="w-4 h-4 shrink-0 text-text-faint mt-0.5" />
@@ -67,251 +71,193 @@ function ActionRow({
   )
 }
 
-function buildSections(
-  reviewQueue: EdgeReviewQueueItem[],
-  priorities: EdgePriority[],
-  riskWarnings: string[],
-  workflowMissing: string[],
-  workflowNext: string | null,
-  workflowComplete: boolean,
-  handlers: {
-    openReview: () => void
-    openTrade: (id: number) => void
-    openPerfOs: () => void
-    openJournal: () => void
-    openRisk: () => void
-    openCoach: () => void
-    openEdge: () => void
-  }
-): ActionSection[] {
-  const sections: ActionSection[] = []
-
-  if (reviewQueue.length > 0) {
-    sections.push({
-      id: 'reviews',
-      title: 'Pending trade reviews',
-      icon: ListChecks,
-      items: reviewQueue.slice(0, 8).map((item) => ({
-        id: `review-${item.trade_id}`,
-        title: `${item.symbol} — ${item.reason}`,
-        subtitle: item.mistake_tags.length > 0 ? item.mistake_tags.join(', ') : undefined,
-        severity: item.severity,
-        onClick: () => handlers.openTrade(item.trade_id),
-      })),
-    })
-  }
-
-  if (!workflowComplete && (workflowMissing.length > 0 || workflowNext)) {
-    sections.push({
-      id: 'journal',
-      title: 'Daily journal',
-      icon: BookOpen,
-      items: [
-        ...(workflowMissing.length > 0
-          ? workflowMissing.map((item, i) => ({
-              id: `wf-missing-${i}`,
-              title: item,
-              severity: 'warning' as const,
-              onClick: handlers.openPerfOs,
-            }))
-          : []),
-        ...(workflowNext
-          ? [{
-              id: 'wf-next',
-              title: workflowNext,
-              subtitle: 'Next workflow step',
-              onClick: handlers.openPerfOs,
-            }]
-          : []),
-      ],
-    })
-  }
-
-  if (riskWarnings.length > 0) {
-    sections.push({
-      id: 'risk',
-      title: 'Risk warnings',
-      icon: ShieldAlert,
-      items: riskWarnings.slice(0, 6).map((msg, i) => ({
-        id: `risk-${i}`,
-        title: msg,
-        severity: 'critical' as const,
-        onClick: handlers.openRisk,
-      })),
-    })
-  }
-
-  const suggested = priorities.filter((p) => p.severity === 'warning' || p.severity === 'critical').slice(0, 5)
-  if (suggested.length > 0) {
-    sections.push({
-      id: 'suggested',
-      title: 'Suggested actions',
-      icon: Sparkles,
-      items: suggested.map((p) => ({
-        id: p.id,
-        title: p.title,
-        subtitle: p.action,
-        severity: p.severity === 'critical' ? 'critical' : 'warning',
-        onClick: () => {
-          if (p.related_trade_ids.length > 0) handlers.openTrade(p.related_trade_ids[0])
-          else if (p.category === 'review') handlers.openReview()
-          else handlers.openEdge()
-        },
-      })),
-    })
-  }
-
-  const infoPriorities = priorities.filter((p) => p.severity === 'info').slice(0, 3)
-  if (infoPriorities.length > 0) {
-    sections.push({
-      id: 'notifications',
-      title: 'Insights',
-      icon: ClipboardList,
-      items: infoPriorities.map((p) => ({
-        id: p.id,
-        title: p.summary,
-        subtitle: p.source,
-        onClick: handlers.openCoach,
-      })),
-    })
-  }
-
-  return sections
+function InboxSectionBlock({
+  section,
+  onItemClick,
+}: {
+  section: ActionInboxSection
+  onItemClick: (item: ActionItem) => void
+}) {
+  const Icon = SECTION_ICONS[section.id] ?? Bell
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-3.5 h-3.5 text-accent" />
+        <h3 className="text-[10px] font-data uppercase tracking-wider text-text-faint">{section.title}</h3>
+      </div>
+      <div className="space-y-2">
+        {section.items.map((item) => (
+          <ActionRow key={item.id} item={item} onClick={() => onItemClick(item)} />
+        ))}
+      </div>
+    </div>
+  )
 }
 
-export function ActionsInbox() {
-  const [open, setOpen] = useState(false)
-  const { data: edge } = useEdgeCommandCenterQuery()
-  const { data: operational } = useOperationalDashboardQuery()
-  const setActiveView = useAppStore((s) => s.setActiveView)
-  const openDetailTrade = useAppStore((s) => s.openDetailTrade)
+function readLargeScreen() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(min-width: 1024px)').matches
+}
 
-  const handlers = useMemo(
-    () => ({
-      openReview: () => {
-        setActiveView('review')
-        setOpen(false)
-      },
-      openTrade: (id: number) => {
-        openDetailTrade(id)
-        setOpen(false)
-      },
-      openPerfOs: () => {
-        setActiveView('perf-os')
-        setOpen(false)
-      },
-      openJournal: () => {
-        setActiveView('journal')
-        setOpen(false)
-      },
-      openRisk: () => {
-        setActiveView('risk')
-        setOpen(false)
-      },
-      openCoach: () => {
-        setActiveView('coach')
-        setOpen(false)
-      },
-      openEdge: () => {
-        setActiveView('edge-center')
-        setOpen(false)
-      },
-    }),
-    [setActiveView, openDetailTrade]
-  )
+function useIsLargeScreen() {
+  const [isLg, setIsLg] = useState(readLargeScreen)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const onChange = () => setIsLg(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isLg
+}
 
-  const reviewQueue = edge?.review_queue ?? []
-  const priorities = edge?.priorities ?? []
-  const riskWarnings = [
-    ...(operational?.risk?.warnings?.map((w) => w.message) ?? []),
-    ...(edge?.summary.risk_warnings ?? []),
-  ]
-  const workflow = edge?.workflow ?? null
-  const workflowMissing = workflow?.missing_items ?? []
-  const workflowNext = workflow?.next_step ?? null
-  const workflowComplete = workflow?.is_complete ?? false
+function InboxPanel({
+  navMode,
+  isLoading,
+  isError,
+  isFetching,
+  data,
+  sections,
+  showEdgeLink,
+  onClose,
+  onRetry,
+  onItemClick,
+  onOpenEdge,
+}: {
+  navMode: 'simple' | 'pro'
+  isLoading: boolean
+  isError: boolean
+  isFetching: boolean
+  data: ReturnType<typeof useActionsInboxQuery>['data']
+  sections: ActionInboxSection[]
+  showEdgeLink: boolean
+  onClose: () => void
+  onRetry: () => void
+  onItemClick: (item: ActionItem) => void
+  onOpenEdge: () => void
+}) {
+  const body = () => {
+    if (isLoading && !data) {
+      return (
+        <div className={cn(CARD_COMPACT, 'flex flex-col items-center justify-center py-12 gap-2')}>
+          <Loader2 className="w-6 h-6 text-accent animate-spin" aria-hidden />
+          <p className="text-sm text-text-muted">Loading your action list…</p>
+        </div>
+      )
+    }
 
-  const sections = useMemo(
-    () =>
-      buildSections(
-        reviewQueue,
-        priorities,
-        [...new Set(riskWarnings)],
-        workflowMissing,
-        workflowNext,
-        workflowComplete,
-        handlers
-      ),
-    [reviewQueue, priorities, riskWarnings, workflowMissing, workflowNext, workflowComplete, handlers]
-  )
+    if (isError) {
+      return (
+        <ErrorState
+          compact
+          title="Couldn't load actions"
+          message="Your list will show up once the connection is back. Tap Retry to try again."
+          onRetry={onRetry}
+        />
+      )
+    }
 
-  const badgeCount = useMemo(() => {
-    let n = reviewQueue.length
-    if (!workflowComplete) n += Math.max(workflowMissing.length, workflowNext ? 1 : 0)
-    n += operational?.risk?.warnings?.length ?? 0
-    n += priorities.filter((p) => p.severity === 'critical' || p.severity === 'warning').length
-    return Math.min(99, n)
-  }, [reviewQueue, workflowComplete, workflowMissing, workflowNext, operational, priorities])
+    if (sections.length === 0) {
+      return (
+        <EmptyState compact title={EMPTY_TITLE} message={EMPTY_MESSAGE} icon={Bell} />
+      )
+    }
 
-  const panel = (
-    <div className="flex flex-col max-h-[min(70vh,520px)]">
+    return sections.map((section) => (
+      <InboxSectionBlock key={section.id} section={section} onItemClick={onItemClick} />
+    ))
+  }
+
+  return (
+    <div className="flex flex-col min-h-0 flex-1 max-h-[min(72dvh,32rem)] lg:max-h-none lg:h-full">
       <div className="flex items-center justify-between border-b border-border px-4 py-3 shrink-0">
         <div>
           <h2 className="text-base font-display text-text-heading">Actions</h2>
           <p className="text-[length:var(--text-xs)] text-text-muted mt-0.5">
-            Reviews, journal, risk, and coaching prompts
+            {navMode === 'pro'
+              ? 'Reviews, journal, risk, and intelligence prompts'
+              : 'Reviews, journal, and risk alerts'}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-border text-text-muted hover:text-text-heading cursor-pointer lg:hidden"
           aria-label="Close actions"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 scrollbar-thin">
-        {sections.length === 0 ? (
-          <div className={cn(CARD_COMPACT, 'text-center py-8')}>
-            <p className="text-sm text-text-heading font-medium">All caught up</p>
-            <p className="text-[length:var(--text-xs)] text-text-muted mt-1">No pending reviews or warnings right now.</p>
-          </div>
-        ) : (
-          sections.map((section) => {
-            const Icon = section.icon
-            return (
-              <div key={section.id}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Icon className="w-3.5 h-3.5 text-accent" />
-                  <h3 className="text-[10px] font-data uppercase tracking-wider text-text-faint">{section.title}</h3>
-                </div>
-                <div className="space-y-2">
-                  {section.items.map((item) => (
-                    <ActionRow
-                      key={item.id}
-                      title={item.title}
-                      subtitle={item.subtitle}
-                      severity={item.severity}
-                      onClick={item.onClick}
-                    />
-                  ))}
-                </div>
-              </div>
-            )
-          })
-        )}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-4 scrollbar-thin"
+        role="region"
+        aria-label="Action items"
+      >
+        {isFetching && data ? (
+          <p className="text-[10px] text-text-faint text-center" aria-live="polite">
+            Updating…
+          </p>
+        ) : null}
+        {body()}
       </div>
-      <div className="border-t border-border px-4 py-3 shrink-0">
-        <button
-          type="button"
-          onClick={handlers.openEdge}
-          className="w-full text-center text-[length:var(--text-xs)] font-medium text-accent hover:underline cursor-pointer"
-        >
-          Open full command center →
-        </button>
-      </div>
+      {showEdgeLink && (
+        <div className="border-t border-border px-4 py-3 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onOpenEdge}
+            className="w-full text-center text-[length:var(--text-xs)] font-medium text-accent hover:underline cursor-pointer"
+          >
+            Open full command center →
+          </button>
+        </div>
+      )}
     </div>
+  )
+}
+
+export function ActionsInbox() {
+  const [open, setOpen] = useState(false)
+  const isLargeScreen = useIsLargeScreen()
+  const navMode = useAppStore((s) => s.navMode)
+  const tradeFormMode = useAppStore((s) => s.tradeFormMode)
+  const setActiveView = useAppStore((s) => s.setActiveView)
+  const openDetailTrade = useAppStore((s) => s.openDetailTrade)
+
+  const { data, isLoading, isError, refetch, isFetching } = useActionsInboxQuery(navMode)
+
+  const handleItemClick = useCallback(
+    (item: ActionItem) => {
+      navigateActionTarget(item.target, { setActiveView, openDetailTrade }, navMode)
+      setOpen(false)
+    },
+    [setActiveView, openDetailTrade, navMode]
+  )
+
+  const badgeCount = Math.min(99, data?.open_count ?? 0)
+  const sections = data?.sections ?? []
+  const showEdgeLink = navMode === 'pro'
+
+  if (tradeFormMode !== 'list') {
+    return null
+  }
+
+  const panel = (
+    <InboxPanel
+      navMode={navMode}
+      isLoading={isLoading}
+      isError={isError}
+      isFetching={isFetching}
+      data={data}
+      sections={sections}
+      showEdgeLink={showEdgeLink}
+      onClose={() => setOpen(false)}
+      onRetry={() => refetch()}
+      onItemClick={handleItemClick}
+      onOpenEdge={() => {
+        navigateActionTarget({ view: 'edge-center' }, { setActiveView, openDetailTrade }, navMode)
+        setOpen(false)
+      }}
+    />
   )
 
   return (
@@ -320,31 +266,33 @@ export function ActionsInbox() {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          'fixed z-[90] inline-flex min-h-12 min-w-12 items-center justify-center rounded-full',
+          'fixed z-[45] inline-flex min-h-11 min-w-11 items-center justify-center rounded-full',
           'bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover transition-colors cursor-pointer',
-          'bottom-[calc(var(--bottom-nav-height)+0.75rem)] right-4 lg:bottom-6 lg:right-6'
+          'bottom-[var(--actions-bell-bottom-mobile)] right-4',
+          'lg:bottom-6 lg:right-6 lg:z-[90] lg:min-h-12 lg:min-w-12'
         )}
         aria-label={badgeCount > 0 ? `Actions, ${badgeCount} pending` : 'Open actions'}
         title="Actions & notifications"
       >
         <Bell className="w-5 h-5" />
         {badgeCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-loss text-[10px] font-bold font-data flex items-center justify-center leading-none">
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-loss text-[10px] font-bold font-data flex items-center justify-center leading-none"
+            aria-hidden
+          >
             {badgeCount > 9 ? '9+' : badgeCount}
           </span>
         )}
       </button>
 
-      {/* Mobile: bottom sheet */}
-      <div className="lg:hidden">
-        <BottomSheet open={open} onClose={() => setOpen(false)} title="Actions">
-          {panel}
+      {!isLargeScreen && (
+        <BottomSheet open={open} onClose={() => setOpen(false)} flush>
+          {open ? panel : null}
         </BottomSheet>
-      </div>
+      )}
 
-      {/* Desktop: slide-over */}
-      {open && (
-        <div className="hidden lg:block">
+      {open && isLargeScreen && (
+        <>
           <div
             className="fixed inset-0 z-[100] bg-black/40"
             onClick={() => setOpen(false)}
@@ -357,7 +305,7 @@ export function ActionsInbox() {
           >
             {panel}
           </aside>
-        </div>
+        </>
       )}
     </>
   )

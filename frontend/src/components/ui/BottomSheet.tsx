@@ -8,9 +8,11 @@ interface BottomSheetProps {
   onClose: () => void
   children: ReactNode
   title?: string
+  /** Remove inner padding so children control layout (e.g. Actions Inbox). */
+  flush?: boolean
 }
 
-export function BottomSheet({ open, onClose, children, title }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, children, title, flush = false }: BottomSheetProps) {
   useEffect(() => {
     if (!open) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -36,7 +38,9 @@ export function BottomSheet({ open, onClose, children, title }: BottomSheetProps
             onClick={onClose}
           />
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-[101] bg-bg-card rounded-t-2xl border border-border shadow-xl max-h-[85vh] overflow-y-auto"
+            className={`fixed bottom-0 left-0 right-0 z-[101] bg-bg-card rounded-t-2xl border border-border shadow-xl max-h-[min(85dvh,640px)] flex flex-col ${
+              flush ? 'overflow-hidden' : 'overflow-y-auto'
+            }`}
             role="dialog"
             aria-modal="true"
             aria-label={title ?? 'Bottom sheet'}
@@ -59,7 +63,7 @@ export function BottomSheet({ open, onClose, children, title }: BottomSheetProps
                 </button>
               </div>
             )}
-            <div className="p-5">
+            <div className={flush ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'p-5 overflow-y-auto'}>
               {children}
             </div>
           </motion.div>
