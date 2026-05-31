@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 
 from app.models.trade import Trade
 from app.models.partial_exit import PartialExit
+from app.utils.trade_dates import get_trade_session_date
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -285,7 +286,7 @@ class TradeService:
         groups = defaultdict(list)
         for t in trades:
             state = "open" if t.exit_price is None else "closed"
-            groups[(t.symbol, t.entry_time.date(), state)].append(t)
+            groups[(t.symbol, get_trade_session_date(t), state)].append(t)
 
         merged_count = 0
         kept_trade_ids = set()

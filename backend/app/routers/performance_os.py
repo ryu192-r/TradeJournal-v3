@@ -27,6 +27,7 @@ from app.schemas.performance_os import (
 from app.utils.logging import get_logger
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.pnl_helpers import get_realized_pnl_events
+from app.utils.trade_dates import get_trade_session_date
 from app.core.dependencies import get_current_user
 
 logger = get_logger(__name__)
@@ -363,7 +364,7 @@ def _enrich_weekly(db: Session, review: WeeklyReview, user_id: int) -> WeeklyRev
     daily_breakdown = []
     for offset in range(5):
         day = review.week_start + timedelta(days=offset)
-        day_trades = [t for t in trades if t.entry_time and t.entry_time.date() == day]
+        day_trades = [t for t in trades if get_trade_session_date(t) == day]
         day_pnl = sum(t.pnl or Decimal("0") for t in day_trades if t.exit_price)
         daily_breakdown.append({"date": day.isoformat(), "trades": len(day_trades), "pnl": f"{day_pnl:.2f}"})
 

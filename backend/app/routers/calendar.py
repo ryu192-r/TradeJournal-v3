@@ -17,6 +17,13 @@ from app.models.trade import Trade
 from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.pnl_helpers import get_realized_pnl_events
+from app.utils.trade_dates import (
+    get_realized_session_date,
+    get_trade_session_date,
+    get_trade_session_date_iso,
+    month_datetime_filter_bounds,
+    trades_for_session_month,
+)
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/calendar", tags=["calendar"])
@@ -86,15 +93,15 @@ def get_calendar_month(
     current_user: User = Depends(get_current_user),
 ):
     month_start, month_end = _parse_month(month)
-    start_dt = datetime.combine(month_start, time.min)
-    end_dt = datetime.combine(month_end, time.max)
+    start_dt, end_dt = month_datetime_filter_bounds(month_start, month_end)
 
-    trades = (
+    trades_raw = (
         db.query(Trade)
         .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt, Trade.user_id == current_user.id)
         .order_by(Trade.entry_time.asc())
         .all()
     )
+    trades = trades_for_session_month(trades_raw, month_start, month_end)
     trade_ids = [t.id for t in trades]
     emotions = (
         db.query(EmotionLog)
@@ -107,10 +114,12 @@ def get_calendar_month(
     journals = db.query(DailyJournal).filter(DailyJournal.date >= month_start, DailyJournal.date <= month_end, DailyJournal.user_id == current_user.id).all()
     workflows = db.query(DailyWorkflow).filter(DailyWorkflow.date >= month_start, DailyWorkflow.date <= month_end, DailyWorkflow.user_id == current_user.id).all()
 
+    # Bucket by entry_time session date in Asia/Kolkata — never created_at / imported_at / UTC .date()
     trades_by_day: dict[date, list[Trade]] = defaultdict(list)
     for trade in trades:
-        if trade.entry_time:
-            trades_by_day[trade.entry_time.date()].append(trade)
+        session = get_trade_session_date(trade)
+        if session:
+            trades_by_day[session].append(trade)
 
     emotions_by_trade: dict[int, list[EmotionLog]] = defaultdict(list)
     for emotion in emotions:
@@ -145,6 +154,7 @@ def get_calendar_month(
                     "id": t.id,
                     "symbol": t.symbol,
                     "setup": t.setup,
+                    "session_date": get_trade_session_date_iso(t),
                     "entry_time": t.entry_time.isoformat() if t.entry_time else None,
                     "exit_time": t.exit_time.isoformat() if t.exit_time else None,
                     "entry_price": str(t.entry_price),
@@ -188,7 +198,9 @@ def get_calendar_month(
     partial_pnl_by_trade: dict[int, Decimal] = defaultdict(Decimal)
     for ev in realized_events:
         if ev.source == "partial_exit":
-            ev_day = ev.timestamp.date() if hasattr(ev.timestamp, "date") else ev.timestamp
+            ev_day = get_realized_session_date(ev.timestamp)
+            if ev_day is None:
+                continue
             partial_pnl_by_day[ev_day] += ev.pnl
             partial_pnl_by_trade[ev.trade_id] += ev.pnl
             month_pnl += ev.pnl

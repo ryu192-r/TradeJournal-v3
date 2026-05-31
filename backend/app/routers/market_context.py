@@ -30,6 +30,7 @@ from app.models.live_quote import LiveQuote
 from app.models.user import User
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.logging import get_logger
+from app.utils.trade_dates import get_trade_session_date
 
 from app.services.live_quote_sync import LIVE_QUOTE_STALE_AFTER_SECONDS, sync_open_trade_quotes
 from app.core.dependencies import get_current_user
@@ -420,7 +421,7 @@ def performance_correlation(
 
     matched_trades: list[tuple[Trade, MarketSnapshot]] = []
     for t in closed_trades:
-        trade_date = t.entry_time.date() if t.entry_time else None
+        trade_date = get_trade_session_date(t)
         if trade_date and trade_date in snap_map:
             matched_trades.append((t, snap_map[trade_date]))
 

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.market_snapshot import MarketSnapshot
 from app.models.setup_playbook import SetupPlaybook
 from app.models.trade import Trade
+from app.utils.trade_dates import get_trade_session_date
 from app.schemas.playbook_edge import (
     PlaybookEdgeListResponse,
     PlaybookScore,
@@ -261,7 +262,7 @@ def _compute_condition_breakdowns(
     if not closed:
         return []
 
-    snapshot_dates = {t.entry_time.date() for t in closed if t.entry_time}
+    snapshot_dates = {get_trade_session_date(t) for t in closed if get_trade_session_date(t)}
     snapshots: dict = {}
     if snapshot_dates:
         rows = (
@@ -284,7 +285,7 @@ def _compute_condition_breakdowns(
         buckets[("direction", direction)].append(r)
 
         if t.entry_time:
-            snap = snapshots.get(t.entry_time.date())
+            snap = snapshots.get(get_trade_session_date(t))
             if snap:
                 bucket = _market_regime_bucket(snap.nifty_regime, snap.nifty_trend)
                 buckets[("market_context", bucket)].append(r)

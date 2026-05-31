@@ -11,6 +11,7 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.pnl_helpers import get_realized_pnl_events
+from app.utils.trade_dates import get_trade_session_date_iso
 from app.services.setup_edge_service import get_all_setup_edges
 from app.schemas.recommendations import (
     RecommendationDashboardResponse,
@@ -523,8 +524,8 @@ def _overtrading_recommendations(
     # Group by day
     daily: dict[str, list[Trade]] = defaultdict(list)
     for t in all_trades:
-        if t.entry_time:
-            day_key = t.entry_time.strftime("%Y-%m-%d")
+        day_key = get_trade_session_date_iso(t)
+        if day_key:
             daily[day_key].append(t)
 
     heavy_days = []

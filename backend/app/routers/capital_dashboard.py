@@ -16,6 +16,7 @@ from app.db.database import get_db
 from app.utils.logging import get_logger
 from app.utils.calculations import compute_aggregate_kpis
 from app.utils.decimal_utils import ensure_decimal
+from app.utils.trade_dates import get_realized_session_date
 from app.core.dependencies import get_current_user, scoped_trade_query, scoped_account_query
 from app.models.user import User
 
@@ -296,13 +297,17 @@ def get_capital_dashboard(db: Session = Depends(get_db), current_user: User = De
 
     # Closed trade PnL by exit date
     for t in closed_trades:
-        day = t.exit_time.date() if t.exit_time else t.entry_time.date()
+        day = get_realized_session_date(t.exit_time, t.entry_time)
+        if day is None:
+            continue
         daily_balance[day] += ensure_decimal(t.pnl)
 
     # Partial exit realized PnL by exit date
     for t in open_trades:
         for pe in pe_by_trade.get(t.id, []):
-            day = pe.exit_time.date() if pe.exit_time else date.today()
+            day = get_realized_session_date(pe.exit_time, created_at=getattr(pe, "created_at", None))
+            if day is None:
+                continue
             pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
             daily_balance[day] += pe_pnl
 
@@ -310,7 +315,9 @@ def get_capital_dashboard(db: Session = Depends(get_db), current_user: User = De
     events_asc = sorted(events_q, key=lambda e: e.timestamp)
     for evt in events_asc:
         if evt.event_type in ("deposit", "withdrawal", "fee"):
-            day = evt.timestamp.date()
+            day = get_realized_session_date(evt.timestamp)
+            if day is None:
+                continue
             amt = ensure_decimal(evt.amount)
             if evt.event_type == "withdrawal":
                 amt = -abs(amt)

@@ -14,6 +14,7 @@ from app.models.trade import Trade
 from app.models.user import User
 from app.routers.calendar import get_calendar_month
 from app.routers.reports import get_weekly_report
+from app.utils.trade_dates import get_trade_session_date, weekday_from_session_date
 
 _email_counter = count(1)
 
@@ -70,6 +71,36 @@ def test_calendar_month_returns_day_rollups(db_session):
     assert day["journal_done"] is True
     assert "emotional-trading" in day["warnings"]
     assert "rule-violation" in day["warnings"]
+
+
+def test_calendar_monday_trade_not_on_prior_sunday(db_session):
+    """Regression: entry on Monday must not appear on previous Sunday."""
+    user = _make_user(db_session)
+    # 2025-11-24 is Monday; 2025-11-23 is Sunday
+    trade = Trade(
+        symbol="RELIANCE",
+        entry_price=Decimal("100"),
+        exit_price=Decimal("110"),
+        quantity=Decimal("10"),
+        entry_time=datetime(2025, 11, 24, 9, 30),
+        exit_time=datetime(2025, 11, 24, 15, 15),
+        pnl=Decimal("100"),
+        status="closed",
+        user_id=user.id,
+    )
+    db_session.add(trade)
+    db_session.commit()
+
+    assert get_trade_session_date(trade) == date(2025, 11, 24)
+    assert weekday_from_session_date(date(2025, 11, 24)) == 1
+
+    payload = get_calendar_month(month="2025-11", db=db_session, current_user=user)
+    sunday = next(d for d in payload["days"] if d["date"] == "2025-11-23")
+    monday = next(d for d in payload["days"] if d["date"] == "2025-11-24")
+
+    assert sunday["trade_count"] == 0
+    assert monday["trade_count"] == 1
+    assert len(monday["trades"]) == 1
 
 
 def test_reports_weekly_returns_deterministic_sections(db_session):

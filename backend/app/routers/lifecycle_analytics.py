@@ -29,6 +29,7 @@ from app.models.execution_grade import ExecutionGrade
 from app.models.trade_timeline import TradeTimeline
 from app.models.daily_journal import DailyJournal
 from app.utils.calculations import compute_aggregate_kpis
+from app.utils.trade_dates import as_exchange_datetime, get_trade_session_date_iso
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/lifecycle", tags=["lifecycle-analytics"])
 
@@ -453,9 +454,9 @@ def overtrading_detection(
     weekly: dict[str, list] = defaultdict(list)
 
     for t in all_trades:
-        if t.entry_time:
-            day_key = t.entry_time.strftime("%Y-%m-%d")
-            iso_cal = t.entry_time.isocalendar()
+        day_key = get_trade_session_date_iso(t)
+        if day_key and t.entry_time:
+            iso_cal = as_exchange_datetime(t.entry_time).isocalendar()
             week_key = f"{iso_cal[0]}-W{iso_cal[1]:02d}"
             daily[day_key].append(t)
             weekly[week_key].append(t)
@@ -746,8 +747,9 @@ def composite_discipline_score(
 
     trade_dates = set()
     for t in all_trades:
-        if t.entry_time:
-            trade_dates.add(t.entry_time.strftime("%Y-%m-%d"))
+        session = get_trade_session_date_iso(t)
+        if session:
+            trade_dates.add(session)
 
     journal_dates_q = db.query(DailyJournal.date).filter(
         DailyJournal.date != None,

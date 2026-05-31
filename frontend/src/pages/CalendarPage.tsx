@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, E
 import { getCalendarMonth } from '@/lib/endpoints'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, parseDecimal } from '@/utils/format'
+import { weekdayFromSessionDate } from '@/utils/tradeDates'
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
 import type { CalendarDay } from '@/types'
@@ -45,7 +46,7 @@ export function CalendarPage() {
   if (isError) return <PageShell><ErrorState title="Calendar unavailable" message="The month aggregate could not be loaded." onRetry={() => refetch()} /></PageShell>
 
   const days = data?.days ?? []
-  const firstWeekday = days[0] ? new Date(`${days[0].date}T00:00:00`).getDay() : 0
+  const firstWeekday = days[0] ? weekdayFromSessionDate(days[0].date) : 0
   const blanks = Array.from({ length: firstWeekday })
 
   return (
@@ -114,7 +115,7 @@ function DayCell({ day, selected, onClick }: { day: CalendarDay; selected: boole
       aria-label={`${new Date(`${day.date}T00:00:00`).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} — ${formatCurrency(day.net_pnl)}`}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="font-data text-[10px] sm:text-xs text-text-heading">{new Date(`${day.date}T00:00:00`).getDate()}</span>
+        <span className="font-data text-[10px] sm:text-xs text-text-heading">{Number(day.date.slice(8, 10))}</span>
         <div className="flex items-center gap-0.5 sm:gap-1">
           {day.journal_done && <NotebookPen className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-accent" />}
           {day.warnings.length > 0 && <AlertTriangle className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gold" />}

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.market_snapshot import MarketSnapshot
 from app.models.trade import Trade
+from app.utils.trade_dates import get_trade_session_date
 from app.schemas.market_regime import (
     CurrentRegime,
     MarketRegimeDashboard,
@@ -226,7 +227,7 @@ def calculate_regime_performance(db: Session, user_id: int) -> RegimePerformance
     for t in trades:
         if not t.entry_time:
             continue
-        regime = regime_map.get(t.entry_time.date())
+        regime = regime_map.get(get_trade_session_date(t))
         if regime is None:
             continue
         matched += 1
@@ -275,7 +276,7 @@ def calculate_setup_regime_matrix(db: Session, user_id: int) -> SetupRegimeMatri
     for t in trades:
         if not t.entry_time:
             continue
-        regime = regime_map.get(t.entry_time.date())
+        regime = regime_map.get(get_trade_session_date(t))
         if regime is None:
             continue
         setup = t.setup or "Uncategorised"

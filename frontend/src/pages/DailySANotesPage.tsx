@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useJournalMutation'
 import { useTradesQuery } from '@/hooks/useTradesQuery'
 import { formatDate, formatCurrency } from '@/utils/format'
+import { getTradeSessionDate } from '@/utils/tradeDates'
 import { cn } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { DailyJournal, ApiTrade } from '@/types'
@@ -23,11 +24,14 @@ import type { DailyJournal, ApiTrade } from '@/types'
 type TabId = 'notes' | 'compare' | 'weekly'
 
 function toISODate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function computeDailyStats(trades: ApiTrade[], date: string) {
-  const dayTrades = trades.filter((t) => t.entry_time && t.entry_time.split('T')[0] === date)
+  const dayTrades = trades.filter((t) => getTradeSessionDate(t) === date)
   const count = dayTrades.length
   const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl ? parseFloat(t.pnl) : 0), 0)
   const wins = dayTrades.filter((t) => t.pnl && parseFloat(t.pnl) > 0)

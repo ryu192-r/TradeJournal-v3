@@ -137,7 +137,10 @@ export function DebouncedTextarea({ value, onSave, debounceMs = 1000, className,
 }
 
 function toISODate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function PhaseDots({ phase, progress }: { phase: WorkflowPhase; progress: DailyDashboard['phase_progress'] }) {

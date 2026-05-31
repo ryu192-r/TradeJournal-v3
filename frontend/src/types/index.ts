@@ -193,6 +193,8 @@ export interface CalendarTrade {
   id: number
   symbol: string
   setup: string | null
+  /** Asia/Kolkata session date from entry_time (YYYY-MM-DD) */
+  session_date?: string | null
   entry_time: string | null
   exit_time: string | null
   entry_price: string

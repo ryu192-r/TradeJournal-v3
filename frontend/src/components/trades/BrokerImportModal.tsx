@@ -5,6 +5,7 @@ import { GlassSelect } from '@/components/ui/GlassSelect'
 import { useToastStore } from '@/store/toastStore'
 import { getBrokerTemplate, importBrokerCsv, previewBrokerImport } from '@/lib/endpoints'
 import type { BrokerInfo, BrokerImportResult } from '@/types'
+import { getTradeSessionDate } from '@/utils/tradeDates'
 
 interface BrokerImportModalProps {
   open: boolean
@@ -331,7 +332,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
                           <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.symbol}</td>
                           <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.entry_price}</td>
                           <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.quantity}</td>
-                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{row.entry_time ? row.entry_time.slice(0, 10) : '—'}</td>
+                          <td className={`px-2 py-1.5 ${row._skipped ? 'text-text-muted' : 'text-text-heading'}`}>{getTradeSessionDate(row.entry_time) ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>

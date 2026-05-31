@@ -30,6 +30,7 @@ from app.models.live_quote import LiveQuote
 from app.models.user import User
 from app.utils.decimal_utils import ensure_decimal
 from app.utils.calculations import calculate_trade_metrics, compute_aggregate_kpis
+from app.utils.trade_dates import as_exchange_datetime, get_realized_session_date, get_trade_session_date, get_trade_session_date_iso
 from app.core.dependencies import get_current_user
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/dashboard", tags=["dashboard"])
@@ -378,7 +379,9 @@ def operational_dashboard(
         .all()
     )
     for t in closed_for_curve:
-        day = t.exit_time.date() if t.exit_time else t.entry_time.date()
+        day = get_realized_session_date(t.exit_time, t.entry_time)
+        if day is None:
+            continue
         daily_balance[day] += ensure_decimal(t.pnl)
 
     open_for_pe = (
@@ -387,7 +390,9 @@ def operational_dashboard(
         .all()
     ) if open_trade_ids else []
     for pe in open_for_pe:
-        day = pe.exit_time.date() if pe.exit_time else pe.created_at.date() if hasattr(pe, 'created_at') and pe.created_at else date.today()
+        day = get_realized_session_date(pe.exit_time, created_at=getattr(pe, "created_at", None))
+        if day is None:
+            continue
         pe_pnl = ensure_decimal(pe.realized_pnl) if pe.realized_pnl else Decimal("0")
         daily_balance[day] += pe_pnl
 
@@ -398,7 +403,9 @@ def operational_dashboard(
         .all()
     )
     for evt in capital_events:
-        day = evt.timestamp.date()
+        day = get_realized_session_date(evt.timestamp)
+        if day is None:
+            continue
         amt = ensure_decimal(evt.amount)
         if evt.event_type == "withdrawal":
             amt = -abs(amt)
@@ -520,10 +527,12 @@ def intelligence_dashboard(
     daily: dict[str, list] = defaultdict(list)
     weekly: dict[str, list] = defaultdict(list)
     for t in all_trades:
-        if t.entry_time:
-            daily[t.entry_time.strftime("%Y-%m-%d")].append(t)
-            iso = t.entry_time.isocalendar()
-            weekly[f"{iso[0]}-W{iso[1]:02d}"].append(t)
+        session = get_trade_session_date_iso(t)
+        if session:
+            daily[session].append(t)
+            iso = as_exchange_datetime(t.entry_time).isocalendar() if t.entry_time else None
+            if iso:
+                weekly[f"{iso[0]}-W{iso[1]:02d}"].append(t)
     for day_trades in daily.values():
         if len(day_trades) > 3:
             overtrading_days += 1

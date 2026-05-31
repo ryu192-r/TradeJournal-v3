@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.utils.decimal_utils import ensure_decimal
+from app.utils.trade_dates import get_realized_session_date
 
 
 @dataclass
@@ -147,7 +148,9 @@ def realized_pnl_by_day(
     """Aggregate realized PnL events into a {date: total_pnl} dict."""
     daily: dict[date, Decimal] = defaultdict(Decimal)
     for e in events:
-        day = e.timestamp.date() if hasattr(e.timestamp, "date") else e.timestamp
+        day = get_realized_session_date(e.timestamp)
+        if day is None:
+            continue
         daily[day] += e.pnl
     return daily
 

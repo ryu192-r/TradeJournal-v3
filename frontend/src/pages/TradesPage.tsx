@@ -9,6 +9,7 @@ import { useAppStore } from '@/store/appStore'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
 import { nowIST } from '@/schemas/tradeForm'
+import { getTradeSessionDate, todaySessionDate } from '@/utils/tradeDates'
 import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liveQuotes'
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
@@ -120,7 +121,7 @@ const BUILT_IN_VIEWS: SavedTradeView[] = [
   { id: 'losses', name: 'Losses to Review', symbolFilter: '', statusFilter: 'closed', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, pnlMax: '-0.01', unreviewed: true } },
   { id: 'no-stop', name: 'No Stop', symbolFilter: '', statusFilter: 'open', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, noStop: true } },
   { id: 'partial-exits', name: 'Partial Exits', symbolFilter: '', statusFilter: '', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, hasPartialExit: true } },
-  { id: 'this-month', name: 'This Month', symbolFilter: '', statusFilter: '', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10) } },
+  { id: 'this-month', name: 'This Month', symbolFilter: '', statusFilter: '', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, fromDate: `${todaySessionDate().slice(0, 7)}-01` } },
   { id: 'unreviewed', name: 'Unreviewed Trades', symbolFilter: '', statusFilter: '', researchFilters: { ...RESEARCH_FILTER_DEFAULTS, unreviewed: true } },
 ]
 
@@ -153,7 +154,7 @@ function loadSavedViews(): SavedTradeView[] {
 }
 
 function tradeDate(trade: ApiTrade) {
-  return trade.entry_time ? trade.entry_time.slice(0, 10) : ''
+  return getTradeSessionDate(trade) ?? ''
 }
 
 function matchesResearchFilters(trade: ApiTrade, filters: ResearchFilters) {

@@ -19,6 +19,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from app.services.fetch import fetch_trades
+from app.utils.trade_dates import as_exchange_datetime, get_realized_session_date, get_trade_session_date
 
 
 # ────────────────────────── helpers ──────────────────────────
@@ -71,8 +72,23 @@ def _as_percent(ratio: Optional[float], ndigits: int = 2) -> Optional[float]:
 
 
 def _realized_time_series(df: pd.DataFrame) -> pd.Series:
-    """Return the timestamp when a realized outcome should land in analytics."""
+    """Datetime when realized outcome occurred (for ordering / duration)."""
     return df["exit_time"].fillna(df["entry_time"])
+
+
+def _realized_session_dates(df: pd.DataFrame) -> pd.Series:
+    """Exchange session dates when realized PnL lands."""
+    def _row(r):
+        exit_ts = r["exit_time"] if pd.notna(r.get("exit_time")) else None
+        entry_ts = r["entry_time"] if pd.notna(r.get("entry_time")) else None
+        return get_realized_session_date(exit_ts, entry_ts)
+
+    return df.apply(_row, axis=1)
+
+
+def _entry_session_dates(df: pd.DataFrame) -> pd.Series:
+    """Exchange session dates from trade entry_time."""
+    return df["entry_time"].apply(lambda ts: get_trade_session_date(ts) if pd.notna(ts) else None)
 
 
 def _calc_max_drawdown(df: pd.DataFrame) -> tuple[Optional[float], Optional[float]]:
@@ -80,12 +96,13 @@ def _calc_max_drawdown(df: pd.DataFrame) -> tuple[Optional[float], Optional[floa
     if df.empty:
         return None, None
 
-    realized_time = _realized_time_series(df)
+    realized_dates = _realized_session_dates(df)
     daily = (
         pd.DataFrame({
-            "realized_date": realized_time.dt.date,
+            "realized_date": realized_dates,
             "pnl": df["pnl"],
         })
+        .dropna(subset=["realized_date"])
         .groupby("realized_date", as_index=False)["pnl"]
         .sum()
         .sort_values("realized_date")
@@ -309,8 +326,8 @@ def _calc_monthly_pnl(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["realized_time"] = _realized_time_series(df)
-    df["month"] = df["realized_time"].dt.to_period("M")
+    df["realized_session"] = _realized_session_dates(df)
+    df["month"] = pd.to_datetime(df["realized_session"]).dt.to_period("M")
     monthly = df.groupby("month").agg(
         trade_count=("id", "count"),
         net_pnl=("pnl", "sum"),
@@ -339,8 +356,8 @@ def _calc_daily_pnl(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["date"] = _realized_time_series(df).dt.date
-    daily = df.groupby("date").agg(
+    df["date"] = _realized_session_dates(df)
+    daily = df.dropna(subset=["date"]).groupby("date").agg(
         trade_count=("id", "count"),
         net_pnl=("pnl", "sum"),
     ).reset_index()
@@ -365,7 +382,8 @@ def _calc_day_of_week(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["dow"] = _realized_time_series(df).dt.dayofweek
+    df["entry_session"] = _entry_session_dates(df)
+    df["dow"] = pd.to_datetime(df["entry_session"]).dt.dayofweek
     df = df[df["dow"] < 5]  # Weekdays only
 
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
@@ -403,7 +421,9 @@ def _calc_time_of_day(df: pd.DataFrame) -> List[Dict[str, Any]]:
         return []
 
     df = df.copy()
-    df["hour"] = df["entry_time"].dt.hour
+    df["hour"] = df["entry_time"].apply(
+        lambda ts: as_exchange_datetime(ts).hour if pd.notna(ts) else None
+    )
 
     results = []
     for hour in range(9, 16):

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useSwipeTabs } from '@/hooks/useSwipeTabs'
 import { formatDate, formatCurrency } from '@/utils/format'
+import { getTradeSessionDate } from '@/utils/tradeDates'
 import { cn } from '@/lib/utils'
 import { DailyJournalForm } from '@/components/journal/DailyJournalForm'
 import {
@@ -36,15 +37,14 @@ import { PageHeader } from '@/components/layout/PageHeader'
 // ---------------------------------------------------------------------------
 
 function toISODate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function computeDailyStats(trades: ApiTrade[], date: string) {
-  const dayTrades = trades.filter((t) => {
-    if (!t.entry_time) return false
-    const entryDate = t.entry_time.split('T')[0]
-    return entryDate === date
-  })
+  const dayTrades = trades.filter((t) => getTradeSessionDate(t) === date)
 
   const count = dayTrades.length
   const totalPnl = dayTrades.reduce((sum, t) => {

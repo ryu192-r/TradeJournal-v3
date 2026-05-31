@@ -5,6 +5,7 @@ import type {
   OpenLiveTrade,
   OperationalDashboardPayload,
 } from '@/types'
+import { getTradeSessionDate } from '@/utils/tradeDates'
 
 interface TradesListData {
   total: number
@@ -36,7 +37,7 @@ function matchesTradeFilters(trade: ApiTrade, filters: TradeListFilters): boolea
   const symbol = filters.symbol?.trim().toLowerCase()
   if (symbol && !trade.symbol.toLowerCase().includes(symbol)) return false
 
-  const entryDate = trade.entry_time?.slice(0, 10)
+  const entryDate = getTradeSessionDate(trade)
   if (filters.from_date || filters.to_date) {
     if (!entryDate) return false
     if (filters.from_date && entryDate < filters.from_date) return false

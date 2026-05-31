@@ -14,6 +14,7 @@ from app.models.emotion_log import EmotionLog
 from app.models.execution_grade import ExecutionGrade
 from app.models.daily_journal import DailyJournal
 from app.utils.calculations import compute_aggregate_kpis
+from app.utils.trade_dates import get_trade_session_date
 from app.services.recommendation_service import (
     get_recommendation_dashboard,
     _confidence_from_sample,
@@ -424,7 +425,7 @@ def get_behavioral_drift_signals(
 
     # 7. Journaling consistency
     recent_journal_days = _count_journal_days(db, user_id, recent_start, now)
-    trade_days_recent = {t.entry_time.date() for t in recent_trades if t.entry_time}
+    trade_days_recent = {get_trade_session_date(t) for t in recent_trades if get_trade_session_date(t)}
     if trade_days_recent:
         journal_rate = len(recent_journal_days & trade_days_recent) / len(trade_days_recent) * 100
         if journal_rate < 40 and len(trade_days_recent) >= 3:

@@ -12,6 +12,7 @@ import {
 import type { CapitalDashboardPayload, CapitalEventType } from '@/types'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, parseDecimal } from '@/utils/format'
+import { todaySessionDate } from '@/utils/tradeDates'
 import { TrendingUp, Wallet, Activity, Target, Calendar, ArrowUpRight, Settings, Plus, Trash2, Save, Edit3, X, Loader2, RefreshCw } from 'lucide-react'
 import {
   AreaChart,
@@ -241,7 +242,7 @@ function CapitalEventsManager({ data }: { data: CapitalDashboardPayload }) {
   const [modalType, setModalType] = useState<'deposit' | 'withdrawal' | 'fee'>('deposit')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
-  const [dateStr, setDateStr] = useState(new Date().toISOString().split('T')[0])
+  const [dateStr, setDateStr] = useState(todaySessionDate())
 
   const createMutation = useMutation({
     mutationFn: (payload: { event_type: CapitalEventType; amount: string; timestamp: string; description?: string; account_id: number }) => createCapitalEvent(payload),
