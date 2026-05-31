@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.account import Account
@@ -52,13 +53,31 @@ def _reconcile_account(account_id: int, db: Session, user_id: Optional[int] = No
     if effective_user_id is not None:
         open_query = open_query.filter(Trade.user_id == effective_user_id)
     open_trades_list = open_query.all()
+
+    partial_totals: dict[int, tuple[Decimal, Decimal]] = {}
+    open_trade_ids = [t.id for t in open_trades_list]
+    if open_trade_ids:
+        rows = (
+            db.query(
+                PartialExit.trade_id,
+                func.coalesce(func.sum(PartialExit.qty), 0),
+                func.coalesce(func.sum(PartialExit.realized_pnl), 0),
+            )
+            .filter(PartialExit.trade_id.in_(open_trade_ids))
+            .group_by(PartialExit.trade_id)
+            .all()
+        )
+        partial_totals = {
+            trade_id: (ensure_decimal(total_qty), ensure_decimal(total_realized))
+            for trade_id, total_qty, total_realized in rows
+        }
+
     for t in open_trades_list:
-        partials = db.query(PartialExit).filter(PartialExit.trade_id == t.id).all()
-        total_exited_qty = sum(ensure_decimal(p.qty) for p in partials)
-        for p in partials:
-            partial_realized += ensure_decimal(p.realized_pnl or "0")
-        remaining_qty = ensure_decimal(t.quantity) - total_exited_qty
-        fee_share = ensure_decimal(t.fees or "0") * (remaining_qty / ensure_decimal(t.quantity)) if ensure_decimal(t.quantity) > 0 else Decimal("0")
+        total_exited_qty, trade_partial_realized = partial_totals.get(t.id, (Decimal("0"), Decimal("0")))
+        partial_realized += trade_partial_realized
+        quantity = ensure_decimal(t.quantity)
+        remaining_qty = quantity - total_exited_qty
+        fee_share = ensure_decimal(t.fees or "0") * (remaining_qty / quantity) if quantity > 0 else Decimal("0")
         deployed += ensure_decimal(t.entry_price) * remaining_qty - fee_share
     realized_pnl += partial_realized
 

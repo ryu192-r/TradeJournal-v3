@@ -224,7 +224,13 @@ def operational_dashboard(
     net_equity = ensure_decimal(account.initial_balance) + ensure_decimal(capital_net) + ensure_decimal(realized_pnl) + pe_realized
 
     # ── Unrealized PnL (live quotes × open positions) ──
-    live_quotes = {q.symbol: q for q in db.query(LiveQuote).all()}
+    open_symbols = {t.symbol for t in open_trades}
+    live_quotes = {}
+    if open_symbols:
+        live_quotes = {
+            q.symbol: q
+            for q in db.query(LiveQuote).filter(LiveQuote.symbol.in_(open_symbols)).all()
+        }
     unrealized_pnl = Decimal("0")
     for t in open_trades:
         exited = sum(pe_map.get(t.id, []), Decimal("0"))

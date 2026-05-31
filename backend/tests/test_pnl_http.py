@@ -1,6 +1,9 @@
 """HTTP-level integration tests for partial exits through the public API."""
 
 import pytest
+from sqlalchemy import event
+
+from app.db.database import engine as real_engine
 
 TRADE = {
     "symbol": "RELIANCE",
@@ -117,6 +120,42 @@ class TestPartialExitAPI:
         trade = next(t for t in items if t["id"] == trade_id)
         assert trade["remaining_qty"] is not None
         assert trade["partial_realized_pnl"] is not None
+
+    def test_list_trades_batches_partial_data_lookup(self, client, auth_user_token):
+        """List enrichment loads partial exits once for the visible page."""
+        for idx in range(3):
+            r = client.post(
+                "/api/v1/trades/",
+                json={
+                    **TRADE,
+                    "symbol": f"PNL{idx}",
+                    "entry_time": f"2025-01-1{idx}T09:30:00",
+                },
+                headers=_headers(auth_user_token),
+            )
+            trade_id = r.json()["id"]
+            client.post(
+                f"/api/v1/trades/{trade_id}/partial-exits",
+                json=PARTIAL,
+                headers=_headers(auth_user_token),
+            )
+
+        partial_selects = []
+
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            normalized = statement.lower()
+            if normalized.lstrip().startswith("select") and "from partial_exits" in normalized:
+                partial_selects.append(statement)
+
+        event.listen(real_engine, "before_cursor_execute", before_cursor_execute)
+        try:
+            r = client.get("/api/v1/trades/", headers=_headers(auth_user_token))
+        finally:
+            event.remove(real_engine, "before_cursor_execute", before_cursor_execute)
+
+        assert r.status_code == 200
+        assert len(r.json()["items"]) == 3
+        assert len(partial_selects) == 1
 
     def test_user_cannot_delete_other_user_partial_exit(self, client):
         token_a = _auth(client, "partial-iso-a")

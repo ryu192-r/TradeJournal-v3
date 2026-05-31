@@ -981,7 +981,7 @@ export function DashboardPage() {
         <PageHeader
           title="Command Center"
           right={
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
               <button
                 onClick={() => setCustomizeOpen((open) => !open)}
                 className={cn(

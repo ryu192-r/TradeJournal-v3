@@ -129,7 +129,7 @@ function App() {
                 </div>
                 <div className="inline-flex shrink-0 items-center gap-[.375rem] rounded-md px-2 py-[.1875rem] text-[.5rem] font-semibold font-data uppercase tracking-wider bg-text-muted text-text-muted md:gap-[.4375rem] md:px-2.5 md:py-1 md:text-[.625rem]">
                   <div className="w-[4px] h-[4px] rounded-full bg-accent animate-pulse md:w-[6px] md:h-[6px]" />
-                  <span className="hidden xs:inline">Closed · Opens 9:15 AM IST</span>
+                  <span className="hidden sm:inline">Closed · Opens 9:15 AM IST</span>
                 </div>
               </div>
             </TopBar>

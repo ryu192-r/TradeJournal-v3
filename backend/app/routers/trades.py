@@ -29,13 +29,34 @@ from app.core.dependencies import get_current_user, get_user_trade_or_404, scope
 ALLOWED_EXT = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 
-def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
+def _load_partials_by_trade_id(db: Session, trade_ids: list[int]) -> dict[int, list[PartialExit]]:
+    if not trade_ids:
+        return {}
+
+    partials_by_trade_id: dict[int, list[PartialExit]] = {}
     partials = (
         db.query(PartialExit)
-        .filter(PartialExit.trade_id == trade.id)
-        .order_by(PartialExit.exit_time.asc())
+        .filter(PartialExit.trade_id.in_(trade_ids))
+        .order_by(PartialExit.trade_id.asc(), PartialExit.exit_time.asc())
         .all()
     )
+    for partial in partials:
+        partials_by_trade_id.setdefault(partial.trade_id, []).append(partial)
+    return partials_by_trade_id
+
+
+def _enrich_trade_with_partials(
+    trade: Trade,
+    db: Session,
+    partials: list[PartialExit] | None = None,
+) -> dict:
+    if partials is None:
+        partials = (
+            db.query(PartialExit)
+            .filter(PartialExit.trade_id == trade.id)
+            .order_by(PartialExit.exit_time.asc())
+            .all()
+        )
     total_exited_qty = sum(p.qty for p in partials)
     partial_realized = sum(p.realized_pnl or Decimal("0") for p in partials)
 
@@ -68,11 +89,15 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
     return d
 
 
-def _enrich_response(trade: Trade, db: Session) -> TradeResponse:
+def _enrich_response(
+    trade: Trade,
+    db: Session,
+    partials: list[PartialExit] | None = None,
+) -> TradeResponse:
     """Build TradeResponse with partial-exit enrichment."""
     resp = TradeResponse.model_validate(trade)
     resp.current_stop_price = trade.stop_price
-    extra = _enrich_trade_with_partials(trade, db)
+    extra = _enrich_trade_with_partials(trade, db, partials)
     resp.remaining_qty = extra["remaining_qty"]
     resp.partial_realized_pnl = extra["partial_realized_pnl"]
     resp.unrealized_pnl = extra["unrealized_pnl"]
@@ -177,10 +202,8 @@ def list_trades(
         query = query.filter(Trade.entry_time <= datetime.fromisoformat(to_date + " 23:59:59"))
     total = query.count()
     trades = query.order_by(Trade.entry_time.desc()).offset(skip).limit(limit).all()
-    items = []
-    for t in trades:
-        resp = _enrich_response(t, db)
-        items.append(resp)
+    partials_by_trade_id = _load_partials_by_trade_id(db, [t.id for t in trades])
+    items = [_enrich_response(t, db, partials_by_trade_id.get(t.id, [])) for t in trades]
     return {"total": total, "items": items}
 
 
@@ -210,13 +233,10 @@ def list_open_live_trades(
         .order_by(Trade.entry_time.desc())
         .all()
     )
+    partials_by_trade_id = _load_partials_by_trade_id(db, [t.id for t in trades])
     result = []
     for t in trades:
-        partials = (
-            db.query(PartialExit)
-            .filter(PartialExit.trade_id == t.id)
-            .all()
-        )
+        partials = partials_by_trade_id.get(t.id, [])
         total_exited_qty = sum(p.qty for p in partials)
         remaining = t.quantity - total_exited_qty
         result.append({

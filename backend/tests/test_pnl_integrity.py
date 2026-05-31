@@ -7,6 +7,7 @@ from itertools import count
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import event
 
 from app.core.security import get_password_hash
 from app.db.database import Base, SessionLocal
@@ -486,6 +487,38 @@ class TestCapitalReconciliation:
         remaining_qty = trade.quantity - total_exited_qty
         deployed = trade.entry_price * remaining_qty
         assert deployed == Decimal("100") * Decimal("6")
+
+    def test_reconcile_batches_open_trade_partial_aggregates(self, db_session):
+        """Reconciliation aggregates open-trade partial exits in one query."""
+        user = _make_user(db_session)
+        account = _make_account(db_session, user.id)
+        svc = PartialExitService(db_session)
+
+        for idx in range(3):
+            trade = _trade(
+                user.id,
+                symbol=f"PNL{idx}",
+                entry_time=datetime.fromisoformat(f"2025-01-1{idx}T09:30:00"),
+            )
+            db_session.add(trade)
+            db_session.commit()
+            db_session.refresh(trade)
+            svc.create_partial_exit(trade.id, _payload("4", "110"))
+
+        partial_selects = []
+
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            normalized = statement.lower()
+            if normalized.lstrip().startswith("select") and "from partial_exits" in normalized:
+                partial_selects.append(statement)
+
+        event.listen(real_engine, "before_cursor_execute", before_cursor_execute)
+        try:
+            _reconcile_account(account.id, db_session, user_id=user.id)
+        finally:
+            event.remove(real_engine, "before_cursor_execute", before_cursor_execute)
+
+        assert len(partial_selects) == 1
 
 
 # ── Merge safety ──
