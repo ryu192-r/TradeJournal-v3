@@ -9,7 +9,31 @@ os.environ.setdefault("SECRET_KEY", "test-secret")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret")
 
 import pytest
+import anyio
+import httpx
 from sqlalchemy.orm import close_all_sessions
+
+import fastapi.dependencies.utils as fastapi_dependencies
+import fastapi.routing as fastapi_routing
+import starlette.routing as starlette_routing
+import starlette.concurrency as starlette_concurrency
+
+
+async def _run_sync_inline(func, *args, **kwargs):
+    """Test sandbox: anyio.to_thread.run_sync hangs after sync call returns."""
+    return func(*args, **kwargs)
+
+
+async def _anyio_run_sync_inline(func, *args, abandon_on_cancel=False, cancellable=None, limiter=None):
+    """Inline AnyIO thread offload in tests; product code still uses threads."""
+    return func(*args)
+
+
+anyio.to_thread.run_sync = _anyio_run_sync_inline
+fastapi_dependencies.run_in_threadpool = _run_sync_inline
+fastapi_routing.run_in_threadpool = _run_sync_inline
+starlette_routing.run_in_threadpool = _run_sync_inline
+starlette_concurrency.run_in_threadpool = _run_sync_inline
 
 from app.db.database import Base, get_db
 from app.db.database import engine as real_engine
@@ -25,7 +49,7 @@ def _reset_test_database() -> None:
     Base.metadata.create_all(bind=real_engine)
 
 
-def __get_db_test():
+async def __get_db_test():
     from app.db.database import SessionLocal
     db = SessionLocal()
     try:
@@ -35,6 +59,50 @@ def __get_db_test():
 
 
 _real_app.dependency_overrides[get_db] = __get_db_test
+
+
+class ASGISyncClient:
+    """Sync facade over httpx ASGITransport.
+
+    Starlette TestClient uses anyio.from_thread portals. In this sandbox those
+    portals block before dispatch, so tests drive ASGI in the current thread.
+    """
+
+    def __init__(self, app):
+        self.app = app
+        self.cookies = httpx.Cookies()
+
+    def request(self, method: str, url: str, **kwargs):
+        async def _request():
+            transport = httpx.ASGITransport(app=self.app, raise_app_exceptions=True)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                cookies=self.cookies,
+            ) as async_client:
+                response = await async_client.request(method, url, **kwargs)
+                self.cookies.update(async_client.cookies)
+                return response
+
+        return anyio.run(_request)
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url: str, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def patch(self, url: str, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
+    def delete(self, url: str, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def close(self) -> None:
+        return None
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -51,11 +119,14 @@ def app():
     return _real_app
 
 
-@pytest.fixture(scope="function") 
+@pytest.fixture(scope="function")
 def client(app):
-    """HTTPX sync client backed by the per-test fresh DB (see _fresh_test_database)."""
-    from starlette.testclient import TestClient
-    yield TestClient(app)
+    """HTTPX sync facade backed by per-test fresh DB (see _fresh_test_database)."""
+    http = ASGISyncClient(app)
+    try:
+        yield http
+    finally:
+        http.close()
 
 
 @pytest.fixture(scope="function")

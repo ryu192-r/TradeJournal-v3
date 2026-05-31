@@ -32,3 +32,15 @@ def test_run_migrations_uses_create_all_only_in_dev_fallback(monkeypatch):
     main_module.run_migrations()
 
     assert calls["create_all"] == 1
+
+
+def test_import_db_startup_tasks_skipped_under_pytest(monkeypatch):
+    monkeypatch.setattr(main_module, "_is_test_mode", lambda: True)
+
+    assert main_module._should_run_import_db_startup_tasks() is False
+
+
+def test_import_db_startup_tasks_run_outside_pytest(monkeypatch):
+    monkeypatch.setattr(main_module, "_is_test_mode", lambda: False)
+
+    assert main_module._should_run_import_db_startup_tasks() is True

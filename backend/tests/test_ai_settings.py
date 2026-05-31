@@ -57,8 +57,15 @@ def test_ai_config_save(client, auth_user_token):
     assert data["timeout"] == 90
 
 
-def test_ai_test_connection_fails_gracefully(client, auth_user_token):
+def test_ai_test_connection_fails_gracefully(client, auth_user_token, monkeypatch):
     """POST /ai/test returns an error when provider is unreachable (expected in test env)."""
+    async def fail_chat(*args, **kwargs):
+        raise RuntimeError("provider unavailable in test")
+
+    from app.routers import ai_settings
+
+    monkeypatch.setattr(ai_settings.AIProviderClient, "chat", fail_chat)
+
     resp = client.post(
         "/api/v1/ai/test",
         headers={"Authorization": f"Bearer {auth_user_token}"},

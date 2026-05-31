@@ -1,5 +1,4 @@
 """Dhan webhook processing service for stop-loss/target hit notifications."""
-import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Tuple
@@ -13,8 +12,9 @@ from app.models.trade_timeline import TradeTimeline
 from app.models.webhook_event import WebhookEvent
 from app.services.capital_service import _auto_reconcile
 from app.services.setup_playbook_service import _update_setup_stats
+from app.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 VALID_EXIT_REASONS = {"stop_loss", "target", "manual", "trailing", "system"}
 
@@ -37,7 +37,7 @@ class DhanWebhookService:
     def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
         self.user_id = user_id
-        self.logger = logger.getChild("dhan_webhook")
+        self.logger = logger.bind(component="dhan_webhook")
 
     def process_event(
         self,

@@ -45,8 +45,6 @@ def run_migrations():
         Base.metadata.create_all(bind=engine)
         logger.info("database_tables_ensured", mode="create_all_dev_fallback")
 
-run_migrations()
-
 # Backfill trade status for existing trades with old status values
 def _backfill_trade_statuses():
     try:
@@ -62,7 +60,20 @@ def _backfill_trade_statuses():
     except Exception as e:
         logger.warning(f"Trade status backfill skipped: {e}")
 
-_backfill_trade_statuses()
+
+def _should_run_import_db_startup_tasks() -> bool:
+    return not _is_test_mode()
+
+
+def _run_import_db_startup_tasks() -> None:
+    run_migrations()
+    _backfill_trade_statuses()
+
+
+if _should_run_import_db_startup_tasks():
+    _run_import_db_startup_tasks()
+else:
+    logger.info("database_startup_tasks_skipped", reason="pytest")
 
 quote_sync_lock = Lock()
 
