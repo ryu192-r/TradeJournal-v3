@@ -17,6 +17,12 @@ class TradeCalculationResult:
     risk_amount: Optional[Decimal] = None
     planned_reward_amount: Optional[Decimal] = None
     risk_reward_ratio: Optional[Decimal] = None
+    current_risk_per_unit: Optional[Decimal] = None
+    current_risk_amount: Optional[Decimal] = None
+    locked_profit_per_unit: Optional[Decimal] = None
+    locked_profit_amount: Optional[Decimal] = None
+    current_protection_status: Optional[str] = None
+    current_is_risk_free: bool = False
     pnl_per_unit: Optional[Decimal] = None
     gross_pnl: Optional[Decimal] = None
     net_pnl: Optional[Decimal] = None
@@ -43,6 +49,8 @@ def calculate_trade_metrics(
     quantity=None,
     fees=None,
     stop_price=None,
+    planned_stop_price=None,
+    current_stop_price=None,
     target_price=None,
     direction="LONG",
 ) -> TradeCalculationResult:
@@ -53,7 +61,8 @@ def calculate_trade_metrics(
     exit_ = _safe_decimal(exit_price)
     qty = _safe_decimal(quantity)
     fees_val = _safe_decimal(fees) if fees is not None else Decimal("0")
-    stop = _safe_decimal(stop_price)
+    planned_stop = _safe_decimal(planned_stop_price if planned_stop_price is not None else stop_price)
+    current_stop = _safe_decimal(current_stop_price if current_stop_price is not None else stop_price)
     target = _safe_decimal(target_price)
 
     if entry is None or entry <= 0:
@@ -75,14 +84,14 @@ def calculate_trade_metrics(
         result.is_valid_for_pnl = True
 
     # ── Risk (planned) ──
-    if stop is not None:
+    if planned_stop is not None:
         if is_long:
-            result.risk_per_unit = entry - stop
+            result.risk_per_unit = entry - planned_stop
         else:
-            result.risk_per_unit = stop - entry
+            result.risk_per_unit = planned_stop - entry
 
         if result.risk_per_unit is not None and result.risk_per_unit <= Decimal("0"):
-            warnings.append("Stop loss is at or above entry (invalid for risk calculation)")
+            warnings.append("Planned stop loss is on wrong side of entry (invalid for planned risk)")
             result.risk_per_unit = None
         else:
             result.risk_amount = result.risk_per_unit * qty
@@ -111,6 +120,24 @@ def calculate_trade_metrics(
     # ── R-multiple (actual P&L / planned risk) ──
     if result.net_pnl is not None and result.risk_per_unit is not None and result.risk_per_unit != Decimal("0"):
         result.r_multiple = result.net_pnl / result.risk_amount
+
+    # ── Current/live protection (separate from planned risk truth) ──
+    if current_stop is not None:
+        protection_per_unit = (current_stop - entry) if is_long else (entry - current_stop)
+        if protection_per_unit >= Decimal("0"):
+            result.current_risk_per_unit = Decimal("0")
+            result.current_risk_amount = Decimal("0")
+            result.current_is_risk_free = True
+            if protection_per_unit == Decimal("0"):
+                result.current_protection_status = "breakeven"
+            else:
+                result.current_protection_status = "profit_locked"
+                result.locked_profit_per_unit = protection_per_unit
+                result.locked_profit_amount = protection_per_unit * qty
+        else:
+            result.current_protection_status = "active_risk"
+            result.current_risk_per_unit = abs(protection_per_unit)
+            result.current_risk_amount = result.current_risk_per_unit * qty
 
     result.warnings = warnings
     return result

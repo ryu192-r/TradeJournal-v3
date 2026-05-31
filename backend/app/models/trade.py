@@ -29,7 +29,11 @@ class Trade(Base):
     tags = Column(TagsList)
     setup = Column(String(100))
     tactic = Column(String(100))
+    # stop_price = current/live stop used for position protection
     stop_price = Column(Numeric(precision=18, scale=8))
+    # original_stop_price = planned/original stop used for risk/R-multiple truth
+    original_stop_price = Column(Numeric(precision=18, scale=8))
+    stop_loss_status = Column(String(20), default="original")  # original, breakeven, trailing, manual, risk_free
     target_price = Column(Numeric(precision=18, scale=8))
     r_multiple = Column(Numeric(precision=10, scale=4))
     
@@ -73,12 +77,37 @@ class Trade(Base):
         else:
             self.status = "open"
 
+    def _planned_stop_price(self):
+        """Risk truth: original planned stop. Falls back to current stop for legacy rows."""
+        return self.original_stop_price if self.original_stop_price is not None else self.stop_price
+
+    def _is_risk_free_stop(self) -> bool:
+        if self.stop_price is None or self.entry_price is None:
+            return False
+        direction = (self.direction or "LONG").upper()
+        if direction == "LONG":
+            return self.stop_price >= self.entry_price
+        return self.stop_price <= self.entry_price
+
+    def _sync_stop_loss_state(self):
+        # Backfill planned stop for legacy rows / old payloads.
+        if self.original_stop_price is None and self.stop_price is not None:
+            self.original_stop_price = self.stop_price
+        if self.stop_price is None:
+            return
+        if self._is_risk_free_stop():
+            self.stop_loss_status = "risk_free"
+        elif not self.stop_loss_status:
+            self.stop_loss_status = "original"
+
     def compute_pnl(self):
         """Auto-compute PnL and R-multiple. Direction-aware. Handles partial exits
         for both open and closed trades."""
         self._auto_set_status()
+        self._sync_stop_loss_state()
         direction = (self.direction or "LONG").upper()
         is_long = direction == "LONG"
+        planned_stop = self._planned_stop_price()
 
         # Gather partial exits from DB or relationship
         partials = []
@@ -115,7 +144,7 @@ class Trade(Base):
                 exit_price=self.exit_price,
                 quantity=quantity,
                 fees=fees,
-                stop_price=self.stop_price,
+                stop_price=planned_stop,
                 target_price=self.target_price,
                 direction=direction,
             )
@@ -131,11 +160,11 @@ class Trade(Base):
             self.pnl = None
 
         # R-multiple for partial or full closed trades
-        if self.stop_price and self.entry_price and self.pnl is not None and quantity > 0:
+        if planned_stop and self.entry_price and self.pnl is not None and quantity > 0:
             if is_long:
-                risk_per_unit = self.entry_price - self.stop_price
+                risk_per_unit = self.entry_price - planned_stop
             else:
-                risk_per_unit = self.stop_price - self.entry_price
+                risk_per_unit = planned_stop - self.entry_price
             risk = risk_per_unit * quantity
             if risk and risk > 0:
                 self.r_multiple = self.pnl / risk

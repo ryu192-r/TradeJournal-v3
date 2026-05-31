@@ -193,20 +193,40 @@ function PnLHero({
 
 function MetricGrid({
   calc,
+  originalStopPrice,
+  currentStopPrice,
+  protectionStatus,
 }: {
   calc: ReturnType<typeof calculateTradeMetrics>
+  originalStopPrice: number | null
+  currentStopPrice: number | null
+  protectionStatus: string | null
 }) {
+  const protectionLabel = (() => {
+    if (calc.currentProtectionStatus === 'profit_locked') return 'Profit Locked'
+    if (calc.currentProtectionStatus === 'breakeven') return 'Breakeven / Risk-Free'
+    if (calc.currentProtectionStatus === 'active_risk') return 'Active Risk'
+    if (protectionStatus === 'risk_free') return 'Risk-Free'
+    if (protectionStatus) return protectionStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    return 'No Stop'
+  })()
+
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
+        <MetricRow label="Original SL" value={originalStopPrice != null ? formatPrice(originalStopPrice) : null} tone="neutral" />
+        <MetricRow label="Current SL" value={currentStopPrice != null ? formatPrice(currentStopPrice) : null} tone="neutral" />
         <MetricRow label="Gross P&amp;L" value={calc.isValidForPnl ? fmtMoney(calc.grossPnl) : null} tone={calc.isValidForPnl ? (calc.grossPnl! >= 0 ? 'profit' : 'loss') : null} />
         <MetricRow label="Net P&amp;L" value={calc.isValidForPnl ? fmtMoney(calc.netPnl) : null} tone={calc.isValidForPnl ? (calc.netPnl! >= 0 ? 'profit' : 'loss') : null} />
-        <MetricRow label="Risk Amount" value={calc.riskAmount != null ? formatCurrency(Math.abs(calc.riskAmount)) : null} tone={calc.riskAmount != null ? 'loss' : null} icon />
+        <MetricRow label="Planned Risk" value={calc.riskAmount != null ? formatCurrency(Math.abs(calc.riskAmount)) : null} tone={calc.riskAmount != null ? 'loss' : null} icon />
+        <MetricRow label="Current Risk" value={calc.currentRiskAmount != null ? formatCurrency(Math.abs(calc.currentRiskAmount)) : null} tone={calc.currentRiskAmount != null && calc.currentRiskAmount > 0 ? 'loss' : 'neutral'} />
+        <MetricRow label="Locked Profit" value={calc.lockedProfitAmount != null ? formatCurrency(calc.lockedProfitAmount) : null} tone={calc.lockedProfitAmount != null ? 'profit' : null} />
+        <MetricRow label="Protection Status" value={protectionLabel} tone={calc.currentIsRiskFree ? 'profit' : 'neutral'} />
         <MetricRow label="Planned Reward" value={calc.plannedRewardAmount != null ? formatCurrency(calc.plannedRewardAmount) : null} tone={calc.plannedRewardAmount != null ? 'profit' : null} />
         <MetricRow label="Planned Risk:Reward" value={calc.isValidForRiskReward ? `1:${calc.riskRewardRatio!.toFixed(2)}` : null} tone="neutral" />
         <MetricRow label="Actual R Multiple" value={calc.rMultiple != null ? `${calc.rMultiple >= 0 ? '+' : ''}${calc.rMultiple.toFixed(2)}R` : null} tone={calc.rMultiple != null ? (calc.rMultiple >= 0 ? 'profit' : 'loss') : null} />
         <MetricRow label="P&amp;L per Unit" value={calc.pnlPerUnit != null ? `${calc.pnlPerUnit >= 0 ? '+' : ''}${formatPrice(Math.abs(calc.pnlPerUnit))}` : null} tone={calc.pnlPerUnit != null ? (calc.pnlPerUnit >= 0 ? 'profit' : 'loss') : null} />
-        <MetricRow label="Risk per Unit" value={calc.riskPerUnit != null ? formatPrice(calc.riskPerUnit) : null} tone={calc.riskPerUnit != null ? 'loss' : null} />
+        <MetricRow label="Planned Risk/Unit" value={calc.riskPerUnit != null ? formatPrice(calc.riskPerUnit) : null} tone={calc.riskPerUnit != null ? 'loss' : null} />
       </div>
 
       {calc.warnings.length > 0 && (
@@ -261,7 +281,8 @@ function StatCards({ trade, isOpen, duration, showPartialInfo, remainingQty }: {
         detail={null}
       />
       <StatCell label="Duration" value={duration} detail={trade.exit_reason ? trade.exit_reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null} />
-      <StatCell label="Stop Loss" value={trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—'} detail={null} />
+      <StatCell label="Current SL" value={trade.current_stop_price ? formatPrice(Number(trade.current_stop_price)) : (trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—')} detail={null} />
+      <StatCell label="Original SL" value={trade.original_stop_price ? formatPrice(Number(trade.original_stop_price)) : (trade.stop_price ? formatPrice(Number(trade.stop_price)) : '—')} detail={null} />
       <StatCell label="Target" value={trade.target_price ? formatPrice(Number(trade.target_price)) : '—'} detail={null} />
       <StatCell label="Fees" value={trade.fees != null && Number(trade.fees) > 0 ? formatCurrency(Number(trade.fees)) : '—'} detail={null} />
       <StatCell
@@ -376,10 +397,14 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
     exitPrice: trade.exit_price != null ? Number(trade.exit_price) : undefined,
     quantity: Number(trade.quantity),
     fees: Number(trade.fees ?? 0),
-    stopPrice: trade.stop_price != null ? Number(trade.stop_price) : undefined,
+    plannedStopPrice: trade.original_stop_price != null ? Number(trade.original_stop_price) : (trade.stop_price != null ? Number(trade.stop_price) : undefined),
+    currentStopPrice: trade.current_stop_price != null ? Number(trade.current_stop_price) : (trade.stop_price != null ? Number(trade.stop_price) : undefined),
     targetPrice: trade.target_price != null ? Number(trade.target_price) : undefined,
     direction: trade.direction ?? 'LONG',
   }), [trade])
+
+  const originalStopPrice = trade.original_stop_price != null ? Number(trade.original_stop_price) : (trade.stop_price != null ? Number(trade.stop_price) : null)
+  const currentStopPrice = trade.current_stop_price != null ? Number(trade.current_stop_price) : (trade.stop_price != null ? Number(trade.stop_price) : null)
 
   const backendPnl = trade.pnl != null ? Number(trade.pnl) : null
   const pnlValue = backendPnl != null ? backendPnl : calc.netPnl
@@ -448,7 +473,12 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
       </DetailSection>
 
       <DetailSection title="Risk &amp; Reward" icon={Target}>
-        <MetricGrid calc={calc} />
+        <MetricGrid
+          calc={calc}
+          originalStopPrice={originalStopPrice}
+          currentStopPrice={currentStopPrice}
+          protectionStatus={trade.stop_loss_status ?? null}
+        />
       </DetailSection>
 
       <DetailSection title="Chart" icon={BarChart3}>

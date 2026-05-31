@@ -71,6 +71,7 @@ def _enrich_trade_with_partials(trade: Trade, db: Session) -> dict:
 def _enrich_response(trade: Trade, db: Session) -> TradeResponse:
     """Build TradeResponse with partial-exit enrichment."""
     resp = TradeResponse.model_validate(trade)
+    resp.current_stop_price = trade.stop_price
     extra = _enrich_trade_with_partials(trade, db)
     resp.remaining_qty = extra["remaining_qty"]
     resp.partial_realized_pnl = extra["partial_realized_pnl"]
@@ -131,6 +132,10 @@ def create_trade(
 ):
     svc = TradeService(db)
     trade_data = trade.model_dump()
+    if trade_data.get("original_stop_price") is None and trade_data.get("stop_price") is not None:
+        trade_data["original_stop_price"] = trade_data["stop_price"]
+    if trade_data.get("stop_loss_status") is None and trade_data.get("stop_price") is not None:
+        trade_data["stop_loss_status"] = "original"
     trade_data["user_id"] = current_user.id
     db_trade, action = svc.merge_or_create(trade_data)
     db_trade.compute_pnl()
@@ -215,6 +220,9 @@ def list_open_live_trades(
             "quantity": t.quantity,
             "remaining_qty": remaining,
             "stop_price": t.stop_price,
+            "original_stop_price": t.original_stop_price,
+            "current_stop_price": t.stop_price,
+            "stop_loss_status": t.stop_loss_status,
             "fees": t.fees,
         })
     return result
@@ -247,7 +255,7 @@ def update_trade(
     for field, value in update_data.items():
         setattr(db_trade, field, value)
 
-    if any(k in update_data for k in ("entry_price", "exit_price", "quantity", "fees")):
+    if any(k in update_data for k in ("entry_price", "exit_price", "quantity", "fees", "original_stop_price")):
         _update_pnl(db_trade)
 
     if "exit_price" in update_data:
@@ -271,6 +279,7 @@ def update_trade(
         )
         db.add(timeline)
     if "stop_price" in update_data:
+        db_trade.stop_loss_status = "manual"
         timeline = TradeTimeline(
             trade_id=db_trade.id,
             event_type="stop_updated",
@@ -373,6 +382,7 @@ def create_stop_history(
     db.add(entry)
     old_stop = str(trade.stop_price) if trade.stop_price else None
     trade.stop_price = payload.price
+    trade.stop_loss_status = payload.stop_type
     timeline = TradeTimeline(
         trade_id=trade_id,
         event_type="stop_updated",

@@ -91,12 +91,13 @@ def _stop_validity(trade: Trade) -> tuple[bool, bool]:
 
     LONG: stop must be below entry. SHORT: stop must be above entry.
     """
-    has_stop = _has_positive_stop(trade.stop_price)
+    planned_stop = trade.original_stop_price if trade.original_stop_price is not None else trade.stop_price
+    has_stop = _has_positive_stop(planned_stop)
     if not has_stop:
         return False, False
     try:
         entry_d = Decimal(str(trade.entry_price))
-        stop_d = Decimal(str(trade.stop_price))
+        stop_d = Decimal(str(planned_stop))
     except Exception:
         return True, False
     if entry_d <= 0:
@@ -109,7 +110,7 @@ def _stop_validity(trade: Trade) -> tuple[bool, bool]:
 
 def _risk_per_share(trade: Trade) -> Optional[Decimal]:
     entry = trade.entry_price
-    stop = trade.stop_price
+    stop = trade.original_stop_price if trade.original_stop_price is not None else trade.stop_price
     if entry is None or stop is None:
         return None
     try:
@@ -788,7 +789,8 @@ def review_trade_v2(db: Session, user_id: int, trade_id: int) -> TradeReviewV2Re
         exit_price=trade.exit_price,
         quantity=trade.quantity,
         fees=trade.fees,
-        stop_price=trade.stop_price,
+        planned_stop_price=trade.original_stop_price,
+        current_stop_price=trade.stop_price,
         target_price=trade.target_price,
         direction=trade.direction or "LONG",
     )

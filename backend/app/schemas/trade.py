@@ -31,7 +31,9 @@ class TradeBase(BaseModel):
     tags: Optional[List[str]] = Field(None, description="List of tags")
     setup: Optional[str] = Field(None, description="Trade setup type")
     tactic: Optional[str] = Field(None, description="Trading tactic used")
-    stop_price: Optional[Decimal] = Field(None, description="Stop loss price")
+    stop_price: Optional[Decimal] = Field(None, description="Current/live stop loss price")
+    original_stop_price: Optional[Decimal] = Field(None, description="Original planned stop loss (risk truth)")
+    stop_loss_status: Optional[str] = Field(None, description="original, breakeven, trailing, manual, risk_free")
     target_price: Optional[Decimal] = Field(None, description="Target profit price")
     r_multiple: Optional[Decimal] = Field(None, description="Risk multiple")
     exit_reason: Optional[str] = Field(None, description="Exit reason: stop_loss, target, manual, trailing, system")
@@ -46,6 +48,16 @@ class TradeBase(BaseModel):
             raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
+    @field_validator("stop_loss_status")
+    @classmethod
+    def validate_stop_loss_status(cls, v):
+        if v is None:
+            return v
+        allowed = {"original", "breakeven", "trailing", "manual", "risk_free"}
+        if v not in allowed:
+            raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
+        return v
+
     @field_validator("entry_time", "exit_time")
     @classmethod
     def strip_to_ist(cls, v):
@@ -54,7 +66,7 @@ class TradeBase(BaseModel):
         return _strip_to_ist(v)
 
     # Keep as strings to avoid precision loss
-    @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
+    @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "original_stop_price", "target_price", "r_multiple")
     @classmethod
     def validate_decimal(cls, v):
         return ensure_decimal(v)
@@ -78,6 +90,8 @@ class TradeUpdate(BaseModel):
     setup: Optional[str] = None
     tactic: Optional[str] = None
     stop_price: Optional[Decimal] = None
+    original_stop_price: Optional[Decimal] = None
+    stop_loss_status: Optional[str] = None
     target_price: Optional[Decimal] = None
     r_multiple: Optional[Decimal] = None
     chart_images: Optional[List[str]] = None
@@ -95,6 +109,16 @@ class TradeUpdate(BaseModel):
             raise ValueError("Direction must be 'LONG' — only long positions supported")
         return v
 
+    @field_validator("stop_loss_status")
+    @classmethod
+    def validate_stop_loss_status_update(cls, v):
+        if v is None:
+            return v
+        allowed = {"original", "breakeven", "trailing", "manual", "risk_free"}
+        if v not in allowed:
+            raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
+        return v
+
     @field_validator("entry_time", "exit_time")
     @classmethod
     def strip_to_ist_update(cls, v):
@@ -102,7 +126,7 @@ class TradeUpdate(BaseModel):
             return v
         return _strip_to_ist(v)
 
-    @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple")
+    @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "original_stop_price", "target_price", "r_multiple")
     @classmethod
     def ensure_decimal(cls, v):
         return ensure_decimal(v)
@@ -123,6 +147,9 @@ class TradeResponse(BaseModel):
     setup: Optional[str] = None
     tactic: Optional[str] = None
     stop_price: Optional[Decimal] = None
+    original_stop_price: Optional[Decimal] = None
+    current_stop_price: Optional[Decimal] = None
+    stop_loss_status: Optional[str] = None
     target_price: Optional[Decimal] = None
     r_multiple: Optional[Decimal] = None
     status: str = Field(default="open", description="open, closed, or deleted")
@@ -163,7 +190,7 @@ class TradeResponse(BaseModel):
             return v.isoformat()
         return str(v)
 
-    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl", "weighted_avg_exit_price")
+    @field_serializer("pnl", "entry_price", "exit_price", "quantity", "fees", "stop_price", "original_stop_price", "current_stop_price", "target_price", "r_multiple", "remaining_qty", "partial_realized_pnl", "unrealized_pnl", "weighted_avg_exit_price")
     def serialize_decimal(self, v):
         if v is None:
             return None
@@ -183,11 +210,14 @@ class OpenLiveTradeResponse(BaseModel):
     quantity: Decimal
     remaining_qty: Decimal
     stop_price: Optional[Decimal] = None
+    original_stop_price: Optional[Decimal] = None
+    current_stop_price: Optional[Decimal] = None
+    stop_loss_status: Optional[str] = None
     fees: Decimal
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("entry_price", "quantity", "remaining_qty", "stop_price", "fees")
+    @field_serializer("entry_price", "quantity", "remaining_qty", "stop_price", "original_stop_price", "current_stop_price", "fees")
     def serialize_decimal(self, v):
         if v is None:
             return None

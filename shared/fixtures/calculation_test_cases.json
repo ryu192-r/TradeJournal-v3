@@ -92,7 +92,7 @@
       "r_multiple": null,
       "is_valid_for_pnl": true,
       "is_valid_for_risk_reward": false,
-      "warnings": ["Stop loss is at or above entry (invalid for risk calculation)"]
+      "warnings": ["Planned stop loss is on wrong side of entry (invalid for planned risk)"]
     }
   },
   {
@@ -140,7 +140,7 @@
       "r_multiple": null,
       "is_valid_for_pnl": true,
       "is_valid_for_risk_reward": false,
-      "warnings": ["Stop loss is at or above entry (invalid for risk calculation)"]
+      "warnings": ["Planned stop loss is on wrong side of entry (invalid for planned risk)"]
     }
   }
 ]

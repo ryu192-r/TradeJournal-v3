@@ -62,10 +62,14 @@ export function datetimeLocalToIso(local: string | undefined): string | undefine
   return local.length === 16 ? local + ':00' : local
 }
 
-export function formDataToApiPayload(data: TradeFormData): Record<string, unknown> {
+export function formDataToApiPayload(
+  data: TradeFormData,
+  options?: { mode?: 'create' | 'edit' },
+): Record<string, unknown> {
   const tagsStr = (data.tags ?? '').trim()
   const tagsList = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : null
-  return {
+  const stopPrice = data.stop_price || null
+  const basePayload = {
     symbol: data.symbol,
     direction: 'LONG',
     entry_price: data.entry_price,
@@ -76,9 +80,17 @@ export function formDataToApiPayload(data: TradeFormData): Record<string, unknow
     fees: data.fees || '0',
     setup: data.setup || null,
     tactic: data.tactic || null,
-    stop_price: data.stop_price || null,
+    original_stop_price: stopPrice,
     target_price: data.target_price || null,
     tags: tagsList,
     notes: data.notes || null,
+  }
+  if (options?.mode === 'edit') {
+    return basePayload
+  }
+  return {
+    ...basePayload,
+    stop_price: stopPrice,
+    stop_loss_status: stopPrice ? 'original' : null,
   }
 }

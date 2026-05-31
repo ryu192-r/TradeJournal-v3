@@ -164,6 +164,88 @@ describe('calculateTradeMetrics — zero risk (stop = entry)', () => {
   })
 })
 
+describe('calculateTradeMetrics — planned vs current stop split', () => {
+  it('long breakeven current stop keeps planned risk and no invalid warning', () => {
+    const result = r({
+      entryPrice: 100,
+      exitPrice: 110,
+      quantity: 100,
+      plannedStopPrice: 95,
+      currentStopPrice: 100,
+      targetPrice: 120,
+      direction: 'LONG',
+    })
+    expect(result.riskPerUnit).toBe(5)
+    expect(result.riskAmount).toBe(500)
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.currentProtectionStatus).toBe('breakeven')
+    expect(result.currentIsRiskFree).toBe(true)
+    expect(result.riskRewardRatio).toBe(4)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('long current stop above entry reports locked profit', () => {
+    const result = r({
+      entryPrice: 100,
+      quantity: 100,
+      plannedStopPrice: 95,
+      currentStopPrice: 103,
+      targetPrice: 120,
+      direction: 'LONG',
+    })
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.lockedProfitPerUnit).toBe(3)
+    expect(result.lockedProfitAmount).toBe(300)
+    expect(result.currentProtectionStatus).toBe('profit_locked')
+  })
+
+  it('short breakeven current stop keeps planned risk and no invalid warning', () => {
+    const result = r({
+      entryPrice: 100,
+      quantity: 100,
+      plannedStopPrice: 105,
+      currentStopPrice: 100,
+      targetPrice: 90,
+      direction: 'SHORT',
+    })
+    expect(result.riskPerUnit).toBe(5)
+    expect(result.riskAmount).toBe(500)
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.currentProtectionStatus).toBe('breakeven')
+    expect(result.currentIsRiskFree).toBe(true)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('short current stop below entry reports locked profit', () => {
+    const result = r({
+      entryPrice: 100,
+      quantity: 100,
+      plannedStopPrice: 105,
+      currentStopPrice: 97,
+      targetPrice: 90,
+      direction: 'SHORT',
+    })
+    expect(result.currentRiskAmount).toBe(0)
+    expect(result.lockedProfitPerUnit).toBe(3)
+    expect(result.lockedProfitAmount).toBe(300)
+    expect(result.currentProtectionStatus).toBe('profit_locked')
+  })
+
+  it('R-multiple and planned R:R stay tied to original planned stop', () => {
+    const result = r({
+      entryPrice: 100,
+      exitPrice: 110,
+      quantity: 100,
+      plannedStopPrice: 95,
+      currentStopPrice: 103,
+      targetPrice: 120,
+      direction: 'LONG',
+    })
+    expect(result.rMultiple).toBe(2)
+    expect(result.riskRewardRatio).toBe(4)
+  })
+})
+
 describe('calculateTradeMetrics — missing entry', () => {
   it('returns early with warning', () => {
     const result = r({ entryPrice: null, exitPrice: 110, quantity: 100 })

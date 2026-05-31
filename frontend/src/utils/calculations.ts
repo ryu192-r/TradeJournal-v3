@@ -4,6 +4,12 @@ export interface TradeCalculationResult {
   riskAmount: number | null
   plannedRewardAmount: number | null
   riskRewardRatio: number | null
+  currentRiskPerUnit: number | null
+  currentRiskAmount: number | null
+  lockedProfitPerUnit: number | null
+  lockedProfitAmount: number | null
+  currentProtectionStatus: 'none' | 'active_risk' | 'breakeven' | 'profit_locked'
+  currentIsRiskFree: boolean
   pnlPerUnit: number | null
   grossPnl: number | null
   netPnl: number | null
@@ -19,6 +25,8 @@ export interface TradeMetricInputs {
   quantity?: number | null | undefined
   fees?: number | null | undefined
   stopPrice?: number | null | undefined
+  plannedStopPrice?: number | null | undefined
+  currentStopPrice?: number | null | undefined
   targetPrice?: number | null | undefined
   direction?: string
 }
@@ -36,6 +44,12 @@ export function calculateTradeMetrics(inputs: TradeMetricInputs): TradeCalculati
     riskAmount: null,
     plannedRewardAmount: null,
     riskRewardRatio: null,
+    currentRiskPerUnit: null,
+    currentRiskAmount: null,
+    lockedProfitPerUnit: null,
+    lockedProfitAmount: null,
+    currentProtectionStatus: 'none',
+    currentIsRiskFree: false,
     pnlPerUnit: null,
     grossPnl: null,
     netPnl: null,
@@ -49,7 +63,8 @@ export function calculateTradeMetrics(inputs: TradeMetricInputs): TradeCalculati
   const exit = toNum(inputs.exitPrice)
   const qty = toNum(inputs.quantity)
   const fees = inputs.fees != null ? toNum(inputs.fees) ?? 0 : 0
-  const stop = toNum(inputs.stopPrice)
+  const plannedStop = toNum(inputs.plannedStopPrice ?? inputs.stopPrice)
+  const currentStop = toNum(inputs.currentStopPrice ?? inputs.stopPrice)
   const target = toNum(inputs.targetPrice)
   const isLong = (inputs.direction ?? 'LONG').toUpperCase() === 'LONG'
 
@@ -69,10 +84,10 @@ export function calculateTradeMetrics(inputs: TradeMetricInputs): TradeCalculati
     result.isValidForPnl = true
   }
 
-  if (stop != null) {
-    result.riskPerUnit = isLong ? entry - stop : stop - entry
+  if (plannedStop != null) {
+    result.riskPerUnit = isLong ? entry - plannedStop : plannedStop - entry
     if (result.riskPerUnit != null && result.riskPerUnit <= 0) {
-      result.warnings.push('Stop loss is at or above entry (invalid for risk calculation)')
+      result.warnings.push('Planned stop loss is on wrong side of entry (invalid for planned risk)')
       result.riskPerUnit = null
     } else {
       result.riskAmount = result.riskPerUnit * qty
@@ -100,6 +115,26 @@ export function calculateTradeMetrics(inputs: TradeMetricInputs): TradeCalculati
 
   if (result.netPnl != null && result.riskPerUnit != null && result.riskPerUnit !== 0 && result.riskAmount != null && result.riskAmount !== 0) {
     result.rMultiple = result.netPnl / result.riskAmount
+  }
+
+  if (currentStop != null) {
+    const protectionPerUnit = isLong ? currentStop - entry : entry - currentStop
+    if (protectionPerUnit >= 0) {
+      result.currentRiskPerUnit = 0
+      result.currentRiskAmount = 0
+      result.currentIsRiskFree = true
+      if (protectionPerUnit === 0) {
+        result.currentProtectionStatus = 'breakeven'
+      } else {
+        result.currentProtectionStatus = 'profit_locked'
+        result.lockedProfitPerUnit = protectionPerUnit
+        result.lockedProfitAmount = protectionPerUnit * qty
+      }
+    } else {
+      result.currentProtectionStatus = 'active_risk'
+      result.currentRiskPerUnit = Math.abs(protectionPerUnit)
+      result.currentRiskAmount = result.currentRiskPerUnit * qty
+    }
   }
 
   return result

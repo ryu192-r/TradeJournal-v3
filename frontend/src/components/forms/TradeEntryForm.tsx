@@ -39,6 +39,7 @@ interface TradeEntryFormProps {
 
 function apiTradeToFormData(trade: ApiTrade): TradeFormData {
   const tagsStr = trade.tags ? trade.tags.join(', ') : undefined
+  const plannedStop = trade.original_stop_price ?? trade.stop_price
   return {
     symbol: trade.symbol,
     entry_price: String(trade.entry_price),
@@ -49,7 +50,7 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     fees: String(trade.fees ?? 0),
     setup: trade.setup || undefined,
     tactic: trade.tactic || undefined,
-    stop_price: trade.stop_price != null ? String(trade.stop_price) : undefined,
+    stop_price: plannedStop != null ? String(plannedStop) : undefined,
     target_price: trade.target_price != null ? String(trade.target_price) : undefined,
     tags: tagsStr,
     notes: trade.notes || undefined,
@@ -169,7 +170,7 @@ export function TradeEntryForm({
       return
     }
     try {
-      const payload = formDataToApiPayload(data)
+      const payload = formDataToApiPayload(data, { mode })
       await submitFn(payload)
       addToast({
         title: mode === 'create' ? 'Trade created' : 'Trade updated',

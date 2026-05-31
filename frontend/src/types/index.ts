@@ -61,6 +61,9 @@ export interface ApiTrade {
   tags: string[] | null
   setup: string | null
   tactic: string | null
+  original_stop_price?: string | null
+  current_stop_price?: string | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
   stop_price: string | null
   target_price: string | null
   r_multiple: string | null
@@ -89,6 +92,9 @@ export interface OpenLiveTrade {
   entry_price: string
   quantity: string
   remaining_qty: string
+  original_stop_price?: string | null
+  current_stop_price?: string | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
   stop_price: string | null
   fees: string
 }
@@ -107,6 +113,8 @@ export interface ApiTradeUpdatePayload {
   setup?: string | null
   tactic?: string | null
   stop_price?: string | null
+  original_stop_price?: string | null
+  stop_loss_status?: 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | null
   target_price?: string | null
   r_multiple?: string | null
   status?: BackendTradeStatus

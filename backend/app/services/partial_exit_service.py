@@ -111,11 +111,12 @@ class PartialExitService:
             )
 
         r_captured = payload.r_captured
-        if r_captured is None and trade.stop_price and trade.entry_price:
+        planned_stop = trade.original_stop_price if trade.original_stop_price is not None else trade.stop_price
+        if r_captured is None and planned_stop and trade.entry_price:
             if is_long:
-                risk_per_unit = trade.entry_price - trade.stop_price
+                risk_per_unit = trade.entry_price - planned_stop
             else:
-                risk_per_unit = trade.stop_price - trade.entry_price
+                risk_per_unit = planned_stop - trade.entry_price
             if risk_per_unit and risk_per_unit > 0:
                 gross_pnl = (payload.exit_price - trade.entry_price if is_long else trade.entry_price - payload.exit_price) * payload.qty
                 r_captured = gross_pnl / (risk_per_unit * payload.qty)

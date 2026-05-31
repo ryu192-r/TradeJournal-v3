@@ -213,6 +213,85 @@ class TestZeroRisk:
         assert any("risk" in w.lower() for w in result.warnings)
 
 
+class TestPlannedVsCurrentStopLoss:
+    def test_long_planned_risk_kept_when_current_breakeven(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            exit_price=110,
+            quantity=100,
+            planned_stop_price=95,
+            current_stop_price=100,
+            target_price=120,
+            direction="LONG",
+        )
+        assert result.risk_per_unit == Decimal("5")
+        assert result.risk_amount == Decimal("500")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.current_protection_status == "breakeven"
+        assert result.current_is_risk_free is True
+        assert result.risk_reward_ratio == Decimal("4")
+        assert result.warnings == []
+
+    def test_long_profit_lock_calculation(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            quantity=100,
+            planned_stop_price=95,
+            current_stop_price=103,
+            target_price=120,
+            direction="LONG",
+        )
+        assert result.risk_per_unit == Decimal("5")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.locked_profit_per_unit == Decimal("3")
+        assert result.locked_profit_amount == Decimal("300")
+        assert result.current_protection_status == "profit_locked"
+
+    def test_short_planned_risk_kept_when_current_breakeven(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            quantity=100,
+            planned_stop_price=105,
+            current_stop_price=100,
+            target_price=90,
+            direction="SHORT",
+        )
+        assert result.risk_per_unit == Decimal("5")
+        assert result.risk_amount == Decimal("500")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.current_protection_status == "breakeven"
+        assert result.current_is_risk_free is True
+        assert result.warnings == []
+
+    def test_short_profit_lock_calculation(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            quantity=100,
+            planned_stop_price=105,
+            current_stop_price=97,
+            target_price=90,
+            direction="SHORT",
+        )
+        assert result.risk_per_unit == Decimal("5")
+        assert result.current_risk_amount == Decimal("0")
+        assert result.locked_profit_per_unit == Decimal("3")
+        assert result.locked_profit_amount == Decimal("300")
+        assert result.current_protection_status == "profit_locked"
+
+    def test_r_multiple_uses_planned_stop_not_current_stop(self):
+        result = calculate_trade_metrics(
+            entry_price=100,
+            exit_price=110,
+            quantity=100,
+            planned_stop_price=95,
+            current_stop_price=103,
+            target_price=120,
+            direction="LONG",
+        )
+        assert result.r_multiple == Decimal("2")
+        assert result.risk_reward_ratio == Decimal("4")
+
+
 class TestMissingEntry:
     def test_returns_early(self):
         result = calculate_trade_metrics(entry_price=None, exit_price=110, quantity=100)
