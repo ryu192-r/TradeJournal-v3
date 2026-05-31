@@ -122,3 +122,38 @@ def test_empty_api_key_payload_preserves_existing_key(client, db_session):
 
     setting = db_session.query(AIProviderSetting).one()
     assert setting.api_key == "secret-a"
+
+
+def test_api_key_can_be_replaced_or_explicitly_removed(client, db_session):
+    token = _register(client, "replace-remove-key")
+    headers = _headers(token)
+
+    first = client.put(
+        "/api/v1/ai/config",
+        json=_payload("https://api.example.com", api_key="secret-a"),
+        headers=headers,
+    )
+    assert first.status_code == 200, first.text
+
+    replace = client.put(
+        "/api/v1/ai/config",
+        json=_payload("https://api.example.com", api_key="secret-b"),
+        headers=headers,
+    )
+    assert replace.status_code == 200, replace.text
+    db_session.expire_all()
+    setting = db_session.query(AIProviderSetting).one()
+    assert setting.api_key == "secret-b"
+
+    remove_payload = _payload("https://api.example.com", api_key="")
+    remove_payload["remove_api_key"] = True
+    remove = client.put(
+        "/api/v1/ai/config",
+        json=remove_payload,
+        headers=headers,
+    )
+
+    assert remove.status_code == 200, remove.text
+    assert remove.json()["has_api_key"] is False
+    db_session.expire_all()
+    assert db_session.query(AIProviderSetting).one().api_key is None

@@ -53,6 +53,44 @@ def test_update_idea_status(client, auth_user_token):
     assert data["status"] == "active"
 
 
+def test_patch_update_route_removed(client, auth_user_token):
+    r = _create_idea(client, auth_user_token)
+    idea = r.json().get("data", r.json())
+    idea_id = idea["id"]
+
+    resp = client.patch(
+        f"/api/v1/ideas/{idea_id}",
+        json={"status": "active"},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    assert resp.status_code == 405
+
+    get_resp = client.get(
+        f"/api/v1/ideas/{idea_id}",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert get_resp.status_code == 200
+    assert get_resp.json()["status"] == "draft"
+
+
+def test_put_update_route_is_canonical(client, auth_user_token):
+    r = _create_idea(client, auth_user_token, symbol="CANONICAL")
+    idea = r.json().get("data", r.json())
+    idea_id = idea["id"]
+
+    resp = client.put(
+        f"/api/v1/ideas/{idea_id}",
+        json={"status": "active", "thesis": "Updated thesis"},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["status"] == "active"
+    assert data["thesis"] == "Updated thesis"
+
+
 def test_convert_idea_to_trade(client, auth_user_token):
     r = _create_idea(client, auth_user_token)
     idea = r.json().get("data", r.json())

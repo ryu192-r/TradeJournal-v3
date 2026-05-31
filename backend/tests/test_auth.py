@@ -40,6 +40,14 @@ def test_register_duplicate_email(client):
     assert "Registration failed" in resp.json()["detail"]
 
 
+def test_register_rejects_weak_passwords(client):
+    weak_passwords = ["", "short1", "password", "12345678", "aaaaaaaa"]
+    for idx, password in enumerate(weak_passwords):
+        resp = _register(client, email=f"weak-{idx}@test.com", password=password)
+        assert resp.status_code == 422
+        assert "Password must be at least 8 characters" in resp.text
+
+
 def test_login_ok(client):
     _register(client)
     resp = _login(client)
@@ -117,3 +125,20 @@ def test_change_password_ok(client):
     # New password should work
     new = _login(client, password="NewPass5678!")
     assert new.status_code == 200
+
+
+def test_change_password_rejects_weak_new_password(client):
+    _register(client)
+    login = _login(client)
+    token = login.json()["access_token"]
+
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "Pass1234!", "new_password": "weak"},
+    )
+
+    assert resp.status_code == 422
+
+    still_valid = _login(client, password="Pass1234!")
+    assert still_valid.status_code == 200

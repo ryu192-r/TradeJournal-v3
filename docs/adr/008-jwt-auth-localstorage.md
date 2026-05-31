@@ -18,6 +18,9 @@ JWT access + refresh tokens stored in `localStorage` (`auth_token`, `refresh_tok
 - ⚠️ Refresh token endpoint exists (`/auth/refresh`) but is not called by frontend
 - ⚠️ bcrypt used for passwords (not passlib, due to Python 3.12 incompatibility)
 
+## Security Follow-up
+TODO: migrate browser token storage from `localStorage` to `httpOnly`, `Secure`, `SameSite` cookies. That migration should add CSRF protection for cookie-authenticated mutation routes, rotate refresh cookies server-side, and remove persisted access tokens from Zustand/localStorage. Until then, any XSS bug can read `auth_token` and `refresh_token`, so keep the CSP/sanitization posture tight and avoid rendering untrusted HTML.
+
 ## Implementation
 - `frontend/src/lib/api.ts` — axios interceptor: 401 → `localStorage.removeItem('auth_token')` + `window.location.reload()`
 - `frontend/src/store/authStore.ts` — `persist({ name: 'auth-storage', partialize: (state) => ({ token: state.token }) })`

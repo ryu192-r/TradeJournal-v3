@@ -266,6 +266,8 @@ def _save_user_ai_config(db: Any, user_id: int, cfg: dict[str, Any]) -> dict[str
     setting = db.query(AIProviderSetting).filter(AIProviderSetting.user_id == user_id).first()
     current = _setting_to_config(setting) if setting else _default_config()
     merged = _merge_config(current, cfg, preserve_empty_api_key=True)
+    if cfg.get("remove_api_key") is True:
+        merged["api_key"] = ""
     validate_ai_base_url(merged["base_url"])
 
     if setting is None:

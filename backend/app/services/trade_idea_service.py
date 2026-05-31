@@ -84,9 +84,9 @@ class TradeIdeaService:
         return total, ideas
 
     @staticmethod
-    def update(db: Session, idea_id: int, update: TradeIdeaUpdate) -> Optional[TradeIdea]:
+    def update(db: Session, idea_id: int, update: TradeIdeaUpdate, user_id: Optional[int] = None) -> Optional[TradeIdea]:
         """Update a trade idea with validated status transition."""
-        db_idea = TradeIdeaService.get_by_id(db, idea_id)
+        db_idea = TradeIdeaService.get_by_id(db, idea_id, user_id=user_id)
         if not db_idea:
             return None
 

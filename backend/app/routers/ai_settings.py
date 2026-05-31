@@ -28,6 +28,7 @@ class AIConfigUpdate(BaseModel):
     provider: str = Field(default="ollama_local")
     base_url: str = Field(default="")
     api_key: Optional[str] = Field(default=None, repr=False)
+    remove_api_key: bool = Field(default=False)
     model: str = Field(default="qwen2.5:latest")
     timeout: float = Field(default=60.0, ge=1.0, le=300.0)
     max_retries: int = Field(default=3, ge=1, le=10)

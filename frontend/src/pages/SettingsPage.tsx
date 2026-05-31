@@ -25,6 +25,7 @@ export function SettingsPage() {
   const [aiBaseUrl, setAiBaseUrl] = useState('')
   const [aiApiKey, setAiApiKey] = useState('')
   const [aiHasApiKey, setAiHasApiKey] = useState(false)
+  const [aiRemoveApiKey, setAiRemoveApiKey] = useState(false)
   const [aiModel, setAiModel] = useState('')
   const [aiCustomModels, setAiCustomModels] = useState('')
   const [aiTimeout, setAiTimeout] = useState(60)
@@ -61,6 +62,7 @@ export function SettingsPage() {
         setAiBaseUrl(configData.base_url || '')
         setAiApiKey('')
         setAiHasApiKey(Boolean(configData.has_api_key))
+        setAiRemoveApiKey(false)
         setAiModel(configData.model || '')
         setAiTimeout(configData.timeout ?? 60)
         setAiMaxRetries(configData.max_retries ?? 3)
@@ -126,13 +128,20 @@ export function SettingsPage() {
         provider: aiProvider,
         base_url: effectiveUrl,
         api_key: needsApiKey && aiApiKey.trim() ? aiApiKey.trim() : undefined,
+        remove_api_key: needsApiKey && aiRemoveApiKey,
         model: effectiveModel,
         timeout: aiTimeout,
         max_retries: aiMaxRetries,
         temperature: aiTemperature,
         personality,
       })
-      if (needsApiKey && aiApiKey.trim()) setAiHasApiKey(true)
+      if (needsApiKey && aiRemoveApiKey) {
+        setAiHasApiKey(false)
+        setAiRemoveApiKey(false)
+      } else if (needsApiKey && aiApiKey.trim()) {
+        setAiHasApiKey(true)
+      }
+      setAiApiKey('')
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -140,7 +149,7 @@ export function SettingsPage() {
     } finally {
       setSaving(false)
     }
-  }, [aiProvider, aiBaseUrl, aiApiKey, aiModel, aiTimeout, aiMaxRetries, aiTemperature, isCustomProvider, currentProvider, needsApiKey, personality])
+  }, [aiProvider, aiBaseUrl, aiApiKey, aiModel, aiTimeout, aiMaxRetries, aiTemperature, isCustomProvider, currentProvider, needsApiKey, personality, aiRemoveApiKey])
 
   return (
     <PageShell className="space-y-[var(--page-gap)]">
@@ -373,7 +382,10 @@ export function SettingsPage() {
                   <input
                     type={showApiKey ? 'text' : 'password'}
                     value={aiApiKey}
-                    onChange={(e) => setAiApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setAiApiKey(e.target.value)
+                      if (e.target.value) setAiRemoveApiKey(false)
+                    }}
                     placeholder={aiHasApiKey ? 'Stored key will be kept' : 'sk-...'}
                     className={`${inputStyle} pr-10`}
                   />
@@ -386,6 +398,17 @@ export function SettingsPage() {
                     {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {aiHasApiKey && !aiApiKey && (
+                  <label className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+                    <input
+                      type="checkbox"
+                      checked={aiRemoveApiKey}
+                      onChange={(e) => setAiRemoveApiKey(e.target.checked)}
+                      className="accent-accent"
+                    />
+                    Remove stored key on save
+                  </label>
+                )}
               </div>
             )}
 

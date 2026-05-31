@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { Loader2, BarChart3 } from 'lucide-react'
 
+const PASSWORD_POLICY_MESSAGE = 'Password must be at least 8 characters and include at least one letter and one number'
+
 export function LoginPage() {
   const { login, register, isLoading, error, clearError } = useAuthStore()
   const [isSignup, setIsSignup] = useState(false)
@@ -21,8 +23,13 @@ export function LoginPage() {
         setFormError('Passwords do not match')
         return
       }
-      if (password.length < 6) {
-        setFormError('Password must be at least 6 characters')
+      if (
+        password.length < 8 ||
+        password.trim() !== password ||
+        !/[A-Za-z]/.test(password) ||
+        !/\d/.test(password)
+      ) {
+        setFormError(PASSWORD_POLICY_MESSAGE)
         return
       }
       try {

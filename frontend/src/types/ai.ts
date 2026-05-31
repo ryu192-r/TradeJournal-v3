@@ -21,6 +21,7 @@ export interface AiConfigSaveRequest {
   provider: string
   base_url: string
   api_key?: string | null
+  remove_api_key?: boolean
   model: string
   timeout: number
   max_retries: number
