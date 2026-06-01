@@ -14,15 +14,44 @@ import { getLiveQuoteDisplayClass, getLiveQuoteDisplayStatus } from '@/utils/liv
 import { computeLivePnl, computeLivePnlPct, computeMaxRisk, computeCapPct } from '@/utils/calculations'
 import type { BackendTradeStatus, ApiTrade, LiveQuote } from '@/types'
 import { pyramidTrade, deleteTrade, getCapitalDashboard, createPartialExit, updateTrade } from '@/lib/endpoints'
-import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X, Upload, Layers, Download, CheckSquare, Square, ArrowDownToLine, RefreshCw, SlidersHorizontal, Save, Columns3, LayoutGrid, LayoutList, ListChecks, ClipboardCheck } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { useRowGestures } from '@/hooks/useRowGestures'
 import { usePartialExitsQuery } from '@/hooks/usePartialExitQuery'
 import { useCreateStopHistoryMutation } from '@/hooks/useStopHistoryQuery'
+import { useDeleteTradeMutation } from '@/hooks/useTradeMutation'
 import { invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook, invalidateTradeDetail, invalidateLifecycle, setTradeCache, patchTradeInLists, removeTradeFromLists } from '@/lib/queryInvalidation'
 import { useState, useCallback, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { MetricCard, InlineBadge } from '@/components/ui/SharedUI'
+
+/* ─── Stop-status badge ───────────────────────────────────────
+ * Mirrors backend `stop_loss_status` enum. Display-only — does
+ * not mutate trade data. The protection state is informational
+ * here; the actual SL price is in `current_stop_price` / `stop_price`.
+ */
+type StopLossStatus = 'original' | 'breakeven' | 'trailing' | 'manual' | 'risk_free' | 'profit_locked'
+type StopBadge = { label: string; tone: 'neutral' | 'accent' | 'profit' | 'warning' | 'loss' }
+
+const STOP_BADGE_MAP: Record<StopLossStatus, StopBadge> = {
+  original:     { label: 'Original',  tone: 'neutral' },
+  breakeven:    { label: 'Breakeven', tone: 'accent'  },
+  trailing:     { label: 'Trailing',  tone: 'accent'  },
+  manual:       { label: 'Manual',    tone: 'warning' },
+  risk_free:    { label: 'Risk Free', tone: 'profit'  },
+  profit_locked:{ label: 'Locked',    tone: 'profit'  },
+}
+
+function StopStatusPill({ status }: { status?: StopLossStatus | string | null }) {
+  const key = (status ?? 'original') as StopLossStatus
+  const badge = STOP_BADGE_MAP[key] ?? STOP_BADGE_MAP.original
+  return <InlineBadge tone={badge.tone}>{badge.label}</InlineBadge>
+}
+
+function isTradeReviewed(trade: ApiTrade): boolean {
+  return Boolean(trade.review_notes) || (trade.review_tags?.length ?? 0) > 0
+}
 
 type ListingMode = 'auto' | 'table' | 'cards'
 
@@ -37,12 +66,16 @@ type TradeColumnId =
   | 'entry'
   | 'exit'
   | 'ltp'
+  | 'originalStop'
+  | 'currentStop'
+  | 'stopStatus'
   | 'sl'
   | 'maxRisk'
   | 'quantity'
   | 'remaining'
   | 'setup'
   | 'status'
+  | 'review'
   | 'realized'
   | 'unrealized'
   | 'capPct'
@@ -100,18 +133,38 @@ const COLUMN_LABELS: Record<TradeColumnId, string> = {
   entry: 'Entry',
   exit: 'Exit',
   ltp: 'LTP',
+  originalStop: 'Original SL',
+  currentStop: 'Current SL',
+  stopStatus: 'Stop',
   sl: 'SL',
   maxRisk: 'Max Risk',
   quantity: 'Qty',
   remaining: 'Rem.',
   setup: 'Setup',
   status: 'Status',
+  review: 'Review',
   realized: 'Realized',
   unrealized: 'Unrealized',
   capPct: 'Cap%',
 }
 
-const DEFAULT_COLUMN_ORDER: TradeColumnId[] = ['symbol', 'entry', 'exit', 'ltp', 'sl', 'maxRisk', 'quantity', 'remaining', 'setup', 'status', 'realized', 'unrealized', 'capPct']
+const DEFAULT_COLUMN_ORDER: TradeColumnId[] = [
+  'symbol',
+  'entry',
+  'exit',
+  'originalStop',
+  'currentStop',
+  'stopStatus',
+  'maxRisk',
+  'quantity',
+  'remaining',
+  'setup',
+  'status',
+  'review',
+  'realized',
+  'unrealized',
+  'capPct',
+]
 const DEFAULT_VISIBLE_COLUMNS = new Set<TradeColumnId>(DEFAULT_COLUMN_ORDER)
 const TRADE_TABLE_PREFS_KEY = 'tjv3-trade-table-prefs-v1'
 const SAVED_VIEWS_KEY = 'tjv3-trade-saved-views-v1'
@@ -190,6 +243,9 @@ function downloadFilteredTradesCsv(trades: ApiTrade[], columns: TradeColumnId[])
       if (column === 'entry') return `${trade.entry_price} ${trade.entry_time}`
       if (column === 'exit') return `${trade.exit_price ?? ''} ${trade.exit_time ?? ''}`
       if (column === 'ltp') return ''
+      if (column === 'originalStop') return trade.original_stop_price ?? trade.stop_price ?? ''
+      if (column === 'currentStop') return trade.current_stop_price ?? trade.stop_price ?? ''
+      if (column === 'stopStatus') return trade.stop_loss_status ?? 'original'
       if (column === 'sl') return trade.stop_price ?? ''
       if (column === 'maxRisk') {
         if (trade.stop_price == null || trade.stop_price === '') return ''
@@ -224,11 +280,13 @@ export function TradesPage() {
   const addToast = useToastStore((s) => s.addToast)
   const { openCreateTrade, openEditTrade, openDetailTrade } = useAppStore()
   const queryClient = useQueryClient()
+  const deleteMutation = useDeleteTradeMutation()
   const [page, setPage] = useState(1)
   const [symbolFilter, setSymbolFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [researchFilters, setResearchFilters] = useState<ResearchFilters>(RESEARCH_FILTER_DEFAULTS)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [tableConfigOpen, setTableConfigOpen] = useState(false)
   const [saveViewName, setSaveViewName] = useState('')
   const [savedViews, setSavedViews] = useState<SavedTradeView[]>(loadSavedViews)
@@ -491,6 +549,53 @@ export function TradesPage() {
 
   const allSelected = displayedTrades.length > 0 && displayedTrades.every((trade) => selectedIds.has(trade.id))
 
+  const handleDeleteOne = useCallback(async (trade: ApiTrade) => {
+    const ok = window.confirm(`Delete ${trade.symbol}? This cannot be undone.`)
+    if (!ok) return
+    try {
+      await deleteMutation.mutateAsync(trade.id)
+      removeTradeFromLists(queryClient, trade.id)
+      addToast({ title: 'Deleted', message: `${trade.symbol} removed.`, variant: 'info' })
+      void invalidateRisk(queryClient)
+      void invalidateAnalytics(queryClient)
+      void invalidatePlaybook(queryClient)
+      void invalidateTradeList(queryClient)
+    } catch {
+      addToast({ title: 'Error', message: 'Failed to delete trade.', variant: 'error' })
+    }
+  }, [deleteMutation, queryClient, addToast])
+
+  // Trade summary — derived from the currently-loaded page of trades only.
+  // Do not introduce new server queries; when the page is empty we omit
+  // computed figures entirely rather than fabricate a server-side number.
+  const tradeSummary = useMemo(() => {
+    if (!data || data.items.length === 0) {
+      return { hasData: false, total: 0, open: 0, closed: 0, netPnl: null, needsReview: 0 }
+    }
+    let open = 0
+    let closed = 0
+    let netPnl = 0
+    let hasPnl = false
+    let needsReview = 0
+    for (const trade of data.items) {
+      if (trade.exit_price == null) open += 1
+      else closed += 1
+      if (trade.pnl != null && trade.pnl !== '') {
+        netPnl += Number(trade.pnl)
+        hasPnl = true
+      }
+      if (!isTradeReviewed(trade)) needsReview += 1
+    }
+    return {
+      hasData: true,
+      total: data.total,
+      open,
+      closed,
+      netPnl: hasPnl ? netPnl : null,
+      needsReview,
+    }
+  }, [data])
+
   const handleRefresh = useCallback(async () => {
     void invalidateTradeList(queryClient)
   }, [queryClient])
@@ -513,21 +618,68 @@ export function TradesPage() {
       {/* Page header */}
       <PageHeader
         title="Trades"
-        subtitle="Track and manage every trade in your journal."
+        subtitle="Browse, manage, and review your trade history."
         actions={
           <div className="flex items-center gap-2">
-            <GlassButton variant="ghost" size="sm" onClick={() => syncQuotes.mutate()} disabled={syncQuotes.isPending}>
+            <GlassButton variant="ghost" size="sm" onClick={() => syncQuotes.mutate()} disabled={syncQuotes.isPending} className="hidden sm:inline-flex">
               {syncQuotes.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync
             </GlassButton>
-            <GlassButton variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
+            <GlassButton variant="ghost" size="sm" onClick={() => setImportOpen(true)} className="hidden sm:inline-flex">
               <Upload className="w-4 h-4" /> Import
             </GlassButton>
             <GlassButton variant="accent" size="sm" onClick={openCreateTrade}>
-              <Plus className="w-4 h-4" /> New Trade
+              <Plus className="w-4 h-4" /> <span className="sm:inline">Add Trade</span>
             </GlassButton>
           </div>
         }
       />
+
+      {/* Trade summary row — derived from the currently-loaded page only.
+          Omitted entirely when no data so we never display fabricated figures. */}
+      {tradeSummary.hasData && (
+        <div
+          data-testid="trades-summary"
+          className="grid grid-cols-2 gap-[var(--page-gap)] sm:grid-cols-3 lg:grid-cols-5"
+        >
+          <MetricCard
+            label="Total"
+            value={tradeSummary.total}
+            icon={ListChecks}
+            tone="neutral"
+            detail={`${tradeSummary.open} open · ${tradeSummary.closed} closed`}
+          />
+          <MetricCard
+            label="Open"
+            value={tradeSummary.open}
+            icon={Layers}
+            tone="accent"
+            detail="positions still active"
+          />
+          <MetricCard
+            label="Closed"
+            value={tradeSummary.closed}
+            icon={ClipboardCheck}
+            tone="neutral"
+            detail="realized outcomes"
+          />
+          {tradeSummary.netPnl != null && (
+            <MetricCard
+              label="Net P&L"
+              value={`${tradeSummary.netPnl >= 0 ? '+' : ''}${formatCurrency(tradeSummary.netPnl)}`}
+              icon={ArrowDownToLine}
+              tone={tradeSummary.netPnl >= 0 ? 'profit' : 'loss'}
+              detail="this page"
+            />
+          )}
+          <MetricCard
+            label="Needs Review"
+            value={tradeSummary.needsReview}
+            icon={ClipboardCheck}
+            tone={tradeSummary.needsReview > 0 ? 'warning' : 'neutral'}
+            detail={tradeSummary.needsReview > 0 ? 'awaiting notes' : 'all reviewed'}
+          />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="rounded-2xl border border-border bg-card p-[var(--page-px)] space-y-3">
@@ -555,14 +707,22 @@ export function TradesPage() {
         <button
           type="button"
           onClick={() => setFiltersOpen((open) => !open)}
-          className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${filtersOpen || advancedFilterCount > 0 ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
+          className={`hidden md:inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${filtersOpen || advancedFilterCount > 0 ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" /> Filters {advancedFilterCount > 0 ? `(${advancedFilterCount})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen(true)}
+          className={`md:hidden inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${advancedFilterCount > 0 ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
+          aria-label="Open filters"
         >
           <SlidersHorizontal className="w-3.5 h-3.5" /> Filters {advancedFilterCount > 0 ? `(${advancedFilterCount})` : ''}
         </button>
         <button
           type="button"
           onClick={() => setTableConfigOpen((open) => !open)}
-          className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${tableConfigOpen ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
+          className={`hidden md:inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${tableConfigOpen ? 'bg-accent-muted text-accent' : 'text-text-muted hover:text-text-heading hover:bg-accent-faint'}`}
         >
           <Columns3 className="w-3.5 h-3.5" /> Columns
         </button>
@@ -582,7 +742,7 @@ export function TradesPage() {
         <button
           type="button"
           onClick={() => downloadFilteredTradesCsv(displayedTrades, activeColumns)}
-          className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
+          className="hidden md:inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs text-text-muted hover:text-text-heading hover:bg-accent-faint transition-all cursor-pointer"
           title="Export current filtered table"
         >
           <Download className="w-3.5 h-3.5" /> Export
@@ -602,7 +762,7 @@ export function TradesPage() {
       </div>
 
       {filtersOpen && (
-        <div className="grid gap-3 border-t border-border pt-3 md:grid-cols-4">
+        <div className="hidden md:grid gap-3 border-t border-border pt-3 md:grid-cols-4">
           <FilterInput label="From" type="date" value={researchFilters.fromDate} onChange={(value) => updateResearchFilter('fromDate', value)} />
           <FilterInput label="To" type="date" value={researchFilters.toDate} onChange={(value) => updateResearchFilter('toDate', value)} />
           <FilterInput label="Setup" value={researchFilters.setup} onChange={(value) => updateResearchFilter('setup', value)} placeholder="EP, Pullback..." />
@@ -685,6 +845,60 @@ export function TradesPage() {
       )}
       </div>
 
+      {/* Mobile filters bottom sheet — mirrors the inline filters panel
+          but lives in a sheet so the page stays compact on small screens. */}
+      <BottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} title="Filters">
+        <div className="space-y-3 pb-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FilterInput label="From" type="date" value={researchFilters.fromDate} onChange={(value) => updateResearchFilter('fromDate', value)} />
+            <FilterInput label="To" type="date" value={researchFilters.toDate} onChange={(value) => updateResearchFilter('toDate', value)} />
+            <FilterInput label="Setup" value={researchFilters.setup} onChange={(value) => updateResearchFilter('setup', value)} placeholder="EP, Pullback..." />
+            <FilterInput label="Tactic" value={researchFilters.tactic} onChange={(value) => updateResearchFilter('tactic', value)} placeholder="ORB, PDH..." />
+            <FilterInput label="Tags" value={researchFilters.tags} onChange={(value) => updateResearchFilter('tags', value)} placeholder="mistake, A+" />
+            <div>
+              <label className="block text-[10px] font-data uppercase tracking-wider text-text-muted mb-1">Exit reason</label>
+              <select value={researchFilters.exitReason} onChange={(e) => updateResearchFilter('exitReason', e.target.value)}
+                className="w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50 transition-all">
+                <option value="">Any</option>
+                {['stop_loss', 'target', 'manual', 'trailing', 'system'].map((reason) => <option key={reason} value={reason}>{reason.replace(/_/g, ' ')}</option>)}
+              </select>
+            </div>
+            <FilterInput label="PnL min" type="number" value={researchFilters.pnlMin} onChange={(value) => updateResearchFilter('pnlMin', value)} />
+            <FilterInput label="PnL max" type="number" value={researchFilters.pnlMax} onChange={(value) => updateResearchFilter('pnlMax', value)} />
+            <FilterInput label="R min" type="number" value={researchFilters.rMin} onChange={(value) => updateResearchFilter('rMin', value)} />
+            <FilterInput label="R max" type="number" value={researchFilters.rMax} onChange={(value) => updateResearchFilter('rMax', value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <FilterToggle label="Has screenshot" checked={researchFilters.hasScreenshot} onChange={(checked) => updateResearchFilter('hasScreenshot', checked)} />
+            <FilterToggle label="Has journal note" checked={researchFilters.hasJournalNote} onChange={(checked) => updateResearchFilter('hasJournalNote', checked)} />
+            <FilterToggle label="Has stop" checked={researchFilters.hasStop} onChange={(checked) => updateResearchFilter('hasStop', checked)} />
+            <FilterToggle label="No stop" checked={researchFilters.noStop} onChange={(checked) => updateResearchFilter('noStop', checked)} />
+            <FilterToggle label="Has partial exit" checked={researchFilters.hasPartialExit} onChange={(checked) => updateResearchFilter('hasPartialExit', checked)} />
+            <FilterToggle label="Unreviewed" checked={researchFilters.unreviewed} onChange={(checked) => updateResearchFilter('unreviewed', checked)} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <input
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              placeholder="Saved view name"
+              className="min-h-10 w-full rounded-lg border border-border-strong bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 sm:w-56"
+              aria-label="Saved view name"
+            />
+            <button type="button" onClick={saveCurrentView} disabled={!saveViewName.trim()} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+              <Save className="w-3.5 h-3.5" /> Save view
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 border-t border-border pt-4 pb-2">
+          <button type="button" onClick={clearFilters} className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-muted hover:text-text-heading hover:bg-bg-elevated transition-colors cursor-pointer">
+            <X className="w-4 h-4" /> Clear
+          </button>
+          <button type="button" onClick={() => setMobileFiltersOpen(false)} className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-all cursor-pointer">
+            Apply
+          </button>
+        </div>
+      </BottomSheet>
+
       {/* Bulk actions bar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent-muted border border-accent/20">
@@ -722,7 +936,7 @@ export function TradesPage() {
         )}
         {!isLoading && !error && displayedTrades.length === 0 && (
           <div className="p-[var(--page-px)]">
-            <EmptyState title="No trades yet" message="Add or import trades to start tracking performance." action={{ label: 'Add Trade', onClick: openCreateTrade }} />
+            <EmptyState title="No trades yet" message="Add your first trade to start building your journal." action={{ label: 'Add Trade', onClick: openCreateTrade }} />
           </div>
         )}
         {!isLoading && !error && displayedTrades.length > 0 && showCards && (
@@ -745,6 +959,8 @@ export function TradesPage() {
                   isSelected={selectedIds.has(trade.id)}
                   onToggleSelect={() => toggleSelect(trade.id)}
                   onSellTrade={() => openSellTrade(trade)}
+                  onEditTrade={() => openEditTrade(trade.id)}
+                  onDeleteTrade={() => void handleDeleteOne(trade)}
                 />
               ))}
             </div>
@@ -800,6 +1016,7 @@ export function TradesPage() {
                         setPyramidingTradeId={setPyramidingTradeId}
                         onPyramidOpen={() => setPyramidDate(nowIST())}
                        openSellTrade={openSellTrade}
+                       onDeleteTrade={(t) => void handleDeleteOne(t)}
                        netEquity={netEquity}
                        quoteMap={quoteMap}
                        activeColumns={activeColumns}
@@ -980,16 +1197,24 @@ function TradeCard({
   isSelected,
   onToggleSelect,
   onSellTrade,
+  onEditTrade,
+  onDeleteTrade,
 }: {
   trade: ApiTrade
   onTap: () => void
   isSelected: boolean
   onToggleSelect: () => void
   onSellTrade: () => void
+  onEditTrade: () => void
+  onDeleteTrade: () => void
 }) {
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const isProfitable = pnlNum >= 0
   const isOpen = trade.exit_price == null
+  const reviewed = isTradeReviewed(trade)
+  const originalStop = trade.original_stop_price ?? trade.stop_price ?? null
+  const currentStop = trade.current_stop_price ?? trade.stop_price ?? null
+  const showSlSplit = originalStop != null && currentStop != null && originalStop !== currentStop
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -1004,19 +1229,20 @@ function TradeCard({
       onClick={onTap}
       onKeyDown={handleKeyDown}
       aria-label={`${trade.symbol} trade, ${isOpen ? 'open' : 'closed'}, ${pnlNum >= 0 ? 'profit' : 'loss'}`}
-      className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${isSelected ? 'border-accent/40 bg-accent-faint/30' : 'border-border bg-bg-elevated/30 hover:border-text-muted/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg`}
+      className={`w-full min-w-0 text-left rounded-xl border p-3 transition-all cursor-pointer ${isSelected ? 'border-accent/40 bg-accent-faint/30' : 'border-border bg-bg-elevated/30 hover:border-text-muted/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
             <span className="text-sm font-semibold text-text-heading truncate">{trade.symbol}</span>
+            <InlineBadge tone="accent">Long</InlineBadge>
             <span className={`shrink-0 inline-flex items-center px-1.5 py-px rounded-full text-[9px] font-medium ${isOpen ? 'bg-border text-text-muted' : isProfitable ? 'bg-profit-muted text-profit' : 'bg-loss-muted text-loss'}`}>
               {isOpen ? 'Open' : 'Closed'}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
-            <span>{formatDateTime(trade.entry_time)}</span>
-            {trade.setup && <span className="px-1 py-px rounded bg-accent-faint text-accent font-medium">{trade.setup}</span>}
+          <div className="flex items-center gap-1.5 text-[10px] text-text-muted min-w-0">
+            <span className="truncate">{formatDateTime(trade.entry_time)}</span>
+            {trade.setup && <span className="shrink-0 px-1 py-px rounded bg-accent-faint text-accent font-medium">{trade.setup}</span>}
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -1030,7 +1256,7 @@ function TradeCard({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-3 mt-2 text-[10px]">
+      <div className="flex items-center gap-3 mt-2 text-[10px] flex-wrap">
         <div className="flex items-center gap-1">
           <span className="text-text-faint">Entry</span>
           <span className="text-text-heading font-data font-medium">{formatPrice(Number(trade.entry_price))}</span>
@@ -1044,16 +1270,64 @@ function TradeCard({
           <span className="text-text-heading font-data font-medium">{formatQuantity(trade.quantity)}</span>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-1.5">
-        <button onClick={(e) => { e.stopPropagation(); onToggleSelect() }} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`} aria-label={isSelected ? `Deselect ${trade.symbol}` : `Select ${trade.symbol}`}>
+      <div className="flex items-center gap-3 mt-1.5 text-[10px] flex-wrap">
+        {showSlSplit ? (
+          <>
+            <div className="flex items-center gap-1">
+              <span className="text-text-faint">Orig SL</span>
+              <span className="text-text-muted font-data">{formatPrice(Number(originalStop))}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-text-faint">Current SL</span>
+              <span className="text-text-heading font-data font-medium">{formatPrice(Number(currentStop))}</span>
+            </div>
+          </>
+        ) : currentStop != null ? (
+          <div className="flex items-center gap-1">
+            <span className="text-text-faint">SL</span>
+            <span className="text-text-heading font-data font-medium">{formatPrice(Number(currentStop))}</span>
+          </div>
+        ) : null}
+        <StopStatusPill status={trade.stop_loss_status} />
+        {reviewed ? (
+          <InlineBadge tone="profit">Reviewed</InlineBadge>
+        ) : (
+          <InlineBadge tone="warning">Needs Review</InlineBadge>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-2 gap-1">
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSelect() }}
+          className={`text-[9px] px-1.5 py-1 rounded transition-colors cursor-pointer min-h-7 ${isSelected ? 'text-accent bg-accent-faint' : 'text-text-faint hover:text-text-muted'}`}
+          aria-label={isSelected ? `Deselect ${trade.symbol}` : `Select ${trade.symbol}`}
+        >
           {isSelected ? 'Selected' : 'Select'}
         </button>
-        {isOpen && (
-          <button onClick={(e) => { e.stopPropagation(); onSellTrade() }} className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded text-profit bg-profit-muted hover:text-profit transition-colors" aria-label={`Sell ${trade.symbol}`}>
-            <ArrowDownToLine className="w-3 h-3" />
-            Sell
+        <div className="flex items-center gap-1">
+          {isOpen && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSellTrade() }}
+              className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded text-profit bg-profit-muted hover:text-profit transition-colors cursor-pointer min-h-7"
+              aria-label={`Sell ${trade.symbol}`}
+            >
+              <ArrowDownToLine className="w-3 h-3" /> Sell
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onEditTrade() }}
+            className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded text-text-muted bg-bg-elevated hover:text-accent transition-colors cursor-pointer min-h-7"
+            aria-label={`Edit ${trade.symbol}`}
+          >
+            <Pencil className="w-3 h-3" /> Edit
           </button>
-        )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeleteTrade() }}
+            className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded text-text-muted hover:text-loss hover:bg-loss-muted/30 transition-colors cursor-pointer min-h-7"
+            aria-label={`Delete ${trade.symbol}`}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       </div>
     </article>
   )
@@ -1114,6 +1388,7 @@ interface TradeRowProps {
    setPyramidingTradeId: (id: number | null) => void
    onPyramidOpen: () => void
   openSellTrade: (trade: ApiTrade) => void
+  onDeleteTrade: (trade: ApiTrade) => void
   netEquity: string | null
   quoteMap: Map<string, LiveQuote>
   activeColumns: TradeColumnId[]
@@ -1126,7 +1401,7 @@ const STOP_TYPE_OPTIONS = [
   { value: 'breakeven', label: 'Breakeven' },
 ]
 
-function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, onPyramidOpen, openSellTrade, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
+function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailTrade, setPyramidingTradeId, onPyramidOpen, openSellTrade, onDeleteTrade, netEquity, quoteMap, activeColumns, density }: TradeRowProps) {
   const entryCost = Number(trade.entry_price) * Number(trade.quantity)
   const pnlNum = trade.pnl != null ? Number(trade.pnl) : 0
   const capPct = computeCapPct(pnlNum, Number(netEquity))
@@ -1225,6 +1500,37 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
           ) : (
             <span className={`text-xs font-data ${getLiveQuoteDisplayClass(quoteStatus)}`}>{quoteStatus}</span>
           )}
+        </td>
+      )
+    }
+    if (column === 'originalStop') {
+      const orig = trade.original_stop_price ?? trade.stop_price
+      return (
+        <td key={column} className={cellClass}>
+          <span className={`font-data text-xs ${orig ? 'text-text-muted' : 'text-text-faint'}`}>{orig ? formatPrice(Number(orig)) : '—'}</span>
+        </td>
+      )
+    }
+    if (column === 'currentStop') {
+      const curr = trade.current_stop_price ?? trade.stop_price
+      return (
+        <td key={column} className={cellClass}>
+          <span className={`font-data text-xs ${curr ? 'text-text-heading font-medium' : 'text-text-faint'}`}>{curr ? formatPrice(Number(curr)) : '—'}</span>
+        </td>
+      )
+    }
+    if (column === 'stopStatus') {
+      return (
+        <td key={column} className={cellClass}>
+          <StopStatusPill status={trade.stop_loss_status} />
+        </td>
+      )
+    }
+    if (column === 'review') {
+      const reviewed = isTradeReviewed(trade)
+      return (
+        <td key={column} className={cellClass}>
+          <InlineBadge tone={reviewed ? 'profit' : 'warning'}>{reviewed ? 'Reviewed' : 'Needs Review'}</InlineBadge>
         </td>
       )
     }
@@ -1337,6 +1643,14 @@ function TradeRow({ trade, selectedIds, toggleSelect, openEditTrade, openDetailT
             aria-label={`Edit ${trade.symbol}`}
           >
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDeleteTrade(trade)}
+            className="p-1.5 rounded-md text-text-muted hover:text-loss hover:bg-loss-muted transition-colors cursor-pointer"
+            title="Delete"
+            aria-label={`Delete ${trade.symbol}`}
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </td>
