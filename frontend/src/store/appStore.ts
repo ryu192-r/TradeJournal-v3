@@ -83,7 +83,7 @@ export const useAppStore = create<AppState>()(
       activeView: 'dashboard',
       setActiveView: (view) => {
         const { navMode } = get()
-        let resolved: ActiveView = view === 'analytics' ? 'review' : view
+        let resolved: ActiveView = view
         if (view === 'analytics') storeReviewTab('overview')
         else if (view === 'review') storeReviewTab('queue')
         if (!canAccessView(resolved, navMode)) {
@@ -112,12 +112,12 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'app-storage',
-      partialize: (state) => ({ navMode: state.navMode, theme: state.theme }),
+      partialize: (state) => ({ navMode: state.navMode, theme: state.theme, activeView: state.activeView }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme)
           state.navMode = normalizeNavMode(state.navMode)
-          if (state.navMode === 'simple' && !canAccessView(state.activeView, 'simple')) {
+          if (!canAccessView(state.activeView, state.navMode)) {
             state.activeView = getSimpleFallbackView(state.activeView)
           }
         }

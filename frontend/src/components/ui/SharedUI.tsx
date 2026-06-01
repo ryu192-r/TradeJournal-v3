@@ -5,6 +5,31 @@ import { RefreshCw, Clock, ChevronDown, ChevronRight, Loader2 } from 'lucide-rea
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
+/* ─── SectionCard ─────────────────────────────────────────── */
+
+export function SectionCard({
+  children,
+  className,
+  padding = 'default',
+}: {
+  children: ReactNode
+  className?: string
+  padding?: 'default' | 'compact' | 'none'
+}) {
+  return (
+    <section
+      className={cn(
+        'min-w-0 max-w-full rounded-2xl border border-border bg-card animate-card-in',
+        padding === 'default' && 'p-[var(--page-px)]',
+        padding === 'compact' && 'p-3 sm:p-4',
+        className
+      )}
+    >
+      {children}
+    </section>
+  )
+}
+
 /* ─── SyncBadge ────────────────────────────────────────────── */
 
 export function SyncBadge({ isSyncing, onClick }: { isSyncing: boolean; onClick?: () => void }) {

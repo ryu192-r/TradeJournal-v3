@@ -13,6 +13,7 @@ import {
   ArrowDown, PanelTopClose, PanelTopOpen, X,
 } from 'lucide-react'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { PageShell } from '@/components/layout/PageShell'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
 import { RecommendationSummaryStrip } from '@/components/recommendations/RecommendationSummaryStrip'
@@ -889,7 +890,7 @@ export function DashboardPage() {
   // ── First load — show skeletons only if truly no data ──
   if (isLoading && !data) {
     return (
-      <div className="px-[var(--page-px)] py-[var(--page-py)] space-y-[var(--page-gap)]">
+      <PageShell className="space-y-[var(--page-gap)]">
         <PageHeader title="Dashboard" right={<SyncBadge isSyncing={isFetching || syncQuotes.isPending} />} />
         <KpiSkeleton />
         <CardSkeleton height="h-40" />
@@ -898,27 +899,27 @@ export function DashboardPage() {
           <MetricSkeleton />
           <MetricSkeleton />
         </div>
-      </div>
+      </PageShell>
     )
   }
 
   if (error && !data) {
     return (
-      <div className="px-[var(--page-px)] py-[var(--page-py)] page-container min-w-0">
+      <PageShell>
         <ErrorState
           title="Dashboard failed to load"
           message={(error as Error)?.message || 'Something went wrong loading your dashboard.'}
           onRetry={handleRefresh}
         />
-      </div>
+      </PageShell>
     )
   }
 
   if (!data) {
     return (
-      <div className="px-[var(--page-px)] py-[var(--page-py)] page-container min-w-0">
+      <PageShell>
         <EmptyState title="No data" message="Your dashboard is empty. Add trades to see performance metrics." />
-      </div>
+      </PageShell>
     )
   }
 
@@ -976,7 +977,7 @@ export function DashboardPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-      <div className="page-container min-w-0 space-y-[var(--page-gap)] px-[var(--page-px)] py-[var(--page-py)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
+      <PageShell className="space-y-[var(--page-gap)]">
         {/* ── HEADER: Today + Sync ── */}
         <PageHeader
           title="Command Center"
@@ -1018,7 +1019,7 @@ export function DashboardPage() {
             </WidgetShell>
           )
         })}
-      </div>
+      </PageShell>
     </PullToRefresh>
   )
 }

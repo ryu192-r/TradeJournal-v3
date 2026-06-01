@@ -6,6 +6,7 @@ export { ResponsiveTabs } from './ResponsiveTabs'
 export {
   SyncBadge,
   LastUpdated,
+  SectionCard,
   SectionHeader,
   SectionTitle,
   MetricCard,

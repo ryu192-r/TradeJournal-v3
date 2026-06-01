@@ -36,6 +36,8 @@ const GRADE_COLORS: Record<string, string> = {
 }
 
 function EmotionBreakdown({ emotions, mostFrequent }: { emotions: EmotionSummaryEntry[]; mostFrequent: string | null }) {
+  const total = useMemo(() => emotions.reduce((s, e) => s + e.count, 0), [emotions])
+
   if (!emotions.length) {
     return (
       <EmptyState
@@ -46,7 +48,6 @@ function EmotionBreakdown({ emotions, mostFrequent }: { emotions: EmotionSummary
       />
     )
   }
-  const total = useMemo(() => emotions.reduce((s, e) => s + e.count, 0), [emotions])
   return (
     <div className="space-y-2">
       {emotions.map((e) => {

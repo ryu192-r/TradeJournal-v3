@@ -228,7 +228,7 @@ function getHeatmapCellColor(value: number, maxAbs: number, hasTrade: boolean) {
 }
 
 export function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
-  const safeData = data && data.length > 0 ? data : []
+  const safeData = useMemo(() => (data && data.length > 0 ? data : []), [data])
   const defaultDate = safeData.length > 0 ? safeData[safeData.length - 1]?.date ?? null : null
   const [activeDate, setActiveDate] = useState<string | null>(defaultDate)
 
@@ -286,7 +286,7 @@ export function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
     let nextBestDay: HeatmapCell | null = null
     let nextWorstDay: HeatmapCell | null = null
 
-    for (const entry of data) {
+    for (const entry of safeData) {
       const value = pnlNum(entry.net_pnl)
       nextTotalNetPnl += value
       nextTradedDays += 1
@@ -368,7 +368,7 @@ export function TradingHeatmap({ data }: { data: DailyPnlEntry[] }) {
       bestDay: nextBestDay,
       worstDay: nextWorstDay,
     }
-  }, [activeDate, data])
+  }, [activeDate, safeData])
 
   if (months.length === 0) return null
 

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate, parseDecimal } from '@/utils/format'
 import { todaySessionDate, weekdayFromSessionDate } from '@/utils/tradeDates'
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
-import { MetricCard, PageHeader, SectionHeader } from '@/components/ui/SharedUI'
+import { MetricCard, PageHeader, SectionCard, SectionHeader } from '@/components/ui/SharedUI'
 import type { CalendarDay } from '@/types'
 import { PageShell } from '@/components/layout/PageShell'
 import { useAppStore } from '@/store/appStore'
@@ -93,7 +93,7 @@ export function CalendarPage() {
       </div>
 
       <div className="mt-[var(--page-gap)] grid gap-[var(--page-gap)] xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section className={CARD}>
+        <SectionCard>
           <SectionHeader icon={CalendarDays} title="Monthly P&L Calendar" subtitle="One backend aggregate call for all day cells." />
           <div className="mt-[var(--page-gap)] grid grid-cols-7 gap-2 text-center text-[10px] font-data uppercase tracking-wider text-text-muted">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day}>{day}</div>)}
@@ -104,7 +104,7 @@ export function CalendarPage() {
               <DayCell key={day.date} day={day} selected={selectedDay?.date === day.date} onClick={() => setSelectedDate(day.date)} />
             ))}
           </div>
-        </section>
+        </SectionCard>
 
         <DayDetail day={selectedDay} />
       </div>

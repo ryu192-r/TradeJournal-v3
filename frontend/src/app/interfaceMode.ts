@@ -15,7 +15,6 @@ export function isProMode(mode: NavMode): boolean {
 export const PRO_ONLY_VIEWS = new Set<ActiveView>([
   'analytics',
   'ideas',
-  'calendar',
   'capital',
   'perf-os',
   'journal',
