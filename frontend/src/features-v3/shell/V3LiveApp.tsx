@@ -13,7 +13,8 @@ import { ReviewV3Page } from '../review'
 import { AnalyticsV3Page } from '../analytics'
 import { ReportsV3Page } from '../reports'
 import { PlaybookV3Page } from '../playbook'
-import { V3ImportSection } from './V3ImportSection'
+import { ImportV3Page } from '../import'
+import { SettingsV3Page } from '../settings'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
 import type { V3PreviewSectionId, V3ShellMode } from './V3Shell.types'
@@ -80,6 +81,7 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
   const [sectionOverride, setSectionOverride] = useState<V3PreviewSectionId | null>(null)
   const [legacyDetailFallback, setLegacyDetailFallback] = useState(false)
   const [legacyPlaybookFallback, setLegacyPlaybookFallback] = useState(false)
+  const [legacySettingsFallback, setLegacySettingsFallback] = useState(false)
 
   useEffect(() => {
     if (tradeFormMode !== 'detail') {
@@ -90,6 +92,12 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
   useEffect(() => {
     if (activeView !== 'playbook') {
       setLegacyPlaybookFallback(false)
+    }
+  }, [activeView])
+
+  useEffect(() => {
+    if (activeView !== 'settings') {
+      setLegacySettingsFallback(false)
     }
   }, [activeView])
 
@@ -170,7 +178,11 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     }
 
     if (sectionOverride === 'import') {
-      return <V3ImportSection />
+      return (
+        <ErrorBoundary name="ImportV3">
+          <ImportV3Page />
+        </ErrorBoundary>
+      )
     }
 
     if (sectionOverride === 'more') {
@@ -233,12 +245,19 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           </ErrorBoundary>
         )
       case 'settings':
+        if (legacySettingsFallback) {
+          return (
+            <div className="tjv3-legacy-embed">
+              <ErrorBoundary name="LegacySettings">
+                <SettingsPage />
+              </ErrorBoundary>
+            </div>
+          )
+        }
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Settings">
-              <SettingsPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="SettingsV3">
+            <SettingsV3Page onOpenLegacy={() => setLegacySettingsFallback(true)} />
+          </ErrorBoundary>
         )
       case 'ideas':
         return (

@@ -46,6 +46,24 @@ vi.mock('../trades', () => ({
   ),
 }))
 
+vi.mock('../import', () => ({
+  ImportV3Page: () => (
+    <div>
+      <h1>Import</h1>
+      <div>Import v3 live</div>
+    </div>
+  ),
+}))
+
+vi.mock('../settings', () => ({
+  SettingsV3Page: () => (
+    <div>
+      <h1>Settings</h1>
+      <div>Settings v3 live</div>
+    </div>
+  ),
+}))
+
 vi.mock('@/components/layout/ProModeGate', () => ({
   ProModeGate: ({ view }: { view: string }) => <div>Pro mode gate for {view}</div>,
 }))
@@ -82,13 +100,12 @@ describe('V3 live app promotion', () => {
     expect(screen.getByText('Trades v3 live')).toBeInTheDocument()
   })
 
-  it('shows import fallback section with legacy import action', async () => {
+  it('renders Import v3 when import section is active', async () => {
     const user = userEvent.setup()
     render(<V3LiveApp />)
 
     await user.click(screen.getByRole('button', { name: /Import/ }))
-    expect(screen.getByText('Import remains on the existing stable flow for now.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open import' })).toBeInTheDocument()
+    expect(screen.getByText('Import v3 live')).toBeInTheDocument()
   })
 
   it('routes Review navigation through live app store', async () => {
