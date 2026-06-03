@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChargesLedgerPage } from '../ChargesLedgerPage'
 
 const mocks = vi.hoisted(() => ({
@@ -67,6 +68,13 @@ function makeSummary(overrides: Partial<import('@/types').DailyChargesSummary> =
 }
 
 describe('ChargesLedgerPage', () => {
+  function renderPage() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return render(
+      <QueryClientProvider client={qc}><ChargesLedgerPage /></QueryClientProvider>,
+    )
+  }
+
   beforeEach(() => {
     mocks.useChargesLedgerData.mockReturnValue({
       data: null,
@@ -81,7 +89,7 @@ describe('ChargesLedgerPage', () => {
   })
 
   it('renders loading state', () => {
-    render(<ChargesLedgerPage />)
+    renderPage()
     expect(screen.getByText('Daily Charges Ledger')).toBeInTheDocument()
     expect(screen.getByLabelText(/loading/i)).toBeInTheDocument()
   })
@@ -96,7 +104,7 @@ describe('ChargesLedgerPage', () => {
       period: '30d',
       setPeriod: vi.fn(),
     })
-    render(<ChargesLedgerPage />)
+    renderPage()
     expect(screen.getByText('No trading activity')).toBeInTheDocument()
   })
 
@@ -110,7 +118,7 @@ describe('ChargesLedgerPage', () => {
       period: '30d',
       setPeriod: vi.fn(),
     })
-    render(<ChargesLedgerPage />)
+    renderPage()
     expect(screen.getAllByText('Missing charges').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Recorded charges').length).toBeGreaterThan(0)
     expect(screen.getByText(/300\.00/)).toBeInTheDocument()
@@ -128,7 +136,7 @@ describe('ChargesLedgerPage', () => {
       setPeriod: vi.fn(),
     })
     const user = userEvent.setup()
-    render(<ChargesLedgerPage />)
+    renderPage()
     await user.click(screen.getAllByRole('button', { name: /Add charges/i })[0])
     expect(screen.getByRole('dialog', { name: /Add charges/i })).toBeInTheDocument()
   })
@@ -144,7 +152,7 @@ describe('ChargesLedgerPage', () => {
       setPeriod: vi.fn(),
     })
     const user = userEvent.setup()
-    render(<ChargesLedgerPage />)
+    renderPage()
 
     const deleteButtons = screen.getAllByRole('button', { name: /^Delete$/i })
     await user.click(deleteButtons[0])
@@ -168,7 +176,7 @@ describe('ChargesLedgerPage', () => {
       period: '30d',
       setPeriod: vi.fn(),
     })
-    const { container } = render(<ChargesLedgerPage />)
+    const { container } = renderPage()
     const missingRow = container.querySelector('tr:has(td:nth-child(4) .tjv3-chip-warning)')
     if (missingRow) {
       expect(missingRow.textContent).toContain('Missing')
@@ -186,7 +194,7 @@ describe('ChargesLedgerPage', () => {
       period: '30d',
       setPeriod: vi.fn(),
     })
-    render(<ChargesLedgerPage />)
+    renderPage()
     expect(screen.getByText('Pending charges')).toBeInTheDocument()
   })
 
@@ -200,7 +208,7 @@ describe('ChargesLedgerPage', () => {
       period: '30d',
       setPeriod: vi.fn(),
     })
-    render(<ChargesLedgerPage />)
+    renderPage()
     expect(screen.queryByText('Pending charges')).not.toBeInTheDocument()
   })
 })

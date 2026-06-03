@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button, EmptyState, ErrorState, LoadingState, Page, Stack } from '@/new-ui'
 import { RefreshCw, Receipt } from 'lucide-react'
 import { deleteDailyCharges } from '@/lib/endpoints'
@@ -11,12 +12,19 @@ import { DailyChargesEntryDrawer } from './components/DailyChargesEntryDrawer'
 import { ChargesDeleteConfirm } from './components/ChargesDeleteConfirm'
 
 export function ChargesLedgerPage() {
+  const queryClient = useQueryClient()
   const { data, isLoading, isFetching, error, refetch, period, setPeriod } = useChargesLedgerData()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<'add' | 'edit'>('add')
   const [drawerDate, setDrawerDate] = useState('')
   const [deleteConfirmDate, setDeleteConfirmDate] = useState<string | null>(null)
+
+  /** Invalidate all queries that consume daily charges data (cockpit, analytics, reports). */
+  const invalidateChargesDependents = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['daily-charges'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] })
+  }, [queryClient])
 
   const openAdd = useCallback((date: string) => {
     setDrawerMode('add')
@@ -35,10 +43,11 @@ export function ChargesLedgerPage() {
       await deleteDailyCharges(date)
       setDeleteConfirmDate(null)
       void refetch()
+      invalidateChargesDependents()
     } catch {
       // keep confirm open if needed, or show toast
     }
-  }, [refetch])
+  }, [refetch, invalidateChargesDependents])
 
   return (
     <Page
@@ -94,6 +103,7 @@ export function ChargesLedgerPage() {
         onClose={() => setDrawerOpen(false)}
         onSaved={() => {
           void refetch()
+          invalidateChargesDependents()
         }}
       />
 
