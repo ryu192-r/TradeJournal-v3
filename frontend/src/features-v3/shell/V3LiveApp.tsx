@@ -8,6 +8,7 @@ import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
 import { TradeDetailV3Page } from '../trade-detail'
 import { ChargesLedgerPage } from '../charges'
+import { TradeFormV3Page } from '../trade-form'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -22,8 +23,6 @@ const SetupPlaybookPage = lazy(() =>
 )
 const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
-const CreateTradePage = lazy(() => import('@/pages/CreateTradePage').then((m) => ({ default: m.CreateTradePage })))
-const EditTradePage = lazy(() => import('@/pages/EditTradePage').then((m) => ({ default: m.EditTradePage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
 const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
 const TradeIdeasPage = lazy(() =>
@@ -128,21 +127,17 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
 
     if (tradeFormMode === 'create') {
       return (
-        <div className="tjv3-legacy-embed">
-          <ErrorBoundary name="CreateTrade">
-            <CreateTradePage />
-          </ErrorBoundary>
-        </div>
+        <ErrorBoundary name="TradeFormV3Create">
+          <TradeFormV3Page mode="create" />
+        </ErrorBoundary>
       )
     }
 
     if (tradeFormMode === 'edit' && selectedTradeId != null) {
       return (
-        <div className="tjv3-legacy-embed">
-          <ErrorBoundary name="EditTrade">
-            <EditTradePage tradeId={selectedTradeId} />
-          </ErrorBoundary>
-        </div>
+        <ErrorBoundary name="TradeFormV3Edit">
+          <TradeFormV3Page mode="edit" tradeId={selectedTradeId} />
+        </ErrorBoundary>
       )
     }
 
