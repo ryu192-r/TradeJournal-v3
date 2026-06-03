@@ -1,0 +1,18 @@
+/* PlaybookV3 layout — desktop two-column, mobile stacked. */
+@media (max-width: 60rem) {
+  .tjv3-playbook-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Active card visual — used by SetupListCard when active. */
+.tjv3-playbook-card {
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.tjv3-playbook-card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+}
+.tjv3-playbook-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
