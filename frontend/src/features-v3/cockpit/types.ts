@@ -10,6 +10,8 @@ export interface CockpitV3Data {
   isLoading: boolean
   isFetching: boolean
   error: Error | null
+  tradesError?: Error | null
+  dashboardError?: Error | null
   refresh: () => Promise<void>
 }
 

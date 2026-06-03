@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { getIntelligenceDashboard, getOperationalDashboard, listTrades } from '@/lib/endpoints'
-import type { ApiTradeListResponse, IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
+import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
+import { normalizeTradeListResponse } from '../../shared/apiAdapters'
 import type { CockpitV3Data } from '../types'
 
 export function useCockpitV3Data(enabled = true): CockpitV3Data {
@@ -10,20 +11,20 @@ export function useCockpitV3Data(enabled = true): CockpitV3Data {
     queryKey: ['dashboard', 'operational'],
     queryFn: getOperationalDashboard,
     staleTime: 30_000,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: OperationalDashboardPayload | undefined) => previousData,
     enabled,
   })
   const intelligence = useQuery<IntelligenceDashboardPayload>({
     queryKey: ['dashboard', 'intelligence'],
     queryFn: getIntelligenceDashboard,
     staleTime: 2 * 60 * 1000,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: IntelligenceDashboardPayload | undefined) => previousData,
     enabled,
   })
-  const trades = useQuery<ApiTradeListResponse>({
+  const trades = useQuery<unknown>({
     queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 250 }],
     queryFn: () => listTrades({ limit: 250 }),
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: unknown) => previousData,
     enabled,
   })
 
@@ -36,13 +37,21 @@ export function useCockpitV3Data(enabled = true): CockpitV3Data {
     ])
   }, [enabled, queryClient])
 
+  const normalizedTrades = normalizeTradeListResponse(trades.data)
+  const tradesError = enabled ? (trades.error as Error | null) : null
+  const dashboardError = enabled
+    ? ((operational.error as Error | null) ?? (intelligence.error as Error | null) ?? null)
+    : null
+
   return {
     operational: operational.data,
     intelligence: intelligence.data,
-    trades: trades.data?.items ?? [],
-    isLoading: enabled && ((operational.isLoading && !operational.data) || (trades.isLoading && !trades.data)),
+    trades: normalizedTrades.items,
+    isLoading: enabled && trades.isLoading && !trades.data,
     isFetching: enabled && (operational.isFetching || intelligence.isFetching || trades.isFetching),
-    error: enabled ? (operational.error as Error | null) ?? (trades.error as Error | null) ?? (intelligence.error as Error | null) ?? null : null,
+    error: tradesError,
+    tradesError,
+    dashboardError,
     refresh,
   }
 }

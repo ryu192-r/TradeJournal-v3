@@ -43,7 +43,7 @@ export function TradesV3Page({ dataEnabled = true }: TradesV3PageProps) {
       <div className="tjv3-trades">
         <ErrorState
           title="Could not load trades"
-          description="Existing trade list endpoint did not return data for this preview."
+          description="Please retry or open the existing Trades page."
           onRetry={() => {
             void data.refresh()
           }}

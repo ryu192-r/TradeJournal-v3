@@ -155,6 +155,18 @@ describe('V3 shell preview', () => {
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 
+  it('waits for stored auth token before showing V3 demo gate', () => {
+    mocks.isAuthenticated = false
+    localStorage.setItem('auth_token', 'stored-token')
+    window.history.pushState({}, '', '/v3-preview')
+
+    render(<App />)
+
+    expect(screen.queryByDisplayValue('demo@tradejournal.local')).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Preview@123')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
+  })
+
   it('keeps legacy route on existing AppShell', () => {
     window.history.pushState({}, '', '/')
     render(<App />)

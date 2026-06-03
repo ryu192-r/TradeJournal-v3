@@ -54,6 +54,8 @@ function App() {
   const viewBlocked = !canAccessView(activeView, navMode)
   const { isAuthenticated, fetchMe } = useAuthStore()
   const isV3PreviewRoute = window.location.pathname === '/v3-preview'
+  const hasStoredAuthToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('auth_token'))
+  const isAuthPending = !isAuthenticated && hasStoredAuthToken
 
   useEffect(() => {
     fetchMe()
@@ -96,7 +98,9 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isV3PreviewRoute && (isAuthenticated || import.meta.env.DEV) ? (
+      {isAuthPending ? (
+        <ViewFallback />
+      ) : isV3PreviewRoute && (isAuthenticated || import.meta.env.DEV) ? (
         <Suspense fallback={<ViewFallback />}>
           <ErrorBoundary name="V3Preview">
             <V3PreviewRoute isAuthenticated={isAuthenticated} />

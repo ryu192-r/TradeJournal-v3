@@ -59,7 +59,7 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
       <div className="tjv3-cockpit">
         <ErrorState
           title="Cockpit data unavailable"
-          description="Existing dashboard or trade endpoints did not return data for this preview."
+          description="Existing trade endpoint did not return data for this preview."
           onRetry={() => {
             void data.refresh()
           }}
@@ -91,6 +91,18 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
           >
             <div className="tjv3-cockpit__micro">
               Log in with a real account to load data-backed Cockpit metrics. N3 still shows honest unavailable states here.
+            </div>
+          </Panel>
+        )}
+
+        {dataEnabled && data.dashboardError && (
+          <Panel
+            title="Trades loaded"
+            description="Some dashboard metrics are unavailable in this preview response."
+            action={<Badge variant="warning">Partial data</Badge>}
+          >
+            <div className="tjv3-cockpit__micro">
+              Cockpit v3 is using existing trade data. Dashboard operational or intelligence data can be retried without hiding loaded trades.
             </div>
           </Panel>
         )}

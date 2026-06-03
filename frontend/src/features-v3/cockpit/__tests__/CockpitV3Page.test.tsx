@@ -123,6 +123,19 @@ describe('CockpitV3Page', () => {
     expect(screen.getByText('Setup context missing')).toBeInTheDocument()
   })
 
+  it('shows partial dashboard warning without hiding trades', () => {
+    mocks.useCockpitV3Data.mockReturnValue(data({
+      trades: [trade({ pnl: '100', fees: '10', setup: 'ORB', notes: 'Clean', review_notes: 'Reviewed' })],
+      dashboardError: new Error('dashboard failed'),
+    }))
+
+    render(<CockpitV3Page />)
+
+    expect(screen.getByText('Trades loaded')).toBeInTheDocument()
+    expect(screen.getByText('Partial data')).toBeInTheDocument()
+    expect(screen.getAllByText('RELIANCE').length).toBeGreaterThan(0)
+  })
+
   it('opens and closes drawer preview from trading tape', async () => {
     const user = userEvent.setup()
     mocks.useCockpitV3Data.mockReturnValue(data({
