@@ -235,3 +235,9 @@
     display: block;
   }
 }
+
+.tjv3-trades__drawer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

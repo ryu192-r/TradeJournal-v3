@@ -24,6 +24,10 @@ vi.mock('@/store/appStore', () => ({
     tradeFormMode: 'list',
     selectedTradeId: null,
     navMode: 'simple',
+    setActiveView: vi.fn(),
+    closeTradeForm: vi.fn(),
+    openCreateTrade: vi.fn(),
+    openDetailTrade: vi.fn(),
   }),
 }))
 
@@ -139,16 +143,11 @@ describe('V3 shell preview', () => {
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 
-  it('allows dev demo credentials for unauthenticated V3 preview only', async () => {
-    const user = userEvent.setup()
+  it('allows unauthenticated V3 preview route in dev without legacy shell', async () => {
     mocks.isAuthenticated = false
     window.history.pushState({}, '', '/v3-preview')
 
     render(<App />)
-
-    expect(await screen.findByDisplayValue('demo@tradejournal.local')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Preview@123')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Open V3 preview' }))
 
     expect(await screen.findByRole('heading', { name: 'Cockpit', level: 1 })).toBeInTheDocument()
     expect(localStorage.getItem('auth_token')).toBeNull()
@@ -167,10 +166,12 @@ describe('V3 shell preview', () => {
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 
-  it('keeps legacy route on existing AppShell', () => {
+  it('renders V3 live shell for authenticated app route', async () => {
     window.history.pushState({}, '', '/')
     render(<App />)
-    expect(screen.getByTestId('legacy-shell')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Main navigation')).toBeInTheDocument()
+    expect(await screen.findByText('Cockpit v3 mock')).toBeInTheDocument()
+    expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 
   it('renders Trades v3 from preview local navigation', async () => {

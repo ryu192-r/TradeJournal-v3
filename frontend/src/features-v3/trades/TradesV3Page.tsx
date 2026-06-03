@@ -15,7 +15,7 @@ import { applyTradesV3Filters, getSetupOptions } from './utils/tradesV3Filters'
 import { summarizeTrades } from './utils/tradesV3Metrics'
 import './trades.css'
 
-export function TradesV3Page({ dataEnabled = true }: TradesV3PageProps) {
+export function TradesV3Page({ dataEnabled = true, onOpenLegacyDetail }: TradesV3PageProps) {
   const data = useTradesV3Data(dataEnabled)
   const { filters, updateFilter, resetFilters } = useTradesV3Filters()
   const [selectedTrade, setSelectedTrade] = useState<ApiTrade | null>(null)
@@ -103,7 +103,11 @@ export function TradesV3Page({ dataEnabled = true }: TradesV3PageProps) {
         )}
       </Stack>
 
-      <TradePreviewDrawer trade={selectedTrade} onClose={() => setSelectedTrade(null)} />
+      <TradePreviewDrawer
+        trade={selectedTrade}
+        onClose={() => setSelectedTrade(null)}
+        onOpenLegacyDetail={onOpenLegacyDetail}
+      />
     </div>
   )
 }
