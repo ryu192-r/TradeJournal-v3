@@ -1,0 +1,7 @@
+export * from './TradesV3Page'
+export * from './types'
+export * from './hooks/useTradesV3Data'
+export * from './hooks/useTradesV3Filters'
+export * from './utils/tradesV3Filters'
+export * from './utils/tradesV3Metrics'
+export * from './utils/tradesV3Formatters'

@@ -52,6 +52,15 @@ vi.mock('../cockpit', () => ({
   ),
 }))
 
+vi.mock('../trades', () => ({
+  TradesV3Page: () => (
+    <div>
+      <h1>Trades</h1>
+      <div>Trades v3 mock</div>
+    </div>
+  ),
+}))
+
 vi.mock('@/pages/DashboardPage', () => ({
   DashboardPage: () => <div>Legacy dashboard mock</div>,
 }))
@@ -115,7 +124,7 @@ describe('V3 shell preview', () => {
     const user = userEvent.setup()
     render(<V3PreviewPage />)
 
-    await user.click(screen.getAllByRole('button', { name: /Trades/ })[0])
+    await user.click(screen.getAllByRole('button', { name: /Review/ })[0])
     await user.click(screen.getByRole('button', { name: 'Open drawer preview' }))
     expect(screen.getByRole('dialog', { name: 'V3 drawer preview' })).toBeInTheDocument()
 
@@ -150,5 +159,14 @@ describe('V3 shell preview', () => {
     window.history.pushState({}, '', '/')
     render(<App />)
     expect(screen.getByTestId('legacy-shell')).toBeInTheDocument()
+  })
+
+  it('renders Trades v3 from preview local navigation', async () => {
+    const user = userEvent.setup()
+    render(<V3PreviewPage />)
+
+    await user.click(screen.getAllByRole('button', { name: /Trades/ })[0])
+    expect(screen.getByRole('heading', { name: 'Trades', level: 1 })).toBeInTheDocument()
+    expect(screen.getByText('Trades v3 mock')).toBeInTheDocument()
   })
 })
