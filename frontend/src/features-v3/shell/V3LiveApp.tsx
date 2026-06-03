@@ -10,15 +10,13 @@ import { TradeDetailV3Page } from '../trade-detail'
 import { ChargesLedgerPage } from '../charges'
 import { TradeFormV3Page } from '../trade-form'
 import { ReviewV3Page } from '../review'
+import { AnalyticsV3Page } from '../analytics'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
 import type { V3PreviewSectionId, V3ShellMode } from './V3Shell.types'
 import { activeViewToV3Section, v3SectionToActiveView } from './v3ViewMapping'
 
-const ReviewAnalyticsPage = lazy(() =>
-  import('@/pages/ReviewAnalyticsPage').then((m) => ({ default: m.ReviewAnalyticsPage })),
-)
 const SetupPlaybookPage = lazy(() =>
   import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
 )
@@ -192,11 +190,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'analytics':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="ReviewAnalytics">
-              <ReviewAnalyticsPage defaultTab="overview" />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="AnalyticsV3">
+            <AnalyticsV3Page dataEnabled />
+          </ErrorBoundary>
         )
       case 'playbook':
         return (
