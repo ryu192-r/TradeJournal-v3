@@ -1,0 +1,122 @@
+/* V3-native trade form styling — scoped to .tjv3-tradeform */
+.tjv3-tradeform {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--tj-space-section);
+}
+
+@media (min-width: 1024px) {
+  .tjv3-tradeform {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+  }
+  .tjv3-tradeform__preview {
+    position: sticky;
+    top: var(--tj-space-section);
+  }
+}
+
+.tjv3-tradeform__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tj-space-section);
+  min-width: 0;
+}
+
+.tjv3-formgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--tj-space-row);
+}
+
+.tjv3-formfield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.tjv3-formfield__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.tjv3-formfield__label--req::after {
+  content: ' *';
+  color: var(--color-accent);
+}
+
+.tjv3-formfield__control {
+  width: 100%;
+  min-height: 2.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  padding: 0 0.75rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+textarea.tjv3-formfield__control {
+  padding: 0.625rem 0.75rem;
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.tjv3-formfield__control::placeholder {
+  color: var(--color-text-faint);
+}
+
+.tjv3-formfield__control:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.tjv3-formfield__control--error {
+  border-color: var(--color-loss);
+}
+
+.tjv3-formfield__error {
+  font-size: 0.6875rem;
+  color: var(--color-loss);
+}
+
+.tjv3-formfield__help {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.tjv3-tradeform__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.tjv3-tradeform__metarow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.tjv3-tradeform__metarow span:first-child {
+  color: var(--color-text-muted);
+}
+
+.tjv3-tradeform__metarow span:last-child {
+  color: var(--color-text);
+  font-weight: 500;
+  text-align: right;
+  min-width: 0;
+}
+
+.tjv3-spin {
+  animation: tjv3-spin 0.8s linear infinite;
+}
+
+@keyframes tjv3-spin {
+  to { transform: rotate(360deg); }
+}
