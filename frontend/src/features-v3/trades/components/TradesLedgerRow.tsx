@@ -11,6 +11,7 @@ interface TradesLedgerRowProps {
 }
 
 export function TradesLedgerRow({ trade, onSelectTrade }: TradesLedgerRowProps) {
+  const chips = [trade.exchange, trade.product_type].filter(v => v && v !== 'UNKNOWN')
   return (
     <tr>
       <td>
@@ -23,6 +24,9 @@ export function TradesLedgerRow({ trade, onSelectTrade }: TradesLedgerRowProps) 
         <div className="tjv3-trades__status-stack">
           <span>{getTradeDirection(trade)}</span>
           <TradeStatusPill trade={trade} />
+          {chips.length > 0 && (
+            <small className="tjv3-trades__meta-chips">{chips.join(' · ')}</small>
+          )}
         </div>
       </td>
       <td>

@@ -40,6 +40,40 @@ class TradeBase(BaseModel):
     import_source: Optional[str] = Field(None, description="Source of import (broker_csv, dhan_sync, dhan_webhook)")
     import_fingerprint: Optional[str] = Field(None, description="SHA-256 fingerprint for deduplication")
     external_order_id: Optional[str] = Field(None, description="Broker order/trade ID")
+    exchange: Optional[str] = Field("UNKNOWN", description="NSE, BSE, or UNKNOWN")
+    segment: Optional[str] = Field("UNKNOWN", description="EQUITY, EQUITY_FNO, COMMODITY, CURRENCY, or UNKNOWN")
+    product_type: Optional[str] = Field("UNKNOWN", description="DELIVERY, INTRADAY, MTF, FNO, or UNKNOWN")
+    executed_order_count: Optional[int] = Field(None, description="Broker executed order count override", ge=1)
+
+    @field_validator("exchange")
+    @classmethod
+    def validate_exchange(cls, v):
+        if v is None:
+            return "UNKNOWN"
+        allowed = {"NSE", "BSE", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"exchange must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("segment")
+    @classmethod
+    def validate_segment(cls, v):
+        if v is None:
+            return "UNKNOWN"
+        allowed = {"EQUITY", "EQUITY_FNO", "COMMODITY", "CURRENCY", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"segment must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("product_type")
+    @classmethod
+    def validate_product_type(cls, v):
+        if v is None:
+            return "UNKNOWN"
+        allowed = {"DELIVERY", "INTRADAY", "MTF", "FNO", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"product_type must be one of: {', '.join(sorted(allowed))}")
+        return v
 
     @field_validator("direction")
     @classmethod
@@ -99,6 +133,10 @@ class TradeUpdate(BaseModel):
     review_tags: Optional[List[str]] = None
     exit_notes: Optional[str] = None
     exit_reason: Optional[str] = None
+    exchange: Optional[str] = None
+    segment: Optional[str] = None
+    product_type: Optional[str] = None
+    executed_order_count: Optional[int] = Field(None, ge=1)
 
     @field_validator("direction")
     @classmethod
@@ -130,6 +168,36 @@ class TradeUpdate(BaseModel):
     @classmethod
     def ensure_decimal(cls, v):
         return ensure_decimal(v)
+
+    @field_validator("exchange")
+    @classmethod
+    def validate_exchange_update(cls, v):
+        if v is None:
+            return v
+        allowed = {"NSE", "BSE", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"exchange must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("segment")
+    @classmethod
+    def validate_segment_update(cls, v):
+        if v is None:
+            return v
+        allowed = {"EQUITY", "EQUITY_FNO", "COMMODITY", "CURRENCY", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"segment must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("product_type")
+    @classmethod
+    def validate_product_type_update(cls, v):
+        if v is None:
+            return v
+        allowed = {"DELIVERY", "INTRADAY", "MTF", "FNO", "UNKNOWN"}
+        if v not in allowed:
+            raise ValueError(f"product_type must be one of: {', '.join(sorted(allowed))}")
+        return v
 
 
 class TradeResponse(BaseModel):
@@ -165,6 +233,10 @@ class TradeResponse(BaseModel):
     partial_realized_pnl: Optional[Decimal] = None
     unrealized_pnl: Optional[Decimal] = None
     weighted_avg_exit_price: Optional[Decimal] = None
+    exchange: str = "UNKNOWN"
+    segment: str = "UNKNOWN"
+    product_type: str = "UNKNOWN"
+    executed_order_count: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -70,6 +70,8 @@ export function DhanEstimatePanel({ actualTotal, onUseAsDraft, currentEntryMode,
     setBuyTurnover(String(deriveResult.inputs.buyTurnover))
     setSellTurnover(String(deriveResult.inputs.sellTurnover))
     setOrderCount(String(deriveResult.inputs.executedOrderCount))
+    if (deriveResult.inputs.exchange) setExchange(deriveResult.inputs.exchange)
+    if (deriveResult.inputs.productType) setProductType(deriveResult.inputs.productType)
   }, [deriveResult])
 
   const handleCalculate = useCallback(() => {

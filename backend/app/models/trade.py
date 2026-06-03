@@ -55,6 +55,12 @@ class Trade(Base):
     import_fingerprint = Column(String(64))
     external_order_id = Column(String(100))
 
+    # Market metadata
+    exchange = Column(String(20), nullable=False, default='UNKNOWN')
+    segment = Column(String(30), nullable=False, default='UNKNOWN')
+    product_type = Column(String(30), nullable=False, default='UNKNOWN')
+    executed_order_count = Column(Integer, nullable=True)
+
     # Timestamps (auto-managed)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

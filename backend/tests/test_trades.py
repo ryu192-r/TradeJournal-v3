@@ -289,3 +289,93 @@ def test_broker_import_response_shape(client, auth_user_token):
     data = resp.json()
     assert "preview" in data, "Response must have a preview key"
     assert isinstance(data["preview"], list)
+
+
+# ── Market metadata tests ──
+
+
+def test_create_trade_with_metadata(client, auth_user_token):
+    resp = _create(client, auth_user_token, exchange="NSE", segment="EQUITY", product_type="INTRADAY", executed_order_count=3)
+    assert resp.status_code in (200, 201), resp.text
+    trade = resp.json().get("data", resp.json())
+    assert trade["exchange"] == "NSE"
+    assert trade["segment"] == "EQUITY"
+    assert trade["product_type"] == "INTRADAY"
+    assert trade["executed_order_count"] == 3
+
+
+def test_create_trade_without_metadata_defaults(client, auth_user_token):
+    resp = _create(client, auth_user_token)
+    assert resp.status_code in (200, 201), resp.text
+    trade = resp.json().get("data", resp.json())
+    assert trade["exchange"] == "UNKNOWN"
+    assert trade["segment"] == "UNKNOWN"
+    assert trade["product_type"] == "UNKNOWN"
+    assert trade["executed_order_count"] is None
+
+
+def test_update_trade_metadata(client, auth_user_token):
+    r = _create(client, auth_user_token)
+    trade_id = r.json().get("data", r.json())["id"]
+    resp = _update(client, auth_user_token, trade_id, exchange="BSE", segment="EQUITY_FNO", product_type="FNO", executed_order_count=5)
+    assert resp.status_code == 200, resp.text
+    trade = resp.json().get("data", resp.json())
+    assert trade["exchange"] == "BSE"
+    assert trade["segment"] == "EQUITY_FNO"
+    assert trade["product_type"] == "FNO"
+    assert trade["executed_order_count"] == 5
+
+
+def test_invalid_exchange_rejected(client, auth_user_token):
+    resp = _create(client, auth_user_token, exchange="INVALID")
+    assert resp.status_code == 422
+
+
+def test_invalid_segment_rejected(client, auth_user_token):
+    resp = _create(client, auth_user_token, segment="INVALID")
+    assert resp.status_code == 422
+
+
+def test_invalid_product_type_rejected(client, auth_user_token):
+    resp = _create(client, auth_user_token, product_type="INVALID")
+    assert resp.status_code == 422
+
+
+def test_executed_order_count_rejects_zero(client, auth_user_token):
+    resp = _create(client, auth_user_token, executed_order_count=0)
+    assert resp.status_code == 422
+
+
+def test_executed_order_count_rejects_negative(client, auth_user_token):
+    resp = _create(client, auth_user_token, executed_order_count=-1)
+    assert resp.status_code == 422
+
+
+def test_trade_list_includes_metadata(client, auth_user_token):
+    _create(client, auth_user_token, exchange="NSE", segment="EQUITY", product_type="DELIVERY")
+    resp = _list(client, auth_user_token)
+    items = resp.json()["items"]
+    assert len(items) > 0
+    trade = items[0]
+    assert "exchange" in trade
+    assert "segment" in trade
+    assert "product_type" in trade
+    assert "executed_order_count" in trade
+
+
+def test_trade_detail_includes_metadata(client, auth_user_token):
+    r = _create(client, auth_user_token, exchange="BSE", product_type="MTF")
+    trade_id = r.json().get("data", r.json())["id"]
+    resp = _get(client, auth_user_token, trade_id)
+    assert resp.status_code == 200
+    trade = resp.json().get("data", resp.json())
+    assert trade["exchange"] == "BSE"
+    assert trade["product_type"] == "MTF"
+
+
+def test_metadata_does_not_affect_pnl(client, auth_user_token):
+    r1 = _create(client, auth_user_token, entry_price=100, exit_price=110, quantity=10, exchange="NSE", product_type="INTRADAY")
+    r2 = _create(client, auth_user_token, entry_price=100, exit_price=110, quantity=10, entry_time="2025-01-14T09:30:00")
+    t1 = r1.json().get("data", r1.json())
+    t2 = r2.json().get("data", r2.json())
+    assert t1["pnl"] == t2["pnl"]

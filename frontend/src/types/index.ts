@@ -79,6 +79,10 @@ export interface ApiTrade {
   partial_realized_pnl?: string | null
   unrealized_pnl?: string | null
   weighted_avg_exit_price?: string | null
+  exchange?: string
+  segment?: string
+  product_type?: string
+  executed_order_count?: number | null
 }
 
 export interface ApiTradeListResponse {
