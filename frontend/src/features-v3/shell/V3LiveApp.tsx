@@ -6,19 +6,39 @@ import { useAppStore } from '@/store/appStore'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
-import { TradeDetailV3Page } from '../trade-detail'
-import { ChargesLedgerPage } from '../charges'
-import { TradeFormV3Page } from '../trade-form'
-import { ReviewV3Page } from '../review'
-import { AnalyticsV3Page } from '../analytics'
-import { ReportsV3Page } from '../reports'
-import { PlaybookV3Page } from '../playbook'
-import { ImportV3Page } from '../import'
-import { SettingsV3Page } from '../settings'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
 import type { V3PreviewSectionId, V3ShellMode } from './V3Shell.types'
 import { activeViewToV3Section, v3SectionToActiveView } from './v3ViewMapping'
+
+// Heavy V3 pages — lazy to keep V3LiveApp chunk small.
+const TradeDetailV3Page = lazy(() =>
+  import('../trade-detail').then((m) => ({ default: m.TradeDetailV3Page })),
+)
+const ChargesLedgerPage = lazy(() =>
+  import('../charges').then((m) => ({ default: m.ChargesLedgerPage })),
+)
+const TradeFormV3Page = lazy(() =>
+  import('../trade-form').then((m) => ({ default: m.TradeFormV3Page })),
+)
+const ReviewV3Page = lazy(() =>
+  import('../review').then((m) => ({ default: m.ReviewV3Page })),
+)
+const AnalyticsV3Page = lazy(() =>
+  import('../analytics').then((m) => ({ default: m.AnalyticsV3Page })),
+)
+const ReportsV3Page = lazy(() =>
+  import('../reports').then((m) => ({ default: m.ReportsV3Page })),
+)
+const PlaybookV3Page = lazy(() =>
+  import('../playbook').then((m) => ({ default: m.PlaybookV3Page })),
+)
+const ImportV3Page = lazy(() =>
+  import('../import').then((m) => ({ default: m.ImportV3Page })),
+)
+const SettingsV3Page = lazy(() =>
+  import('../settings').then((m) => ({ default: m.SettingsV3Page })),
+)
 
 const SetupPlaybookPage = lazy(() =>
   import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
@@ -52,8 +72,6 @@ const CoachingIntelligencePage = lazy(() =>
 const EdgeCommandCenterPage = lazy(() =>
   import('@/pages/EdgeCommandCenterPage').then((m) => ({ default: m.EdgeCommandCenterPage })),
 )
-const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
-const TradesPage = lazy(() => import('@/pages/TradesPage').then((m) => ({ default: m.TradesPage })))
 
 function ViewFallback() {
   return (
@@ -382,26 +400,5 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     >
       <Suspense fallback={<ViewFallback />}>{renderContent()}</Suspense>
     </V3Shell>
-  )
-}
-
-/** Internal fallback pages kept available for future debug routes. */
-export function V3LegacyDashboardFallback() {
-  return (
-    <div className="tjv3-legacy-embed">
-      <ErrorBoundary name="LegacyDashboard">
-        <DashboardPage />
-      </ErrorBoundary>
-    </div>
-  )
-}
-
-export function V3LegacyTradesFallback() {
-  return (
-    <div className="tjv3-legacy-embed">
-      <ErrorBoundary name="LegacyTrades">
-        <TradesPage />
-      </ErrorBoundary>
-    </div>
   )
 }

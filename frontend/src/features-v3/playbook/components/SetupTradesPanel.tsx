@@ -60,7 +60,8 @@ export function SetupTradesPanel({ trades, onOpenTrade, onReviewTrade }: SetupTr
       title="Trades"
       description={trades.length > MAX_ROWS ? `Showing latest ${MAX_ROWS} of ${trades.length}.` : `${trades.length} trade${trades.length === 1 ? '' : 's'}.`}
     >
-      <Stack gap="xs">
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+      <Stack gap="xs" style={{ minWidth: '34rem' }}>
         <div
           style={{
             display: 'grid',
@@ -138,6 +139,7 @@ export function SetupTradesPanel({ trades, onOpenTrade, onReviewTrade }: SetupTr
           )
         })}
       </Stack>
+      </div>
     </Panel>
   )
 }
