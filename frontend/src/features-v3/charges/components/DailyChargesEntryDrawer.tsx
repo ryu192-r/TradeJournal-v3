@@ -166,6 +166,7 @@ export function DailyChargesEntryDrawer({ open, date, mode, onClose, onSaved }: 
               actualTotal={actualTotal}
               onUseAsDraft={handleUseEstimateAsDraft}
               currentEntryMode={form.entry_mode}
+              date={date}
             />
 
             {serverError && (
