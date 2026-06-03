@@ -8,11 +8,12 @@ import { V3Shell } from '../shell/V3Shell'
 
 const mocks = vi.hoisted(() => ({
   fetchMe: vi.fn(),
+  isAuthenticated: true,
 }))
 
 vi.mock('@/store/authStore', () => ({
   useAuthStore: () => ({
-    isAuthenticated: true,
+    isAuthenticated: mocks.isAuthenticated,
     fetchMe: mocks.fetchMe,
   }),
 }))
@@ -49,6 +50,8 @@ vi.mock('@/pages/DashboardPage', () => ({
 describe('V3 shell preview', () => {
   beforeEach(() => {
     mocks.fetchMe.mockClear()
+    mocks.isAuthenticated = true
+    localStorage.clear()
     window.history.pushState({}, '', '/')
   })
 
@@ -115,6 +118,22 @@ describe('V3 shell preview', () => {
     window.history.pushState({}, '', '/v3-preview')
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'V3 Shell Preview', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
+  })
+
+  it('allows dev demo credentials for unauthenticated V3 preview only', async () => {
+    const user = userEvent.setup()
+    mocks.isAuthenticated = false
+    window.history.pushState({}, '', '/v3-preview')
+
+    render(<App />)
+
+    expect(await screen.findByDisplayValue('demo@tradejournal.local')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Preview@123')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Open V3 preview' }))
+
+    expect(await screen.findByRole('heading', { name: 'V3 Shell Preview', level: 1 })).toBeInTheDocument()
+    expect(localStorage.getItem('auth_token')).toBeNull()
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 

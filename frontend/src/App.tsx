@@ -36,7 +36,7 @@ const MarketContextPage = lazy(() => import('@/pages/MarketContextPage').then((m
 const RecommendationsPage = lazy(() => import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })))
 const CoachingIntelligencePage = lazy(() => import('@/pages/CoachingIntelligencePage').then((m) => ({ default: m.CoachingIntelligencePage })))
 const EdgeCommandCenterPage = lazy(() => import('@/pages/EdgeCommandCenterPage').then((m) => ({ default: m.EdgeCommandCenterPage })))
-const V3PreviewPage = lazy(() => import('@/features-v3/preview/V3PreviewPage').then((m) => ({ default: m.V3PreviewPage })))
+const V3PreviewRoute = lazy(() => import('@/features-v3/preview/V3PreviewRoute').then((m) => ({ default: m.V3PreviewRoute })))
 
 // queryClient is shared from src/lib/queryClient.ts — imported by App.tsx and authStore.ts
 // so logout() can clear the cache to prevent stale user data leaks.
@@ -96,15 +96,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!isAuthenticated ? (
-        <Suspense fallback={<ViewFallback />}>
-          <LoginPage />
-        </Suspense>
-      ) : isV3PreviewRoute ? (
+      {isV3PreviewRoute && (isAuthenticated || import.meta.env.DEV) ? (
         <Suspense fallback={<ViewFallback />}>
           <ErrorBoundary name="V3Preview">
-            <V3PreviewPage />
+            <V3PreviewRoute isAuthenticated={isAuthenticated} />
           </ErrorBoundary>
+        </Suspense>
+      ) : !isAuthenticated ? (
+        <Suspense fallback={<ViewFallback />}>
+          <LoginPage />
         </Suspense>
       ) : (
         <>
