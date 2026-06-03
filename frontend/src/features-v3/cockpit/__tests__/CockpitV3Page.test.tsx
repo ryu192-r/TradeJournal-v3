@@ -8,10 +8,15 @@ import type { CockpitV3Data } from '../types'
 
 const mocks = vi.hoisted(() => ({
   useCockpitV3Data: vi.fn(),
+  useDailyChargesSummary: vi.fn(),
 }))
 
 vi.mock('../hooks/useCockpitV3Data', () => ({
   useCockpitV3Data: mocks.useCockpitV3Data,
+}))
+
+vi.mock('../hooks/useDailyChargesSummary', () => ({
+  useDailyChargesSummary: mocks.useDailyChargesSummary,
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {
@@ -43,6 +48,7 @@ function data(overrides: Partial<CockpitV3Data> = {}): CockpitV3Data {
 describe('CockpitV3Page', () => {
   beforeEach(() => {
     mocks.useCockpitV3Data.mockReturnValue(data())
+    mocks.useDailyChargesSummary.mockReturnValue({ data: null, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
   })
 
   it('renders loading state safely', () => {

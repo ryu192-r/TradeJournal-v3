@@ -12,6 +12,7 @@ import { ReviewActionCenter } from './components/ReviewActionCenter'
 import { SetupIntelligence } from './components/SetupIntelligence'
 import { TradingTape } from './components/TradingTape'
 import { useCockpitV3Data } from './hooks/useCockpitV3Data'
+import { useDailyChargesSummary } from './hooks/useDailyChargesSummary'
 import type { CockpitActionItem, CockpitPeriod } from './types'
 import { buildCockpitMetrics } from './utils/cockpitMetrics'
 import './cockpit.css'
@@ -25,6 +26,7 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
   const [selectedTrade, setSelectedTrade] = useState<ApiTrade | null>(null)
   const [selectedActionItem, setSelectedActionItem] = useState<CockpitActionItem | null>(null)
   const data = useCockpitV3Data(dataEnabled)
+  const chargesQuery = useDailyChargesSummary(period, dataEnabled)
 
   const metrics = useMemo(
     () => buildCockpitMetrics(data.trades, period, data.operational),
@@ -113,7 +115,13 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
         </div>
 
         <div className="tjv3-cockpit__module-grid">
-          <ChargesIntelligence metrics={metrics} />
+          <ChargesIntelligence
+            metrics={metrics}
+            summary={chargesQuery.data ?? null}
+            onRefetch={() => {
+              void chargesQuery.refetch()
+            }}
+          />
           <ReviewActionCenter items={metrics.reviewItems} onSelectItem={handleSelectActionItem} />
           <SetupIntelligence setups={metrics.setupSummaries} />
           <AttentionSignals signals={metrics.attentionSignals} />

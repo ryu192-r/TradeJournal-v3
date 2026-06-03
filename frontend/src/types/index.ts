@@ -1238,3 +1238,55 @@ export interface IntelligenceDashboardPayload {
   playbook: IntelligencePlaybookHighlight
   market: IntelligenceMarketHighlight
 }
+
+// ---------------------------------------------------------------------------
+// Daily charges ledger
+// ---------------------------------------------------------------------------
+
+export interface DailyCharges {
+  id: number
+  trade_date: string
+  broker: string | null
+  account_ref: string | null
+  contract_note_ref: string | null
+  brokerage: string
+  stt: string
+  exchange_txn_charges: string
+  sebi_charges: string
+  stamp_duty: string
+  gst: string
+  clearing_charges: string
+  other_charges: string
+  total_charges: string
+  notes: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface DailyChargesDaySummary {
+  trade_date: string
+  gross_realized_pnl: string | null
+  charges_recorded: boolean
+  total_charges: string | null
+  net_realized_pnl: string | null
+  trade_count: number
+}
+
+export interface DailyChargesSummary {
+  start_date: string
+  end_date: string
+  gross_realized_pnl: string | null
+  total_charges: string | null
+  net_realized_pnl: string | null
+  charges_recorded_days: number
+  trading_days: number
+  missing_charge_days: number
+  days: DailyChargesDaySummary[]
+}
+
+export type DailyChargesCreatePayload = Omit<DailyCharges, 'id' | 'total_charges' | 'created_at' | 'updated_at'>
+
+export interface DailyChargesListResponse {
+  total: number
+  items: DailyCharges[]
+}

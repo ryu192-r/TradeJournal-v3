@@ -735,3 +735,28 @@ export function getTradeChartData(tradeId: number, params?: { timeframe?: string
   const qs = searchParams.toString()
   return apiClient.get<import('@/types/chart').TradeChartData>(`/trades/${tradeId}/chart-data${qs ? `?${qs}` : ''}`).then(r => r.data)
 }
+
+// ────────────────────────── Daily Charges ──────────────────────────
+
+export function getDailyChargesByDate(date: string) {
+  return apiClient.get<import('@/types').DailyCharges>(`/daily-charges/${date}`).then(r => r.data)
+}
+
+export function listDailyCharges(startDate?: string, endDate?: string) {
+  const params = new URLSearchParams()
+  if (startDate) params.append('start_date', startDate)
+  if (endDate) params.append('end_date', endDate)
+  return apiClient.get<import('@/types').DailyChargesListResponse>(`/daily-charges/?${params.toString()}`).then(r => r.data)
+}
+
+export function upsertDailyCharges(date: string, payload: import('@/types').DailyChargesCreatePayload) {
+  return apiClient.put<import('@/types').DailyCharges>(`/daily-charges/${date}`, payload).then(r => r.data)
+}
+
+export function deleteDailyCharges(date: string) {
+  return apiClient.delete(`/daily-charges/${date}`).then(() => {})
+}
+
+export function getDailyChargesSummary(startDate: string, endDate: string) {
+  return apiClient.get<import('@/types').DailyChargesSummary>(`/daily-charges/summary?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`).then(r => r.data)
+}
