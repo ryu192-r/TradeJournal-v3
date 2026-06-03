@@ -1,6 +1,6 @@
 import { Button, Page, Stack } from '@/new-ui'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { TradeEntryForm } from '@/components/forms/TradeEntryForm'
+import { TradeFormV3Body } from './TradeFormV3Body'
 import { useCreateTradeMutation, useUpdateTradeMutation, useTradeQuery } from '@/hooks/useTradeMutation'
 import { useAppStore } from '@/store/appStore'
 
@@ -50,7 +50,7 @@ export function TradeFormV3Page({ mode, tradeId }: TradeFormV3PageProps) {
 
   return (
     <Page title={title} subtitle={subtitle} actions={<BackButton onClick={closeTradeForm} />}>
-      <TradeEntryForm
+      <TradeFormV3Body
         mode={mode}
         initialData={mode === 'edit' ? trade : undefined}
         submitFn={

@@ -19,8 +19,8 @@ vi.mock('@/hooks/useTradeMutation', () => ({
   useTradeQuery: () => mocks.tradeQuery,
 }))
 
-vi.mock('@/components/forms/TradeEntryForm', () => ({
-  TradeEntryForm: ({ mode }: { mode: string }) => <div data-testid="trade-entry-form" data-mode={mode} />,
+vi.mock('../TradeFormV3Body', () => ({
+  TradeFormV3Body: ({ mode }: { mode: string }) => <div data-testid="trade-entry-form" data-mode={mode} />,
 }))
 
 describe('TradeFormV3Page', () => {
