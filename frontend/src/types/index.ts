@@ -123,6 +123,8 @@ export interface ApiTradeUpdatePayload {
   r_multiple?: string | null
   status?: BackendTradeStatus
   exit_reason?: string | null
+  review_notes?: string | null
+  review_tags?: string[] | null
 }
 
 export interface DashboardKpi {
