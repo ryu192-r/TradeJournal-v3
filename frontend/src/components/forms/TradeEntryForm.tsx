@@ -29,6 +29,28 @@ const TACTIC_OPTIONS = [
   { value: 'Custom', label: 'Custom' },
 ]
 
+const EXCHANGE_OPTIONS = [
+  { value: 'UNKNOWN', label: 'Unknown' },
+  { value: 'NSE', label: 'NSE' },
+  { value: 'BSE', label: 'BSE' },
+]
+
+const SEGMENT_OPTIONS = [
+  { value: 'UNKNOWN', label: 'Unknown' },
+  { value: 'EQUITY', label: 'Equity' },
+  { value: 'EQUITY_FNO', label: 'Equity F&O' },
+  { value: 'COMMODITY', label: 'Commodity' },
+  { value: 'CURRENCY', label: 'Currency' },
+]
+
+const PRODUCT_TYPE_OPTIONS = [
+  { value: 'UNKNOWN', label: 'Unknown' },
+  { value: 'DELIVERY', label: 'Delivery' },
+  { value: 'INTRADAY', label: 'Intraday' },
+  { value: 'MTF', label: 'MTF' },
+  { value: 'FNO', label: 'F&O' },
+]
+
 interface TradeEntryFormProps {
   mode?: 'create' | 'edit'
   initialData?: ApiTrade
@@ -54,6 +76,10 @@ function apiTradeToFormData(trade: ApiTrade): TradeFormData {
     target_price: trade.target_price != null ? String(trade.target_price) : undefined,
     tags: tagsStr,
     notes: trade.notes || undefined,
+    exchange: trade.exchange || 'UNKNOWN',
+    segment: trade.segment || 'UNKNOWN',
+    product_type: trade.product_type || 'UNKNOWN',
+    executed_order_count: trade.executed_order_count != null ? String(trade.executed_order_count) : undefined,
   }
 }
 
@@ -127,6 +153,10 @@ export function TradeEntryForm({
         target_price: undefined,
         tags: undefined,
         notes: undefined,
+        exchange: 'UNKNOWN',
+        segment: 'UNKNOWN',
+        product_type: 'UNKNOWN',
+        executed_order_count: undefined,
       }
 
   const {
@@ -311,6 +341,42 @@ export function TradeEntryForm({
             <div className="sm:col-span-2">
               <GlassInput label="Tags (comma-separated)" placeholder="e.g. A+, earnings, breakout" {...register('tags')} error={errors.tags?.message} />
             </div>
+          </div>
+        </div>
+
+        {/* ── 5b. Market Details ── */}
+        <div>
+          <SectionTitle icon={Info} title="Market Details" subtitle="Exchange, segment, product type — used for charge estimates" />
+          <div className={inputGrid}>
+            <Controller
+              name="exchange"
+              control={control}
+              render={({ field }) => (
+                <GlassSelect label="Exchange" options={EXCHANGE_OPTIONS} {...field} value={field.value || 'UNKNOWN'} />
+              )}
+            />
+            <Controller
+              name="segment"
+              control={control}
+              render={({ field }) => (
+                <GlassSelect label="Segment" options={SEGMENT_OPTIONS} {...field} value={field.value || 'UNKNOWN'} />
+              )}
+            />
+            <Controller
+              name="product_type"
+              control={control}
+              render={({ field }) => (
+                <GlassSelect label="Product type" options={PRODUCT_TYPE_OPTIONS} {...field} value={field.value || 'UNKNOWN'} />
+              )}
+            />
+            <GlassInput
+              label="Executed order count"
+              type="number"
+              min={1}
+              step={1}
+              placeholder="Optional"
+              {...register('executed_order_count')}
+            />
           </div>
         </div>
 

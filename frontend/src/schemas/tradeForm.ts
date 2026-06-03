@@ -18,6 +18,10 @@ export const tradeFormSchema = z.object({
   target_price: z.string().optional(),
   tags: z.string().optional(),
   notes: z.string().optional(),
+  exchange: z.string().optional(),
+  segment: z.string().optional(),
+  product_type: z.string().optional(),
+  executed_order_count: z.string().optional(),
 })
 
 export type TradeFormData = z.infer<typeof tradeFormSchema>
@@ -83,6 +87,10 @@ export function formDataToApiPayload(
     target_price: data.target_price || null,
     tags: tagsList,
     notes: data.notes || null,
+    exchange: data.exchange || 'UNKNOWN',
+    segment: data.segment || 'UNKNOWN',
+    product_type: data.product_type || 'UNKNOWN',
+    executed_order_count: data.executed_order_count ? parseInt(data.executed_order_count, 10) || null : null,
   }
   if (options?.mode === 'edit') {
     // Single SL field edits current/live stop only. Original risk plan stays stable

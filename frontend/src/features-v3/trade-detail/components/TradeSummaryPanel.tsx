@@ -55,6 +55,10 @@ export function TradeSummaryPanel({ trade }: TradeSummaryPanelProps) {
         />
         <DataRow title="Setup" trailing={<Value value={getTradeSetup(trade)} />} />
         <DataRow title="Fees" trailing={<MoneyValue value={safeNumber(trade.fees)} tone="neutral" />} />
+        <DataRow title="Exchange" trailing={<Value value={trade.exchange && trade.exchange !== 'UNKNOWN' ? trade.exchange : 'Not set'} />} />
+        <DataRow title="Segment" trailing={<Value value={trade.segment && trade.segment !== 'UNKNOWN' ? trade.segment : 'Not set'} />} />
+        <DataRow title="Product type" trailing={<Value value={trade.product_type && trade.product_type !== 'UNKNOWN' ? trade.product_type : 'Not set'} />} />
+        <DataRow title="Executed orders" trailing={<Value value={trade.executed_order_count != null ? String(trade.executed_order_count) : 'Not set'} />} />
         <DataRow title="Charges status" trailing={<Value value="Pending / unavailable" />} />
       </DataList>
     </Panel>

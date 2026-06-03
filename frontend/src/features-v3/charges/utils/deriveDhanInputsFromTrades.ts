@@ -1,4 +1,5 @@
 import type { ApiTrade } from '@/types'
+import type { DhanProductType, DhanExchange } from '../templates/dhan/dhanChargesConfig'
 
 // ────────────────────────── Types ──────────────────────────
 
@@ -8,6 +9,8 @@ export interface DerivedDhanInputs {
   buyTurnover: number
   sellTurnover: number
   executedOrderCount: number
+  exchange?: DhanExchange
+  productType?: DhanProductType
 }
 
 export interface DeriveSourceStats {
@@ -39,6 +42,13 @@ function isEligible(t: ApiTrade): boolean {
   return t.status !== 'deleted'
 }
 
+const PRODUCT_MAP: Record<string, DhanProductType> = {
+  DELIVERY: 'equity_delivery',
+  INTRADAY: 'equity_intraday',
+  MTF: 'equity_mtf',
+  FNO: 'equity_fno',
+}
+
 // ────────────────────────── Main Function ──────────────────────────
 
 /**
@@ -67,7 +77,8 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
 
   let buyTurnover = 0
   let sellTurnover = 0
-  let orderCount = 0
+  let orderCountFromMetadata = 0
+  let orderCountEstimated = 0
   let closedCount = 0
   let partialCount = 0
   let skippedCount = 0
@@ -75,6 +86,10 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
   let missingQuantityCount = 0
   const warnings: string[] = []
   const assumptions: string[] = []
+
+  // Track metadata for derivation
+  const exchanges = new Set<string>()
+  const productTypes = new Set<string>()
 
   for (const trade of eligible) {
     const entryPrice = safeNum(trade.entry_price)
@@ -91,9 +106,19 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
       continue
     }
 
+    // Collect metadata
+    if (trade.exchange && trade.exchange !== 'UNKNOWN') exchanges.add(trade.exchange)
+    if (trade.product_type && trade.product_type !== 'UNKNOWN') productTypes.add(trade.product_type)
+
     // Buy side: entry_price * quantity (all trades are LONG)
     buyTurnover += entryPrice * qty
-    orderCount++ // 1 order for entry
+
+    // Order count: prefer executed_order_count metadata when available
+    if (trade.executed_order_count != null && trade.executed_order_count > 0) {
+      orderCountFromMetadata += trade.executed_order_count
+    } else {
+      orderCountEstimated++ // 1 for entry
+    }
 
     // Sell side: depends on exit status
     const exitPrice = safeNum(trade.exit_price)
@@ -108,19 +133,37 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
         if (closedQty > 0) {
           sellTurnover += exitPrice * closedQty
           partialCount++
-          orderCount++ // at least 1 exit order
+          if (!trade.executed_order_count) orderCountEstimated++ // 1 exit order
         }
       } else {
         // Fully closed
         sellTurnover += exitPrice * qty
         closedCount++
-        orderCount++ // 1 exit order
+        if (!trade.executed_order_count) orderCountEstimated++ // 1 exit order
       }
     } else if (remainingQty !== null && Number.isFinite(remainingQty) && remainingQty < qty) {
-      // Has partial exits but no final exit_price — partial exit turnover cannot be fully derived
       partialCount++
     }
-    // Open trade with no exit: only buy side counted, no sell order
+  }
+
+  const orderCount = orderCountFromMetadata + orderCountEstimated
+
+  // Derive exchange
+  let derivedExchange: DhanExchange | undefined
+  if (exchanges.size === 1) {
+    const ex = [...exchanges][0]
+    if (ex === 'NSE' || ex === 'BSE') derivedExchange = ex
+  } else if (exchanges.size > 1) {
+    warnings.push('Mixed exchanges detected — select exchange manually.')
+  }
+
+  // Derive product type
+  let derivedProductType: DhanProductType | undefined
+  if (productTypes.size === 1) {
+    const pt = [...productTypes][0]
+    if (pt in PRODUCT_MAP) derivedProductType = PRODUCT_MAP[pt]
+  } else if (productTypes.size > 1) {
+    warnings.push('Mixed product types detected — select product type manually.')
   }
 
   // Determine confidence
@@ -145,8 +188,18 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
     warnings.push(`${skippedCount} trade(s) skipped due to missing price or quantity.`)
   }
 
-  assumptions.push('Exchange and product type cannot be derived from trade records — select manually.')
-  assumptions.push('Order count is estimated (1 entry + 1 exit per trade). Actual broker order count may differ.')
+  if (!derivedExchange && exchanges.size === 0) {
+    assumptions.push('Exchange not set on trades — select manually.')
+  }
+  if (!derivedProductType && productTypes.size === 0) {
+    assumptions.push('Product type not set on trades — select manually.')
+  }
+
+  if (orderCountFromMetadata > 0 && orderCountEstimated > 0) {
+    assumptions.push('Order count mixes broker metadata and estimates for trades without metadata.')
+  } else if (orderCountFromMetadata === 0) {
+    assumptions.push('Order count is estimated (1 entry + 1 exit per trade). Actual broker order count may differ.')
+  }
 
   if (totalProcessed > 0 && closedCount + partialCount < totalProcessed) {
     assumptions.push('Open trades contribute buy turnover only (no sell side).')
@@ -157,6 +210,8 @@ export function deriveDhanEstimateInputsFromTrades(trades: ApiTrade[]): DeriveRe
       buyTurnover: Math.round(buyTurnover * 100) / 100,
       sellTurnover: Math.round(sellTurnover * 100) / 100,
       executedOrderCount: orderCount,
+      exchange: derivedExchange,
+      productType: derivedProductType,
     },
     confidence,
     warnings,

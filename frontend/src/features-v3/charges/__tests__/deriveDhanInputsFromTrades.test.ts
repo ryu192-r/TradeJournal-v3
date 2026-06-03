@@ -155,14 +155,78 @@ describe('deriveDhanEstimateInputsFromTrades', () => {
     expect(result.confidence).toBe('unavailable')
   })
 
-  it('always warns about exchange and product type', () => {
+  it('warns about exchange/product type when not set on trades', () => {
     const result = deriveDhanEstimateInputsFromTrades([makeTrade()])
-    expect(result.assumptions.some(a => /exchange/i.test(a) && /product type/i.test(a))).toBe(true)
+    expect(result.assumptions.some(a => /exchange/i.test(a))).toBe(true)
+    expect(result.assumptions.some(a => /product type/i.test(a))).toBe(true)
   })
 
   it('always warns about order count approximation', () => {
     const result = deriveDhanEstimateInputsFromTrades([makeTrade()])
     expect(result.assumptions.some(a => /order count/i.test(a))).toBe(true)
+  })
+
+  it('derives exchange when all trades share same exchange', () => {
+    const trades = [
+      makeTrade({ id: 1, exchange: 'NSE' }),
+      makeTrade({ id: 2, exchange: 'NSE' }),
+    ]
+    const result = deriveDhanEstimateInputsFromTrades(trades)
+    expect(result.inputs.exchange).toBe('NSE')
+  })
+
+  it('warns on mixed exchange', () => {
+    const trades = [
+      makeTrade({ id: 1, exchange: 'NSE' }),
+      makeTrade({ id: 2, exchange: 'BSE' }),
+    ]
+    const result = deriveDhanEstimateInputsFromTrades(trades)
+    expect(result.inputs.exchange).toBeUndefined()
+    expect(result.warnings.some(w => /mixed exchange/i.test(w))).toBe(true)
+  })
+
+  it('does not derive exchange when all UNKNOWN', () => {
+    const result = deriveDhanEstimateInputsFromTrades([makeTrade({ exchange: 'UNKNOWN' })])
+    expect(result.inputs.exchange).toBeUndefined()
+  })
+
+  it('maps product_type INTRADAY to equity_intraday', () => {
+    const result = deriveDhanEstimateInputsFromTrades([makeTrade({ product_type: 'INTRADAY' })])
+    expect(result.inputs.productType).toBe('equity_intraday')
+  })
+
+  it('maps product_type DELIVERY to equity_delivery', () => {
+    const result = deriveDhanEstimateInputsFromTrades([makeTrade({ product_type: 'DELIVERY' })])
+    expect(result.inputs.productType).toBe('equity_delivery')
+  })
+
+  it('warns on mixed product types', () => {
+    const trades = [
+      makeTrade({ id: 1, product_type: 'INTRADAY' }),
+      makeTrade({ id: 2, product_type: 'DELIVERY' }),
+    ]
+    const result = deriveDhanEstimateInputsFromTrades(trades)
+    expect(result.inputs.productType).toBeUndefined()
+    expect(result.warnings.some(w => /mixed product/i.test(w))).toBe(true)
+  })
+
+  it('uses executed_order_count from metadata when available', () => {
+    const trades = [
+      makeTrade({ id: 1, executed_order_count: 4 }),
+      makeTrade({ id: 2, executed_order_count: 3 }),
+    ]
+    const result = deriveDhanEstimateInputsFromTrades(trades)
+    expect(result.inputs.executedOrderCount).toBe(7) // 4 + 3
+  })
+
+  it('mixes metadata and estimated order count with warning', () => {
+    const trades = [
+      makeTrade({ id: 1, executed_order_count: 4 }),
+      makeTrade({ id: 2 }), // no metadata — estimated as 2 (entry+exit)
+    ]
+    const result = deriveDhanEstimateInputsFromTrades(trades)
+    expect(result.inputs.executedOrderCount).toBe(6) // 4 + 2
+    expect(result.assumptions.some(a => /mixes/i.test(a))).toBe(true)
   })
 
   it('handles partial trade with no exit_price but reduced remaining_qty', () => {
