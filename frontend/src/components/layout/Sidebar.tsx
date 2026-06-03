@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { MoreHorizontal, PanelLeft, Sparkles } from 'lucide-react'
+import { Eye, MoreHorizontal, PanelLeft, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
@@ -15,6 +15,46 @@ import {
 } from '@/app/navigation'
 import { interfaceModeLabel, isProMode } from '@/app/interfaceMode'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+
+const V3_PREVIEW_HREF = '/v3-preview'
+const V3_PREVIEW_LABEL = 'V3 Preview'
+
+function V3PreviewLink({ className }: { className?: string }) {
+  return (
+    <a
+      href={V3_PREVIEW_HREF}
+      className={cn(
+        'flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-transparent px-[.8125rem] py-[.625rem] text-[.8125rem] font-medium text-text opacity-75 transition-all duration-[120ms] ease-out hover:border-accent/20 hover:bg-accent-faint hover:text-text-heading hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-low',
+        className
+      )}
+      title="Open the V3 design system preview (Cockpit + Trades)."
+      aria-label={V3_PREVIEW_LABEL}
+    >
+      <Eye className="h-[15px] w-[15px] shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{V3_PREVIEW_LABEL}</span>
+      <span className="shrink-0 rounded-full border border-accent/15 bg-accent-faint px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-accent">
+        Preview
+      </span>
+    </a>
+  )
+}
+
+function V3PreviewMobileLink({ onAfterNavigate }: { onAfterNavigate?: () => void }) {
+  return (
+    <a
+      href={V3_PREVIEW_HREF}
+      onClick={() => onAfterNavigate?.()}
+      className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-text transition-colors hover:bg-accent-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-card"
+      aria-label={V3_PREVIEW_LABEL}
+    >
+      <Eye className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{V3_PREVIEW_LABEL}</span>
+      <span className="shrink-0 rounded-full border border-accent/15 bg-accent-faint px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-accent">
+        Preview
+      </span>
+    </a>
+  )
+}
 
 function isSelectableView(value: string): value is ActiveView {
   return Boolean(viewMeta[value as ActiveView])
@@ -107,6 +147,13 @@ export function DesktopSidebar() {
               </div>
             </div>
           ))}
+
+          <div className="mt-2 border-t border-border pt-2">
+            <div className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-faint">
+              Preview
+            </div>
+            <V3PreviewLink />
+          </div>
         </nav>
 
         <div className="flex items-center gap-3 border-t border-border px-5 pb-[.875rem] pt-3.5">
@@ -261,6 +308,11 @@ export function MobileBottomNav() {
               ))}
             </div>
           )}
+
+          <div className="mt-2 border-t border-border pt-2">
+            <div className="px-3 pb-1 text-[10px] font-data uppercase tracking-wider text-text-faint">Preview</div>
+            <V3PreviewMobileLink onAfterNavigate={() => setMoreSheetOpen(false)} />
+          </div>
         </div>
       </BottomSheet>
     </>

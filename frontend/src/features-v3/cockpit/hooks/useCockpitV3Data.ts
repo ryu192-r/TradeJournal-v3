@@ -22,8 +22,8 @@ export function useCockpitV3Data(enabled = true): CockpitV3Data {
     enabled,
   })
   const trades = useQuery<unknown>({
-    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 250 }],
-    queryFn: () => listTrades({ limit: 250 }),
+    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 200 }],
+    queryFn: () => listTrades({ limit: 200 }),
     placeholderData: (previousData: unknown) => previousData,
     enabled,
   })

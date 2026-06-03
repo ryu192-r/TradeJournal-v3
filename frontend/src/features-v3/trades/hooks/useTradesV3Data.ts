@@ -7,8 +7,8 @@ import type { TradesV3Data } from '../types'
 export function useTradesV3Data(enabled = true): TradesV3Data {
   const queryClient = useQueryClient()
   const trades = useQuery<unknown>({
-    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 500 }],
-    queryFn: () => listTrades({ limit: 500 }),
+    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 200 }],
+    queryFn: () => listTrades({ limit: 200 }),
     placeholderData: (previousData: unknown) => previousData,
     enabled,
   })
