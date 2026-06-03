@@ -11,6 +11,7 @@ import { ChargesLedgerPage } from '../charges'
 import { TradeFormV3Page } from '../trade-form'
 import { ReviewV3Page } from '../review'
 import { AnalyticsV3Page } from '../analytics'
+import { ReportsV3Page } from '../reports'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -20,7 +21,6 @@ import { activeViewToV3Section, v3SectionToActiveView } from './v3ViewMapping'
 const SetupPlaybookPage = lazy(() =>
   import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
 )
-const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
 const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
@@ -204,11 +204,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'reports':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Reports">
-              <ReportsPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="ReportsV3">
+            <ReportsV3Page dataEnabled />
+          </ErrorBoundary>
         )
       case 'charges':
         return (
