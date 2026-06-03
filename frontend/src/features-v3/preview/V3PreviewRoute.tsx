@@ -10,7 +10,7 @@ export function V3PreviewRoute({ isAuthenticated }: V3PreviewRouteProps) {
   const [demoUnlocked, setDemoUnlocked] = useState(() => localStorage.getItem('tjv3_preview_demo') === 'enabled')
 
   if (isAuthenticated || demoUnlocked) {
-    return <V3PreviewPage />
+    return <V3PreviewPage dataEnabled={isAuthenticated} />
   }
 
   return <V3PreviewDemoLogin onUnlock={() => setDemoUnlocked(true)} />

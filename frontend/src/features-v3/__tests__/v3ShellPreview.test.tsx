@@ -43,6 +43,15 @@ vi.mock('@/components/ui/InstallPrompt', () => ({
   InstallPrompt: () => null,
 }))
 
+vi.mock('../cockpit', () => ({
+  CockpitV3Page: () => (
+    <div>
+      <h1>Cockpit</h1>
+      <div>Cockpit v3 mock</div>
+    </div>
+  ),
+}))
+
 vi.mock('@/pages/DashboardPage', () => ({
   DashboardPage: () => <div>Legacy dashboard mock</div>,
 }))
@@ -57,7 +66,7 @@ describe('V3 shell preview', () => {
 
   it('renders V3PreviewPage', () => {
     render(<V3PreviewPage />)
-    expect(screen.getByRole('heading', { name: 'V3 Shell Preview', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cockpit', level: 1 })).toBeInTheDocument()
   })
 
   it('renders V3Shell sidebar, topbar, and content', () => {
@@ -74,7 +83,7 @@ describe('V3 shell preview', () => {
 
   it('renders preview route content', () => {
     render(<V3PreviewPage />)
-    expect(screen.getByText('Isolated rebuild shell for the next TradeJournal interface.')).toBeInTheDocument()
+    expect(screen.getByText('Cockpit v3 mock')).toBeInTheDocument()
   })
 
   it('renders desktop nav labels', () => {
@@ -99,14 +108,14 @@ describe('V3 shell preview', () => {
     expect(screen.queryByText(/open p&l/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/win rate/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/live account/i)).not.toBeInTheDocument()
-    expect(screen.getAllByText('No production data connected').length).toBeGreaterThan(0)
-    expect(screen.getByText('Static formatting demo, not account data.')).toBeInTheDocument()
+    expect(screen.getByText('Cockpit v3 mock')).toBeInTheDocument()
   })
 
   it('opens and closes drawer preview', async () => {
     const user = userEvent.setup()
     render(<V3PreviewPage />)
 
+    await user.click(screen.getAllByRole('button', { name: /Trades/ })[0])
     await user.click(screen.getByRole('button', { name: 'Open drawer preview' }))
     expect(screen.getByRole('dialog', { name: 'V3 drawer preview' })).toBeInTheDocument()
 
@@ -117,7 +126,7 @@ describe('V3 shell preview', () => {
   it('renders V3 preview route without legacy shell', async () => {
     window.history.pushState({}, '', '/v3-preview')
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'V3 Shell Preview', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Cockpit', level: 1 })).toBeInTheDocument()
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
 
@@ -132,7 +141,7 @@ describe('V3 shell preview', () => {
     expect(screen.getByDisplayValue('Preview@123')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Open V3 preview' }))
 
-    expect(await screen.findByRole('heading', { name: 'V3 Shell Preview', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Cockpit', level: 1 })).toBeInTheDocument()
     expect(localStorage.getItem('auth_token')).toBeNull()
     expect(screen.queryByTestId('legacy-shell')).not.toBeInTheDocument()
   })
