@@ -9,6 +9,7 @@ import { TradesV3Page } from '../trades'
 import { TradeDetailV3Page } from '../trade-detail'
 import { ChargesLedgerPage } from '../charges'
 import { TradeFormV3Page } from '../trade-form'
+import { ReviewV3Page } from '../review'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -184,11 +185,16 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           </ErrorBoundary>
         )
       case 'review':
+        return (
+          <ErrorBoundary name="ReviewV3">
+            <ReviewV3Page dataEnabled />
+          </ErrorBoundary>
+        )
       case 'analytics':
         return (
           <div className="tjv3-legacy-embed">
             <ErrorBoundary name="ReviewAnalytics">
-              <ReviewAnalyticsPage defaultTab={activeView === 'analytics' ? 'overview' : 'queue'} />
+              <ReviewAnalyticsPage defaultTab="overview" />
             </ErrorBoundary>
           </div>
         )

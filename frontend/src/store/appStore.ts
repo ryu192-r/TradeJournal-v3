@@ -39,6 +39,9 @@ interface AppState {
   openDetailTrade: (id: number) => void
   closeTradeForm: () => void
 
+  reviewTargetId: number | null
+  openReviewTrade: (id: number) => void
+
   theme: 'dark' | 'light'
   toggleTheme: () => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -98,6 +101,12 @@ export const useAppStore = create<AppState>()(
       openEditTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'edit', selectedTradeId: id }),
       openDetailTrade: (id) => set({ activeView: 'trades', tradeFormMode: 'detail', selectedTradeId: id }),
       closeTradeForm: () => set({ tradeFormMode: 'list', selectedTradeId: null }),
+
+      reviewTargetId: null,
+      openReviewTrade: (id) => {
+        storeReviewTab('queue')
+        set({ activeView: 'review', tradeFormMode: 'list', selectedTradeId: null, reviewTargetId: id })
+      },
 
       theme: getSystemTheme(),
       toggleTheme: () => {
