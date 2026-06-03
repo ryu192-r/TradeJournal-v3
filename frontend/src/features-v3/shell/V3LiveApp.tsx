@@ -12,6 +12,7 @@ import { TradeFormV3Page } from '../trade-form'
 import { ReviewV3Page } from '../review'
 import { AnalyticsV3Page } from '../analytics'
 import { ReportsV3Page } from '../reports'
+import { PlaybookV3Page } from '../playbook'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -78,12 +79,19 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
   } = useAppStore()
   const [sectionOverride, setSectionOverride] = useState<V3PreviewSectionId | null>(null)
   const [legacyDetailFallback, setLegacyDetailFallback] = useState(false)
+  const [legacyPlaybookFallback, setLegacyPlaybookFallback] = useState(false)
 
   useEffect(() => {
     if (tradeFormMode !== 'detail') {
       setLegacyDetailFallback(false)
     }
   }, [tradeFormMode])
+
+  useEffect(() => {
+    if (activeView !== 'playbook') {
+      setLegacyPlaybookFallback(false)
+    }
+  }, [activeView])
 
   const activeSection = useMemo(
     () => activeViewToV3Section(activeView, tradeFormMode, sectionOverride),
@@ -195,12 +203,22 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           </ErrorBoundary>
         )
       case 'playbook':
+        if (legacyPlaybookFallback) {
+          return (
+            <div className="tjv3-legacy-embed">
+              <ErrorBoundary name="LegacyPlaybook">
+                <SetupPlaybookPage />
+              </ErrorBoundary>
+            </div>
+          )
+        }
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Playbook">
-              <SetupPlaybookPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="PlaybookV3">
+            <PlaybookV3Page
+              dataEnabled
+              onOpenLegacy={() => setLegacyPlaybookFallback(true)}
+            />
+          </ErrorBoundary>
         )
       case 'reports':
         return (
