@@ -1,6 +1,6 @@
-const CACHE = 'tj-v3-v4'
+const CACHE = 'tj-v3-v5'
 const STATIC_URLS = ['/', '/index.html', '/manifest.json']
-const API_CACHE = 'tj-v3-api-v1'
+const API_CACHE = 'tj-v3-api-v2'
 
 // Install: cache static assets
 self.addEventListener('install', (e) => {
