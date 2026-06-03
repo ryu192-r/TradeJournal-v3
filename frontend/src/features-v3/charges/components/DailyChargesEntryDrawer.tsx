@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Drawer, Stack } from '@/new-ui'
 import { getDailyChargesByDate, upsertDailyCharges } from '@/lib/endpoints'
 import type { DailyCharges } from '@/types'
+import type { DhanEstimateResult } from '../templates/dhan/dhanChargesTypes'
 import {
   ChargesFormData,
   ChargesFormErrors,
@@ -10,11 +11,13 @@ import {
   formDataToPayload,
   validateChargesForm,
   computeBreakdownTotal,
+  applyEstimateToFormData,
 } from '../utils/chargesFormUtils'
 import { ChargesModeToggle } from './ChargesModeToggle'
 import { ChargesBreakdownFields } from './ChargesBreakdownFields'
 import { ChargesTotalOnlyFields } from './ChargesTotalOnlyFields'
 import { formatChargesDateLabel } from '../utils/chargesFormUtils'
+import { DhanEstimatePanel } from './DhanEstimatePanel'
 
 interface DailyChargesEntryDrawerProps {
   open: boolean
@@ -30,11 +33,13 @@ export function DailyChargesEntryDrawer({ open, date, mode, onClose, onSaved }: 
   const [form, setForm] = useState<ChargesFormData>(emptyChargesForm)
   const [errors, setErrors] = useState<ChargesFormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
+  const [actualTotal, setActualTotal] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !date) return
     setServerError(null)
     setErrors({})
+    setActualTotal(null)
     if (mode === 'add') {
       setLoading(false)
       setForm({ ...emptyChargesForm, trade_date: date })
@@ -44,6 +49,7 @@ export function DailyChargesEntryDrawer({ open, date, mode, onClose, onSaved }: 
     getDailyChargesByDate(date)
       .then((data: DailyCharges) => {
         setForm(dailyChargesToFormData(data, date))
+        setActualTotal(data.total_charges)
       })
       .catch(() => {
         setForm({ ...emptyChargesForm, trade_date: date })
@@ -53,6 +59,10 @@ export function DailyChargesEntryDrawer({ open, date, mode, onClose, onSaved }: 
 
   const handleChange = useCallback((field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleUseEstimateAsDraft = useCallback((estimate: DhanEstimateResult) => {
+    setForm((prev) => applyEstimateToFormData(prev, estimate))
   }, [])
 
   const computedTotal = useMemo(() => computeBreakdownTotal(form), [form])
@@ -151,6 +161,12 @@ export function DailyChargesEntryDrawer({ open, date, mode, onClose, onSaved }: 
                 onChange={(e) => handleChange('notes', e.target.value)}
               />
             </div>
+
+            <DhanEstimatePanel
+              actualTotal={actualTotal}
+              onUseAsDraft={handleUseEstimateAsDraft}
+              currentEntryMode={form.entry_mode}
+            />
 
             {serverError && (
               <div className="tjv3-cockpit__micro" style={{ color: 'var(--color-loss)' }}>{serverError}</div>

@@ -1,4 +1,5 @@
 import type { DailyCharges } from '@/types'
+import type { DhanEstimateResult } from '../templates/dhan/dhanChargesTypes'
 
 export type ChargesMode = 'breakdown' | 'total_only'
 
@@ -139,4 +140,33 @@ export function formatCurrencyValue(v: string | number | null | undefined): stri
 export function formatChargesDateLabel(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00`)
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' })
+}
+
+// ────────────────────────── Apply estimate to form ──────────────────────────
+
+export function applyEstimateToFormData(
+  current: ChargesFormData,
+  estimate: DhanEstimateResult,
+): ChargesFormData {
+  if (current.entry_mode === 'total_only') {
+    return {
+      ...current,
+      total_charges: String(estimate.total_charges),
+      broker: 'Dhan',
+      notes: current.notes || 'Estimated using Dhan template. Verify contract note.',
+    }
+  }
+  // Breakdown mode — fill component fields + IPFT rolled into other_charges
+  return {
+    ...current,
+    brokerage: String(estimate.brokerage),
+    stt: String(estimate.stt),
+    exchange_txn_charges: String(estimate.exchange_txn_charges),
+    sebi_charges: String(estimate.sebi_charges),
+    stamp_duty: String(estimate.stamp_duty),
+    gst: String(estimate.gst),
+    other_charges: String(estimate.other_charges),
+    broker: 'Dhan',
+    notes: current.notes || 'Estimated using Dhan template. Verify contract note.',
+  }
 }

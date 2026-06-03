@@ -7,6 +7,7 @@ import {
   computeBreakdownTotal,
   validateChargesForm,
   formatCurrencyValue,
+  applyEstimateToFormData,
 } from '../utils/chargesFormUtils'
 
 const sampleDailyCharges = {
@@ -112,5 +113,74 @@ describe('chargesFormUtils', () => {
     expect(formatCurrencyValue('')).toBe('-')
     expect(formatCurrencyValue('0')).toBe('0.00')
     expect(formatCurrencyValue('1234.5')).toBe('1,234.50')
+  })
+
+  it('applyEstimateToFormData fills total in total_only mode', () => {
+    const estimate = {
+      brokerage: 0,
+      stt: 200,
+      exchange_txn_charges: 10,
+      sebi_charges: 5,
+      stamp_duty: 15,
+      gst: 18,
+      ipft: 0.01,
+      other_charges: 0.01,
+      total_charges: 248.01,
+      confidence: 'high' as const,
+      warnings: [],
+      assumptions: [],
+      breakdown: [],
+    }
+    const result = applyEstimateToFormData({ ...emptyChargesForm, entry_mode: 'total_only' }, estimate)
+    expect(result.total_charges).toBe('248.01')
+    expect(result.broker).toBe('Dhan')
+    expect(result.notes).toContain('Estimated using Dhan template')
+  })
+
+  it('applyEstimateToFormData fills breakdown fields in breakdown mode', () => {
+    const estimate = {
+      brokerage: 20,
+      stt: 200,
+      exchange_txn_charges: 10,
+      sebi_charges: 5,
+      stamp_duty: 15,
+      gst: 18,
+      ipft: 0.01,
+      other_charges: 0.01,
+      total_charges: 268.01,
+      confidence: 'high' as const,
+      warnings: [],
+      assumptions: [],
+      breakdown: [],
+    }
+    const result = applyEstimateToFormData({ ...emptyChargesForm, entry_mode: 'breakdown' }, estimate)
+    expect(result.brokerage).toBe('20')
+    expect(result.stt).toBe('200')
+    expect(result.exchange_txn_charges).toBe('10')
+    expect(result.sebi_charges).toBe('5')
+    expect(result.stamp_duty).toBe('15')
+    expect(result.gst).toBe('18')
+    expect(result.other_charges).toBe('0.01')
+    expect(result.broker).toBe('Dhan')
+  })
+
+  it('applyEstimateToFormData preserves existing notes', () => {
+    const estimate = {
+      brokerage: 0,
+      stt: 0,
+      exchange_txn_charges: 0,
+      sebi_charges: 0,
+      stamp_duty: 0,
+      gst: 0,
+      ipft: 0,
+      other_charges: 0,
+      total_charges: 0,
+      confidence: 'high' as const,
+      warnings: [],
+      assumptions: [],
+      breakdown: [],
+    }
+    const result = applyEstimateToFormData({ ...emptyChargesForm, entry_mode: 'total_only', notes: 'Existing note' }, estimate)
+    expect(result.notes).toBe('Existing note')
   })
 })
