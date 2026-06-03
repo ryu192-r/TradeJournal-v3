@@ -5,12 +5,13 @@ import type { TradesV3Filters, TradesV3Summary } from '../types'
 interface TradesCommandHeaderProps {
   filters: TradesV3Filters
   summary: TradesV3Summary
+  loadedCount: number
   isFetching: boolean
   dataEnabled: boolean
   onRefresh: () => void
 }
 
-export function TradesCommandHeader({ filters, summary, isFetching, dataEnabled, onRefresh }: TradesCommandHeaderProps) {
+export function TradesCommandHeader({ filters, summary, loadedCount, isFetching, dataEnabled, onRefresh }: TradesCommandHeaderProps) {
   return (
     <section className="tjv3-trades__header">
       <div className="tjv3-trades__header-main">
@@ -33,6 +34,7 @@ export function TradesCommandHeader({ filters, summary, isFetching, dataEnabled,
 
       <Cluster>
         <Badge variant="accent">{filters.period === 'all' ? 'All time' : filters.period}</Badge>
+        {dataEnabled && <Badge variant="info">API loaded {loadedCount}</Badge>}
         <Badge variant="neutral">{summary.total} trades</Badge>
         <Badge variant={summary.open > 0 ? 'info' : 'neutral'}>{summary.open} open</Badge>
         <Badge variant={summary.partial > 0 ? 'accent' : 'neutral'}>{summary.partial} partial</Badge>

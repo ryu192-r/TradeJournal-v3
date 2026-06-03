@@ -21,7 +21,7 @@ interface CockpitV3PageProps {
 }
 
 export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
-  const [period, setPeriod] = useState<CockpitPeriod>('today')
+  const [period, setPeriod] = useState<CockpitPeriod>('all')
   const [selectedTrade, setSelectedTrade] = useState<ApiTrade | null>(null)
   const [selectedActionItem, setSelectedActionItem] = useState<CockpitActionItem | null>(null)
   const data = useCockpitV3Data(dataEnabled)

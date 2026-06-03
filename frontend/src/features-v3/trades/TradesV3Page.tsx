@@ -58,6 +58,7 @@ export function TradesV3Page({ dataEnabled = true }: TradesV3PageProps) {
         <TradesCommandHeader
           filters={filters}
           summary={summary}
+          loadedCount={data.trades.length}
           isFetching={data.isFetching}
           dataEnabled={dataEnabled}
           onRefresh={() => {
@@ -87,7 +88,7 @@ export function TradesV3Page({ dataEnabled = true }: TradesV3PageProps) {
         />
 
         {filteredTrades.length === 0 ? (
-          <TradeEmptyState />
+          <TradeEmptyState loadedCount={data.trades.length} />
         ) : (
           <>
             <TradesLedger trades={filteredTrades} onSelectTrade={setSelectedTrade} />
