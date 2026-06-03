@@ -11,6 +11,8 @@ interface BrokerImportModalProps {
   open: boolean
   onClose: () => void
   onImported?: () => void
+  /** Fired with the parser result whenever an import attempt completes (success or error). Additive — does not change existing flow. */
+  onImportComplete?: (result: BrokerImportResult) => void
 }
 
 const BROKER_OPTIONS_STATIC: BrokerInfo[] = [
@@ -19,7 +21,7 @@ const BROKER_OPTIONS_STATIC: BrokerInfo[] = [
   { id: 'generic', name: 'Generic CSV' },
 ]
 
-export function BrokerImportModal({ open, onClose, onImported }: BrokerImportModalProps) {
+export function BrokerImportModal({ open, onClose, onImported, onImportComplete }: BrokerImportModalProps) {
   const addToast = useToastStore((s) => s.addToast)
   const [broker, setBroker] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -91,6 +93,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
       const res = await importBrokerCsv(broker, file, false)
       setResult(res)
       setStep('result')
+      onImportComplete?.(res)
       if (res.status === 'success') {
         addToast({
           title: 'Import complete',
@@ -106,7 +109,7 @@ export function BrokerImportModal({ open, onClose, onImported }: BrokerImportMod
     } finally {
       setIsUploading(false)
     }
-  }, [broker, file, addToast, onImported])
+  }, [broker, file, addToast, onImported, onImportComplete])
 
   const handleDownloadTemplate = useCallback(async () => {
     if (!broker) return
