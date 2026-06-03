@@ -13,6 +13,8 @@ from app.utils.trade_dates import get_realized_session_date
 
 
 def _compute_total_charges(dc: DailyCharges) -> Decimal:
+    if dc.entry_mode == "total_only":
+        return ensure_decimal(dc.total_charges)
     return (
         ensure_decimal(dc.brokerage)
         + ensure_decimal(dc.stt)
@@ -57,6 +59,11 @@ class DailyChargesService:
         self.user_id = user_id
 
     def upsert(self, trade_date: date, payload: dict) -> DailyCharges:
+        entry_mode = payload.get("entry_mode", "breakdown")
+        if entry_mode == "total_only":
+            tc = payload.get("total_charges")
+            if tc is None or tc == "":
+                raise ValueError("total_charges is required when entry_mode is total_only")
         existing = (
             self.db.query(DailyCharges)
             .filter(DailyCharges.user_id == self.user_id, DailyCharges.trade_date == trade_date)
@@ -65,11 +72,13 @@ class DailyChargesService:
         if existing:
             for k, v in payload.items():
                 setattr(existing, k, v)
+            existing.entry_mode = entry_mode
             existing.total_charges = _compute_total_charges(existing)
             self.db.commit()
             self.db.refresh(existing)
             return existing
         dc = DailyCharges(user_id=self.user_id, trade_date=trade_date, **payload)
+        dc.entry_mode = entry_mode
         dc.total_charges = _compute_total_charges(dc)
         self.db.add(dc)
         self.db.commit()
@@ -162,6 +171,8 @@ class DailyChargesService:
                         "total_charges": str(tc),
                         "net_realized_pnl": str(net),
                         "trade_count": day_counts.get(current, 0),
+                        "entry_mode": dc.entry_mode,
+                        "broker": dc.broker,
                     })
                     gross_total += gross
                     charges_total += tc

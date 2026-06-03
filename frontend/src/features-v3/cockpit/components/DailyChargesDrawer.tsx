@@ -88,6 +88,7 @@ export function DailyChargesDrawer({ open, date, onClose, onSaved }: DailyCharge
     try {
       await upsertDailyCharges(date, {
         trade_date: date,
+        entry_mode: 'breakdown',
         broker: form.broker || null,
         account_ref: null,
         contract_note_ref: form.contract_note_ref || null,

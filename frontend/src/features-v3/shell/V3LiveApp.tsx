@@ -7,6 +7,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
 import { TradeDetailV3Page } from '../trade-detail'
+import { ChargesLedgerPage } from '../charges'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -211,6 +212,12 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
               <ReportsPage />
             </ErrorBoundary>
           </div>
+        )
+      case 'charges':
+        return (
+          <ErrorBoundary name="ChargesLedger">
+            <ChargesLedgerPage />
+          </ErrorBoundary>
         )
       case 'settings':
         return (

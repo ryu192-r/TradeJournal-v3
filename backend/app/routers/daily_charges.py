@@ -65,7 +65,10 @@ def upsert_daily_charges(
     svc = DailyChargesService(db, user_id=current_user.id)
     d = _to_date(trade_date)
     data = payload.model_dump(exclude={"trade_date"}, exclude_none=True)
-    return svc.upsert(d, data)
+    try:
+        return svc.upsert(d, data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.get("/{trade_date}", response_model=DailyChargesRead)

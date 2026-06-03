@@ -22,6 +22,8 @@ export function activeViewToV3Section(
       return 'playbooks'
     case 'reports':
       return 'reports'
+    case 'charges':
+      return 'charges'
     case 'settings':
       return 'settings'
     default:
@@ -43,6 +45,8 @@ export function v3SectionToActiveView(section: V3PreviewSectionId): ActiveView |
       return 'playbook'
     case 'reports':
       return 'reports'
+    case 'charges':
+      return 'charges'
     case 'settings':
       return 'settings'
     case 'import':

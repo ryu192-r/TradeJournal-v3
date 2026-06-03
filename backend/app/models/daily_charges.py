@@ -25,6 +25,7 @@ class DailyCharges(Base):
     other_charges = Column(Numeric(precision=18, scale=8), default=Decimal("0"))
 
     total_charges = Column(Numeric(precision=18, scale=8), default=Decimal("0"))
+    entry_mode = Column(String(20), default="breakdown")
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime, server_default=func.now())

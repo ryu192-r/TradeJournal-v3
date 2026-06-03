@@ -9,6 +9,7 @@ export type V3PreviewSectionId =
   | 'analytics'
   | 'reports'
   | 'settings'
+  | 'charges'
   | 'more'
 
 export interface V3NavigationItem {

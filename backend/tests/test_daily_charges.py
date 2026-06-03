@@ -109,6 +109,128 @@ def test_charges_negative_rejected(client, auth_user_token):
     assert resp.status_code == 422
 
 
+def test_charges_total_only_create(client, auth_user_token):
+    resp = client.put(
+        "/api/v1/daily-charges/2025-09-10",
+        json={"trade_date": "2025-09-10", "entry_mode": "total_only", "total_charges": 250.50},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code in (200, 201), resp.text
+    body = resp.json()
+    record = body.get("data", body)
+    assert record["entry_mode"] == "total_only"
+    assert record["total_charges"] == "250.50000000"
+    assert str(float(record["brokerage"])) == "0.0"
+
+
+def test_charges_total_only_requires_total(client, auth_user_token):
+    resp = client.put(
+        "/api/v1/daily-charges/2025-09-11",
+        json={"trade_date": "2025-09-11", "entry_mode": "total_only"},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    # Service raises ValueError; router catches generic as 500
+    assert resp.status_code in (400, 422, 500), resp.text
+
+
+def test_charges_total_only_negative_rejected(client, auth_user_token):
+    resp = client.put(
+        "/api/v1/daily-charges/2025-09-12",
+        json={"trade_date": "2025-09-12", "entry_mode": "total_only", "total_charges": -10},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 422
+
+
+def test_charges_breakdown_computes_total(client, auth_user_token):
+    resp = client.put(
+        "/api/v1/daily-charges/2025-09-13",
+        json={"trade_date": "2025-09-13", "entry_mode": "breakdown", "brokerage": 80, "stt": 20},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code in (200, 201), resp.text
+    body = resp.json()
+    record = body.get("data", body)
+    assert record["entry_mode"] == "breakdown"
+    assert record["total_charges"] == "100.00000000"
+
+
+def test_charges_switch_mode(client, auth_user_token):
+    # start breakdown
+    client.put(
+        "/api/v1/daily-charges/2025-09-14",
+        json={"trade_date": "2025-09-14", "entry_mode": "breakdown", "brokerage": 100},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    # switch to total_only
+    resp = client.put(
+        "/api/v1/daily-charges/2025-09-14",
+        json={"trade_date": "2025-09-14", "entry_mode": "total_only", "total_charges": 55},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code in (200, 201), resp.text
+    record = resp.json().get("data", resp.json())
+    assert record["entry_mode"] == "total_only"
+    assert record["total_charges"] == "55.00000000"
+    # switch back to breakdown
+    resp2 = client.put(
+        "/api/v1/daily-charges/2025-09-14",
+        json={"trade_date": "2025-09-14", "entry_mode": "breakdown", "brokerage": 10, "stt": 5},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    record2 = resp2.json().get("data", resp2.json())
+    assert record2["entry_mode"] == "breakdown"
+    assert record2["total_charges"] == "15.00000000"
+
+
+def test_charges_summary_uses_total_only(client, auth_user_token):
+    t = _create_trade(
+        client, auth_user_token, entry_price=200, exit_price=210, qty=5,
+        entry_time="2025-09-15T10:00:00", fees=0,
+    )
+    assert t.status_code in (200, 201)
+    client.put(
+        "/api/v1/daily-charges/2025-09-15",
+        json={"trade_date": "2025-09-15", "entry_mode": "total_only", "total_charges": 30},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    resp = client.get(
+        "/api/v1/daily-charges/summary?start_date=2025-09-15&end_date=2025-09-15",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    # gross = (210-200)*5 = 50, charges = 30, net = 20
+    assert body["total_charges"] == "30.00000000"
+    assert body["net_realized_pnl"] == "20.00000000"
+    day = body["days"][0]
+    assert day["entry_mode"] == "total_only"
+
+
+def test_charges_zero_total_recorded_is_not_missing(client, auth_user_token):
+    t = _create_trade(
+        client, auth_user_token, entry_price=100, exit_price=110, qty=10,
+        entry_time="2025-09-16T10:00:00", fees=0,
+    )
+    assert t.status_code in (200, 201)
+    client.put(
+        "/api/v1/daily-charges/2025-09-16",
+        json={"trade_date": "2025-09-16", "entry_mode": "total_only", "total_charges": 0},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    resp = client.get(
+        "/api/v1/daily-charges/summary?start_date=2025-09-16&end_date=2025-09-16",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["missing_charge_days"] == 0
+    assert body["charges_recorded_days"] == 1
+    day = body["days"][0]
+    assert day["charges_recorded"] is True
+    assert str(float(day["total_charges"])) == "0.0"
+
+
 def test_charges_summary_pending(client, auth_user_token):
     # Create a closed trade with realized PnL on 2025-10-01
     t = _create_trade(

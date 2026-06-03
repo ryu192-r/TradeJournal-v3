@@ -17,6 +17,7 @@ class DailyChargesBase(BaseSchema):
     broker: Optional[str] = Field(None, max_length=100)
     account_ref: Optional[str] = Field(None, max_length=100)
     contract_note_ref: Optional[str] = Field(None, max_length=100)
+    entry_mode: str = Field(default="breakdown", pattern=r"^(breakdown|total_only)$")
     brokerage: Decimal = Field(default=Decimal("0"), ge=0)
     stt: Decimal = Field(default=Decimal("0"), ge=0)
     exchange_txn_charges: Decimal = Field(default=Decimal("0"), ge=0)
@@ -25,12 +26,18 @@ class DailyChargesBase(BaseSchema):
     gst: Decimal = Field(default=Decimal("0"), ge=0)
     clearing_charges: Decimal = Field(default=Decimal("0"), ge=0)
     other_charges: Decimal = Field(default=Decimal("0"), ge=0)
+    total_charges: Optional[Decimal] = Field(default=None, ge=0)
     notes: Optional[str] = Field(None, max_length=1000)
 
     @field_validator("brokerage", "stt", "exchange_txn_charges", "sebi_charges", "stamp_duty", "gst", "clearing_charges", "other_charges", mode="before")
     @classmethod
     def coerce_charges(cls, v):
         return _ensure_decimal(v)
+
+    @field_validator("entry_mode", mode="before")
+    @classmethod
+    def default_entry_mode(cls, v):
+        return v or "breakdown"
 
 
 class DailyChargesCreate(DailyChargesBase):
@@ -41,6 +48,7 @@ class DailyChargesUpdate(BaseSchema):
     broker: Optional[str] = Field(None, max_length=100)
     account_ref: Optional[str] = Field(None, max_length=100)
     contract_note_ref: Optional[str] = Field(None, max_length=100)
+    entry_mode: Optional[str] = Field(None, pattern=r"^(breakdown|total_only)$")
     brokerage: Optional[Decimal] = Field(None, ge=0)
     stt: Optional[Decimal] = Field(None, ge=0)
     exchange_txn_charges: Optional[Decimal] = Field(None, ge=0)
@@ -49,6 +57,7 @@ class DailyChargesUpdate(BaseSchema):
     gst: Optional[Decimal] = Field(None, ge=0)
     clearing_charges: Optional[Decimal] = Field(None, ge=0)
     other_charges: Optional[Decimal] = Field(None, ge=0)
+    total_charges: Optional[Decimal] = Field(None, ge=0)
     notes: Optional[str] = Field(None, max_length=1000)
 
     @field_validator("brokerage", "stt", "exchange_txn_charges", "sebi_charges", "stamp_duty", "gst", "clearing_charges", "other_charges", mode="before")
@@ -57,6 +66,13 @@ class DailyChargesUpdate(BaseSchema):
         if v is None:
             return None
         return ensure_decimal(v)
+
+    @field_validator("entry_mode", mode="before")
+    @classmethod
+    def default_entry_mode(cls, v):
+        if v is None:
+            return None
+        return v or "breakdown"
 
 
 class DailyChargesRead(DailyChargesBase):
@@ -86,6 +102,8 @@ class DailyChargesDaySummary(BaseSchema):
     total_charges: Optional[str] = None
     net_realized_pnl: Optional[str] = None
     trade_count: int = 0
+    entry_mode: Optional[str] = None
+    broker: Optional[str] = None
 
 
 class DailyChargesSummary(BaseSchema):

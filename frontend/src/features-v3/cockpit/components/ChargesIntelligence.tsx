@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Badge, Button, DataList, DataRow, MoneyValue, Panel, Value } from '@/new-ui'
+import { useAppStore } from '@/store/appStore'
 import type { CockpitMetrics } from '../types'
 import type { DailyChargesSummary } from '@/types'
 import { DailyChargesDrawer } from './DailyChargesDrawer'
@@ -11,6 +12,7 @@ interface ChargesIntelligenceProps {
 }
 
 export function ChargesIntelligence({ metrics, summary, onRefetch }: ChargesIntelligenceProps) {
+  const { setActiveView } = useAppStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const noTrades = metrics.chargesState === 'no_trades'
 
@@ -27,25 +29,28 @@ export function ChargesIntelligence({ metrics, summary, onRefetch }: ChargesInte
       <Panel
         title="Charges Intelligence"
         description="India-first P&L model: gross trade P&L first, net only after charges are recorded."
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Badge variant={
-              chargesRecorded && missingDays === 0 ? 'success'
-                : noTrades ? 'neutral'
-                : 'warning'
-            }>
-              {noTrades ? 'No trades'
-                : chargesRecorded && missingDays === 0 ? 'Recorded'
-                : chargesRecorded ? `Missing: ${missingDays} day(s)`
-                : 'Pending'}
-            </Badge>
-            {!noTrades && (
-              <Button variant="ghost" size="sm" onClick={() => setDrawerOpen(true)}>
-                {chargesRecorded ? 'Edit charges' : 'Add charges'}
-              </Button>
-            )}
-          </div>
-        }
+      action={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Badge variant={
+            chargesRecorded && missingDays === 0 ? 'success'
+              : noTrades ? 'neutral'
+              : 'warning'
+          }>
+            {noTrades ? 'No trades'
+              : chargesRecorded && missingDays === 0 ? 'Recorded'
+              : chargesRecorded ? `Missing: ${missingDays} day(s)`
+              : 'Pending'}
+          </Badge>
+          {!noTrades && (
+            <Button variant="ghost" size="sm" onClick={() => setDrawerOpen(true)}>
+              {chargesRecorded ? 'Edit charges' : 'Add charges'}
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={() => setActiveView('charges')}>
+            Open ledger
+          </Button>
+        </div>
+      }
       >
         <DataList>
           <DataRow

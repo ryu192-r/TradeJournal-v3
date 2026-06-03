@@ -43,6 +43,7 @@ export type ActiveView =
   | 'recommendations'
   | 'coaching-intelligence'
   | 'edge-center'
+  | 'charges'
 
 export type NavigationItem = {
   id: string

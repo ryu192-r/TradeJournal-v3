@@ -1249,6 +1249,7 @@ export interface DailyCharges {
   broker: string | null
   account_ref: string | null
   contract_note_ref: string | null
+  entry_mode: 'breakdown' | 'total_only'
   brokerage: string
   stt: string
   exchange_txn_charges: string
@@ -1270,6 +1271,8 @@ export interface DailyChargesDaySummary {
   total_charges: string | null
   net_realized_pnl: string | null
   trade_count: number
+  entry_mode: 'breakdown' | 'total_only' | null
+  broker: string | null
 }
 
 export interface DailyChargesSummary {
@@ -1284,7 +1287,9 @@ export interface DailyChargesSummary {
   days: DailyChargesDaySummary[]
 }
 
-export type DailyChargesCreatePayload = Omit<DailyCharges, 'id' | 'total_charges' | 'created_at' | 'updated_at'>
+export type DailyChargesCreatePayload = Omit<DailyCharges, 'id' | 'total_charges' | 'created_at' | 'updated_at'> & {
+  total_charges?: string | null
+}
 
 export interface DailyChargesListResponse {
   total: number
