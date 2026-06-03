@@ -34,6 +34,7 @@ export function useCockpitV3Data(enabled = true): CockpitV3Data {
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'intelligence'] }),
       queryClient.invalidateQueries({ queryKey: ['trades'] }),
+      queryClient.invalidateQueries({ queryKey: ['daily-charges'] }),
     ])
   }, [enabled, queryClient])
 

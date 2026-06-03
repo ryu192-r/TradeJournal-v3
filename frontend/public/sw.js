@@ -1,6 +1,6 @@
-const CACHE = 'tj-v3-v8'
+const CACHE = 'tj-v3-v9'
 const STATIC_URLS = ['/', '/index.html', '/manifest.json']
-const API_CACHE = 'tj-v3-api-v2'
+const API_CACHE = 'tj-v3-api-v3'
 
 // Install: cache static assets
 self.addEventListener('install', (e) => {
@@ -26,24 +26,27 @@ self.addEventListener('activate', (e) => {
   self.clients.claim()
 })
 
-// Fetch: stale-while-revalidate for API, network-first for HTML, cache-first for assets
+// Fetch: network-first for API + HTML, cache-first for hashed assets
 self.addEventListener('fetch', (e) => {
   const req = e.request
   const url = new URL(req.url)
 
-  // API calls: stale-while-revalidate
+  // Skip non-GET (mutations must never be cached)
+  if (req.method !== 'GET') return
+
+  // API calls: network-first (financial data must not be stale)
   if (url.pathname.startsWith('/api/v1/')) {
-    e.respondWith(staleWhileRevalidate(req))
+    e.respondWith(networkFirstApi(req))
     return
   }
 
-  // HTML (index.html): network-first — always get fresh hash references
+  // HTML (index.html): network-first
   if (url.pathname === '/' || url.pathname === '/index.html') {
     e.respondWith(networkFirst(req))
     return
   }
 
-  // Hashed assets: cache-first — immutable, cache aggressively
+  // Hashed assets: cache-first — immutable
   if (url.pathname.startsWith('/assets/')) {
     e.respondWith(
       caches.match(req).then((cached) => cached || fetch(req).then((res) => {
@@ -72,32 +75,18 @@ async function networkFirst(req) {
   }
 }
 
-async function staleWhileRevalidate(req) {
+async function networkFirstApi(req) {
   const cache = await caches.open(API_CACHE)
-  const cached = await cache.match(req)
-
-  // Return cached response immediately (if exists)
-  const networkPromise = fetch(req)
-    .then((res) => {
-      const clone = res.clone()
-      cache.put(req, clone)
-      return res
-    })
-    .catch(() => {
-      // Network failed, we'll return cached below
-      return null
-    })
-
-  if (cached) {
-    // Return cached, update in background
-    networkPromise.catch(() => {})
-    return cached
+  try {
+    const res = await fetch(req)
+    const clone = res.clone()
+    cache.put(req, clone)
+    return res
+  } catch {
+    const cached = await cache.match(req)
+    return cached || new Response(
+      JSON.stringify({ error: 'offline', message: 'You are offline. Data unavailable.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    )
   }
-
-  // Nothing cached, wait for network
-  const network = await networkPromise
-  return network || new Response(
-    JSON.stringify({ error: 'offline', message: 'You are offline. Data unavailable.' }),
-    { status: 503, headers: { 'Content-Type': 'application/json' } }
-  )
 }
