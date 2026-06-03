@@ -1,11 +1,14 @@
 import { Button, Cluster, Panel } from '@/new-ui'
-import { ExternalLink, Pencil } from 'lucide-react'
+import { ExternalLink, Pencil, Scissors, XCircle, Shield } from 'lucide-react'
+import type { PositionAction } from '../../position-actions'
 
 interface TradeDetailActionsProps {
   onBack: () => void
   onEdit?: () => void
   onOpenLegacyWorkspace?: () => void
   showLegacyWorkspace?: boolean
+  isTradeOpen?: boolean
+  onPositionAction?: (action: PositionAction) => void
 }
 
 export function TradeDetailActions({
@@ -13,9 +16,11 @@ export function TradeDetailActions({
   onEdit,
   onOpenLegacyWorkspace,
   showLegacyWorkspace = true,
+  isTradeOpen = false,
+  onPositionAction,
 }: TradeDetailActionsProps) {
   return (
-    <Panel title="Actions" description="Display-only workspace. Mutations stay in existing legacy flows.">
+    <Panel title="Actions">
       <Cluster gap="sm">
         <Button variant="secondary" onClick={onBack}>
           Back to Trades
@@ -26,16 +31,29 @@ export function TradeDetailActions({
             Edit trade
           </Button>
         )}
+        {isTradeOpen && onPositionAction && (
+          <>
+            <Button variant="secondary" onClick={() => onPositionAction('partial_exit')}>
+              <Scissors aria-hidden="true" size={14} />
+              Partial exit
+            </Button>
+            <Button variant="secondary" onClick={() => onPositionAction('close')}>
+              <XCircle aria-hidden="true" size={14} />
+              Close trade
+            </Button>
+            <Button variant="secondary" onClick={() => onPositionAction('protection_stop')}>
+              <Shield aria-hidden="true" size={14} />
+              Move stop
+            </Button>
+          </>
+        )}
         {showLegacyWorkspace && onOpenLegacyWorkspace && (
-          <Button variant="secondary" onClick={onOpenLegacyWorkspace}>
+          <Button variant="ghost" onClick={onOpenLegacyWorkspace}>
             <ExternalLink aria-hidden="true" size={14} />
-            Open legacy workspace
+            Legacy workspace
           </Button>
         )}
       </Cluster>
-      <div className="tjv3-trade-detail__actions-note">
-        Partial exit, close, and delete actions remain in the legacy trade workspace.
-      </div>
     </Panel>
   )
 }

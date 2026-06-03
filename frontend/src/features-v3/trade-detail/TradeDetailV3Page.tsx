@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Grid, Stack } from '@/new-ui'
 import { useAppStore } from '@/store/appStore'
 import { useTradeDetailV3Data } from './hooks/useTradeDetailV3Data'
 import type { TradeDetailV3PageProps } from './types'
+import { PositionActionDrawer, type PositionAction } from '../position-actions'
 import { PartialExitsPanel } from './components/PartialExitsPanel'
 import { PlanVsExecutionPanel } from './components/PlanVsExecutionPanel'
 import { NotesReviewPanel } from './components/NotesReviewPanel'
@@ -37,6 +38,11 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
   }, [data.trade, data.stopHistory, data.partialExits, data.timelineEvents])
 
   const handleBack = () => closeTradeForm()
+
+  // Position action drawer
+  const [actionDrawer, setActionDrawer] = useState<{ open: boolean; action: PositionAction }>({ open: false, action: 'partial_exit' })
+  const openAction = (action: PositionAction) => setActionDrawer({ open: true, action })
+  const closeAction = () => setActionDrawer((s) => ({ ...s, open: false }))
 
   if (data.isLoading) {
     return (
@@ -92,8 +98,19 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
           onBack={handleBack}
           onEdit={() => openEditTrade(trade.id)}
           onOpenLegacyWorkspace={onOpenLegacyWorkspace}
+          isTradeOpen={!trade.exit_price}
+          onPositionAction={openAction}
         />
       </Stack>
+
+      {actionDrawer.open && (
+        <PositionActionDrawer
+          open={actionDrawer.open}
+          onClose={closeAction}
+          trade={trade}
+          initialAction={actionDrawer.action}
+        />
+      )}
     </div>
   )
 }
