@@ -1,4 +1,4 @@
-const CACHE = 'tj-v3-v6'
+const CACHE = 'tj-v3-v7'
 const STATIC_URLS = ['/', '/index.html', '/manifest.json']
 const API_CACHE = 'tj-v3-api-v2'
 

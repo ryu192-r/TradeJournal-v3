@@ -60,5 +60,7 @@ export interface TradesV3Summary {
 
 export interface TradesV3PageProps {
   dataEnabled?: boolean
+  onOpenTradeDetail?: (tradeId: number) => void
+  /** @deprecated Use onOpenTradeDetail */
   onOpenLegacyDetail?: (tradeId: number) => void
 }

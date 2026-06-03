@@ -3,9 +3,10 @@ import { ProModeGate } from '@/components/layout/ProModeGate'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingState } from '@/components/ui'
 import { useAppStore } from '@/store/appStore'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
+import { TradeDetailV3Page } from '../trade-detail'
 import { V3ImportSection } from './V3ImportSection'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
@@ -77,6 +78,13 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     openDetailTrade,
   } = useAppStore()
   const [sectionOverride, setSectionOverride] = useState<V3PreviewSectionId | null>(null)
+  const [legacyDetailFallback, setLegacyDetailFallback] = useState(false)
+
+  useEffect(() => {
+    if (tradeFormMode !== 'detail') {
+      setLegacyDetailFallback(false)
+    }
+  }, [tradeFormMode])
 
   const activeSection = useMemo(
     () => activeViewToV3Section(activeView, tradeFormMode, sectionOverride),
@@ -138,12 +146,23 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     }
 
     if (tradeFormMode === 'detail' && selectedTradeId != null) {
+      if (legacyDetailFallback) {
+        return (
+          <div className="tjv3-legacy-embed">
+            <ErrorBoundary name="LegacyTradeDetail">
+              <TradeDetailPage tradeId={selectedTradeId} />
+            </ErrorBoundary>
+          </div>
+        )
+      }
+
       return (
-        <div className="tjv3-legacy-embed">
-          <ErrorBoundary name="TradeDetail">
-            <TradeDetailPage tradeId={selectedTradeId} />
-          </ErrorBoundary>
-        </div>
+        <ErrorBoundary name="TradeDetailV3">
+          <TradeDetailV3Page
+            tradeId={selectedTradeId}
+            onOpenLegacyWorkspace={() => setLegacyDetailFallback(true)}
+          />
+        </ErrorBoundary>
       )
     }
 
@@ -165,7 +184,7 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
       case 'trades':
         return (
           <ErrorBoundary name="TradesV3">
-            <TradesV3Page dataEnabled onOpenLegacyDetail={openDetailTrade} />
+            <TradesV3Page dataEnabled onOpenTradeDetail={openDetailTrade} />
           </ErrorBoundary>
         )
       case 'review':

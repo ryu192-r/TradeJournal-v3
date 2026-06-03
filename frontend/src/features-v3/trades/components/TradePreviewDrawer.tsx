@@ -7,10 +7,18 @@ import { TradeQualityBadges } from './TradeQualityBadges'
 interface TradePreviewDrawerProps {
   trade: ApiTrade | null
   onClose: () => void
+  onOpenTradeDetail?: (tradeId: number) => void
+  /** @deprecated Use onOpenTradeDetail */
   onOpenLegacyDetail?: (tradeId: number) => void
 }
 
-export function TradePreviewDrawer({ trade, onClose, onOpenLegacyDetail }: TradePreviewDrawerProps) {
+export function TradePreviewDrawer({
+  trade,
+  onClose,
+  onOpenTradeDetail,
+  onOpenLegacyDetail,
+}: TradePreviewDrawerProps) {
+  const openDetail = onOpenTradeDetail ?? onOpenLegacyDetail
   return (
     <Drawer
       open={Boolean(trade)}
@@ -19,15 +27,15 @@ export function TradePreviewDrawer({ trade, onClose, onOpenLegacyDetail }: Trade
       description="Preview only. No edit, delete, close, or partial-exit action is available in N4."
       footer={
         <div className="tjv3-trades__drawer-footer">
-          {trade && onOpenLegacyDetail && (
+          {trade && openDetail && (
             <Button
               variant="primary"
               onClick={() => {
-                onOpenLegacyDetail(trade.id)
+                openDetail(trade.id)
                 onClose()
               }}
             >
-              Open full trade detail
+              Open full trade
             </Button>
           )}
           <Button variant="secondary" onClick={onClose}>Close preview</Button>
