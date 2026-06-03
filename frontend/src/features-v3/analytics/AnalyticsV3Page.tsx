@@ -128,7 +128,8 @@ function GroupTable({ rows, title }: { rows: GroupMetrics[]; title?: string }) {
   return (
     <div>
       {title && <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>{title}</div>}
-      <table style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+      <table style={{ width: '100%', minWidth: '26rem', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ color: 'var(--color-text-muted)', textAlign: 'left' }}>
             <th style={{ padding: '0.375rem 0' }}>Name</th>
@@ -150,6 +151,7 @@ function GroupTable({ rows, title }: { rows: GroupMetrics[]; title?: string }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

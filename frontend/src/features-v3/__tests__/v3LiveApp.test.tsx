@@ -105,7 +105,7 @@ describe('V3 live app promotion', () => {
     render(<V3LiveApp />)
 
     await user.click(screen.getByRole('button', { name: /Import/ }))
-    expect(screen.getByText('Import v3 live')).toBeInTheDocument()
+    expect(await screen.findByText('Import v3 live')).toBeInTheDocument()
   })
 
   it('routes Review navigation through live app store', async () => {
