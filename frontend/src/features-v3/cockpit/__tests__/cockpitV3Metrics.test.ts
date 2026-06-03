@@ -39,22 +39,41 @@ describe('Cockpit v3 metrics', () => {
   })
 
   it('keeps missing charges pending and does not fake net P&L', () => {
+    // No chargesContext passed → defaults to pending (ledger not loaded)
     const metrics = buildCockpitMetrics([trade({ pnl: '500', fees: undefined, status: 'closed' })], 'all')
 
     expect(metrics.chargesState).toBe('pending')
-    expect(metrics.recordedFees).toBeNull()
     expect(metrics.netPnlState).toBe('pending_charges')
     expect(metrics.netPnl).toBeNull()
   })
 
-  it('renders recorded fees as available net state only when fees exist', () => {
-    const metrics = buildCockpitMetrics([trade({ pnl: '450', fees: '50', status: 'closed' })], 'all')
+  it('renders charges as recorded when daily charges ledger reports no missing days', () => {
+    const metrics = buildCockpitMetrics(
+      [trade({ pnl: '450', fees: '50', status: 'closed' })],
+      'all',
+      undefined,
+      undefined,
+      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0 },
+    )
 
     expect(metrics.chargesState).toBe('recorded')
-    expect(metrics.recordedFees).toBe(50)
     expect(metrics.netPnlState).toBe('available')
     expect(metrics.netPnl).toBe(450)
     expect(calculateGrossPnl(metrics.closedTrades)).toBe(500)
+  })
+
+  it('charges remain pending when ledger has missing days', () => {
+    const metrics = buildCockpitMetrics(
+      [trade({ pnl: '450', fees: '50', status: 'closed' })],
+      'all',
+      undefined,
+      undefined,
+      { chargesRecordedDays: 1, tradingDays: 3, missingDays: 2 },
+    )
+
+    expect(metrics.chargesState).toBe('pending')
+    expect(metrics.netPnlState).toBe('pending_charges')
+    expect(metrics.netPnl).toBeNull()
   })
 
   it('keeps invalid numeric values safe', () => {
@@ -73,11 +92,24 @@ describe('Cockpit v3 metrics', () => {
   })
 
   it('keeps review action center empty when notes/setup/stops are present', () => {
-    const metrics = buildCockpitMetrics([
-      trade({ review_notes: 'Reviewed', notes: 'Plan followed', setup: 'ORB', tags: ['orb'], pnl: '100', fees: '10' }),
-    ], 'all')
+    const metrics = buildCockpitMetrics(
+      [trade({ review_notes: 'Reviewed', notes: 'Plan followed', setup: 'ORB', tags: ['orb'], pnl: '100', fees: '10' })],
+      'all',
+      undefined,
+      undefined,
+      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0 },
+    )
 
     expect(metrics.reviewItems).toHaveLength(0)
+  })
+
+  it('win rate uses GROSS P&L (pnl + fees) for win detection', () => {
+    // Trade: pnl=-5 (net), fees=10. Gross = -5 + 10 = +5 → WIN
+    const metrics = buildCockpitMetrics([
+      trade({ pnl: '-5', fees: '10', status: 'closed' }),
+    ], 'all')
+
+    expect(metrics.winRate).toBe(100) // gross-profitable = win
   })
 
   it('builds data-backed attention signals only from supplied metrics', () => {

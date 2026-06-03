@@ -29,8 +29,12 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
   const chargesQuery = useDailyChargesSummary(period, dataEnabled)
 
   const metrics = useMemo(
-    () => buildCockpitMetrics(data.trades, period, data.operational),
-    [data.operational, data.trades, period],
+    () => buildCockpitMetrics(data.trades, period, data.operational, undefined, chargesQuery.data ? {
+      chargesRecordedDays: chargesQuery.data.charges_recorded_days ?? null,
+      tradingDays: chargesQuery.data.trading_days ?? null,
+      missingDays: chargesQuery.data.missing_charge_days ?? null,
+    } : null),
+    [data.operational, data.trades, period, chargesQuery.data],
   )
 
   const handleSelectTrade = (trade: ApiTrade) => {

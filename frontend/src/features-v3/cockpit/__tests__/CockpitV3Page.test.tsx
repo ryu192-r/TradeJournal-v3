@@ -110,6 +110,10 @@ describe('CockpitV3Page', () => {
     mocks.useCockpitV3Data.mockReturnValue(data({
       trades: [trade({ pnl: '100', fees: '10', setup: 'Breakout', tags: ['breakout'], notes: 'Clean', review_notes: 'Reviewed' })],
     }))
+    mocks.useDailyChargesSummary.mockReturnValue({
+      data: { charges_recorded_days: 1, trading_days: 1, missing_charge_days: 0 },
+      isLoading: false, isFetching: false, error: null, refetch: vi.fn(),
+    })
 
     render(<CockpitV3Page />)
 

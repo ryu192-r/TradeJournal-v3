@@ -29,10 +29,14 @@ export function calculateRecordedFees(trades: ApiTrade[]): number | null {
   return fees.reduce((sum, value) => sum + value, 0)
 }
 
+/**
+ * Win rate using GROSS P&L (pnl + fees > 0) for consistency with the
+ * Cockpit's gross-first philosophy. A trade profitable before fees is a win.
+ */
 export function calculateWinRate(trades: ApiTrade[]): number | null {
   const closed = trades.filter(isClosedTrade)
   if (closed.length === 0) return null
-  const wins = closed.filter((trade) => (safeNumber(trade.pnl) ?? 0) > 0).length
+  const wins = closed.filter((trade) => (tradeGrossPnl(trade) ?? 0) > 0).length
   return (wins / closed.length) * 100
 }
 
@@ -70,7 +74,7 @@ export function getUntaggedCount(trades: ApiTrade[]): number {
   return excludeDeletedTrades(trades).filter((trade) => !(trade.setup?.trim()) && (trade.tags?.length ?? 0) === 0).length
 }
 
-export function buildReviewItems(trades: ApiTrade[], chargesPending: boolean): CockpitActionItem[] {
+export function buildReviewItems(trades: ApiTrade[], activeTrades: ApiTrade[], chargesPending: boolean): CockpitActionItem[] {
   const items: CockpitActionItem[] = []
   const active = excludeDeletedTrades(trades)
 
@@ -96,8 +100,11 @@ export function buildReviewItems(trades: ApiTrade[], chargesPending: boolean): C
         trade,
       })
     }
+  }
 
-    if (isOpenTrade(trade) && !trade.current_stop_price && !trade.stop_price) {
+  // Check ALL open trades for missing SL (not just period-filtered ones)
+  for (const trade of activeTrades) {
+    if (!trade.current_stop_price && !trade.stop_price) {
       items.push({
         id: `risk-${trade.id}`,
         type: 'risk',
@@ -108,7 +115,7 @@ export function buildReviewItems(trades: ApiTrade[], chargesPending: boolean): C
       })
     }
 
-    if (isOpenTrade(trade) && safeNumber(trade.partial_realized_pnl) != null) {
+    if (safeNumber(trade.partial_realized_pnl) != null) {
       items.push({
         id: `partial-${trade.id}`,
         type: 'position',
@@ -153,7 +160,8 @@ export function groupSetups(trades: ApiTrade[]): CockpitSetupSummary[] {
       current.closedCount += 1
       const gross = tradeGrossPnl(trade)
       current.grossPnl += gross ?? 0
-      if ((safeNumber(trade.pnl) ?? 0) > 0) current.wins += 1
+      // Use GROSS P&L for win detection (consistent with headline metrics)
+      if ((gross ?? 0) > 0) current.wins += 1
     }
 
     grouped.set(name, current)
@@ -202,30 +210,74 @@ export function buildAttentionSignals(metrics: Pick<CockpitMetrics, 'periodTrade
   return signals.slice(0, 6)
 }
 
+/**
+ * Charges state is determined by the DailyChargesSummary query, NOT by
+ * per-trade fees. The daily charges ledger is the source of truth.
+ */
+export interface ChargesContext {
+  /** From useDailyChargesSummary — null if query hasn't loaded yet. */
+  chargesRecordedDays: number | null
+  tradingDays: number | null
+  missingDays: number | null
+}
+
+function resolveChargesState(
+  periodTrades: ApiTrade[],
+  charges: ChargesContext | null,
+): 'recorded' | 'pending' | 'no_trades' {
+  if (periodTrades.length === 0) return 'no_trades'
+  if (!charges || charges.tradingDays == null) return 'pending'
+  if (charges.tradingDays === 0) return 'no_trades'
+  if (charges.missingDays != null && charges.missingDays === 0) return 'recorded'
+  return 'pending'
+}
+
 export function buildCockpitMetrics(
   trades: ApiTrade[],
   period: CockpitPeriod,
   operational?: OperationalDashboardPayload,
   todayKey?: string,
+  chargesContext?: ChargesContext | null,
 ): CockpitMetrics {
   const normalTrades = excludeDeletedTrades(trades)
   const periodTrades = filterTradesByPeriod(normalTrades, period, todayKey)
   const closedTrades = periodTrades.filter(isClosedTrade)
   const activeTrades = normalTrades.filter(isOpenTrade)
-  const grossPnl = calculateGrossPnl(closedTrades)
+
+  // For 'all' period, prefer backend KPI (computed from ALL trades, not 200-cap)
+  const useBackendKpi = period === 'all' && operational?.kpi != null
+  const kpi = operational?.kpi
+
+  const grossPnl = useBackendKpi
+    ? safeNumber(kpi!.gross_profit) != null && safeNumber(kpi!.gross_loss) != null
+      ? (safeNumber(kpi!.gross_profit) ?? 0) + (safeNumber(kpi!.gross_loss) ?? 0)
+      : calculateGrossPnl(closedTrades)
+    : calculateGrossPnl(closedTrades)
+
   const recordedFees = calculateRecordedFees(closedTrades)
-  const hasRecordedFees = (recordedFees ?? 0) > 0
-  const chargesState = periodTrades.length === 0 ? 'no_trades' : hasRecordedFees ? 'recorded' : 'pending'
+
+  // Charges state from daily charges ledger (source of truth), NOT per-trade fees
+  const chargesState = resolveChargesState(periodTrades, chargesContext ?? null)
+
   const periodNetValues = closedTrades
     .map((trade) => safeNumber(trade.pnl))
     .filter((value): value is number => value != null)
   const periodNet = periodNetValues.length > 0 ? periodNetValues.reduce((sum, value) => sum + value, 0) : null
+
   const netPnlState = periodTrades.length === 0 ? 'no_trades' : chargesState === 'recorded' ? 'available' : 'pending_charges'
+
   const openRisk = calculateOpenRisk(activeTrades, operational)
-  const winRate = calculateWinRate(periodTrades)
-  const avgR = calculateAvgR(periodTrades)
+
+  const winRate = useBackendKpi && kpi!.win_rate != null
+    ? kpi!.win_rate
+    : calculateWinRate(periodTrades)
+
+  const avgR = useBackendKpi && kpi!.avg_r_multiple != null
+    ? kpi!.avg_r_multiple
+    : calculateAvgR(periodTrades)
+
   const untaggedCount = getUntaggedCount(periodTrades)
-  const reviewItems = buildReviewItems(periodTrades, chargesState === 'pending')
+  const reviewItems = buildReviewItems(periodTrades, activeTrades, chargesState === 'pending')
   const setupSummaries = groupSetups(periodTrades)
   const attentionSignals = buildAttentionSignals({
     periodTrades,
@@ -243,7 +295,7 @@ export function buildCockpitMetrics(
     deletedExcludedCount: trades.length - normalTrades.length,
     grossPnl,
     recordedFees,
-    hasRecordedFees,
+    hasRecordedFees: (recordedFees ?? 0) > 0,
     chargesState,
     netPnlState,
     netPnl: netPnlState === 'available' ? periodNet : null,

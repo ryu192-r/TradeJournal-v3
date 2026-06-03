@@ -54,7 +54,7 @@ export function TradingTape({ metrics, onSelectTrade }: TradingTapeProps) {
               <button key={trade.id} type="button" className="tjv3-cockpit__trade-row" onClick={() => onSelectTrade(trade)}>
                 <div className="tjv3-cockpit__row-top">
                   <div className="tjv3-cockpit__symbol">{trade.symbol}</div>
-                  <MoneyValue value={safeNumber(trade.pnl)} tone="auto" />
+                  <MoneyValue value={safeNumber(trade.pnl) == null ? null : (safeNumber(trade.pnl) ?? 0) + (safeNumber(trade.fees) ?? 0)} tone="auto" />
                 </div>
                 <div className="tjv3-cockpit__micro">
                   {tradeStatusLabel(trade)} · Qty {displayQuantity(trade.quantity)} · {displaySetup(trade)} · {displayTradeDate(trade)}
