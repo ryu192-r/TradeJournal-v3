@@ -122,10 +122,10 @@ def get_realized_pnl_events(
     )
     pe_params: dict = {"user_id": user_id}
     if start:
-        pe_q += " AND COALESCE(pe.exit_time, pe.created_at, t.entry_time) >= :start"
+        pe_q += " AND COALESCE(pe.exit_time, t.entry_time) >= :start"
         pe_params["start"] = start
     if end:
-        pe_q += " AND COALESCE(pe.exit_time, pe.created_at, t.entry_time) <= :end"
+        pe_q += " AND COALESCE(pe.exit_time, t.entry_time) <= :end"
         pe_params["end"] = end
 
     pe_rows = db.execute(text(pe_q), pe_params).fetchall()
