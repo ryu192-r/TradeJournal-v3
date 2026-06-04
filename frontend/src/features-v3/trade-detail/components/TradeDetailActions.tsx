@@ -1,5 +1,5 @@
 import { Button, Cluster, Panel } from '@/new-ui'
-import { ExternalLink, Pencil, Scissors, XCircle, Shield } from 'lucide-react'
+import { ExternalLink, Pencil, Scissors, XCircle, Shield, Layers } from 'lucide-react'
 import type { PositionAction } from '../../position-actions'
 
 interface TradeDetailActionsProps {
@@ -44,6 +44,10 @@ export function TradeDetailActions({
             <Button variant="secondary" onClick={() => onPositionAction('protection_stop')}>
               <Shield aria-hidden="true" size={14} />
               Move stop
+            </Button>
+            <Button variant="secondary" onClick={() => onPositionAction('pyramid')}>
+              <Layers aria-hidden="true" size={14} />
+              Pyramid
             </Button>
           </>
         )}

@@ -45,6 +45,7 @@ export function TradePreviewDrawer({
                 <Button variant="secondary" onClick={() => openAction('partial_exit')}>Partial exit</Button>
                 <Button variant="secondary" onClick={() => openAction('close')}>Close trade</Button>
                 <Button variant="secondary" onClick={() => openAction('protection_stop')}>Move stop</Button>
+                <Button variant="secondary" onClick={() => openAction('pyramid')}>Pyramid</Button>
               </>
             )}
             {trade && openDetail && (
