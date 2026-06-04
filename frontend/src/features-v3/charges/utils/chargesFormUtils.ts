@@ -165,6 +165,7 @@ export function applyEstimateToFormData(
     sebi_charges: String(estimate.sebi_charges),
     stamp_duty: String(estimate.stamp_duty),
     gst: String(estimate.gst),
+    clearing_charges: '0',
     other_charges: String(estimate.other_charges),
     broker: 'Dhan',
     notes: current.notes || 'Estimated using Dhan template. Verify contract note.',

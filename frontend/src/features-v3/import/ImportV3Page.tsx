@@ -52,9 +52,15 @@ export function ImportV3Page({ onOpenLegacy }: ImportV3PageProps) {
   }, [addToast])
 
   const handleImported = useCallback(() => {
-    // Same invalidation pattern as legacy flow — refresh trade lists.
+    // Import creates/merges trades → refresh every trade-domain consumer.
     void queryClient.invalidateQueries({ queryKey: ['trades'] })
     void queryClient.invalidateQueries({ queryKey: ['daily-charges'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'intelligence'] })
+    void queryClient.invalidateQueries({ queryKey: ['capital-dashboard'] })
+    void queryClient.invalidateQueries({ queryKey: ['risk-dashboard'] })
+    void queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    void queryClient.invalidateQueries({ queryKey: ['setups'] })
   }, [queryClient])
 
   const handleImportComplete = useCallback((result: BrokerImportResult) => {

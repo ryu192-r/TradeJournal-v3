@@ -4,6 +4,7 @@ import { Badge, Button, EmptyState, ErrorState, Grid, LoadingState, MetricCard, 
 import { Printer } from 'lucide-react'
 import { useTradesV3Data } from '../trades/hooks/useTradesV3Data'
 import { getDailyChargesSummary } from '@/lib/endpoints'
+import { getTradeSessionDate } from '@/utils/tradeDates'
 import { tradeMatchesPeriod } from '../trades/utils/tradesV3Filters'
 import { isDeletedTrade } from '../trades/utils/tradesV3Metrics'
 import {
@@ -28,8 +29,16 @@ export function ReportsV3Page({ dataEnabled = true }: { dataEnabled?: boolean })
   // Map V3 period values used by tradeMatchesPeriod
   const v3Period = period === 'today' ? 'today' : period === 'week' ? 'week' : 'month'
   const filtered = useMemo(
-    () => trades.filter((t) => !isDeletedTrade(t) && (period === '30d' || period === '90d' ? true : tradeMatchesPeriod(t, v3Period))),
-    [trades, period, v3Period],
+    () => trades.filter((t) => {
+      if (isDeletedTrade(t)) return false
+      if (period === '30d' || period === '90d') {
+        // Filter by session date within the same [start, end] window used for charges.
+        const sd = getTradeSessionDate(t)
+        return sd != null && sd >= start && sd <= end
+      }
+      return tradeMatchesPeriod(t, v3Period)
+    }),
+    [trades, period, v3Period, start, end],
   )
   const perf = useMemo(() => computePerformance(filtered), [filtered])
   const setups = useMemo(() => groupBySetup(filtered), [filtered])

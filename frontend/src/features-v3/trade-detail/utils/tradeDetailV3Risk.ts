@@ -22,7 +22,8 @@ export function getDisplayCurrentStop(trade: ApiTrade): string | null {
 export function getOriginalPlannedRisk(trade: ApiTrade): number | null {
   const entry = safeNumber(trade.entry_price)
   const stop = safeNumber(readOriginalStop(trade) ?? trade.stop_price)
-  const qty = safeNumber(trade.remaining_qty ?? trade.quantity)
+  // Original planned risk = risk at inception → full original quantity, not remaining.
+  const qty = safeNumber(trade.quantity)
   if (entry == null || stop == null || qty == null) return null
   return computeMaxRisk(entry, stop, qty, trade.direction)
 }

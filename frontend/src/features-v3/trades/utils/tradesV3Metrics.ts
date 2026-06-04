@@ -80,7 +80,7 @@ export function summarizeTrades(trades: ApiTrade[], includeDeleted = false): Tra
   const rValues = closed
     .map(getTradeRMultiple)
     .filter((value): value is number => value != null)
-  const wins = closed.filter((trade) => (safeNumber(trade.pnl) ?? 0) > 0).length
+  const wins = closed.filter((trade) => (getTradeGrossPnl(trade) ?? 0) > 0).length
   const missingSetup = scoped.filter(hasMissingSetup).length
   const missingNotes = scoped.filter(hasMissingNotes).length
   const missingStop = scoped.filter(hasMissingStop).length
