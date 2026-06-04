@@ -13,6 +13,7 @@ interface TradesListData {
 }
 
 interface TradeListFilters {
+  scope?: 'all'
   status?: BackendTradeStatus
   symbol?: string
   from_date?: string
@@ -28,7 +29,10 @@ function readTradeFilters(queryKey: QueryKey): TradeListFilters {
 
 function effectiveTradeStatus(trade: ApiTrade): BackendTradeStatus {
   if (trade.status === 'deleted') return 'deleted'
-  return trade.exit_price == null ? 'open' : 'closed'
+  const remaining = Number(trade.remaining_qty)
+  if (Number.isFinite(remaining) && remaining > 0) return 'open'
+  if (trade.exit_price != null || trade.status === 'closed') return 'closed'
+  return 'open'
 }
 
 function matchesTradeFilters(trade: ApiTrade, filters: TradeListFilters): boolean {
@@ -49,6 +53,10 @@ function matchesTradeFilters(trade: ApiTrade, filters: TradeListFilters): boolea
 
 function isOpenTrade(trade: ApiTrade): boolean {
   return effectiveTradeStatus(trade) === 'open'
+}
+
+function listLimit(filters: TradeListFilters): number {
+  return filters.scope === 'all' ? Number.POSITIVE_INFINITY : filters.limit ?? 100
 }
 
 function toOpenLiveTrade(trade: ApiTrade): OpenLiveTrade {
@@ -99,7 +107,7 @@ export function patchTradeInLists(qc: QueryClient, trade: ApiTrade) {
       //          page 1; later pages will be corrected by background refetch.
       if ((filters.skip ?? 0) > 0) return old
 
-      const limit = filters.limit ?? 100
+      const limit = listLimit(filters)
       return {
         ...old,
         total: old.total + 1,
@@ -119,7 +127,7 @@ export function addTradeToLists(qc: QueryClient, trade: ApiTrade) {
       if ((filters.skip ?? 0) > 0) return old
       if (old.items.some((t) => t.id === trade.id)) return old
 
-      const limit = filters.limit ?? 100
+      const limit = listLimit(filters)
       return {
         ...old,
         total: old.total + 1,
@@ -227,7 +235,31 @@ export function invalidateLifecycle(qc: QueryClient, tradeId: number) {
 export function invalidateAnalytics(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['analytics'] }),
+    qc.invalidateQueries({ queryKey: ['daily-charges', 'summary', 'analytics'] }),
+    qc.invalidateQueries({ queryKey: ['daily-charges', 'summary', 'reports'] }),
     qc.invalidateQueries({ queryKey: ['journal', 'weekly-stats'] }),
+  ])
+}
+
+export function invalidateChargesDependents(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ['daily-charges'] }),
+    invalidateOperationalDashboard(qc),
+    invalidateIntelligenceDashboard(qc),
+    invalidateAnalytics(qc),
+  ])
+}
+
+export function invalidateTradeDomain(qc: QueryClient, tradeId?: number) {
+  return Promise.all([
+    invalidateTradeList(qc),
+    tradeId != null ? invalidateTradeDetail(qc, tradeId) : Promise.resolve(),
+    tradeId != null ? invalidateLifecycle(qc, tradeId) : Promise.resolve(),
+    invalidateRisk(qc),
+    invalidateCapital(qc),
+    invalidateAnalytics(qc),
+    invalidatePlaybook(qc),
+    invalidateChargesDependents(qc),
   ])
 }
 

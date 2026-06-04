@@ -4,7 +4,7 @@ import {
   setTradeCache, patchTradeInLists, addTradeToLists, removeTradeFromLists,
   invalidateTradeList, invalidateRisk, invalidateAnalytics, invalidatePlaybook,
   invalidateTradeDetail, invalidateIntelligenceDashboard, patchOperationalDashboardTrade,
-  removeTradeFromOperationalDashboard,
+  removeTradeFromOperationalDashboard, invalidateChargesDependents,
 } from '@/lib/queryInvalidation'
 import { span } from '@/utils/performance'
 import { useRef } from 'react'
@@ -29,6 +29,7 @@ export function useCreateTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
+      void invalidateChargesDependents(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -66,6 +67,7 @@ export function useUpdateTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
+      void invalidateChargesDependents(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -102,6 +104,7 @@ export function useDeleteTradeMutation() {
       void invalidateAnalytics(qc)
       void invalidatePlaybook(qc)
       void invalidateIntelligenceDashboard(qc)
+      void invalidateChargesDependents(qc)
       endSpanRef.current?.()
       endSpanRef.current = null
     },

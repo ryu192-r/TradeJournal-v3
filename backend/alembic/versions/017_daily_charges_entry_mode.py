@@ -15,13 +15,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "daily_charges",
-        sa.Column("entry_mode", sa.String(length=20), nullable=True),
-    )
+    with op.batch_alter_table("daily_charges") as batch_op:
+        batch_op.add_column(sa.Column("entry_mode", sa.String(length=20), nullable=True))
     op.execute("UPDATE daily_charges SET entry_mode = 'breakdown'")
-    op.alter_column("daily_charges", "entry_mode", nullable=False)
+    with op.batch_alter_table("daily_charges") as batch_op:
+        batch_op.alter_column("entry_mode", nullable=False)
 
 
 def downgrade() -> None:
-    op.drop_column("daily_charges", "entry_mode")
+    with op.batch_alter_table("daily_charges") as batch_op:
+        batch_op.drop_column("entry_mode")

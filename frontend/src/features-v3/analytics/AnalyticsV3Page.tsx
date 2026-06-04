@@ -52,6 +52,11 @@ export function AnalyticsV3Page({ dataEnabled = true }: { dataEnabled?: boolean 
   const exchanges = useMemo(() => groupByExchange(filtered), [filtered])
   const products = useMemo(() => groupByProductType(filtered), [filtered])
   const charges = useMemo(() => buildChargesStatus(chargesQuery.data ?? null), [chargesQuery.data])
+  const chargesTitle = period === 'all' ? 'Charges & net P&L (latest 90 days)' : 'Charges & net P&L'
+  const chargesDescription = period === 'all'
+    ? 'Trade metrics above are all time. Charges/net P&L here use latest 90 days only; all-time net is not shown.'
+    : 'Net P&L only shown when all trading days have recorded charges.'
+  const netPnlLabel = period === 'all' ? 'Net P&L (90d)' : 'Net P&L'
 
   if (isLoading) return <Page title="Analytics"><LoadingState label="Loading analytics…" /></Page>
   if (error) return <Page title="Analytics"><ErrorState title="Could not load data" onRetry={() => void refresh()} /></Page>
@@ -79,14 +84,14 @@ export function AnalyticsV3Page({ dataEnabled = true }: { dataEnabled?: boolean 
         </Grid>
 
         {/* Charges / Net P&L */}
-        <Panel title="Charges & net P&L" description="Net P&L only shown when all trading days have recorded charges.">
+        <Panel title={chargesTitle} description={chargesDescription}>
           {charges.tradingDays === 0 ? (
             <EmptyState title="No trading days" description="No closed trades in this period." />
           ) : (
             <Grid minColumnWidth="10rem">
               <MetricCard label="Gross P&L" value={<MoneyValue value={charges.grossPnl} tone="auto" />} />
               <MetricCard label="Total charges" value={<MoneyValue value={charges.totalCharges} tone="neutral" />} />
-              <MetricCard label="Net P&L" value={charges.isComplete ? <MoneyValue value={charges.netPnl} tone="auto" /> : <Badge variant="warning">Pending — {charges.missingDays} day{charges.missingDays !== 1 ? 's' : ''} missing</Badge>} />
+              <MetricCard label={netPnlLabel} value={charges.isComplete ? <MoneyValue value={charges.netPnl} tone="auto" /> : <Badge variant="warning">Pending — {charges.missingDays} day{charges.missingDays !== 1 ? 's' : ''} missing</Badge>} />
               <MetricCard label="Charge days" value={<Value value={`${charges.chargesRecordedDays} / ${charges.tradingDays}`} />} />
             </Grid>
           )}

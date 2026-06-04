@@ -458,8 +458,7 @@ def test_trade_review_prompts_include_largest_loss(client, auth_user_token):
 
 
 def test_trade_review_prompts_use_explicit_stop_check(client, auth_user_token):
-    """Zero stop should count as missing stop, None should too, positive stop should not."""
-    _create_trade(client, auth_user_token, "ZERO", 100, 90, quantity=10, pnl=-100, setup="Breakout", stop_price=0)
+    """None stop should count as missing stop, positive stop should not."""
     _create_trade(client, auth_user_token, "NONE", 100, 90, quantity=10, pnl=-100, setup="Breakout")
     _create_trade(client, auth_user_token, "OK", 100, 110, quantity=10, pnl=100, setup="Breakout", stop_price=95)
 
@@ -470,7 +469,6 @@ def test_trade_review_prompts_use_explicit_stop_check(client, auth_user_token):
     assert resp.status_code == 200
     prompts = resp.json()
     no_stop_symbols = {p["symbol"] for p in prompts if "no-stop" in p.get("related_patterns", [])}
-    assert "ZERO" in no_stop_symbols
     assert "NONE" in no_stop_symbols
     assert "OK" not in no_stop_symbols
 

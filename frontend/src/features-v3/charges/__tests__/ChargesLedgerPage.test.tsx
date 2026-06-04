@@ -7,6 +7,8 @@ import { ChargesLedgerPage } from '../ChargesLedgerPage'
 const mocks = vi.hoisted(() => ({
   useChargesLedgerData: vi.fn(),
   deleteDailyCharges: vi.fn(),
+  upsertDailyCharges: vi.fn(),
+  listTrades: vi.fn(),
 }))
 
 vi.mock('../hooks/useChargesLedgerData', () => ({
@@ -18,6 +20,8 @@ vi.mock('@/lib/endpoints', async (importOriginal) => {
   return {
     ...actual,
     deleteDailyCharges: mocks.deleteDailyCharges,
+    upsertDailyCharges: mocks.upsertDailyCharges,
+    listTrades: mocks.listTrades,
   }
 })
 
@@ -70,9 +74,10 @@ function makeSummary(overrides: Partial<import('@/types').DailyChargesSummary> =
 describe('ChargesLedgerPage', () => {
   function renderPage() {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    return render(
+    const result = render(
       <QueryClientProvider client={qc}><ChargesLedgerPage /></QueryClientProvider>,
     )
+    return { ...result, qc }
   }
 
   beforeEach(() => {
@@ -86,6 +91,8 @@ describe('ChargesLedgerPage', () => {
       setPeriod: vi.fn(),
     })
     mocks.deleteDailyCharges.mockResolvedValue(undefined)
+    mocks.upsertDailyCharges.mockResolvedValue(undefined)
+    mocks.listTrades.mockResolvedValue({ items: [], total: 0 })
   })
 
   it('renders loading state', () => {
@@ -164,6 +171,56 @@ describe('ChargesLedgerPage', () => {
     })!
     await user.click(confirmDelete)
     await waitFor(() => expect(mocks.deleteDailyCharges).toHaveBeenCalled())
+  })
+
+  it('invalidates charges dependents after delete', async () => {
+    mocks.useChargesLedgerData.mockReturnValue({
+      data: makeSummary(),
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+      period: '30d',
+      setPeriod: vi.fn(),
+    })
+    const user = userEvent.setup()
+    const { qc } = renderPage()
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+
+    await user.click(screen.getAllByRole('button', { name: /^Delete$/i })[0])
+    const confirmDelete = screen.getAllByRole('button', { name: /^Delete$/i }).find((el) => el.closest('.tjv3-card') !== null)!
+    await user.click(confirmDelete)
+
+    await waitFor(() => expect(mocks.deleteDailyCharges).toHaveBeenCalled())
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-charges'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'intelligence'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analytics'] })
+  })
+
+  it('invalidates charges dependents after save', async () => {
+    mocks.useChargesLedgerData.mockReturnValue({
+      data: makeSummary({ days: [] }),
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+      period: '30d',
+      setPeriod: vi.fn(),
+    })
+    const user = userEvent.setup()
+    const { qc } = renderPage()
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+
+    await user.click(screen.getByRole('button', { name: /Add charges/i }))
+    await user.type(screen.getByLabelText(/Total charges/i), '25')
+    await user.click(screen.getByRole('button', { name: /Save charges/i }))
+
+    await waitFor(() => expect(mocks.upsertDailyCharges).toHaveBeenCalled())
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-charges'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'intelligence'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analytics'] })
   })
 
   it('does not show missing charges as zero', () => {

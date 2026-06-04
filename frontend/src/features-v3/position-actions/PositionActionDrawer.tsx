@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Button, Drawer, Stack, Badge, Divider } from '@/new-ui'
 import { createPartialExit, updateTrade, createStopHistory } from '@/lib/endpoints'
-import { invalidateTradeList, invalidateTradeDetail, invalidateRisk, invalidateLifecycle, invalidateAnalytics, invalidatePlaybook } from '@/lib/queryInvalidation'
+import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency } from '@/utils/format'
@@ -78,13 +78,7 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
 
   const handleSuccess = useCallback(() => {
     setSuccess(true)
-    void invalidateTradeList(qc)
-    void invalidateTradeDetail(qc, trade.id)
-    void invalidateRisk(qc)
-    void invalidateLifecycle(qc, trade.id)
-    void invalidateAnalytics(qc)
-    void invalidatePlaybook(qc)
-    void qc.invalidateQueries({ queryKey: ['daily-charges'] })
+    void invalidateTradeDomain(qc, trade.id)
     addToast({ title: 'Action completed', message: `${trade.symbol} updated.`, variant: 'success' })
     setTimeout(handleClose, 800)
   }, [qc, addToast, trade.symbol, trade.id, handleClose])
@@ -96,7 +90,7 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
       setError(`Quantity must be between 1 and ${remaining - 1} (partial only).`)
       return
     }
-    if (!price || price <= 0) { setError('Exit price required.'); return }
+    if (!price || price <= 0) { setError('Exit price must be positive.'); return }
     setSubmitting(true)
     setError(null)
     try {

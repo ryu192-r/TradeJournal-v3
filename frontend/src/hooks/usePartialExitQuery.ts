@@ -1,9 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listPartialExits, createPartialExit, deletePartialExit } from '@/lib/endpoints'
-import {
-  invalidateTradeDetail, invalidateRisk, invalidateLifecycle, invalidateAnalytics,
-  invalidateTradeList, invalidateOperationalDashboard, invalidateIntelligenceDashboard,
-} from '@/lib/queryInvalidation'
+import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { span } from '@/utils/performance'
 import { useRef } from 'react'
 import type { PartialExit, PartialExitCreatePayload, PartialExitListResponse, ApiTrade } from '@/types'
@@ -27,13 +24,7 @@ export function useCreatePartialExitMutation() {
       endSpanRef.current = span('mutation:partial-exit')
     },
     onSuccess: (_, { tradeId }) => {
-      void invalidateLifecycle(qc, tradeId)
-      void invalidateTradeDetail(qc, tradeId)
-      void invalidateRisk(qc)
-      void invalidateAnalytics(qc)
-      void invalidateTradeList(qc)
-      void invalidateOperationalDashboard(qc)
-      void invalidateIntelligenceDashboard(qc)
+      void invalidateTradeDomain(qc, tradeId)
       endSpanRef.current?.()
       endSpanRef.current = null
     },
@@ -54,13 +45,7 @@ export function useDeletePartialExitMutation() {
       endSpanRef.current = span('mutation:delete-partial-exit')
     },
     onSuccess: (_, { tradeId }) => {
-      void invalidateLifecycle(qc, tradeId)
-      void invalidateTradeDetail(qc, tradeId)
-      void invalidateRisk(qc)
-      void invalidateAnalytics(qc)
-      void invalidateTradeList(qc)
-      void invalidateOperationalDashboard(qc)
-      void invalidateIntelligenceDashboard(qc)
+      void invalidateTradeDomain(qc, tradeId)
       endSpanRef.current?.()
       endSpanRef.current = null
     },

@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { getIntelligenceDashboard, getOperationalDashboard, listTrades } from '@/lib/endpoints'
+import { getIntelligenceDashboard, getOperationalDashboard } from '@/lib/endpoints'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 import { normalizeTradeListResponse } from '../../shared/apiAdapters'
+import { listAllTrades } from '../../trades/api/listAllTrades'
 import type { CockpitV3Data } from '../types'
 
 export function useCockpitV3Data(enabled = true): CockpitV3Data {
@@ -22,8 +23,8 @@ export function useCockpitV3Data(enabled = true): CockpitV3Data {
     enabled,
   })
   const trades = useQuery<unknown>({
-    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 200 }],
-    queryFn: () => listTrades({ limit: 200 }),
+    queryKey: ['trades', { scope: 'all' }],
+    queryFn: () => listAllTrades(),
     placeholderData: (previousData: unknown) => previousData,
     enabled,
   })

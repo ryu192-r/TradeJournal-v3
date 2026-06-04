@@ -1,6 +1,7 @@
-const CACHE = 'tj-v3-v11'
+const CACHE = 'tj-v3-v12'
 const STATIC_URLS = ['/', '/index.html', '/manifest.json']
-const API_CACHE = 'tj-v3-api-v3'
+const API_CACHE = 'tj-v3-api-v4'
+const API_CACHE_MAX_AGE_MS = 5 * 60 * 1000
 
 // Install: cache static assets
 self.addEventListener('install', (e) => {
@@ -77,16 +78,58 @@ async function networkFirst(req) {
 
 async function networkFirstApi(req) {
   const cache = await caches.open(API_CACHE)
+  const cacheKey = await apiCacheKey(req)
   try {
     const res = await fetch(req)
-    const clone = res.clone()
-    cache.put(req, clone)
+    if (shouldCacheApiResponse(req, res)) {
+      await cacheApiResponse(cache, cacheKey, res)
+    }
     return res
   } catch {
-    const cached = await cache.match(req)
+    const cached = await freshCachedApiResponse(cache, cacheKey)
     return cached || new Response(
       JSON.stringify({ error: 'offline', message: 'You are offline. Data unavailable.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } }
     )
   }
+}
+
+function shouldCacheApiResponse(req, res) {
+  const url = new URL(req.url)
+  if (!res.ok) return false
+  if (url.pathname.startsWith('/api/v1/auth')) return false
+  return true
+}
+
+async function apiCacheKey(req) {
+  const url = new URL(req.url)
+  url.searchParams.set('__tj_auth', await hashText(req.headers.get('Authorization') || 'anon'))
+  return new Request(url.toString(), { method: 'GET' })
+}
+
+async function hashText(value) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
+}
+
+async function cacheApiResponse(cache, req, res) {
+  const headers = new Headers(res.headers)
+  headers.set('X-TJ-Cache-Time', String(Date.now()))
+  const body = await res.clone().arrayBuffer()
+  await cache.put(req, new Response(body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  }))
+}
+
+async function freshCachedApiResponse(cache, req) {
+  const cached = await cache.match(req)
+  if (!cached) return null
+  const cachedAt = Number(cached.headers.get('X-TJ-Cache-Time') || 0)
+  if (!cachedAt || Date.now() - cachedAt > API_CACHE_MAX_AGE_MS) {
+    await cache.delete(req)
+    return null
+  }
+  return cached
 }

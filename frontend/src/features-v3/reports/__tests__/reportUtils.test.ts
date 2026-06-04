@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { reportPeriodToRange, getPeriodLabel } from '../utils/reportPeriods'
 import { buildDailyRows, summarizeDaily } from '../utils/reportDaily'
-import type { DailyChargesDaySummary } from '@/types'
+import { filterBySessionRange } from '../../analytics/utils/analyticsMetrics'
+import type { ApiTrade, DailyChargesDaySummary } from '@/types'
 
 describe('reportPeriodToRange', () => {
   it('today period returns same date for start/end', () => {
@@ -35,6 +36,48 @@ describe('reportPeriodToRange', () => {
   it('getPeriodLabel returns label', () => {
     expect(getPeriodLabel('30d')).toBe('Last 30 days')
     expect(getPeriodLabel('today')).toBe('Today')
+  })
+})
+
+function trade(o: Partial<ApiTrade> = {}): ApiTrade {
+  return {
+    id: 1, symbol: 'RELIANCE', direction: 'LONG', entry_price: '100', exit_price: '110',
+    quantity: '10', entry_time: '2025-06-01T09:30:00', exit_time: '2025-06-01T15:00:00',
+    fees: '0', notes: null, tags: null, setup: null, tactic: null, stop_price: null,
+    target_price: null, r_multiple: null, status: 'closed', pnl: '100', remaining_qty: '0',
+    ...o,
+  }
+}
+
+describe('report trade range alignment', () => {
+  it('excludes closed trades outside the 30d charges range', () => {
+    const [start, end] = reportPeriodToRange('30d', '2025-06-15')
+    const filtered = filterBySessionRange([
+      trade({ id: 1, exit_time: '2025-05-15T15:00:00' }),
+      trade({ id: 2, exit_time: '2025-05-16T15:00:00' }),
+    ], start, end)
+
+    expect(filtered.map((t) => t.id)).toEqual([2])
+  })
+
+  it('excludes closed trades outside the 90d charges range', () => {
+    const [start, end] = reportPeriodToRange('90d', '2025-06-15')
+    const filtered = filterBySessionRange([
+      trade({ id: 1, exit_time: '2025-03-16T15:00:00' }),
+      trade({ id: 2, exit_time: '2025-03-17T15:00:00' }),
+    ], start, end)
+
+    expect(filtered.map((t) => t.id)).toEqual([2])
+  })
+
+  it('uses realized exit date so trade metrics align with charge summary range', () => {
+    const [start, end] = reportPeriodToRange('today', '2025-06-15')
+    const filtered = filterBySessionRange([
+      trade({ id: 1, entry_time: '2025-06-14T09:30:00', exit_time: '2025-06-15T15:00:00' }),
+      trade({ id: 2, entry_time: '2025-06-15T09:30:00', exit_time: '2025-06-16T15:00:00' }),
+    ], start, end)
+
+    expect(filtered.map((t) => t.id)).toEqual([1])
   })
 })
 

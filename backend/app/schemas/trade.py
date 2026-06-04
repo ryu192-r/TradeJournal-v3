@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_validator, field_serializer, ValidationInfo
 
 from app.utils.decimal_utils import ensure_decimal
 
@@ -102,8 +102,15 @@ class TradeBase(BaseModel):
     # Keep as strings to avoid precision loss
     @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "original_stop_price", "target_price", "r_multiple")
     @classmethod
-    def validate_decimal(cls, v):
-        return ensure_decimal(v)
+    def validate_decimal(cls, v, info: ValidationInfo):
+        value = ensure_decimal(v)
+        if value is None:
+            return value
+        if info.field_name in {"entry_price", "exit_price", "quantity", "stop_price", "original_stop_price", "target_price"} and value <= 0:
+            raise ValueError(f"{info.field_name} must be greater than 0")
+        if info.field_name == "fees" and value < 0:
+            raise ValueError("fees must be greater than or equal to 0")
+        return value
 
 
 class TradeCreate(TradeBase):
@@ -166,8 +173,15 @@ class TradeUpdate(BaseModel):
 
     @field_validator("entry_price", "exit_price", "quantity", "fees", "stop_price", "original_stop_price", "target_price", "r_multiple")
     @classmethod
-    def ensure_decimal(cls, v):
-        return ensure_decimal(v)
+    def ensure_decimal(cls, v, info: ValidationInfo):
+        value = ensure_decimal(v)
+        if value is None:
+            return value
+        if info.field_name in {"entry_price", "exit_price", "quantity", "stop_price", "original_stop_price", "target_price"} and value <= 0:
+            raise ValueError(f"{info.field_name} must be greater than 0")
+        if info.field_name == "fees" and value < 0:
+            raise ValueError("fees must be greater than or equal to 0")
+        return value
 
     @field_validator("exchange")
     @classmethod
@@ -312,5 +326,12 @@ class PyramidTradeRequest(BaseModel):
 
     @field_validator("entry_price", "quantity", "fees", "stop_price")
     @classmethod
-    def ensure_decimal(cls, v):
-        return ensure_decimal(v)
+    def ensure_decimal(cls, v, info: ValidationInfo):
+        value = ensure_decimal(v)
+        if value is None:
+            return value
+        if info.field_name in {"entry_price", "quantity", "stop_price"} and value <= 0:
+            raise ValueError(f"{info.field_name} must be greater than 0")
+        if info.field_name == "fees" and value < 0:
+            raise ValueError("fees must be greater than or equal to 0")
+        return value

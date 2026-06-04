@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/appStore'
 import type { CockpitMetrics } from '../types'
 import type { DailyChargesSummary } from '@/types'
 import { DailyChargesDrawer } from './DailyChargesDrawer'
+import { todaySessionDate } from '@/utils/tradeDates'
 
 interface ChargesIntelligenceProps {
   metrics: CockpitMetrics
@@ -22,7 +23,7 @@ export function ChargesIntelligence({ metrics, summary, onRefetch }: ChargesInte
   const netPnl = hasRealData && summary!.net_realized_pnl ? Number(summary!.net_realized_pnl) : null
   const missingDays = hasRealData ? (summary!.missing_charge_days ?? 0) : 0
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todaySessionDate()
 
   return (
     <>

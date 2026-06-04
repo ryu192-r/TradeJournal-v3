@@ -78,10 +78,11 @@ export function TradeFormV3Body({ mode, initialData, submitFn, onSubmitSuccess, 
     [entry_price, exit_price, quantity, fees, stop_price, target_price],
   )
 
-  const currentProtectionStop = mode === 'edit'
-    ? (initialData?.current_stop_price ?? initialData?.stop_price)
-    : undefined
-  const protectionStatus = initialData?.stop_loss_status
+  const originalStop = mode === 'edit' ? initialData?.original_stop_price : undefined
+  const stopFieldLabel = mode === 'edit' ? 'Current protection stop (₹)' : 'Original stop loss (₹)'
+  const stopFieldHelp = mode === 'edit'
+    ? 'Updates current/live protection SL only. Original risk SL remains unchanged.'
+    : 'Planning/risk SL — seeds original risk and current protection SL.'
 
   const onSubmit = async (data: TradeFormData) => {
     setServerError(null)
@@ -136,19 +137,19 @@ export function TradeFormV3Body({ mode, initialData, submitFn, onSubmitSuccess, 
         </Panel>
 
         {/* 3. Risk & Plan */}
-        <Panel title="Risk & plan" description="Original planned stop and target.">
+        <Panel title="Risk & plan" description={mode === 'edit' ? 'Current protection stop and original risk reference.' : 'Original planned stop and target.'}>
           <div className="tjv3-formgrid">
-            <FormInput label="Original stop loss (₹)" type="number" step="0.01" placeholder="e.g. 95" help="Planning/risk SL — used for original risk & R:R." {...register('stop_price')} error={errors.stop_price?.message} />
+            <FormInput label={stopFieldLabel} type="number" step="0.01" placeholder="e.g. 95" help={stopFieldHelp} {...register('stop_price')} error={errors.stop_price?.message} />
             <FormInput label="Target price (₹)" type="number" step="0.01" placeholder="e.g. 120" {...register('target_price')} error={errors.target_price?.message} />
           </div>
-          {mode === 'edit' && currentProtectionStop != null && (
+          {mode === 'edit' && originalStop != null && (
             <>
               <Divider />
               <div className="tjv3-tradeform__metarow">
-                <span>Current protection SL (read-only)</span>
-                <span>{formatCurrency(Number(currentProtectionStop))}{protectionStatus ? ` · ${protectionStatus}` : ''}</span>
+                <span>Original SL (read-only)</span>
+                <span>{formatCurrency(Number(originalStop))}</span>
               </div>
-              <span className="tjv3-formfield__help">Protection SL is managed via lifecycle actions and is not changed here.</span>
+              <span className="tjv3-formfield__help">Original risk plan is preserved on edit.</span>
             </>
           )}
         </Panel>
@@ -199,7 +200,7 @@ export function TradeFormV3Body({ mode, initialData, submitFn, onSubmitSuccess, 
             <Row label="Direction" value="LONG" />
             <Row label="Entry" value={entry_price ? formatCurrency(Number(entry_price)) : 'Unavailable'} />
             <Row label="Quantity" value={quantity || 'Unavailable'} />
-            <Row label="Original SL" value={stop_price ? formatCurrency(Number(stop_price)) : 'Not set'} />
+            <Row label={mode === 'edit' ? 'Current protection' : 'Original SL'} value={stop_price ? formatCurrency(Number(stop_price)) : 'Not set'} />
             <Row label="Target" value={target_price ? formatCurrency(Number(target_price)) : 'Not set'} />
             <Divider />
             <Row label="Planned risk" value={preview.hasEntryQty && preview.hasStop ? money(preview.riskAmount) : 'Unavailable'} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiTrade } from '@/types'
-import { computePerformance, groupBySetup, groupByExchange, groupByProductType, buildChargesStatus, filterByPeriod } from '../utils/analyticsMetrics'
+import { computePerformance, groupBySetup, groupByExchange, groupByProductType, buildChargesStatus, filterByPeriod, filterBySessionRange } from '../utils/analyticsMetrics'
 
 function trade(o: Partial<ApiTrade> = {}): ApiTrade {
   return {
@@ -110,5 +110,14 @@ describe('filterByPeriod', () => {
 
   it('all period includes everything non-deleted', () => {
     expect(filterByPeriod([trade(), trade({ id: 2, status: 'open', exit_price: null })], 'all').length).toBe(2)
+  })
+
+  it('closed period filtering uses realized exit date, not entry date', () => {
+    const r = filterBySessionRange([
+      trade({ id: 1, entry_time: '2025-06-01T09:30:00', exit_time: '2025-06-03T15:00:00' }),
+      trade({ id: 2, entry_time: '2025-06-03T09:30:00', exit_time: '2025-07-01T15:00:00' }),
+    ], '2025-06-01', '2025-06-30')
+
+    expect(r.map((t) => t.id)).toEqual([1])
   })
 })

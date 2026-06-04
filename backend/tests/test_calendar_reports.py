@@ -234,3 +234,28 @@ def test_reports_weekly_returns_deterministic_sections(db_session):
     assert payload["setup_report"][0]["setup"] == "Pullback"
     assert payload["behavior_report"]["journal_days"] == 1
     assert "csv" in payload["export_formats"]
+
+
+def test_reports_weekly_realized_pnl_uses_exit_date_not_entry_date(db_session):
+    user = _make_user(db_session)
+    trade = Trade(
+        symbol="TCS",
+        entry_price=Decimal("100"),
+        exit_price=Decimal("110"),
+        quantity=Decimal("10"),
+        entry_time=datetime(2026, 5, 3, 9, 30),
+        exit_time=datetime(2026, 5, 4, 15, 15),
+        pnl=Decimal("100"),
+        status="closed",
+        setup="EP",
+        user_id=user.id,
+    )
+    db_session.add(trade)
+    db_session.commit()
+
+    payload = get_weekly_report(week_start=date(2026, 5, 4), db=db_session, current_user=user)
+
+    assert payload["summary"]["closed_count"] == 1
+    assert payload["summary"]["net_pnl"] == "100.00"
+    assert payload["daily_report"] == [{"date": "2026-05-04", "trade_count": 0, "net_pnl": "100.00"}]
+    assert payload["trades"][0]["id"] == trade.id

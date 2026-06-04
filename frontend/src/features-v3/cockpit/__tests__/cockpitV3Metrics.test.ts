@@ -35,7 +35,8 @@ describe('Cockpit v3 metrics', () => {
 
   it('uses status and remaining quantity wrapper for open trades, not exit price null checks', () => {
     expect(isOpenTrade(trade({ status: 'open', exit_price: '120', remaining_qty: '5' }))).toBe(true)
-    expect(isOpenTrade(trade({ status: 'closed', exit_price: null, remaining_qty: '5' }))).toBe(false)
+    expect(isOpenTrade(trade({ status: 'closed', exit_price: null, remaining_qty: '5' }))).toBe(true)
+    expect(isOpenTrade(trade({ status: 'open', exit_price: '120', remaining_qty: '0' }))).toBe(false)
   })
 
   it('keeps missing charges pending and does not fake net P&L', () => {

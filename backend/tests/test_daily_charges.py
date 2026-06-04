@@ -279,6 +279,55 @@ def test_charges_summary_with_charges(client, auth_user_token):
     assert day["net_realized_pnl"] == "70.00000000"
 
 
+def test_charges_summary_uses_gross_trade_pnl_before_trade_fees(client, auth_user_token):
+    t = _create_trade(
+        client, auth_user_token, entry_price=100, exit_price=110, qty=10,
+        entry_time="2025-11-03T10:00:00", fees=5,
+    )
+    assert t.status_code in (200, 201)
+    client.put(
+        "/api/v1/daily-charges/2025-11-03",
+        json={"trade_date": "2025-11-03", "entry_mode": "total_only", "total_charges": 10},
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    resp = client.get(
+        "/api/v1/daily-charges/summary?start_date=2025-11-03&end_date=2025-11-03",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["gross_realized_pnl"] == "100.00000000"
+    assert body["net_realized_pnl"] == "90.00000000"
+
+
+def test_charges_summary_net_is_null_when_any_trade_day_missing(client, auth_user_token):
+    _create_trade(
+        client, auth_user_token, symbol="DAY1", entry_price=100, exit_price=110, qty=10,
+        entry_time="2025-11-01T10:00:00", fees=0,
+    )
+    _create_trade(
+        client, auth_user_token, symbol="DAY2", entry_price=100, exit_price=120, qty=10,
+        entry_time="2025-11-02T10:00:00", fees=0,
+    )
+    _upsert_charges(client, auth_user_token, trade_date="2025-11-01", brokerage=20, stt=10)
+
+    resp = client.get(
+        "/api/v1/daily-charges/summary?start_date=2025-11-01&end_date=2025-11-02",
+        headers={"Authorization": f"Bearer {auth_user_token}"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["trading_days"] == 2
+    assert body["charges_recorded_days"] == 1
+    assert body["missing_charge_days"] == 1
+    assert body["gross_realized_pnl"] == "300.00000000"
+    assert body["total_charges"] == "30.00000000"
+    assert body["net_realized_pnl"] is None
+
+
 def test_charges_user_isolation(client, auth_user_token):
     _upsert_charges(client, auth_user_token, trade_date="2025-12-01")
     # Register second user

@@ -1,27 +1,43 @@
 import { z } from 'zod'
 
+function requiredPositiveNumber(label: string) {
+  return z.string()
+    .min(1, `${label} is required`)
+    .refine((v) => Number.isFinite(Number(v)), `${label} must be a valid number`)
+    .refine((v) => Number(v) > 0, `${label} must be greater than 0`)
+}
+
+function optionalNumber(label: string, opts: { positive?: boolean; nonNegative?: boolean; integer?: boolean } = {}) {
+  return z.string()
+    .optional()
+    .refine((v) => v == null || v === '' || Number.isFinite(Number(v)), `${label} must be a valid number`)
+    .refine((v) => v == null || v === '' || !opts.positive || Number(v) > 0, `${label} must be greater than 0`)
+    .refine((v) => v == null || v === '' || !opts.nonNegative || Number(v) >= 0, `${label} must be greater than or equal to 0`)
+    .refine((v) => v == null || v === '' || !opts.integer || Number.isInteger(Number(v)), `${label} must be a whole number`)
+}
+
 export const tradeFormSchema = z.object({
   symbol: z
     .string()
     .min(1, 'Symbol is required')
     .max(20, 'Symbol too long')
     .toUpperCase(),
-  entry_price: z.string().min(1, 'Entry price is required'),
-  exit_price: z.string().optional(),
-  quantity: z.string().min(1, 'Quantity is required'),
+  entry_price: requiredPositiveNumber('Entry price'),
+  exit_price: optionalNumber('Exit price', { positive: true }),
+  quantity: requiredPositiveNumber('Quantity'),
   entry_time: z.string().min(1, 'Entry time is required'),
   exit_time: z.string().optional(),
-  fees: z.string().optional().default('0'),
+  fees: optionalNumber('Fees', { nonNegative: true }).default('0'),
   setup: z.string().optional(),
   tactic: z.string().optional(),
-  stop_price: z.string().optional(),
-  target_price: z.string().optional(),
+  stop_price: optionalNumber('Stop price', { positive: true }),
+  target_price: optionalNumber('Target price', { positive: true }),
   tags: z.string().optional(),
   notes: z.string().optional(),
   exchange: z.string().optional(),
   segment: z.string().optional(),
   product_type: z.string().optional(),
-  executed_order_count: z.string().optional(),
+  executed_order_count: optionalNumber('Executed order count', { positive: true, integer: true }),
 })
 
 export type TradeFormData = z.infer<typeof tradeFormSchema>
@@ -90,7 +106,7 @@ export function formDataToApiPayload(
     exchange: data.exchange || 'UNKNOWN',
     segment: data.segment || 'UNKNOWN',
     product_type: data.product_type || 'UNKNOWN',
-    executed_order_count: data.executed_order_count ? parseInt(data.executed_order_count, 10) || null : null,
+    executed_order_count: data.executed_order_count ? Number(data.executed_order_count) : null,
   }
   if (options?.mode === 'edit') {
     // Single SL field edits current/live stop only. Original risk plan stays stable

@@ -18,7 +18,7 @@ function trade(o: Partial<ApiTrade> = {}): ApiTrade {
     id: 7, symbol: 'TCS', direction: 'LONG', entry_price: '3000', exit_price: null,
     quantity: '5', entry_time: '2025-06-03T10:00:00', exit_time: null, fees: '0',
     notes: null, tags: null, setup: null, tactic: null, stop_price: '2900',
-    current_stop_price: '2950', stop_loss_status: 'breakeven', target_price: '3200',
+    original_stop_price: '2850', current_stop_price: '2950', stop_loss_status: 'breakeven', target_price: '3200',
     r_multiple: null, status: 'open', remaining_qty: null,
     exchange: 'NSE', segment: 'EQUITY', product_type: 'INTRADAY', executed_order_count: 2, ...o,
   }
@@ -60,10 +60,11 @@ describe('TradeFormV3Body', () => {
     expect(screen.getByDisplayValue('3000')).toBeInTheDocument()
   })
 
-  it('shows current protection SL read-only in edit mode', () => {
+  it('labels editable stop as current protection and shows original SL read-only in edit mode', () => {
     render(<TradeFormV3Body mode="edit" initialData={trade()} submitFn={vi.fn()} />)
-    expect(screen.getByText(/Current protection SL/i)).toBeInTheDocument()
-    expect(screen.getByText(/breakeven/i)).toBeInTheDocument()
+    expect(screen.getByText('Current protection stop (₹)')).toBeInTheDocument()
+    expect(screen.getByText('Original SL (read-only)')).toBeInTheDocument()
+    expect(screen.getByText(/Original risk plan is preserved/i)).toBeInTheDocument()
   })
 
   it('submits create with metadata payload', async () => {

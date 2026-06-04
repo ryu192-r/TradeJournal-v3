@@ -146,3 +146,20 @@ def test_operational_dashboard_queries_live_quotes_for_open_symbols_only(db_sess
     assert "CLOSED" not in query_params
     assert [trade.symbol for trade in data.open_trades] == ["OPENONLY"]
     assert Decimal(data.capital.unrealized_pnl) == Decimal("500.00")
+
+
+def test_operational_dashboard_drawdown_uses_realized_exit_date(db_session):
+    user = _make_user(db_session)
+    db_session.add(_account(user.id))
+    winner = _trade("WIN", "1000.00", user.id)
+    winner.entry_time = datetime.fromisoformat("2026-05-01T09:30:00")
+    winner.exit_time = datetime.fromisoformat("2026-05-01T15:15:00")
+    loser = _trade("LOSS", "-5000.00", user.id)
+    loser.entry_time = datetime.fromisoformat("2026-05-01T10:00:00")
+    loser.exit_time = datetime.fromisoformat("2026-05-02T15:15:00")
+    db_session.add_all([winner, loser])
+    db_session.commit()
+
+    data = operational_dashboard(db_session, current_user=user)
+
+    assert data.kpi.max_drawdown_amount == 5000.0

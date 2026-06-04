@@ -7,13 +7,19 @@ export function isDeletedTrade(trade: ApiTrade): boolean {
 }
 
 export function isClosedTradeV3(trade: ApiTrade): boolean {
-  return trade.status === 'closed'
+  if (isDeletedTrade(trade)) return false
+  const remaining = safeNumber(trade.remaining_qty)
+  if (remaining != null && remaining > 0) return false
+  return trade.exit_price != null || trade.status === 'closed'
 }
 
 export function isOpenTradeV3Wrapper(trade: ApiTrade): boolean {
   if (isDeletedTrade(trade)) return false
-  const remaining = safeNumber(trade.remaining_qty ?? trade.quantity)
-  return trade.status === 'open' || (trade.status !== 'closed' && remaining != null && remaining > 0)
+  const remaining = safeNumber(trade.remaining_qty)
+  if (remaining != null && remaining > 0) return true
+  if (trade.exit_price != null) return false
+  if (trade.status === 'closed') return false
+  return trade.status === 'open' || trade.exit_price == null
 }
 
 export function isPartialTradeV3(trade: ApiTrade): boolean {

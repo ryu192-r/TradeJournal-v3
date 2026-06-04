@@ -40,6 +40,13 @@ function wrap(ui: React.ReactElement) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
 }
 
+function renderWithClient(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+  render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+  return { invalidateSpy }
+}
+
 describe('PositionActionDrawer', () => {
   beforeEach(() => {
     mocks.createPartialExit.mockReset()
@@ -91,6 +98,39 @@ describe('PositionActionDrawer', () => {
     expect(mocks.createPartialExit.mock.calls[0][1].qty).toBe('5')
   })
 
+  it('invalidates trade, lifecycle, dashboard, analytics, and charges after action', async () => {
+    mocks.createPartialExit.mockResolvedValue({ partial_exit: {}, trade: openTrade() })
+    const user = userEvent.setup()
+    const { invalidateSpy } = renderWithClient(<PositionActionDrawer open trade={openTrade()} onClose={vi.fn()} />)
+    const qtyInput = screen.getByText('Exit quantity').closest('label')!.querySelector('input')!
+    const priceInput = screen.getByText('Exit price (₹)').closest('label')!.querySelector('input')!
+
+    await user.type(qtyInput, '5')
+    await user.type(priceInput, '2600')
+    await user.click(screen.getByText('Add partial exit'))
+
+    await waitFor(() => expect(mocks.createPartialExit).toHaveBeenCalled())
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trades'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trade', 1] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['partial-exits', 1] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'intelligence'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analytics'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-charges'] })
+  })
+
+  it('shows matching validation message for non-positive partial exit price', async () => {
+    const user = userEvent.setup()
+    render(wrap(<PositionActionDrawer open trade={openTrade()} onClose={vi.fn()} />))
+    const qtyInput = screen.getByText('Exit quantity').closest('label')!.querySelector('input')!
+    const priceInput = screen.getByText('Exit price (₹)').closest('label')!.querySelector('input')!
+    await user.type(qtyInput, '5')
+    await user.type(priceInput, '0')
+    await user.click(screen.getByText('Add partial exit'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Exit price must be positive.')
+    expect(mocks.createPartialExit).not.toHaveBeenCalled()
+  })
+
   it('submits valid close', async () => {
     mocks.updateTrade.mockResolvedValue(closedTrade())
     const user = userEvent.setup()
@@ -103,6 +143,24 @@ describe('PositionActionDrawer', () => {
     expect(mocks.updateTrade.mock.calls[0][1].exit_price).toBe('2600')
   })
 
+  it('invalidates affected domains after close', async () => {
+    mocks.updateTrade.mockResolvedValue(closedTrade())
+    const user = userEvent.setup()
+    const { invalidateSpy } = renderWithClient(<PositionActionDrawer open trade={openTrade()} onClose={vi.fn()} initialAction="close" />)
+    const priceInput = screen.getByText('Close price (₹)').closest('label')!.querySelector('input')!
+
+    await user.type(priceInput, '2600')
+    const buttons = screen.getAllByText('Close trade')
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => expect(mocks.updateTrade).toHaveBeenCalled())
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trades'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trade', 1] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analytics'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-charges'] })
+  })
+
   it('submits valid stop update', async () => {
     mocks.createStopHistory.mockResolvedValue({})
     const user = userEvent.setup()
@@ -112,6 +170,23 @@ describe('PositionActionDrawer', () => {
     await user.click(screen.getByText('Update stop'))
     await waitFor(() => expect(mocks.createStopHistory).toHaveBeenCalled())
     expect(mocks.createStopHistory.mock.calls[0][1].price).toBe('2500')
+  })
+
+  it('invalidates affected domains after stop update', async () => {
+    mocks.createStopHistory.mockResolvedValue({})
+    const user = userEvent.setup()
+    const { invalidateSpy } = renderWithClient(<PositionActionDrawer open trade={openTrade()} onClose={vi.fn()} initialAction="protection_stop" />)
+    const priceInput = screen.getByText('New stop price (₹)').closest('label')!.querySelector('input')!
+
+    await user.type(priceInput, '2500')
+    await user.click(screen.getByText('Update stop'))
+
+    await waitFor(() => expect(mocks.createStopHistory).toHaveBeenCalled())
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trades'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trade', 1] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['stop-history', 1] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['risk-dashboard'] })
   })
 
   it('shows error on API failure', async () => {
