@@ -3,29 +3,32 @@ import { AlertTriangle, CircleDollarSign, ClipboardCheck, ReceiptText, Shield, S
 import type { CockpitMetrics } from '../types'
 
 export function CockpitPerformanceDeck({ metrics }: { metrics: CockpitMetrics }) {
-  const chargesValue = metrics.chargesState === 'recorded'
+  const hasCharges = metrics.recordedFees != null
+  const chargesValue = hasCharges
     ? <MoneyValue value={metrics.recordedFees} tone="neutral" />
     : <Value value={metrics.chargesState === 'no_trades' ? 'No trades' : 'Not added'} />
   const chargesDescription = metrics.chargesState === 'recorded'
-    ? 'Trade-level fees are present.'
+    ? 'From daily charges ledger.'
     : metrics.chargesState === 'no_trades'
       ? 'No period trades to reconcile.'
-      : 'Pending daily charges. Missing charges are not treated as zero.'
+      : hasCharges
+        ? 'Partial — some trading days still need charges.'
+        : 'Pending daily charges. Missing charges are not treated as zero.'
   const netValue = metrics.netPnlState === 'available'
     ? <MoneyValue value={metrics.netPnl} tone="auto" />
     : <Value value={metrics.netPnlState === 'no_trades' ? 'No trades' : 'Pending'} />
   const netDescription = metrics.netPnlState === 'available'
-    ? 'Based on recorded trade-level fees.'
+    ? 'Gross minus recorded daily charges.'
     : metrics.netPnlState === 'no_trades'
       ? 'No period trades yet.'
-      : 'Net unlocks after charges are recorded.'
+      : 'Net unlocks after all trading days have charges.'
 
   return (
     <Grid minColumnWidth="12.5rem">
       <MetricCard
         label="Gross P&L"
         value={<MoneyValue value={metrics.grossPnl} tone="auto" />}
-        description="Closed trades before recorded trade-level fees."
+        description="Realized P&L on closed trades, before daily charges."
         tone={metrics.grossPnl == null ? 'neutral' : metrics.grossPnl >= 0 ? 'profit' : 'loss'}
         icon={<CircleDollarSign aria-hidden="true" />}
       />

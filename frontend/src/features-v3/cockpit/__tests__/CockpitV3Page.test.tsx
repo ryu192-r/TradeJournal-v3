@@ -111,7 +111,7 @@ describe('CockpitV3Page', () => {
       trades: [trade({ pnl: '100', fees: '10', setup: 'Breakout', tags: ['breakout'], notes: 'Clean', review_notes: 'Reviewed' })],
     }))
     mocks.useDailyChargesSummary.mockReturnValue({
-      data: { charges_recorded_days: 1, trading_days: 1, missing_charge_days: 0 },
+      data: { charges_recorded_days: 1, trading_days: 1, missing_charge_days: 0, total_charges: '10', gross_realized_pnl: '110', net_realized_pnl: '100' },
       isLoading: false, isFetching: false, error: null, refetch: vi.fn(),
     })
 

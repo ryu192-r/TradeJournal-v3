@@ -53,12 +53,13 @@ describe('Cockpit v3 metrics', () => {
       'all',
       undefined,
       undefined,
-      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0 },
+      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0, totalCharges: 100, grossRealizedPnl: 500, netRealizedPnl: 400 },
     )
 
     expect(metrics.chargesState).toBe('recorded')
+    expect(metrics.recordedFees).toBe(100) // from daily charges ledger, not trade fees
     expect(metrics.netPnlState).toBe('available')
-    expect(metrics.netPnl).toBe(450)
+    expect(metrics.netPnl).toBe(400) // ledger net
     expect(calculateGrossPnl(metrics.closedTrades)).toBe(500)
   })
 
@@ -68,12 +69,22 @@ describe('Cockpit v3 metrics', () => {
       'all',
       undefined,
       undefined,
-      { chargesRecordedDays: 1, tradingDays: 3, missingDays: 2 },
+      { chargesRecordedDays: 1, tradingDays: 3, missingDays: 2, totalCharges: 100, grossRealizedPnl: 500, netRealizedPnl: null },
     )
 
     expect(metrics.chargesState).toBe('pending')
     expect(metrics.netPnlState).toBe('pending_charges')
     expect(metrics.netPnl).toBeNull()
+  })
+
+  it('gross P&L is realized pnl + fees, never inflated by adding abs losses', () => {
+    // Two trades: +1000 win, -400 loss. Gross = 600 (NOT 1400).
+    const metrics = buildCockpitMetrics([
+      trade({ id: 1, pnl: '1000', fees: '0', status: 'closed' }),
+      trade({ id: 2, pnl: '-400', fees: '0', status: 'closed' }),
+    ], 'all')
+
+    expect(metrics.grossPnl).toBe(600)
   })
 
   it('keeps invalid numeric values safe', () => {
@@ -97,7 +108,7 @@ describe('Cockpit v3 metrics', () => {
       'all',
       undefined,
       undefined,
-      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0 },
+      { chargesRecordedDays: 1, tradingDays: 1, missingDays: 0, totalCharges: 10, grossRealizedPnl: 110, netRealizedPnl: 100 },
     )
 
     expect(metrics.reviewItems).toHaveLength(0)

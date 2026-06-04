@@ -219,6 +219,12 @@ export interface ChargesContext {
   chargesRecordedDays: number | null
   tradingDays: number | null
   missingDays: number | null
+  /** Total recorded daily charges for the period (₹). null if none recorded. */
+  totalCharges: number | null
+  /** Gross realized P&L for the period from the charges ledger (recorded days). */
+  grossRealizedPnl: number | null
+  /** Net realized P&L from the ledger (gross − charges), only when complete. */
+  netRealizedPnl: number | null
 }
 
 function resolveChargesState(
@@ -244,29 +250,29 @@ export function buildCockpitMetrics(
   const closedTrades = periodTrades.filter(isClosedTrade)
   const activeTrades = normalTrades.filter(isOpenTrade)
 
-  // For 'all' period, prefer backend KPI (computed from ALL trades, not 200-cap)
-  const useBackendKpi = period === 'all' && operational?.kpi != null
-  const kpi = operational?.kpi
+  // Gross P&L = realized P&L before daily charges = sum(pnl + fees).
+  // Computed locally from fetched closed trades (period-filtered).
+  const grossPnl = calculateGrossPnl(closedTrades)
 
-  const grossPnl = useBackendKpi
-    ? safeNumber(kpi!.gross_profit) != null && safeNumber(kpi!.gross_loss) != null
-      ? (safeNumber(kpi!.gross_profit) ?? 0) + (safeNumber(kpi!.gross_loss) ?? 0)
-      : calculateGrossPnl(closedTrades)
-    : calculateGrossPnl(closedTrades)
-
-  const recordedFees = calculateRecordedFees(closedTrades)
-
-  // Charges state from daily charges ledger (source of truth), NOT per-trade fees
+  // Charges come from the daily charges LEDGER (source of truth), NOT per-trade fees.
   const chargesState = resolveChargesState(periodTrades, chargesContext ?? null)
+  const recordedFees = chargesContext?.totalCharges ?? null
 
-  const periodNetValues = closedTrades
-    .map((trade) => safeNumber(trade.pnl))
-    .filter((value): value is number => value != null)
-  const periodNet = periodNetValues.length > 0 ? periodNetValues.reduce((sum, value) => sum + value, 0) : null
-
+  // Net P&L = Gross − recorded daily charges, only when all trading days have charges.
   const netPnlState = periodTrades.length === 0 ? 'no_trades' : chargesState === 'recorded' ? 'available' : 'pending_charges'
+  const netPnl = netPnlState === 'available'
+    ? (chargesContext?.netRealizedPnl != null
+        ? chargesContext.netRealizedPnl
+        : grossPnl != null && recordedFees != null
+          ? grossPnl - recordedFees
+          : null)
+    : null
 
   const openRisk = calculateOpenRisk(activeTrades, operational)
+
+  // For 'all' period prefer backend KPI (covers ALL trades, not the 200-row fetch cap).
+  const useBackendKpi = period === 'all' && operational?.kpi != null
+  const kpi = operational?.kpi
 
   const winRate = useBackendKpi && kpi!.win_rate != null
     ? kpi!.win_rate
@@ -298,7 +304,7 @@ export function buildCockpitMetrics(
     hasRecordedFees: (recordedFees ?? 0) > 0,
     chargesState,
     netPnlState,
-    netPnl: netPnlState === 'available' ? periodNet : null,
+    netPnl,
     openRisk,
     winRate,
     avgR,

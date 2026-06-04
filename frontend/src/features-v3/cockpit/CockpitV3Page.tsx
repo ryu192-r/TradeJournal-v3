@@ -33,6 +33,9 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
       chargesRecordedDays: chargesQuery.data.charges_recorded_days ?? null,
       tradingDays: chargesQuery.data.trading_days ?? null,
       missingDays: chargesQuery.data.missing_charge_days ?? null,
+      totalCharges: chargesQuery.data.total_charges != null ? Number(chargesQuery.data.total_charges) : null,
+      grossRealizedPnl: chargesQuery.data.gross_realized_pnl != null ? Number(chargesQuery.data.gross_realized_pnl) : null,
+      netRealizedPnl: chargesQuery.data.net_realized_pnl != null ? Number(chargesQuery.data.net_realized_pnl) : null,
     } : null),
     [data.operational, data.trades, period, chargesQuery.data],
   )
