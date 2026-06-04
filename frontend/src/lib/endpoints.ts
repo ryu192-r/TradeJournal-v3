@@ -84,6 +84,10 @@ export function createStopHistory(tradeId: number, payload: import('@/types').St
   return apiClient.post<import('@/types').StopHistoryEntry>(`/trades/${tradeId}/stop-history`, payload).then(r => r.data)
 }
 
+export function deleteStopHistory(tradeId: number, entryId: number) {
+  return apiClient.delete<{ message: string; trade_stop_price: string | null }>(`/trades/${tradeId}/stop-history/${entryId}`).then(r => r.data)
+}
+
 export function uploadChartImage(tradeId: number, file: File) {
   const formData = new FormData()
   formData.append('file', file)

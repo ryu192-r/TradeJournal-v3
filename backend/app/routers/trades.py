@@ -416,6 +416,35 @@ def create_stop_history(
     return entry
 
 
+@router.delete("/{trade_id}/stop-history/{entry_id}", status_code=status.HTTP_200_OK)
+def delete_stop_history(
+    trade_id: int,
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trade = get_user_trade_or_404(db, trade_id, current_user.id)
+    entry = db.query(StopHistory).filter(StopHistory.id == entry_id, StopHistory.trade_id == trade_id).first()
+    if not entry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stop history entry not found")
+    db.delete(entry)
+    # Revert trade.stop_price to most recent remaining entry or original
+    remaining = (
+        db.query(StopHistory)
+        .filter(StopHistory.trade_id == trade_id, StopHistory.id != entry_id)
+        .order_by(StopHistory.timestamp.desc())
+        .first()
+    )
+    if remaining:
+        trade.stop_price = remaining.price
+    else:
+        trade.stop_price = trade.original_stop_price if hasattr(trade, 'original_stop_price') and trade.original_stop_price else None
+    trade.compute_pnl()
+    _auto_reconcile(db, user_id=current_user.id)
+    db.commit()
+    return {"message": "deleted", "trade_stop_price": str(trade.stop_price) if trade.stop_price else None}
+
+
 # ─────────────────────── Chart Images ───────────────────────
 
 

@@ -23,6 +23,8 @@ export interface TradeDetailTimelineEvent {
   label: string
   detail: string
   kind: TradeDetailTimelineKind
+  type?: string
+  sourceId?: number | null
 }
 
 export type RiskProtectionState =

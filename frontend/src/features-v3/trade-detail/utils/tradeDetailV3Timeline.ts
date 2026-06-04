@@ -33,6 +33,8 @@ export function buildTradeDetailTimeline(
       label: `Stop moved (${stop.stop_type})`,
       detail: formatPrice(Number(stop.price)),
       kind: 'stop',
+      type: 'stop_updated',
+      sourceId: stop.id,
     })
   }
 

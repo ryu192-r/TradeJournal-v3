@@ -1,13 +1,15 @@
-import { DataList, DataRow, EmptyState, MoneyValue, Panel, Value } from '@/new-ui'
-import { Layers } from 'lucide-react'
+import { Button, DataList, DataRow, EmptyState, MoneyValue, Panel, Value } from '@/new-ui'
+import { Layers, Trash2 } from 'lucide-react'
 import type { PartialExit } from '@/types'
 import { formatTradeDateTime, formatTradePrice, formatTradeQuantity, safeNumber } from '../utils/tradeDetailV3Formatters'
 
 interface PartialExitsPanelProps {
   partialExits: PartialExit[]
+  onDelete?: (exitId: number) => void
+  isDeleting?: boolean
 }
 
-export function PartialExitsPanel({ partialExits }: PartialExitsPanelProps) {
+export function PartialExitsPanel({ partialExits, onDelete, isDeleting }: PartialExitsPanelProps) {
   return (
     <Panel title="Partial exits" description="Recorded partial exits from existing API data.">
       {partialExits.length === 0 ? (
@@ -27,6 +29,11 @@ export function PartialExitsPanel({ partialExits }: PartialExitsPanelProps) {
                 <div className="tjv3-trade-detail__partial-trailing">
                   <Value value={`${formatTradeQuantity(exit.qty)} @ ${formatTradePrice(exit.exit_price)}`} />
                   <MoneyValue value={safeNumber(exit.realized_pnl)} tone="auto" />
+                  {onDelete && (
+                    <Button variant="ghost" size="sm" onClick={() => onDelete(exit.id)} disabled={isDeleting}>
+                      <Trash2 aria-hidden="true" size={13} />
+                    </Button>
+                  )}
                 </div>
               }
             />

@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Grid, Stack } from '@/new-ui'
 import { useAppStore } from '@/store/appStore'
+import { deletePartialExit, deleteStopHistory } from '@/lib/endpoints'
+import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { useTradeDetailV3Data } from './hooks/useTradeDetailV3Data'
 import type { TradeDetailV3PageProps } from './types'
 import { PositionActionDrawer, type PositionAction } from '../position-actions'
@@ -44,6 +47,17 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
   const openAction = (action: PositionAction) => setActionDrawer({ open: true, action })
   const closeAction = () => setActionDrawer((s) => ({ ...s, open: false }))
 
+  // Delete mutations
+  const qc = useQueryClient()
+  const deletePartialMut = useMutation({
+    mutationFn: (exitId: number) => deletePartialExit(tradeId, exitId),
+    onSuccess: () => void invalidateTradeDomain(qc, tradeId),
+  })
+  const deleteStopMut = useMutation({
+    mutationFn: (entryId: number) => deleteStopHistory(tradeId, entryId),
+    onSuccess: () => void invalidateTradeDomain(qc, tradeId),
+  })
+
   if (data.isLoading) {
     return (
       <div className="tjv3-trade-detail">
@@ -84,8 +98,16 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
         </Grid>
 
         <Grid minColumnWidth="18rem">
-          <TradeLifecycleTimeline events={timeline} />
-          <PartialExitsPanel partialExits={data.partialExits} />
+          <TradeLifecycleTimeline
+            events={timeline}
+            onDeleteStopEntry={(id) => deleteStopMut.mutate(id)}
+            isDeletingStop={deleteStopMut.isPending}
+          />
+          <PartialExitsPanel
+            partialExits={data.partialExits}
+            onDelete={(id) => deletePartialMut.mutate(id)}
+            isDeleting={deletePartialMut.isPending}
+          />
         </Grid>
 
         <Grid minColumnWidth="18rem">
