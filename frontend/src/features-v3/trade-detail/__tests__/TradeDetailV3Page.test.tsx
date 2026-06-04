@@ -1,8 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ApiTrade } from '@/types'
 import { TradeDetailV3Page } from '../TradeDetailV3Page'
+
+function wrap(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+}
 
 const mocks = vi.hoisted(() => ({
   useTradeDetailV3Data: vi.fn(),
@@ -77,7 +83,7 @@ describe('TradeDetailV3Page', () => {
     mocks.openEditTrade.mockClear()
     mocks.useTradeDetailV3Data.mockReturnValue({
       trade: trade(),
-      partialExits: [],
+      partialExits: [], pyramidEntries: [],
       stopHistory: [],
       timelineEvents: [],
       isLoading: false,
@@ -89,7 +95,7 @@ describe('TradeDetailV3Page', () => {
   it('renders loading state', () => {
     mocks.useTradeDetailV3Data.mockReturnValue({
       trade: undefined,
-      partialExits: [],
+      partialExits: [], pyramidEntries: [],
       stopHistory: [],
       timelineEvents: [],
       isLoading: true,
@@ -97,14 +103,14 @@ describe('TradeDetailV3Page', () => {
       refresh: vi.fn(),
     })
 
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.getByLabelText('Loading trade detail')).toBeInTheDocument()
   })
 
   it('renders not-found state', () => {
     mocks.useTradeDetailV3Data.mockReturnValue({
       trade: undefined,
-      partialExits: [],
+      partialExits: [], pyramidEntries: [],
       stopHistory: [],
       timelineEvents: [],
       isLoading: false,
@@ -112,12 +118,12 @@ describe('TradeDetailV3Page', () => {
       refresh: vi.fn(),
     })
 
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.getByText('Trade not found')).toBeInTheDocument()
   })
 
   it('renders trade summary and separate SL fields', () => {
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
 
     expect(screen.getByRole('heading', { name: 'RELIANCE', level: 1 })).toBeInTheDocument()
     expect(screen.getAllByText('Original planned SL').length).toBeGreaterThan(0)
@@ -127,7 +133,7 @@ describe('TradeDetailV3Page', () => {
   })
 
   it('renders partial exits empty state', () => {
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.getByText('No partial exits recorded')).toBeInTheDocument()
   })
 
@@ -147,6 +153,7 @@ describe('TradeDetailV3Page', () => {
           note: 'Trim',
         },
       ],
+      pyramidEntries: [],
       stopHistory: [],
       timelineEvents: [],
       isLoading: false,
@@ -154,19 +161,19 @@ describe('TradeDetailV3Page', () => {
       refresh: vi.fn(),
     })
 
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.queryByText('No partial exits recorded')).not.toBeInTheDocument()
     expect(screen.getByText('Trim')).toBeInTheDocument()
   })
 
   it('renders chart workspace or honest placeholder path', () => {
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.getByText('Chart workspace mock')).toBeInTheDocument()
   })
 
   it('supports back to trades action', async () => {
     const user = userEvent.setup()
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
 
     await user.click(screen.getAllByRole('button', { name: /Back to Trades/ })[0])
     expect(mocks.closeTradeForm).toHaveBeenCalled()
@@ -175,7 +182,7 @@ describe('TradeDetailV3Page', () => {
   it('shows deleted status via header badges', () => {
     mocks.useTradeDetailV3Data.mockReturnValue({
       trade: trade({ status: 'deleted' }),
-      partialExits: [],
+      partialExits: [], pyramidEntries: [],
       stopHistory: [],
       timelineEvents: [],
       isLoading: false,
@@ -183,7 +190,7 @@ describe('TradeDetailV3Page', () => {
       refresh: vi.fn(),
     })
 
-    render(<TradeDetailV3Page tradeId={42} />)
+    render(wrap(<TradeDetailV3Page tradeId={42} />))
     expect(screen.getByText('DELETED')).toBeInTheDocument()
   })
 })

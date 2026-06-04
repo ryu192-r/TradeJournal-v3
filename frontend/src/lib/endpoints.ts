@@ -398,6 +398,28 @@ export function deletePartialExit(tradeId: number, exitId: number) {
   return apiClient.delete<{ trade: import('@/types').ApiTrade }>(`/trades/${tradeId}/partial-exits/${exitId}`).then(r => r.data)
 }
 
+export function updatePartialExit(tradeId: number, exitId: number, payload: import('@/types').PartialExitUpdatePayload) {
+  return apiClient.put<import('@/types').PartialExit>(`/trades/${tradeId}/partial-exits/${exitId}`, payload).then(r => r.data)
+}
+
+// ───────────────────────── Pyramid Entries ─────────────────────────
+
+export function listPyramidEntries(tradeId: number) {
+  return apiClient.get<import('@/types').PyramidEntryListResponse>(`/trades/${tradeId}/pyramid-entries`).then(r => r.data)
+}
+
+export function createPyramidEntry(tradeId: number, payload: import('@/types').PyramidEntryCreatePayload) {
+  return apiClient.post<import('@/types').PyramidEntry>(`/trades/${tradeId}/pyramid-entries`, payload).then(r => r.data)
+}
+
+export function updatePyramidEntry(tradeId: number, entryId: number, payload: import('@/types').PyramidEntryUpdatePayload) {
+  return apiClient.put<import('@/types').PyramidEntry>(`/trades/${tradeId}/pyramid-entries/${entryId}`, payload).then(r => r.data)
+}
+
+export function deletePyramidEntry(tradeId: number, entryId: number) {
+  return apiClient.delete(`/trades/${tradeId}/pyramid-entries/${entryId}`).then(r => r.data)
+}
+
 // ───────────────────────── Emotion Logs ─────────────────────────
 
 export function listEmotionLogs(tradeId: number) {

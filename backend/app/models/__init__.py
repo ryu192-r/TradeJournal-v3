@@ -22,6 +22,7 @@ from .webhook_event import WebhookEvent
 from .market_candle import MarketCandle
 from .ai_provider_setting import AIProviderSetting
 from .daily_charges import DailyCharges
+from .pyramid_entry import PyramidEntry
 
 __all__ = [
     'Base',
@@ -50,4 +51,5 @@ __all__ = [
     'MarketCandle',
     'AIProviderSetting',
     'DailyCharges',
+    'PyramidEntry',
 ]

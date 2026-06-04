@@ -343,6 +343,8 @@ def pyramid_trade(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.models.pyramid_entry import PyramidEntry as PyramidEntryModel
+
     svc = TradeService(db)
     try:
         trade = svc.pyramid_trade(trade_id, payload.entry_price, payload.quantity,
@@ -350,6 +352,36 @@ def pyramid_trade(
                                    user_id=current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    # Store pyramid entry record for edit/delete later
+    entry_time = payload.entry_time or trade.entry_time
+    pe = PyramidEntryModel(
+        trade_id=trade_id,
+        entry_price=payload.entry_price,
+        quantity=payload.quantity,
+        entry_time=entry_time,
+        fees=payload.fees or 0,
+    )
+    db.add(pe)
+
+    # Seed initial entry if this is the first pyramid record
+    existing_count = db.query(PyramidEntryModel).filter(PyramidEntryModel.trade_id == trade_id).count()
+    if existing_count == 0:
+        # The entry we just added is the only one; also store the "original" position
+        # Recompute original from trade state before pyramid was applied
+        from decimal import Decimal
+        old_qty = trade.quantity - payload.quantity
+        if old_qty > 0:
+            old_price = (trade.entry_price * trade.quantity - payload.entry_price * payload.quantity) / old_qty
+            original = PyramidEntryModel(
+                trade_id=trade_id,
+                entry_price=old_price,
+                quantity=old_qty,
+                entry_time=trade.entry_time,
+                fees=(trade.fees or Decimal("0")) - (payload.fees or Decimal("0")),
+            )
+            db.add(original)
+
     timeline = TradeTimeline(
         trade_id=trade_id,
         event_type="pyramided",

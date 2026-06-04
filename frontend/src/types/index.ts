@@ -589,6 +589,42 @@ export interface PartialExitListResponse {
   remaining_qty: string
 }
 
+export interface PartialExitUpdatePayload {
+  qty?: string
+  exit_price?: string
+  exit_time?: string
+  exit_reason?: string | null
+  note?: string | null
+}
+
+export interface PyramidEntry {
+  id: number
+  trade_id: number
+  entry_price: string
+  quantity: string
+  entry_time: string
+  fees: string
+  created_at?: string
+}
+
+export interface PyramidEntryCreatePayload {
+  entry_price: number
+  quantity: number
+  entry_time?: string
+  fees?: number
+}
+
+export interface PyramidEntryUpdatePayload {
+  entry_price?: number
+  quantity?: number
+  entry_time?: string
+  fees?: number
+}
+
+export interface PyramidEntryListResponse {
+  items: PyramidEntry[]
+}
+
 // ---------------------------------------------------------------------------
 // Emotion Log types
 // ---------------------------------------------------------------------------

@@ -72,6 +72,7 @@ class Trade(Base):
     source_idea = relationship("TradeIdea", back_populates="traded_trade", uselist=False)
     timeline_entries = relationship("TradeTimeline", back_populates="trade", order_by="TradeTimeline.timestamp")
     partial_exits = relationship("PartialExit", back_populates="trade", order_by="PartialExit.exit_time")
+    pyramid_entries = relationship("PyramidEntry", back_populates="trade", order_by="PyramidEntry.entry_time")
     emotion_logs = relationship("EmotionLog", back_populates="trade", order_by="EmotionLog.timestamp")
     execution_grade = relationship("ExecutionGrade", back_populates="trade", uselist=False)
 

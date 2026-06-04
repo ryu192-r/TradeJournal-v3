@@ -1,4 +1,4 @@
-import type { ApiTrade, PartialExit, StopHistoryEntry, TimelineEvent } from '@/types'
+import type { ApiTrade, PartialExit, PyramidEntry, StopHistoryEntry, TimelineEvent } from '@/types'
 
 export interface TradeDetailV3PageProps {
   tradeId: number
@@ -10,6 +10,7 @@ export interface TradeDetailV3Data {
   partialExits: PartialExit[]
   stopHistory: StopHistoryEntry[]
   timelineEvents: TimelineEvent[]
+  pyramidEntries: PyramidEntry[]
   isLoading: boolean
   error: Error | null
   refresh: () => Promise<void>
