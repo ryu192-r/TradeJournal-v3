@@ -62,6 +62,14 @@ def _payload(qty: str):
     )
 
 
+def _payload_with_price(qty: str, exit_price: str):
+    return PartialExitCreate.model_construct(
+        qty=Decimal(qty),
+        exit_price=Decimal(exit_price),
+        exit_time=datetime.fromisoformat("2025-01-13T10:00:00"),
+    )
+
+
 def test_partial_exit_allows_less_than_remaining_quantity(db_session):
     user = _make_user(db_session)
     trade = _trade(user.id)
@@ -89,6 +97,29 @@ def test_partial_exit_rejects_full_remaining_quantity(db_session):
     assert exc.value.status_code == 400
     assert "Use full close for remaining quantity" in exc.value.detail
     assert _remaining_qty(trade, db_session) == Decimal("10.00000000")
+
+
+def test_partial_exit_schema_rejects_zero_exit_price():
+    with pytest.raises(ValueError):
+        PartialExitCreate(
+            qty=Decimal("1"),
+            exit_price=Decimal("0"),
+            exit_time=datetime.fromisoformat("2025-01-13T10:00:00"),
+        )
+
+
+def test_partial_exit_service_rejects_zero_exit_price(db_session):
+    user = _make_user(db_session)
+    trade = _trade(user.id)
+    db_session.add(trade)
+    db_session.commit()
+    db_session.refresh(trade)
+
+    with pytest.raises(HTTPException) as exc:
+        PartialExitService(db_session).create_partial_exit(trade.id, _payload_with_price("4", "0"))
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "Exit price must be positive"
 
 
 def test_partial_exit_rejects_final_remaining_after_prior_partial(db_session):

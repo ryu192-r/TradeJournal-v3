@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formDataToApiPayload, type TradeFormData } from './tradeForm'
+import { formDataToApiPayload, tradeFormSchema, type TradeFormData } from './tradeForm'
 
 const baseForm: TradeFormData = {
   symbol: 'TCS',
@@ -30,5 +30,35 @@ describe('formDataToApiPayload stop loss semantics', () => {
     expect(payload.stop_price).toBe('100')
     expect(payload).not.toHaveProperty('original_stop_price')
     expect(payload).not.toHaveProperty('stop_loss_status')
+  })
+})
+
+describe('tradeFormSchema numeric validation', () => {
+  it.each([
+    ['entry_price', '0'],
+    ['entry_price', '-1'],
+    ['quantity', '0'],
+    ['quantity', '-1'],
+    ['exit_price', '0'],
+    ['stop_price', '0'],
+    ['target_price', '-1'],
+    ['fees', '-1'],
+    ['executed_order_count', '0'],
+    ['executed_order_count', '1.5'],
+    ['entry_price', 'abc'],
+  ])('rejects invalid %s=%s', (field, value) => {
+    const result = tradeFormSchema.safeParse({ ...baseForm, [field]: value })
+    expect(result.success).toBe(false)
+  })
+
+  it('allows blank optional numeric fields', () => {
+    const result = tradeFormSchema.safeParse({
+      ...baseForm,
+      exit_price: '',
+      stop_price: '',
+      target_price: '',
+      executed_order_count: '',
+    })
+    expect(result.success).toBe(true)
   })
 })

@@ -94,10 +94,10 @@ class PartialExitService:
                 detail="Quantity must be positive",
             )
 
-        if payload.exit_price < 0:
+        if payload.exit_price <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Exit price cannot be negative",
+                detail="Exit price must be positive",
             )
 
         direction = (trade.direction or "LONG").upper()

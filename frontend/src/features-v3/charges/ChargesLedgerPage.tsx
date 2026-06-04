@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button, EmptyState, ErrorState, LoadingState, Page, Stack } from '@/new-ui'
 import { RefreshCw, Receipt } from 'lucide-react'
 import { deleteDailyCharges } from '@/lib/endpoints'
+import { invalidateChargesDependents } from '@/lib/queryInvalidation'
+import { todaySessionDate } from '@/utils/tradeDates'
 import { useChargesLedgerData } from './hooks/useChargesLedgerData'
 import { ChargesPeriodFilter } from './components/ChargesPeriodFilter'
 import { ChargesSummaryCards } from './components/ChargesSummaryCards'
@@ -19,12 +21,6 @@ export function ChargesLedgerPage() {
   const [drawerMode, setDrawerMode] = useState<'add' | 'edit'>('add')
   const [drawerDate, setDrawerDate] = useState('')
   const [deleteConfirmDate, setDeleteConfirmDate] = useState<string | null>(null)
-
-  /** Invalidate all queries that consume daily charges data (cockpit, analytics, reports). */
-  const invalidateChargesDependents = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['daily-charges'] })
-    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'operational'] })
-  }, [queryClient])
 
   const openAdd = useCallback((date: string) => {
     setDrawerMode('add')
@@ -43,11 +39,11 @@ export function ChargesLedgerPage() {
       await deleteDailyCharges(date)
       setDeleteConfirmDate(null)
       void refetch()
-      invalidateChargesDependents()
+      void invalidateChargesDependents(queryClient)
     } catch {
       // keep confirm open if needed, or show toast
     }
-  }, [refetch, invalidateChargesDependents])
+  }, [refetch, queryClient])
 
   return (
     <Page
@@ -59,7 +55,7 @@ export function ChargesLedgerPage() {
             <RefreshCw size={14} />
             {isFetching ? 'Refreshing…' : 'Refresh'}
           </Button>
-          <Button variant="primary" size="sm" onClick={() => openAdd(new Date().toISOString().slice(0, 10))}>
+          <Button variant="primary" size="sm" onClick={() => openAdd(todaySessionDate())}>
             Add charges
           </Button>
         </div>
@@ -103,7 +99,7 @@ export function ChargesLedgerPage() {
         onClose={() => setDrawerOpen(false)}
         onSaved={() => {
           void refetch()
-          invalidateChargesDependents()
+          void invalidateChargesDependents(queryClient)
         }}
       />
 

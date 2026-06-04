@@ -63,13 +63,42 @@ describe('useTradesV3Data', () => {
   })
 
   it('handles current paginated response', async () => {
-    mocks.listTrades.mockResolvedValue({ items: [trade(2)], total: 20 })
+    mocks.listTrades.mockResolvedValue({ items: [trade(2)], total: 1 })
     const { result } = renderHook(() => useTradesV3Data(true), { wrapper: createWrapper() })
 
     await waitFor(() => expect(result.current.trades).toHaveLength(1))
 
     expect(result.current.trades[0].id).toBe(2)
-    expect(result.current.total).toBe(20)
+    expect(result.current.total).toBe(1)
+  })
+
+  it('loads all trade pages instead of silently capping at 200', async () => {
+    const firstPage = Array.from({ length: 200 }, (_, i) => trade(i + 1))
+    const secondPage = Array.from({ length: 50 }, (_, i) => trade(i + 201))
+    mocks.listTrades
+      .mockResolvedValueOnce({ items: firstPage, total: 250 })
+      .mockResolvedValueOnce({ items: secondPage, total: 250 })
+
+    const { result } = renderHook(() => useTradesV3Data(true), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.trades).toHaveLength(250))
+
+    expect(result.current.total).toBe(250)
+    expect(mocks.listTrades).toHaveBeenNthCalledWith(1, { skip: 0, limit: 200 })
+    expect(mocks.listTrades).toHaveBeenNthCalledWith(2, { skip: 200, limit: 200 })
+  })
+
+  it('surfaces an error instead of silently truncating after the all-pages guard', async () => {
+    mocks.listTrades.mockResolvedValue({
+      items: Array.from({ length: 200 }, (_, i) => trade(i + 1)),
+      total: 20_001,
+    })
+
+    const { result } = renderHook(() => useTradesV3Data(true), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.error).toBeInstanceOf(Error))
+
+    expect(result.current.error?.message).toMatch(/metrics would be incomplete/)
   })
 
   it('returns error state when API rejects', async () => {

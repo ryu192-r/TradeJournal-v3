@@ -1,8 +1,8 @@
 import type { ApiTrade } from '@/types'
+import { getRealizedSessionDate, getTradeSessionDate, todaySessionDate } from '@/utils/tradeDates'
 import { isClosedTradeV3, isDeletedTrade, getTradeGrossPnl, getTradeRMultiple } from '../../trades/utils/tradesV3Metrics'
 import { isReviewed } from '../../review/utils/reviewStatus'
 import { safeNumber } from '../../trades/utils/tradesV3Formatters'
-import { tradeMatchesPeriod } from '../../trades/utils/tradesV3Filters'
 import type { TradesV3Period } from '../../trades/types'
 
 // ────────────────────────── Types ──────────────────────────
@@ -45,7 +45,34 @@ function closedNonDeleted(trades: ApiTrade[]): ApiTrade[] {
 }
 
 export function filterByPeriod(trades: ApiTrade[], period: TradesV3Period): ApiTrade[] {
-  return trades.filter((t) => !isDeletedTrade(t) && tradeMatchesPeriod(t, period))
+  if (period === 'all') return trades.filter((t) => !isDeletedTrade(t))
+  const today = todaySessionDate()
+  const [start, end] = analyticsPeriodToRange(period, today)
+  return filterBySessionRange(trades, start, end)
+}
+
+export function analyticsPeriodToRange(period: Exclude<TradesV3Period, 'all'>, today = todaySessionDate()): [string, string] {
+  if (period === 'today') return [today, today]
+  if (period === 'week') {
+    const [year, month, day] = today.split('-').map(Number)
+    const date = new Date(Date.UTC(year, month - 1, day))
+    const dayIndex = date.getUTCDay()
+    date.setUTCDate(date.getUTCDate() - (dayIndex === 0 ? 6 : dayIndex - 1))
+    return [date.toISOString().slice(0, 10), today]
+  }
+  return [`${today.slice(0, 7)}-01`, today]
+}
+
+export function tradeMatchesSessionRange(trade: ApiTrade, start: string, end: string): boolean {
+  if (isDeletedTrade(trade)) return false
+  const session = isClosedTradeV3(trade)
+    ? getRealizedSessionDate(trade.exit_time, trade.entry_time, trade.created_at)
+    : getTradeSessionDate(trade)
+  return session != null && session >= start && session <= end
+}
+
+export function filterBySessionRange(trades: ApiTrade[], start: string, end: string): ApiTrade[] {
+  return trades.filter((t) => tradeMatchesSessionRange(t, start, end))
 }
 
 export function computePerformance(trades: ApiTrade[]): PerformanceMetrics {

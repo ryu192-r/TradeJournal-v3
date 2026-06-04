@@ -305,12 +305,10 @@ def operational_dashboard(
     expectancy = kpis["expectancy"]
     avg_r = kpis["avg_r"]
 
-    # ── Max drawdown (includes capital events for correct peak tracking) ──
-    daily_pnl_rows = (
-        db.query(func.date(Trade.entry_time).label("dt"), func.coalesce(func.sum(Trade.pnl), 0))
+    # ── Max drawdown (realized PnL by exit/session date + capital events) ──
+    closed_for_dd = (
+        db.query(Trade)
         .filter(Trade.user_id == current_user.id, Trade.status != "deleted", Trade.pnl.isnot(None))
-        .group_by(func.date(Trade.entry_time))
-        .order_by("dt")
         .all()
     )
     capital_event_rows_dd = (
@@ -320,9 +318,11 @@ def operational_dashboard(
         .all()
     )
     daily_changes_dd: dict[date, Decimal] = defaultdict(Decimal)
-    for dt_val, day_pnl in daily_pnl_rows:
-        dt_key = dt_val.date() if hasattr(dt_val, 'date') else dt_val
-        daily_changes_dd[dt_key] += ensure_decimal(day_pnl)
+    for t in closed_for_dd:
+        dt_key = get_realized_session_date(t.exit_time, t.entry_time, t.created_at)
+        if dt_key is None:
+            continue
+        daily_changes_dd[dt_key] += ensure_decimal(t.pnl)
     for evt in capital_event_rows_dd:
         dt_key = evt.timestamp.date() if hasattr(evt.timestamp, 'date') else evt.timestamp
         amt = ensure_decimal(evt.amount)

@@ -21,12 +21,18 @@ export function excludeDeletedTrades(trades: ApiTrade[]): ApiTrade[] {
 
 export function isOpenTrade(trade: ApiTrade): boolean {
   if (trade.status === 'deleted') return false
-  const remaining = Number(trade.remaining_qty ?? trade.quantity)
-  return trade.status === 'open' || (Number.isFinite(remaining) && remaining > 0 && trade.status !== 'closed')
+  const remaining = Number(trade.remaining_qty)
+  if (Number.isFinite(remaining) && remaining > 0) return true
+  if (trade.exit_price != null) return false
+  if (trade.status === 'closed') return false
+  return trade.status === 'open' || trade.exit_price == null
 }
 
 export function isClosedTrade(trade: ApiTrade): boolean {
-  return trade.status === 'closed'
+  if (trade.status === 'deleted') return false
+  const remaining = Number(trade.remaining_qty)
+  if (Number.isFinite(remaining) && remaining > 0) return false
+  return trade.exit_price != null || trade.status === 'closed'
 }
 
 export function filterTradesByPeriod(trades: ApiTrade[], period: CockpitPeriod, todayKey = todaySessionDate()): ApiTrade[] {

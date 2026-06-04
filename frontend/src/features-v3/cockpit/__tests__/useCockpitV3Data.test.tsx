@@ -39,13 +39,11 @@ function trade(id: number): ApiTrade {
   }
 }
 
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
-  })
-
+function createWrapper(queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+})) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   }
@@ -97,5 +95,22 @@ describe('useCockpitV3Data', () => {
 
     expect(result.current.trades).toEqual([])
     expect(result.current.error?.message).toBe('trades failed')
+  })
+
+  it('refresh invalidates daily charges with dashboards and trades', async () => {
+    mocks.getOperationalDashboard.mockResolvedValue({ kpi: {}, open_trades: [] })
+    mocks.getIntelligenceDashboard.mockResolvedValue({ lifecycle: {}, behavioral: {}, playbook: {}, market: {} })
+    mocks.listTrades.mockResolvedValue({ items: [trade(3)], total: 1 })
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useCockpitV3Data(true), { wrapper: createWrapper(qc) })
+    await waitFor(() => expect(result.current.trades).toHaveLength(1))
+    await result.current.refresh()
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'operational'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'intelligence'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['trades'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-charges'] })
   })
 })

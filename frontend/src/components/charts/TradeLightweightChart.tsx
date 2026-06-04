@@ -178,7 +178,7 @@ export function TradeLightweightChart({ trade }: TradeLightweightChartProps) {
         candleSeriesRef.current = null
       }
     }
-  }, [candles, markers, priceLines, isDark, isFullscreen, timeframe])
+  }, [candles, markers, priceLines, isDark, isFullscreen, timeframe, meta?.is_mock])
 
   // Resize observer — always declared
   useEffect(() => {

@@ -17,7 +17,7 @@ def _strip_to_ist(v: datetime) -> datetime:
 
 class PartialExitCreate(BaseSchema):
     qty: Decimal = Field(..., gt=0)
-    exit_price: Decimal = Field(...)
+    exit_price: Decimal = Field(..., gt=0)
     exit_time: datetime
     realized_pnl: Optional[Decimal] = None
     r_captured: Optional[Decimal] = None

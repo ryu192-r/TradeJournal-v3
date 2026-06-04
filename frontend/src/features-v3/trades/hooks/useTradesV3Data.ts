@@ -1,14 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { listTrades } from '@/lib/endpoints'
 import { normalizeTradeListResponse } from '../../shared/apiAdapters'
+import { listAllTrades } from '../api/listAllTrades'
 import type { TradesV3Data } from '../types'
 
 export function useTradesV3Data(enabled = true): TradesV3Data {
   const queryClient = useQueryClient()
   const trades = useQuery<unknown>({
-    queryKey: ['trades', { status: undefined, symbol: undefined, from_date: undefined, to_date: undefined, skip: 0, limit: 200 }],
-    queryFn: () => listTrades({ limit: 200 }),
+    queryKey: ['trades', { scope: 'all' }],
+    queryFn: () => listAllTrades(),
     placeholderData: (previousData: unknown) => previousData,
     enabled,
   })

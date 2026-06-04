@@ -351,6 +351,44 @@ def test_executed_order_count_rejects_negative(client, auth_user_token):
     assert resp.status_code == 422
 
 
+def test_create_trade_rejects_invalid_numeric_values(client, auth_user_token):
+    invalid_cases = [
+        {"entry_price": 0},
+        {"entry_price": -1},
+        {"quantity": 0},
+        {"quantity": -1},
+        {"exit_price": 0},
+        {"fees": -1},
+        {"stop_price": 0},
+        {"original_stop_price": -1},
+        {"target_price": 0},
+    ]
+
+    for fields in invalid_cases:
+        resp = _create(client, auth_user_token, **fields)
+        assert resp.status_code == 422, (fields, resp.text)
+
+
+def test_update_trade_rejects_invalid_numeric_values(client, auth_user_token):
+    created = _create(client, auth_user_token, exit_price=None)
+    trade_id = created.json().get("data", created.json())["id"]
+
+    invalid_cases = [
+        {"entry_price": 0},
+        {"quantity": -1},
+        {"exit_price": 0},
+        {"fees": -1},
+        {"stop_price": 0},
+        {"original_stop_price": -1},
+        {"target_price": 0},
+        {"executed_order_count": 0},
+    ]
+
+    for fields in invalid_cases:
+        resp = _update(client, auth_user_token, trade_id, **fields)
+        assert resp.status_code == 422, (fields, resp.text)
+
+
 def test_trade_list_includes_metadata(client, auth_user_token):
     _create(client, auth_user_token, exchange="NSE", segment="EQUITY", product_type="DELIVERY")
     resp = _list(client, auth_user_token)

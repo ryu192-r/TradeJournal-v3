@@ -57,58 +57,58 @@ def _serialise_trade(trade: Trade) -> dict:
 
 def _report_payload(db: Session, period: str, start: date, end: date, user_id: int) -> dict:
     start_dt, end_dt = month_datetime_filter_bounds(start, end)
-    trades_raw = (
+    placement_trades_raw = (
         db.query(Trade)
         .filter(Trade.status != "deleted", Trade.entry_time >= start_dt, Trade.entry_time <= end_dt, Trade.user_id == user_id)
         .order_by(Trade.entry_time.asc())
         .all()
     )
-    trades = trades_for_session_month(trades_raw, start, end)
-    closed = [trade for trade in trades if trade.exit_price is not None]
+    placement_trades = trades_for_session_month(placement_trades_raw, start, end)
+
+    # Realized money belongs to exit/session date, not entry date. This keeps
+    # reports aligned with calendar/equity/daily-charges bucketing.
+    realized_events = get_realized_pnl_events(db, user_id, start_dt, end_dt)
+    realized_closed_ids = [ev.trade_id for ev in realized_events if ev.source == "closed"]
+    realized_closed_trades = (
+        db.query(Trade)
+        .filter(Trade.user_id == user_id, Trade.id.in_(realized_closed_ids))
+        .all()
+        if realized_closed_ids
+        else []
+    )
+    trade_by_id = {trade.id: trade for trade in placement_trades}
+    for trade in realized_closed_trades:
+        trade_by_id[trade.id] = trade
+    trades = sorted(trade_by_id.values(), key=lambda trade: trade.entry_time or datetime.min)
+    closed = realized_closed_trades
     kpis = compute_aggregate_kpis(closed)
-    total_pnl = Decimal(kpis["net_pnl"] or 0)
+    total_pnl = sum((ev.pnl for ev in realized_events), Decimal("0"))
     gross_profit = Decimal(kpis["gross_profit"] or 0)
     gross_loss = Decimal(kpis["gross_loss"] or 0)
 
-    # Include partial exit realized PnL from still-open trades
-    realized_events = get_realized_pnl_events(db, user_id, start_dt, end_dt)
-    partial_pnl_by_day: dict[str, Decimal] = defaultdict(Decimal)
-    partial_pnl_by_setup: dict[str, Decimal] = defaultdict(Decimal)
-    partial_pnl_total = Decimal("0")
-    for ev in realized_events:
-        if ev.source == "partial_exit":
-            day_key = get_realized_session_date(ev.timestamp)
-            if day_key is None:
-                continue
-            day_key = day_key.isoformat()
-            partial_pnl_by_day[day_key] += ev.pnl
-            setup = ev.setup or "Unassigned"
-            partial_pnl_by_setup[setup] += ev.pnl
-            partial_pnl_total += ev.pnl
-    total_pnl += partial_pnl_total
-
     setups: dict[str, dict] = defaultdict(lambda: {"trade_count": 0, "closed_count": 0, "net_pnl": Decimal("0"), "wins": 0})
     days: dict[str, dict] = defaultdict(lambda: {"date": "", "trade_count": 0, "net_pnl": Decimal("0")})
-    for trade in trades:
+    for trade in placement_trades:
         setup = trade.setup or "Unassigned"
         setups[setup]["trade_count"] += 1
-        if trade.exit_price is not None:
-            setups[setup]["closed_count"] += 1
-            setups[setup]["net_pnl"] += Decimal(trade.pnl or 0)
-            if Decimal(trade.pnl or 0) > 0:
-                setups[setup]["wins"] += 1
         day_key = get_trade_session_date(trade)
         day_key = day_key.isoformat() if day_key else start.isoformat()
         days[day_key]["date"] = day_key
         days[day_key]["trade_count"] += 1
-        if trade.exit_price is not None:
-            days[day_key]["net_pnl"] += Decimal(trade.pnl or 0)
 
-    # Merge partial exit PnL into daily buckets
-    for day_key, pe_pnl in partial_pnl_by_day.items():
+    for ev in realized_events:
+        setup = ev.setup or "Unassigned"
+        setups[setup]["closed_count"] += 1
+        setups[setup]["net_pnl"] += ev.pnl
+        if ev.pnl > 0:
+            setups[setup]["wins"] += 1
+        day = get_realized_session_date(ev.timestamp)
+        if day is None:
+            continue
+        day_key = day.isoformat()
         if day_key not in days:
             days[day_key] = {"date": day_key, "trade_count": 0, "net_pnl": Decimal("0")}
-        days[day_key]["net_pnl"] += pe_pnl
+        days[day_key]["net_pnl"] += ev.pnl
 
     journals = db.query(DailyJournal).filter(DailyJournal.date >= start, DailyJournal.date <= end, DailyJournal.user_id == user_id).all()
     journal_days = [j for j in journals if any([j.pre_trade_notes, j.post_trade_notes, j.discipline_rating])]
@@ -122,15 +122,6 @@ def _report_payload(db: Session, period: str, start: date, end: date, user_id: i
     emotion_counts: dict[str, int] = defaultdict(int)
     for emotion in emotions:
         emotion_counts[emotion.emotion] += 1
-
-    # Merge partial exit PnL into setup buckets
-    for setup, pe_pnl in partial_pnl_by_setup.items():
-        if setup not in setups:
-            setups[setup] = {"trade_count": 0, "closed_count": 0, "net_pnl": Decimal("0"), "wins": 0}
-        setups[setup]["net_pnl"] += pe_pnl
-        setups[setup]["closed_count"] += 1  # count partial exit as a realized outcome
-        if pe_pnl > 0:
-            setups[setup]["wins"] += 1
 
     setup_report = [
         {

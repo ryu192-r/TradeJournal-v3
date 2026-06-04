@@ -11,8 +11,7 @@ import {
 } from '../templates/dhan/dhanChargesCalculator'
 import type { DhanEstimateResult } from '../templates/dhan/dhanChargesTypes'
 import { deriveDhanEstimateInputsFromTrades, type DeriveResult } from '../utils/deriveDhanInputsFromTrades'
-import { listTrades } from '@/lib/endpoints'
-import type { ApiTrade } from '@/types'
+import { listAllTrades } from '@/features-v3/trades/api/listAllTrades'
 import { DhanEstimateForm } from './DhanEstimateForm'
 import { DhanEstimateBreakdown } from './DhanEstimateBreakdown'
 import { EstimateVsActualCard } from './EstimateVsActualCard'
@@ -53,10 +52,9 @@ export function DhanEstimatePanel({ actualTotal, onUseAsDraft, currentEntryMode,
     }
     setDeriveLoading(true)
     setDeriveError(null)
-    listTrades({ from_date: date, to_date: date, limit: 200 })
+    listAllTrades({ from_date: date, to_date: date })
       .then((res) => {
-        const trades: ApiTrade[] = res.items ?? (res as unknown as ApiTrade[])
-        setDeriveResult(deriveDhanEstimateInputsFromTrades(trades))
+        setDeriveResult(deriveDhanEstimateInputsFromTrades(res.items))
       })
       .catch(() => {
         setDeriveError('Could not load trades for this date.')

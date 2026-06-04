@@ -145,7 +145,7 @@ class DailyChargesService:
                 continue
             if start_date <= sd <= end_date:
                 trading_days.add(sd)
-                day_pnls[sd] = day_pnls.get(sd, Decimal("0")) + ensure_decimal(t.pnl)
+                day_pnls[sd] = day_pnls.get(sd, Decimal("0")) + ensure_decimal(t.pnl) + ensure_decimal(t.fees)
                 day_counts[sd] = day_counts.get(sd, 0) + 1
 
         days: list[dict] = []
@@ -161,6 +161,7 @@ class DailyChargesService:
             if current in trading_days:
                 dc = charges_map.get(current)
                 gross = day_pnls.get(current, Decimal("0"))
+                gross_total += gross
                 if dc:
                     tc = ensure_decimal(dc.total_charges)
                     net = gross - tc
@@ -174,7 +175,6 @@ class DailyChargesService:
                         "entry_mode": dc.entry_mode,
                         "broker": dc.broker,
                     })
-                    gross_total += gross
                     charges_total += tc
                     net_total += net
                     recorded_days += 1
@@ -195,7 +195,9 @@ class DailyChargesService:
             "end_date": end_date.isoformat(),
             "gross_realized_pnl": str(gross_total) if trading_days else None,
             "total_charges": str(charges_total) if recorded_days > 0 else None,
-            "net_realized_pnl": str(net_total) if recorded_days > 0 and trading_days else None,
+            # Net is only complete when every trading day in range has recorded
+            # charges. Missing charge days are pending, never treated as zero.
+            "net_realized_pnl": str(net_total) if trading_days and missing_days == 0 else None,
             "charges_recorded_days": recorded_days,
             "trading_days": len(trading_days),
             "missing_charge_days": missing_days,

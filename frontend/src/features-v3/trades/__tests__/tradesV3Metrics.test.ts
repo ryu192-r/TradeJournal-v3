@@ -53,7 +53,8 @@ describe('Trades v3 metrics', () => {
 
   it('open trade wrapper does not rely on exit_price null checks', () => {
     expect(isOpenTradeV3Wrapper(trade({ status: 'open', exit_price: '120', remaining_qty: '4' }))).toBe(true)
-    expect(isOpenTradeV3Wrapper(trade({ status: 'closed', exit_price: null, remaining_qty: '4' }))).toBe(false)
+    expect(isOpenTradeV3Wrapper(trade({ status: 'closed', exit_price: null, remaining_qty: '4' }))).toBe(true)
+    expect(isOpenTradeV3Wrapper(trade({ status: 'open', exit_price: '120', remaining_qty: '0' }))).toBe(false)
   })
 
   it('gross P&L fallback handles invalid values safely', () => {
