@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 
 revision = 'a8f3c1d2e001'
-down_revision = None
+down_revision = '018_trade_market_metadata'
 branch_labels = None
 depends_on = None
 
