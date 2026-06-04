@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Button, Drawer, Stack, Badge, Divider } from '@/new-ui'
-import { createPartialExit, updateTrade, createStopHistory } from '@/lib/endpoints'
+import { createPartialExit, updateTrade, createStopHistory, pyramidTrade } from '@/lib/endpoints'
 import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '@/store/toastStore'
@@ -9,7 +9,7 @@ import type { ApiTrade } from '@/types'
 import { FormInput, FormSelect, FormTextarea } from '../trade-form/components/FormControls'
 import '../trade-form/trade-form.css'
 
-export type PositionAction = 'partial_exit' | 'close' | 'protection_stop'
+export type PositionAction = 'partial_exit' | 'close' | 'protection_stop' | 'pyramid'
 
 interface PositionActionDrawerProps {
   open: boolean
@@ -58,6 +58,13 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
   const [stopPrice, setStopPrice] = useState('')
   const [stopType, setStopType] = useState('manual')
 
+  // Pyramid state
+  const [pyrPrice, setPyrPrice] = useState('')
+  const [pyrQty, setPyrQty] = useState('')
+  const [pyrTime, setPyrTime] = useState(nowLocal)
+  const [pyrFees, setPyrFees] = useState('')
+  const [pyrStop, setPyrStop] = useState('')
+
   const reset = useCallback(() => {
     setError(null)
     setSuccess(false)
@@ -69,6 +76,11 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
     setCloseTime(nowLocal())
     setStopPrice('')
     setStopType('manual')
+    setPyrPrice('')
+    setPyrQty('')
+    setPyrTime(nowLocal())
+    setPyrFees('')
+    setPyrStop('')
   }, [])
 
   const handleClose = useCallback(() => {
@@ -124,6 +136,26 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
     finally { setSubmitting(false) }
   }
 
+  const submitPyramid = async () => {
+    const price = Number(pyrPrice)
+    const qty = Number(pyrQty)
+    if (!price || price <= 0) { setError('Entry price required.'); return }
+    if (!qty || qty <= 0) { setError('Quantity required.'); return }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await pyramidTrade(trade.id, {
+        entry_price: price,
+        quantity: qty,
+        entry_time: pyrTime ? pyrTime + ':00' : undefined,
+        fees: pyrFees ? Number(pyrFees) : undefined,
+        stop_price: pyrStop ? Number(pyrStop) : undefined,
+      })
+      handleSuccess()
+    } catch (e: any) { setError(e?.response?.data?.detail ?? e?.message ?? 'Failed') }
+    finally { setSubmitting(false) }
+  }
+
   const STOP_TYPE_OPTIONS = [
     { value: 'manual', label: 'Manual' },
     { value: 'breakeven', label: 'Breakeven' },
@@ -144,6 +176,7 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
               <ActionTab active={action === 'partial_exit'} onClick={() => { setAction('partial_exit'); setError(null) }}>Partial exit</ActionTab>
               <ActionTab active={action === 'close'} onClick={() => { setAction('close'); setError(null) }}>Close trade</ActionTab>
               <ActionTab active={action === 'protection_stop'} onClick={() => { setAction('protection_stop'); setError(null) }}>Move stop</ActionTab>
+              <ActionTab active={action === 'pyramid'} onClick={() => { setAction('pyramid'); setError(null) }}>Pyramid</ActionTab>
             </div>
             <Divider />
 
@@ -178,14 +211,24 @@ export function PositionActionDrawer({ open, onClose, trade, initialAction }: Po
               </Stack>
             )}
 
+            {action === 'pyramid' && (
+              <Stack gap="sm">
+                <FormInput label="Entry price (₹)" type="number" step="0.01" value={pyrPrice} onChange={(e) => setPyrPrice(e.target.value)} required help="Price at which you added more shares." />
+                <FormInput label="Quantity" type="number" min={1} step={1} value={pyrQty} onChange={(e) => setPyrQty(e.target.value)} required />
+                <FormInput label="Entry time" type="datetime-local" value={pyrTime} onChange={(e) => setPyrTime(e.target.value)} />
+                <FormInput label="Fees (₹)" type="number" step="0.01" value={pyrFees} onChange={(e) => setPyrFees(e.target.value)} help="Optional" />
+                <FormInput label="New stop price (₹)" type="number" step="0.01" value={pyrStop} onChange={(e) => setPyrStop(e.target.value)} help="Optional — updates stop if provided." />
+              </Stack>
+            )}
+
             {error && <span style={{ color: 'var(--color-loss)', fontSize: '0.8125rem' }} role="alert">{error}</span>}
 
             <Button
               variant="primary"
               disabled={submitting}
-              onClick={action === 'partial_exit' ? submitPartialExit : action === 'close' ? submitClose : submitStop}
+              onClick={action === 'partial_exit' ? submitPartialExit : action === 'close' ? submitClose : action === 'pyramid' ? submitPyramid : submitStop}
             >
-              {submitting ? 'Saving…' : action === 'partial_exit' ? 'Add partial exit' : action === 'close' ? 'Close trade' : 'Update stop'}
+              {submitting ? 'Saving…' : action === 'partial_exit' ? 'Add partial exit' : action === 'close' ? 'Close trade' : action === 'pyramid' ? 'Add pyramid entry' : 'Update stop'}
             </Button>
           </>
         )}
