@@ -87,10 +87,13 @@ export const useAppStore = create<AppState>()(
       setActiveView: (view) => {
         const { navMode } = get()
         let resolved: ActiveView = view
-        if (view === 'analytics') storeReviewTab('overview')
-        else if (view === 'review') storeReviewTab('queue')
+        if (view === 'review') storeReviewTab('queue')
         if (!canAccessView(resolved, navMode)) {
-          resolved = getSimpleFallbackView(resolved)
+          // V3 first-class views bypass simple-mode gating
+          const v3FirstClass: ActiveView[] = ['analytics', 'reports', 'calendar', 'journal', 'capital', 'lifecycle', 'charges']
+          if (!v3FirstClass.includes(view)) {
+            resolved = getSimpleFallbackView(resolved)
+          }
         }
         set({ activeView: resolved, tradeFormMode: 'list', selectedTradeId: null })
       },

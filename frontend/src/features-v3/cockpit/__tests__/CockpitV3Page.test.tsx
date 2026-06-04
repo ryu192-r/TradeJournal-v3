@@ -9,6 +9,7 @@ import type { CockpitV3Data } from '../types'
 const mocks = vi.hoisted(() => ({
   useCockpitV3Data: vi.fn(),
   useDailyChargesSummary: vi.fn(),
+  useRiskDashboardQuery: vi.fn(),
 }))
 
 vi.mock('../hooks/useCockpitV3Data', () => ({
@@ -17,6 +18,10 @@ vi.mock('../hooks/useCockpitV3Data', () => ({
 
 vi.mock('../hooks/useDailyChargesSummary', () => ({
   useDailyChargesSummary: mocks.useDailyChargesSummary,
+}))
+
+vi.mock('@/hooks/useRiskDashboardQuery', () => ({
+  useRiskDashboardQuery: mocks.useRiskDashboardQuery,
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {
@@ -49,6 +54,7 @@ describe('CockpitV3Page', () => {
   beforeEach(() => {
     mocks.useCockpitV3Data.mockReturnValue(data())
     mocks.useDailyChargesSummary.mockReturnValue({ data: null, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
+    mocks.useRiskDashboardQuery.mockReturnValue({ data: undefined, isLoading: false, error: null })
   })
 
   it('renders loading state safely', () => {

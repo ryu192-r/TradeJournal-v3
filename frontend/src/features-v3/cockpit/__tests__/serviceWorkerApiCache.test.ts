@@ -3,7 +3,7 @@ import sw from '../../../../public/sw.js?raw'
 
 describe('service worker API cache policy', () => {
   it('uses bumped cache versions', () => {
-    expect(sw).toContain("const CACHE = 'tj-v3-v12'")
+    expect(sw).toContain("const CACHE = 'tj-v3-v13'")
     expect(sw).toContain("const API_CACHE = 'tj-v3-api-v4'")
   })
 

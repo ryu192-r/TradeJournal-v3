@@ -5,14 +5,10 @@ import { canAccessView } from '@/app/interfaceMode'
 import { viewMeta } from '@/app/navigation'
 
 const MORE_VIEWS: ActiveView[] = [
-  'capital',
   'ideas',
   'coach',
-  'calendar',
-  'journal',
   'perf-os',
   'sa-notes',
-  'lifecycle',
   'risk',
   'market',
   'recommendations',

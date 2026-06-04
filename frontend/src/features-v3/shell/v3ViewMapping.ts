@@ -14,8 +14,12 @@ export function activeViewToV3Section(
       return 'cockpit'
     case 'trades':
       return 'trades'
+    case 'calendar':
+      return 'calendar'
     case 'review':
       return 'review'
+    case 'journal':
+      return 'journal'
     case 'analytics':
       return 'analytics'
     case 'playbook':
@@ -24,6 +28,10 @@ export function activeViewToV3Section(
       return 'reports'
     case 'charges':
       return 'charges'
+    case 'capital':
+      return 'capital'
+    case 'lifecycle':
+      return 'lifecycle'
     case 'settings':
       return 'settings'
     default:
@@ -37,8 +45,12 @@ export function v3SectionToActiveView(section: V3PreviewSectionId): ActiveView |
       return 'dashboard'
     case 'trades':
       return 'trades'
+    case 'calendar':
+      return 'calendar'
     case 'review':
       return 'review'
+    case 'journal':
+      return 'journal'
     case 'analytics':
       return 'analytics'
     case 'playbooks':
@@ -47,6 +59,10 @@ export function v3SectionToActiveView(section: V3PreviewSectionId): ActiveView |
       return 'reports'
     case 'charges':
       return 'charges'
+    case 'capital':
+      return 'capital'
+    case 'lifecycle':
+      return 'lifecycle'
     case 'settings':
       return 'settings'
     case 'import':

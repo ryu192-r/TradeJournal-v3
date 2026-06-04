@@ -1,0 +1,105 @@
+.tjv3-cap__actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tjv3-cap__tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tjv3-cap__tier {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #7f8da3);
+}
+
+.tjv3-cap__tier--current {
+  color: var(--color-accent, #7c8cff);
+  font-weight: 600;
+}
+
+.tjv3-cap__tier-bar {
+  flex: 1;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-border, rgba(148, 163, 184, 0.16));
+  overflow: hidden;
+}
+
+.tjv3-cap__tier-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent, #7c8cff);
+  transition: width 220ms ease;
+}
+
+.tjv3-cap__curve {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 6rem;
+  padding: 0.5rem 0;
+}
+
+.tjv3-cap__curve-bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-accent, #7c8cff);
+  opacity: 0.7;
+}
+
+.tjv3-cap__ledger {
+  overflow-x: auto;
+}
+
+.tjv3-cap__table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.tjv3-cap__table th {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  color: var(--color-text-muted, #7f8da3);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tjv3-cap__table td {
+  padding: 0.5rem;
+  border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+  color: var(--color-text, #cbd5e1);
+}
+
+.tjv3-cap__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #7f8da3);
+}
+
+.tjv3-cap__input {
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+  background: var(--color-bg, #050711);
+  color: var(--color-text, #cbd5e1);
+  font-size: 0.85rem;
+}
+
+.tjv3-cap__input:focus {
+  outline: none;
+  border-color: var(--color-accent, #7c8cff);
+}

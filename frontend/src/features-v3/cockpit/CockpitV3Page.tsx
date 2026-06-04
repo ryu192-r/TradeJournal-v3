@@ -9,6 +9,7 @@ import { CockpitDrawerPreview } from './components/CockpitDrawerPreview'
 import { CockpitPerformanceDeck } from './components/CockpitPerformanceDeck'
 import { OpenRiskBoard } from './components/OpenRiskBoard'
 import { ReviewActionCenter } from './components/ReviewActionCenter'
+import { RiskIntelligencePanel } from './components/RiskIntelligencePanel'
 import { SetupIntelligence } from './components/SetupIntelligence'
 import { TradingTape } from './components/TradingTape'
 import { useCockpitV3Data } from './hooks/useCockpitV3Data'
@@ -120,6 +121,8 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
           <OpenRiskBoard metrics={metrics} onSelectTrade={handleSelectTrade} />
           <TradingTape metrics={metrics} onSelectTrade={handleSelectTrade} />
         </div>
+
+        <RiskIntelligencePanel />
 
         <div className="tjv3-cockpit__module-grid">
           <ChargesIntelligence

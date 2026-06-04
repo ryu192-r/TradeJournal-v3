@@ -1,0 +1,218 @@
+.tjv3-journal__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tj-space-panel, 1rem);
+}
+
+.tjv3-journal__header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tjv3-journal__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tjv3-journal__range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 12rem;
+  justify-content: center;
+  font-weight: 600;
+  font-family: var(--tj-font-numeric, monospace);
+  color: var(--color-text-heading, #f8fafc);
+}
+
+.tjv3-journal__sync {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-accent, #7c8cff);
+  animation: tjv3-journal-pulse 1s ease-in-out infinite;
+}
+
+@keyframes tjv3-journal-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.tjv3-journal__layout {
+  display: grid;
+  gap: var(--tj-space-section, 1.25rem);
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+}
+
+.tjv3-journal__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tjv3-journal__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+  background: var(--color-bg-muted, #0d1422);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.tjv3-journal__card:hover {
+  border-color: var(--color-accent, #7c8cff);
+}
+
+.tjv3-journal__card--filled {
+  background: color-mix(in srgb, var(--color-accent, #7c8cff) 7%, transparent);
+}
+
+.tjv3-journal__card--selected {
+  border-color: var(--color-accent, #7c8cff);
+  box-shadow: 0 0 0 1px var(--color-accent, #7c8cff);
+}
+
+.tjv3-journal__card--today .tjv3-journal__card-day {
+  color: var(--color-accent, #7c8cff);
+}
+
+.tjv3-journal__card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.tjv3-journal__card-day {
+  font-weight: 600;
+  color: var(--color-text-heading, #f8fafc);
+}
+
+.tjv3-journal__card-date {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #7f8da3);
+  font-family: var(--tj-font-numeric, monospace);
+}
+
+.tjv3-journal__card-body {
+  min-height: 2.2rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text, #cbd5e1);
+}
+
+.tjv3-journal__card-empty {
+  color: var(--color-text-muted, #7f8da3);
+  font-style: italic;
+}
+
+.tjv3-journal__card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tjv3-journal__card-rating {
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #7f8da3);
+}
+
+.tjv3-journal__card-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--color-accent, #7c8cff);
+  margin-left: auto;
+}
+
+/* Editor */
+.tjv3-journal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tjv3-journal__field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted, #7f8da3);
+}
+
+.tjv3-journal__textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+  background: var(--color-bg, #050711);
+  color: var(--color-text, #cbd5e1);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.tjv3-journal__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent, #7c8cff);
+}
+
+.tjv3-journal__ratings {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tjv3-journal__rating {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+  background: var(--color-bg-muted, #0d1422);
+  color: var(--color-text-muted, #7f8da3);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.tjv3-journal__rating--active {
+  border-color: var(--color-accent, #7c8cff);
+  background: color-mix(in srgb, var(--color-accent, #7c8cff) 16%, transparent);
+  color: var(--color-accent, #7c8cff);
+}
+
+.tjv3-journal__editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tjv3-journal__dirty {
+  font-size: 0.72rem;
+  color: var(--color-warning, #fbbf24);
+}
+
+.tjv3-journal__save-error {
+  font-size: 0.78rem;
+  color: var(--color-loss, #fb7185);
+}
+
+@media (max-width: 768px) {
+  .tjv3-journal__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tjv3-journal__cards {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .tjv3-journal__card {
+    min-width: 9rem;
+  }
+}

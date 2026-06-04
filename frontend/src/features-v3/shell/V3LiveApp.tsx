@@ -39,13 +39,24 @@ const ImportV3Page = lazy(() =>
 const SettingsV3Page = lazy(() =>
   import('../settings').then((m) => ({ default: m.SettingsV3Page })),
 )
+const CalendarV3Page = lazy(() =>
+  import('../calendar').then((m) => ({ default: m.CalendarV3Page })),
+)
+const JournalV3Page = lazy(() =>
+  import('../journal').then((m) => ({ default: m.JournalV3Page })),
+)
+const CapitalV3Page = lazy(() =>
+  import('../capital').then((m) => ({ default: m.CapitalV3Page })),
+)
+const LifecycleV3Page = lazy(() =>
+  import('../lifecycle').then((m) => ({ default: m.LifecycleV3Page })),
+)
 
 const SetupPlaybookPage = lazy(() =>
   import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
 )
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
-const CapitalPage = lazy(() => import('@/pages/CapitalPage').then((m) => ({ default: m.CapitalPage })))
 const TradeIdeasPage = lazy(() =>
   import('@/components/ideas/TradeIdeasPage').then((m) => ({ default: m.TradeIdeasPage })),
 )
@@ -56,9 +67,6 @@ const PerformanceOSPage = lazy(() =>
 const DailySANotesPage = lazy(() =>
   import('@/pages/DailySANotesPage').then((m) => ({ default: m.DailySANotesPage })),
 )
-const JournalPage = lazy(() => import('@/pages/JournalPage').then((m) => ({ default: m.JournalPage })))
-const CalendarPage = lazy(() => import('@/pages/CalendarPage').then((m) => ({ default: m.CalendarPage })))
-const LifecyclePage = lazy(() => import('@/pages/LifecyclePage').then((m) => ({ default: m.LifecyclePage })))
 const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m.RiskPage })))
 const MarketContextPage = lazy(() =>
   import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })),
@@ -123,7 +131,15 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     () => activeViewToV3Section(activeView, tradeFormMode, sectionOverride),
     [activeView, tradeFormMode, sectionOverride],
   )
-  const viewBlocked = !canAccessView(activeView, navMode)
+  const isV3FirstClassView =
+    activeView === 'analytics' ||
+    activeView === 'reports' ||
+    activeView === 'calendar' ||
+    activeView === 'journal' ||
+    activeView === 'capital' ||
+    activeView === 'lifecycle' ||
+    activeView === 'charges'
+  const viewBlocked = !canAccessView(activeView, navMode) && !isV3FirstClassView
 
   const handleSectionChange = useCallback(
     (section: V3PreviewSectionId) => {
@@ -287,11 +303,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'capital':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Capital">
-              <CapitalPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="CapitalV3">
+            <CapitalV3Page />
+          </ErrorBoundary>
         )
       case 'coach':
         return (
@@ -311,19 +325,15 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'journal':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Journal">
-              <JournalPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="JournalV3">
+            <JournalV3Page dataEnabled />
+          </ErrorBoundary>
         )
       case 'calendar':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Calendar">
-              <CalendarPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="CalendarV3">
+            <CalendarV3Page dataEnabled />
+          </ErrorBoundary>
         )
       case 'sa-notes':
         return (
@@ -335,11 +345,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'lifecycle':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Lifecycle">
-              <LifecyclePage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="LifecycleV3">
+            <LifecycleV3Page />
+          </ErrorBoundary>
         )
       case 'risk':
         return (

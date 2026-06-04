@@ -1,6 +1,9 @@
 import {
   BarChart3,
+  BookOpen,
   BookOpenCheck,
+  Brain,
+  CalendarDays,
   ClipboardCheck,
   FileBarChart,
   Import,
@@ -10,6 +13,7 @@ import {
   Settings,
   SquarePlus,
   TrendingUp,
+  Wallet,
 } from 'lucide-react'
 import type { V3NavigationItem, V3NavigationSection } from './V3Shell.types'
 
@@ -32,6 +36,13 @@ export const v3NavigationSections: V3NavigationSection[] = [
         icon: <TrendingUp aria-hidden="true" />,
         phase: 'N4',
       },
+      {
+        id: 'calendar',
+        label: 'Calendar',
+        description: 'Month view of sessions and PnL',
+        icon: <CalendarDays aria-hidden="true" />,
+        phase: 'N3',
+      },
     ],
   },
   {
@@ -43,6 +54,13 @@ export const v3NavigationSections: V3NavigationSection[] = [
         label: 'Review',
         description: 'Review flow placeholder',
         icon: <ClipboardCheck aria-hidden="true" />,
+        phase: 'N6',
+      },
+      {
+        id: 'journal',
+        label: 'Journal',
+        description: 'Weekly journal + daily editor',
+        icon: <BookOpen aria-hidden="true" />,
         phase: 'N6',
       },
       {
@@ -84,6 +102,20 @@ export const v3NavigationSections: V3NavigationSection[] = [
         label: 'Charges',
         description: 'Daily contract-note charges ledger',
         icon: <Receipt aria-hidden="true" />,
+        phase: 'N6',
+      },
+      {
+        id: 'capital',
+        label: 'Capital',
+        description: 'Equity, deposits, withdrawals, reconciliation',
+        icon: <Wallet aria-hidden="true" />,
+        phase: 'N6',
+      },
+      {
+        id: 'lifecycle',
+        label: 'Lifecycle',
+        description: 'Emotions, grades, behavioral patterns, discipline',
+        icon: <Brain aria-hidden="true" />,
         phase: 'N6',
       },
     ],

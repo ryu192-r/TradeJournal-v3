@@ -171,3 +171,148 @@ button.tjv3-cockpit__signal-row:hover {
     gap: var(--tj-space-row);
   }
 }
+
+/* ── Risk Intelligence panel ── */
+.tjv3-risk__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tjv3-risk__title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tjv3-risk__collapsed {
+  font-size: var(--tj-text-caption);
+  color: var(--tj-text-muted);
+}
+
+.tjv3-risk__gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tjv3-risk__gauge-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--tj-text-caption);
+  font-weight: 600;
+}
+
+.tjv3-risk__gauge-track {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--tj-surface-muted);
+  overflow: hidden;
+}
+
+.tjv3-risk__gauge-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 240ms var(--tj-ease-standard, ease);
+}
+
+.tjv3-risk__gauge-fill--profit { background: var(--tj-profit); }
+.tjv3-risk__gauge-fill--warning { background: var(--tj-warning); }
+.tjv3-risk__gauge-fill--loss { background: var(--tj-loss); }
+.tjv3-risk__gauge-fill--neutral { background: var(--tj-neutral); }
+
+.tjv3-risk__gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--tj-text-micro);
+  color: var(--tj-text-muted);
+}
+
+.tjv3-risk__warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tjv3-risk__warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--tj-text-caption);
+  color: var(--tj-text-secondary);
+}
+
+.tjv3-risk__pos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tjv3-risk__pos-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tjv3-risk__pos-symbol {
+  font-weight: 600;
+  color: var(--tj-text-primary);
+}
+
+.tjv3-risk__pos-pct {
+  font-family: var(--tj-font-numeric);
+  font-size: var(--tj-text-caption);
+  color: var(--tj-text-muted);
+}
+
+.tjv3-risk__pos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.tjv3-risk__pos-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tjv3-risk__pos-grid span {
+  font-size: var(--tj-text-micro);
+  color: var(--tj-text-muted);
+}
+
+.tjv3-risk__empty-pos {
+  font-size: var(--tj-text-caption);
+  color: var(--tj-text-muted);
+  padding: 0.5rem 0;
+}
+
+.tjv3-risk__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tj-text-caption);
+}
+
+.tjv3-risk__table th {
+  text-align: left;
+  color: var(--tj-text-muted);
+  font-weight: 600;
+  padding: 0.3rem 0.4rem;
+}
+
+.tjv3-risk__table td {
+  padding: 0.35rem 0.4rem;
+  border-top: 1px solid var(--tj-border);
+  color: var(--tj-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .tjv3-risk__table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

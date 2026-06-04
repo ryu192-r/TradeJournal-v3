@@ -9,7 +9,7 @@ function isMissingAccount(error: unknown): boolean {
   return typeof detail === 'string' && detail.toLowerCase().includes('no accounts found')
 }
 
-export function useRiskDashboardQuery() {
+export function useRiskDashboardQuery(enabled = true) {
   return useQuery<RiskDashboardPayload | null>({
     queryKey: ['risk-dashboard'],
     queryFn: async () => {
@@ -20,6 +20,7 @@ export function useRiskDashboardQuery() {
         throw error
       }
     },
+    enabled,
     staleTime: 15 * 1000,
     retry: (failureCount, error) => {
       if (isMissingAccount(error)) return false
