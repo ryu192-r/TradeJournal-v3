@@ -227,6 +227,7 @@ export function invalidateLifecycle(qc: QueryClient, tradeId: number) {
     qc.invalidateQueries({ queryKey: ['timeline', tradeId] }),
     qc.invalidateQueries({ queryKey: ['stop-history', tradeId] }),
     qc.invalidateQueries({ queryKey: ['partial-exits', tradeId] }),
+    qc.invalidateQueries({ queryKey: ['pyramid-entries', tradeId] }),
     qc.invalidateQueries({ queryKey: ['emotion-logs', tradeId] }),
     qc.invalidateQueries({ queryKey: ['execution-grade', tradeId] }),
   ])

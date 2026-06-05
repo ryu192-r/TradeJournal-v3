@@ -175,7 +175,8 @@ class PartialExitService:
         self.db.query(TradeTimeline).filter(
             TradeTimeline.trade_id == trade_id,
             TradeTimeline.event_type == "partial_exit",
-            TradeTimeline.new_value == f"qty={exit_entry.qty} @ {exit_entry.exit_price}",
+            TradeTimeline.new_value.contains(str(exit_entry.exit_price.normalize())),
+            TradeTimeline.timestamp == exit_entry.exit_time,
         ).delete(synchronize_session="fetch")
 
         self.db.delete(exit_entry)
