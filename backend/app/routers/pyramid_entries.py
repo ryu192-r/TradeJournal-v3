@@ -253,6 +253,21 @@ def delete_pyramid_entry(
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pyramid entry not found")
 
+    # Remove matching timeline "pyramided" event (match by qty+price in new_value)
+    from app.models.trade_timeline import TradeTimeline
+    pattern = f"+{entry.quantity}" if entry.quantity == int(entry.quantity) else f"+{entry.quantity}"
+    timeline_events = (
+        db.query(TradeTimeline)
+        .filter(
+            TradeTimeline.trade_id == trade_id,
+            TradeTimeline.event_type == "pyramided",
+            TradeTimeline.new_value.contains(str(entry.entry_price)),
+        )
+        .all()
+    )
+    for te in timeline_events:
+        db.delete(te)
+
     db.delete(entry)
     db.flush()
 
@@ -264,7 +279,6 @@ def delete_pyramid_entry(
     )
     if remaining:
         _recalculate_trade_from_entries(trade, remaining)
-    # If no entries remain, leave trade as-is (user should manage via edit trade)
 
     db.commit()
     return {"message": "deleted"}
