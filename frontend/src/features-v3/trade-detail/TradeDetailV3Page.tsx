@@ -125,6 +125,15 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
             onDeleteStopEntry={(id) => deleteStopMut.mutate(id)}
             isDeletingStop={deleteStopMut.isPending}
           />
+          <PyramidEntriesPanel
+            entries={data.pyramidEntries}
+            onEdit={(id, payload) => editPyramidMut.mutate({ entryId: id, payload })}
+            onDelete={(id) => deletePyramidMut.mutate(id)}
+            isSubmitting={editPyramidMut.isPending || deletePyramidMut.isPending}
+          />
+        </Grid>
+
+        <Grid minColumnWidth="18rem">
           <PartialExitsPanel
             partialExits={data.partialExits}
             onDelete={(id) => deletePartialMut.mutate(id)}
@@ -132,15 +141,6 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
             isDeleting={deletePartialMut.isPending || editPartialMut.isPending}
           />
         </Grid>
-
-        {data.pyramidEntries.length > 0 && (
-          <PyramidEntriesPanel
-            entries={data.pyramidEntries}
-            onEdit={(id, payload) => editPyramidMut.mutate({ entryId: id, payload })}
-            onDelete={(id) => deletePyramidMut.mutate(id)}
-            isSubmitting={editPyramidMut.isPending || deletePyramidMut.isPending}
-          />
-        )}
 
         <Grid minColumnWidth="18rem">
           <PlanVsExecutionPanel trade={trade} />

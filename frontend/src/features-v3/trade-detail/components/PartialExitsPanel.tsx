@@ -29,7 +29,7 @@ export function PartialExitsPanel({ partialExits, onDelete, onEdit, isDeleting }
   }
 
   return (
-    <Panel title="Partial exits" description="Recorded partial exits from existing API data.">
+    <Panel title="Partial exits (sells)" description="Shares sold before full close. Each exit reduces remaining quantity and locks in realized P&L.">
       {partialExits.length === 0 ? (
         <EmptyState
           icon={<Layers aria-hidden="true" />}

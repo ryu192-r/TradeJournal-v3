@@ -37,7 +37,7 @@ export function PyramidEntriesPanel({ entries, onEdit, onDelete, isSubmitting }:
   }
 
   return (
-    <Panel title="Pyramid entries" description="Individual position adds. Edit/delete recalculates weighted average entry.">
+    <Panel title="Pyramid entries (position adds)" description="Each buy-add that built this position. Edits recalculate weighted avg entry price and total quantity.">
       {entries.length === 0 ? (
         <EmptyState
           icon={<Layers aria-hidden="true" />}
