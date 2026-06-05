@@ -74,14 +74,97 @@ def list_pyramid_entries(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _get_trade(db, trade_id, current_user.id)
+    trade = _get_trade(db, trade_id, current_user.id)
     entries = (
         db.query(PyramidEntry)
         .filter(PyramidEntry.trade_id == trade_id)
         .order_by(PyramidEntry.entry_time.asc())
         .all()
     )
+
+    # Backfill: if no entries exist but trade has pyramid timeline events, seed them now
+    if not entries:
+        entries = _backfill_pyramid_entries(db, trade)
+
     return {"items": entries}
+
+
+def _backfill_pyramid_entries(db: Session, trade: Trade) -> list[PyramidEntry]:
+    """Create pyramid_entries from timeline 'pyramided' events for legacy trades."""
+    from app.models.trade_timeline import TradeTimeline
+    import re
+
+    timeline_events = (
+        db.query(TradeTimeline)
+        .filter(TradeTimeline.trade_id == trade.id, TradeTimeline.event_type == "pyramided")
+        .order_by(TradeTimeline.timestamp.asc())
+        .all()
+    )
+
+    if not timeline_events:
+        # No pyramiding happened — show trade itself as single entry
+        entry = PyramidEntry(
+            trade_id=trade.id,
+            entry_price=trade.entry_price,
+            quantity=trade.quantity,
+            entry_time=trade.entry_time,
+            fees=trade.fees or Decimal("0"),
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return [entry]
+
+    # Parse pyramid adds from timeline, reconstruct original + adds
+    adds = []
+    for ev in timeline_events:
+        m = re.match(r'\+(\d+(?:\.\d+)?)\s*@\s*(\d+(?:\.\d+)?)', ev.new_value or '')
+        if m:
+            adds.append({
+                "qty": Decimal(m.group(1)),
+                "price": Decimal(m.group(2)),
+                "time": ev.timestamp or trade.entry_time,
+            })
+
+    # Reverse-engineer original position
+    pyramid_qty = sum(a["qty"] for a in adds)
+    pyramid_value = sum(a["qty"] * a["price"] for a in adds)
+    total_qty = trade.quantity
+    original_qty = total_qty - pyramid_qty
+
+    if original_qty > 0:
+        # weighted avg: trade.entry_price * total_qty = orig_price * orig_qty + pyramid_value
+        original_price = (trade.entry_price * total_qty - pyramid_value) / original_qty
+    else:
+        original_price = trade.entry_price
+
+    # Create initial entry
+    initial = PyramidEntry(
+        trade_id=trade.id,
+        entry_price=max(original_price, Decimal("0")),
+        quantity=max(original_qty, Decimal("0")) if original_qty > 0 else trade.quantity,
+        entry_time=trade.entry_time,
+        fees=Decimal("0"),
+    )
+    db.add(initial)
+
+    # Create pyramid add entries
+    created = [initial]
+    for a in adds:
+        pe = PyramidEntry(
+            trade_id=trade.id,
+            entry_price=a["price"],
+            quantity=a["qty"],
+            entry_time=a["time"],
+            fees=Decimal("0"),
+        )
+        db.add(pe)
+        created.append(pe)
+
+    db.commit()
+    for e in created:
+        db.refresh(e)
+    return created
 
 
 @router.post("", response_model=PyramidEntryResponse, status_code=status.HTTP_201_CREATED)
