@@ -7,7 +7,7 @@ import { formatTradeDateTime, formatTradePrice, formatTradeQuantity, safeNumber 
 interface PartialExitsPanelProps {
   partialExits: PartialExit[]
   onDelete?: (exitId: number) => void
-  onEdit?: (exitId: number, payload: { qty?: string; exit_price?: string }) => void
+  onEdit?: (exitId: number, payload: { qty?: string; exit_price?: string; exit_time?: string }) => void
   isDeleting?: boolean
 }
 
@@ -15,16 +15,18 @@ export function PartialExitsPanel({ partialExits, onDelete, onEdit, isDeleting }
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editQty, setEditQty] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editTime, setEditTime] = useState('')
 
   const startEdit = (exit: PartialExit) => {
     setEditingId(exit.id)
     setEditQty(exit.qty)
     setEditPrice(exit.exit_price)
+    setEditTime(exit.exit_time?.slice(0, 16) ?? '')
   }
 
   const confirmEdit = () => {
     if (!editingId || !onEdit) return
-    onEdit(editingId, { qty: editQty, exit_price: editPrice })
+    onEdit(editingId, { qty: editQty, exit_price: editPrice, exit_time: editTime ? editTime + ':00' : undefined })
     setEditingId(null)
   }
 
@@ -44,6 +46,7 @@ export function PartialExitsPanel({ partialExits, onDelete, onEdit, isDeleting }
                 <div className="tjv3-trade-detail__edit-fields">
                   <label>Qty <input type="number" step="1" value={editQty} onChange={(e) => setEditQty(e.target.value)} /></label>
                   <label>Price <input type="number" step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} /></label>
+                  <label>Time <input type="datetime-local" value={editTime} onChange={(e) => setEditTime(e.target.value)} /></label>
                 </div>
                 <div className="tjv3-trade-detail__edit-actions">
                   <Button variant="primary" size="sm" onClick={confirmEdit} disabled={isDeleting}><Check size={13} /></Button>

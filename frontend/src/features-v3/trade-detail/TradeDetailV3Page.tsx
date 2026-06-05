@@ -59,12 +59,12 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
     onSuccess: () => void invalidateTradeDomain(qc, tradeId),
   })
   const editPartialMut = useMutation({
-    mutationFn: (args: { exitId: number; payload: { qty?: string; exit_price?: string } }) =>
+    mutationFn: (args: { exitId: number; payload: { qty?: string; exit_price?: string; exit_time?: string } }) =>
       updatePartialExit(tradeId, args.exitId, args.payload),
     onSuccess: () => void invalidateTradeDomain(qc, tradeId),
   })
   const editPyramidMut = useMutation({
-    mutationFn: (args: { entryId: number; payload: { entry_price?: number; quantity?: number; fees?: number } }) =>
+    mutationFn: (args: { entryId: number; payload: { entry_price?: number; quantity?: number; fees?: number; entry_time?: string } }) =>
       updatePyramidEntry(tradeId, args.entryId, args.payload),
     onSuccess: () => void invalidateTradeDomain(qc, tradeId),
   })

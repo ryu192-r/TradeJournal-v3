@@ -6,7 +6,7 @@ import { formatTradeDateTime, formatTradePrice, formatTradeQuantity } from '../u
 
 interface PyramidEntriesPanelProps {
   entries: PyramidEntry[]
-  onEdit?: (entryId: number, payload: { entry_price?: number; quantity?: number; fees?: number }) => void
+  onEdit?: (entryId: number, payload: { entry_price?: number; quantity?: number; fees?: number; entry_time?: string }) => void
   onDelete?: (entryId: number) => void
   isSubmitting?: boolean
 }
@@ -16,12 +16,14 @@ export function PyramidEntriesPanel({ entries, onEdit, onDelete, isSubmitting }:
   const [editPrice, setEditPrice] = useState('')
   const [editQty, setEditQty] = useState('')
   const [editFees, setEditFees] = useState('')
+  const [editTime, setEditTime] = useState('')
 
   const startEdit = (entry: PyramidEntry) => {
     setEditingId(entry.id)
     setEditPrice(entry.entry_price)
     setEditQty(entry.quantity)
     setEditFees(entry.fees)
+    setEditTime(entry.entry_time?.slice(0, 16) ?? '')
   }
 
   const cancelEdit = () => setEditingId(null)
@@ -32,6 +34,7 @@ export function PyramidEntriesPanel({ entries, onEdit, onDelete, isSubmitting }:
       entry_price: Number(editPrice) || undefined,
       quantity: Number(editQty) || undefined,
       fees: Number(editFees) || undefined,
+      entry_time: editTime ? editTime + ':00' : undefined,
     })
     setEditingId(null)
   }
@@ -53,6 +56,7 @@ export function PyramidEntriesPanel({ entries, onEdit, onDelete, isSubmitting }:
                   <label>Price <input type="number" step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} /></label>
                   <label>Qty <input type="number" step="1" value={editQty} onChange={(e) => setEditQty(e.target.value)} /></label>
                   <label>Fees <input type="number" step="0.01" value={editFees} onChange={(e) => setEditFees(e.target.value)} /></label>
+                  <label>Time <input type="datetime-local" value={editTime} onChange={(e) => setEditTime(e.target.value)} /></label>
                 </div>
                 <div className="tjv3-trade-detail__edit-actions">
                   <Button variant="primary" size="sm" onClick={confirmEdit} disabled={isSubmitting}><Check size={13} /></Button>
