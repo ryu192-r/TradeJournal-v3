@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Button, DataList, DataRow, Drawer, MoneyValue, RMultipleValue, Stack, Value } from '@/new-ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiTrade } from '@/types'
+import { deleteTrade } from '@/lib/endpoints'
+import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { formatTradeDateTime, formatTradePrice, formatTradeQuantity, getCurrentStop, getOriginalStop, getProtectionStatusLabel, getTradeDirection, getTradeNotes, getTradeSessionDateSafe, getTradeSetup, safeNumber } from '../utils/tradesV3Formatters'
 import { getTradeDisplayStatus, getTradeGrossPnl, getTradeRMultiple } from '../utils/tradesV3Metrics'
 import { TradeQualityBadges } from './TradeQualityBadges'
@@ -28,6 +31,17 @@ export function TradePreviewDrawer({
   const [actionDrawer, setActionDrawer] = useState<{ open: boolean; action: PositionAction }>({ open: false, action: 'partial_exit' })
   const openAction = (action: PositionAction) => setActionDrawer({ open: true, action })
   const closeAction = () => setActionDrawer((s) => ({ ...s, open: false }))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const qc = useQueryClient()
+  const deleteMut = useMutation({
+    mutationFn: async () => { if (trade) await deleteTrade(trade.id) },
+    onSuccess: () => {
+      if (trade) void invalidateTradeDomain(qc, trade.id)
+      setConfirmDelete(false)
+      onClose()
+    },
+  })
 
   const tradeIsOpen = trade ? isOpen(trade) : false
 
@@ -60,6 +74,17 @@ export function TradePreviewDrawer({
               </Button>
             )}
             <Button variant="ghost" onClick={onClose}>Close preview</Button>
+            {trade && trade.status !== 'deleted' && !confirmDelete && (
+              <Button variant="danger" onClick={() => setConfirmDelete(true)}>Delete</Button>
+            )}
+            {trade && confirmDelete && (
+              <>
+                <Button variant="danger" onClick={() => deleteMut.mutate()} disabled={deleteMut.isPending}>
+                  {deleteMut.isPending ? 'Deleting…' : 'Confirm delete'}
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+              </>
+            )}
           </div>
         }
       >

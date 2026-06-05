@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Grid, Stack } from '@/new-ui'
 import { useAppStore } from '@/store/appStore'
-import { deletePartialExit, deleteStopHistory, updatePartialExit, updatePyramidEntry, deletePyramidEntry } from '@/lib/endpoints'
+import { deletePartialExit, deleteStopHistory, updatePartialExit, updatePyramidEntry, deletePyramidEntry, deleteTrade } from '@/lib/endpoints'
 import { invalidateTradeDomain } from '@/lib/queryInvalidation'
 import { useTradeDetailV3Data } from './hooks/useTradeDetailV3Data'
 import type { TradeDetailV3PageProps } from './types'
@@ -71,6 +71,13 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
   const deletePyramidMut = useMutation({
     mutationFn: (entryId: number) => deletePyramidEntry(tradeId, entryId),
     onSuccess: () => void invalidateTradeDomain(qc, tradeId),
+  })
+  const deleteTradeMut = useMutation({
+    mutationFn: () => deleteTrade(tradeId),
+    onSuccess: () => {
+      void invalidateTradeDomain(qc, tradeId)
+      closeTradeForm()
+    },
   })
 
   if (data.isLoading) {
@@ -144,6 +151,8 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
         <TradeDetailActions
           onBack={handleBack}
           onEdit={() => openEditTrade(trade.id)}
+          onDelete={() => deleteTradeMut.mutate()}
+          isDeleting={deleteTradeMut.isPending}
           onOpenLegacyWorkspace={onOpenLegacyWorkspace}
           isTradeOpen={!trade.exit_price}
           onPositionAction={openAction}

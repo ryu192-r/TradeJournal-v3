@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Button, Cluster, Panel } from '@/new-ui'
-import { ExternalLink, Pencil, Scissors, XCircle, Shield, Layers } from 'lucide-react'
+import { ExternalLink, Pencil, Scissors, XCircle, Shield, Layers, Trash2 } from 'lucide-react'
 import type { PositionAction } from '../../position-actions'
 
 interface TradeDetailActionsProps {
   onBack: () => void
   onEdit?: () => void
+  onDelete?: () => void
+  isDeleting?: boolean
   onOpenLegacyWorkspace?: () => void
   showLegacyWorkspace?: boolean
   isTradeOpen?: boolean
@@ -14,11 +17,15 @@ interface TradeDetailActionsProps {
 export function TradeDetailActions({
   onBack,
   onEdit,
+  onDelete,
+  isDeleting,
   onOpenLegacyWorkspace,
   showLegacyWorkspace = true,
   isTradeOpen = false,
   onPositionAction,
 }: TradeDetailActionsProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   return (
     <Panel title="Actions">
       <Cluster gap="sm">
@@ -48,6 +55,22 @@ export function TradeDetailActions({
             <Button variant="secondary" onClick={() => onPositionAction('pyramid')}>
               <Layers aria-hidden="true" size={14} />
               Pyramid
+            </Button>
+          </>
+        )}
+        {onDelete && !confirmDelete && (
+          <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+            <Trash2 aria-hidden="true" size={14} />
+            Delete
+          </Button>
+        )}
+        {onDelete && confirmDelete && (
+          <>
+            <Button variant="danger" onClick={onDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting…' : 'Confirm delete'}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
             </Button>
           </>
         )}
