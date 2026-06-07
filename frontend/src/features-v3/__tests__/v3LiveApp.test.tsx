@@ -132,6 +132,7 @@ describe('V3 live app promotion', () => {
     const user = userEvent.setup()
     render(<V3LiveApp />)
 
+    // Import is a topbar action button (not a sidebar item) per Phase 8 spec.
     await user.click(screen.getByRole('button', { name: /Import/ }))
     expect(await screen.findByText('Import v3 live')).toBeInTheDocument()
   })

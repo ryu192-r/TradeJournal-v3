@@ -13,6 +13,7 @@ export function V3Shell({
   mode = 'preview',
   onMobileAdd,
   onAddTrade,
+  onImport,
 }: V3ShellProps) {
   return (
     <V3ShellLayout
@@ -20,7 +21,7 @@ export function V3Shell({
       sidebar={
         <V3Sidebar activeSection={activeSection} onSectionChange={onSectionChange} mode={mode} />
       }
-      topbar={<V3TopBar activeSection={activeSection} mode={mode} onAddTrade={onAddTrade} />}
+      topbar={<V3TopBar activeSection={activeSection} mode={mode} onAddTrade={onAddTrade} onImport={onImport} />}
       mobileNav={
         <V3MobileNav
           activeSection={activeSection}

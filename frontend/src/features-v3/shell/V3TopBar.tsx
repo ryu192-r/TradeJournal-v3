@@ -1,5 +1,5 @@
 import { Badge, Button } from '@/new-ui'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Upload } from 'lucide-react'
 import type { V3PreviewSectionId, V3ShellMode } from './V3Shell.types'
 import { getV3NavigationItem } from './v3Navigation'
 
@@ -7,9 +7,10 @@ interface V3TopBarProps {
   activeSection: V3PreviewSectionId
   mode?: V3ShellMode
   onAddTrade?: () => void
+  onImport?: () => void
 }
 
-export function V3TopBar({ activeSection, mode = 'preview', onAddTrade }: V3TopBarProps) {
+export function V3TopBar({ activeSection, mode = 'preview', onAddTrade, onImport }: V3TopBarProps) {
   const current = getV3NavigationItem(activeSection)
   const isLive = mode === 'live'
 
@@ -35,6 +36,12 @@ export function V3TopBar({ activeSection, mode = 'preview', onAddTrade }: V3TopB
           <kbd className="tjv3-topbar__kbd">/</kbd>
         </div>
         {!isLive && <Badge variant="neutral">No live data</Badge>}
+        {isLive && onImport && (
+          <Button variant="ghost" size="sm" onClick={onImport}>
+            <Upload aria-hidden="true" size={14} />
+            Import
+          </Button>
+        )}
         <Button
           variant="primary"
           size="sm"

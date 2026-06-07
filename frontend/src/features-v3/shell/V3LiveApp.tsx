@@ -263,6 +263,7 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
       onSectionChange={handleSectionChange}
       onMobileAdd={handleMobileAdd}
       onAddTrade={openCreateTrade}
+      onImport={() => handleSectionChange('import')}
     >
       <Suspense fallback={<ViewFallback />}>{renderContent()}</Suspense>
     </V3Shell>

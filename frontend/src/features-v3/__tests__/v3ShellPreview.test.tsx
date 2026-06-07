@@ -101,9 +101,10 @@ describe('V3 shell preview', () => {
 
   it('renders desktop nav labels', () => {
     render(<V3PreviewPage />)
-    expect(screen.getByRole('button', { name: /Cockpit/ })).toBeInTheDocument()
+    // Cockpit appears in both sidebar and mobile nav — use getAllByRole
+    expect(screen.getAllByRole('button', { name: /Cockpit/ }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Trades').length).toBeGreaterThan(0)
-    expect(screen.getByText('Playbooks')).toBeInTheDocument()
+    expect(screen.getByText('Playbook')).toBeInTheDocument()
     expect(screen.getByText('Reports')).toBeInTheDocument()
   })
 
@@ -111,9 +112,9 @@ describe('V3 shell preview', () => {
     render(<V3PreviewPage />)
     const mobileNav = screen.getByRole('navigation', { name: 'V3 preview mobile navigation' })
     expect(mobileNav).toBeInTheDocument()
-    expect(within(mobileNav).getByRole('button', { name: /Today/ })).toBeInTheDocument()
+    expect(within(mobileNav).getByRole('button', { name: /Cockpit/ })).toBeInTheDocument()
     expect(within(mobileNav).getByRole('button', { name: /Add/ })).toBeInTheDocument()
-    expect(within(mobileNav).getByRole('button', { name: /More/ })).toBeInTheDocument()
+    expect(within(mobileNav).getByRole('button', { name: /Review/ })).toBeInTheDocument()
   })
 
   it('does not present fake trading data as real user data', () => {

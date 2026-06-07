@@ -34,6 +34,8 @@ export function activeViewToV3Section(
       return 'lifecycle'
     case 'settings':
       return 'settings'
+    case 'coach':
+      return 'coach'
     default:
       return 'more'
   }
@@ -65,6 +67,8 @@ export function v3SectionToActiveView(section: V3PreviewSectionId): ActiveView |
       return 'lifecycle'
     case 'settings':
       return 'settings'
+    case 'coach':
+      return 'coach'
     case 'import':
     case 'more':
       return null

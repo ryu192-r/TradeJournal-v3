@@ -14,6 +14,7 @@ export type V3PreviewSectionId =
   | 'lifecycle'
   | 'settings'
   | 'charges'
+  | 'coach'
   | 'more'
 
 export interface V3NavigationItem {
@@ -39,4 +40,5 @@ export interface V3ShellProps {
   mode?: V3ShellMode
   onMobileAdd?: () => void
   onAddTrade?: () => void
+  onImport?: () => void
 }

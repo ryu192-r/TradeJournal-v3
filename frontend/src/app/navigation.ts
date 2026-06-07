@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
+  Receipt,
   Sparkles,
   TrendingUp,
   Settings,
@@ -125,42 +126,60 @@ export const desktopNavigationItems = [
   settingsItem,
 ] satisfies NavigationItem[]
 
+const journalItem: NavigationItem = {
+  id: 'journal',
+  label: 'Journal',
+  icon: BookOpen,
+  view: 'journal',
+  purpose: 'Daily notes and weekly journal rollups.',
+}
+
+const capitalItem: NavigationItem = {
+  id: 'capital',
+  label: 'Capital',
+  icon: Wallet,
+  view: 'capital',
+  purpose: 'Account balance, deposits, withdrawals, reconciliation.',
+}
+
+const chargesItem: NavigationItem = {
+  id: 'charges',
+  label: 'Charges',
+  icon: Receipt,
+  view: 'charges',
+  purpose: 'Daily contract-note charges ledger.',
+}
+
+const reportsItem: NavigationItem = {
+  id: 'reports',
+  label: 'Reports',
+  icon: FileText,
+  view: 'reports',
+  purpose: 'Weekly and monthly exportable reports.',
+}
+
+const lifecycleItem: NavigationItem = {
+  id: 'lifecycle',
+  label: 'Lifecycle',
+  icon: Brain,
+  view: 'lifecycle',
+  purpose: 'Emotions, execution grades, and behavioral drift.',
+}
+
+const coachItem: NavigationItem = {
+  id: 'coach',
+  label: 'AI Coach',
+  icon: Sparkles,
+  view: 'coach',
+  purpose: 'AI reviews, patterns, and coaching when you want depth.',
+}
+
 export const advancedNavigationItems = [
-  {
-    id: 'capital',
-    label: 'Capital',
-    icon: Wallet,
-    view: 'capital',
-    purpose: 'Account balance, deposits, withdrawals, reconciliation.',
-  },
-  {
-    id: 'journal',
-    label: 'Journal',
-    icon: BookOpen,
-    view: 'journal',
-    purpose: 'Daily notes and weekly journal rollups.',
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
-    icon: FileText,
-    view: 'reports',
-    purpose: 'Weekly and monthly exportable reports.',
-  },
-  {
-    id: 'lifecycle',
-    label: 'Lifecycle',
-    icon: Brain,
-    view: 'lifecycle',
-    purpose: 'Emotions, execution grades, and behavioral drift.',
-  },
-  {
-    id: 'coach',
-    label: 'AI Coach',
-    icon: Sparkles,
-    view: 'coach',
-    purpose: 'AI reviews, patterns, and coaching when you want depth.',
-  },
+  capitalItem,
+  journalItem,
+  reportsItem,
+  lifecycleItem,
+  coachItem,
 ] satisfies NavigationItem[]
 
 export const mobileBottomNavigationItems = [
@@ -186,14 +205,29 @@ export const mobileNavigationItems = mobileBottomNavigationItems
 
 export const navigationSections: NavigationSection[] = [
   {
-    id: 'primary',
-    label: 'Primary',
-    items: desktopNavigationItems,
+    id: 'today',
+    label: 'Today',
+    items: [dashboardItem, tradesItem, calendarItem, journalItem, reviewItem],
   },
   {
-    id: 'advanced',
-    label: 'Advanced',
-    items: advancedNavigationItems,
+    id: 'insight',
+    label: 'Insight',
+    items: [analyticsItem, playbookItem, lifecycleItem],
+  },
+  {
+    id: 'money',
+    label: 'Money',
+    items: [capitalItem, chargesItem, reportsItem],
+  },
+  {
+    id: 'ai',
+    label: 'AI',
+    items: [coachItem],
+  },
+  {
+    id: 'system',
+    label: 'System',
+    items: [settingsItem],
   },
 ]
 
