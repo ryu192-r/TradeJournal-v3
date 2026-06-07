@@ -13,7 +13,7 @@ import { combineSetups, type PlaybookSetupEntry } from './utils/playbookGrouping
 import { summarizeLibrary } from './utils/playbookMetrics'
 import type { PlaybookFilter } from './utils/playbookFilters'
 import type { SetupPlaybookItem } from '@/types/setupPlaybook'
-import { PlaybookIntelligenceFull } from '@/components/playbook/PlaybookIntelligenceFull'
+import { PlaybookIntelligenceFull } from './components/PlaybookIntelligenceFull'
 
 type PlaybookTab = 'library' | 'intelligence'
 

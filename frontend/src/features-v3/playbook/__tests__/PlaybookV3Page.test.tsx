@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   openReviewTrade: vi.fn(),
 }))
 
-vi.mock('@/components/playbook/PlaybookIntelligenceFull', () => ({
+vi.mock('../components/PlaybookIntelligenceFull', () => ({
   PlaybookIntelligenceFull: () => <div data-testid="playbook-intelligence-mock">Intelligence mock</div>,
 }))
 vi.mock('../../trades/hooks/useTradesV3Data', () => ({ useTradesV3Data: mocks.useTradesV3Data }))

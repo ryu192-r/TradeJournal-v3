@@ -1,6 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import App from '@/App'
 import { V3PreviewPage } from '../preview/V3PreviewPage'
@@ -29,10 +28,6 @@ vi.mock('@/store/appStore', () => ({
     openCreateTrade: vi.fn(),
     openDetailTrade: vi.fn(),
   }),
-}))
-
-vi.mock('@/components/layout/AppShell', () => ({
-  AppShell: ({ children }: { children: ReactNode }) => <div data-testid="legacy-shell">{children}</div>,
 }))
 
 vi.mock('@/store/toastStore', () => ({
