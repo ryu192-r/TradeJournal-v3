@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   openReviewTrade: vi.fn(),
 }))
 
+vi.mock('@/components/playbook/PlaybookIntelligenceFull', () => ({
+  PlaybookIntelligenceFull: () => <div data-testid="playbook-intelligence-mock">Intelligence mock</div>,
+}))
 vi.mock('../../trades/hooks/useTradesV3Data', () => ({ useTradesV3Data: mocks.useTradesV3Data }))
 vi.mock('@/hooks/useSetupPlaybookQuery', () => ({
   useSetupsQuery: mocks.useSetupsQuery,
@@ -174,12 +177,11 @@ describe('PlaybookV3Page', () => {
     expect(screen.getAllByText(/Not in playbook/i).length).toBeGreaterThan(0)
   })
 
-  it('renders legacy fallback button when callback supplied', () => {
+  it('renders Intelligence tab button', () => {
     mocks.useTradesV3Data.mockReturnValue(tradesData({ trades: [] }))
     mocks.useSetupsQuery.mockReturnValue(setupsResponse([]))
-    const onOpenLegacy = vi.fn()
-    render(wrap(<PlaybookV3Page onOpenLegacy={onOpenLegacy} />))
-    expect(screen.getByText(/Analytics \(legacy\)/i)).toBeInTheDocument()
+    render(wrap(<PlaybookV3Page />))
+    expect(screen.getByRole('button', { name: /intelligence/i })).toBeInTheDocument()
   })
 
   it('shows no NaN, undefined, null, or [object Object] for empty data', () => {

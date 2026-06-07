@@ -1,11 +1,11 @@
 import type { SetupEdgeMetrics, SetupConditionBreakdown } from '@/types/playbookEdge'
-import { GlassBadge } from '@/components/ui/GlassBadge'
+import { Badge } from '@/new-ui'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 const STATUS_STYLES = {
-  FOCUS: 'accent',
-  WATCH: 'muted',
+  FOCUS: 'success',
+  WATCH: 'neutral',
   PAUSE: 'loss',
 } as const
 
@@ -32,7 +32,7 @@ export function PlaybookEdgeCard({ metrics }: { metrics: SetupEdgeMetrics }) {
             {metrics.sample_size} trades · {CONF_LABELS[metrics.confidence]}
           </p>
         </div>
-        <GlassBadge variant={statusVariant}>{metrics.status}</GlassBadge>
+        <Badge variant={statusVariant}>{metrics.status}</Badge>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Metric label="Expectancy" value={formatR(metrics.expectancy_r)} tone={metrics.expectancy_r} />

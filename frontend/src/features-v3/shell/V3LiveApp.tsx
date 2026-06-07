@@ -1,7 +1,7 @@
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingState } from '@/new-ui'
 import { useAppStore } from '@/store/appStore'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
 import { CoachV3Page } from '../coach'
@@ -51,10 +51,6 @@ const LifecycleV3Page = lazy(() =>
   import('../lifecycle').then((m) => ({ default: m.LifecycleV3Page })),
 )
 
-const SetupPlaybookPage = lazy(() =>
-  import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
-)
-
 function ViewFallback() {
   return (
     <div className="tjv3-live-fallback">
@@ -78,13 +74,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     openDetailTrade,
   } = useAppStore()
   const [sectionOverride, setSectionOverride] = useState<V3PreviewSectionId | null>(null)
-  const [legacyPlaybookFallback, setLegacyPlaybookFallback] = useState(false)
-
-  useEffect(() => {
-    if (activeView !== 'playbook') {
-      setLegacyPlaybookFallback(false)
-    }
-  }, [activeView])
 
   const activeSection = useMemo(
     () => activeViewToV3Section(activeView, tradeFormMode, sectionOverride),
@@ -182,21 +171,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           </ErrorBoundary>
         )
       case 'playbook':
-        if (legacyPlaybookFallback) {
-          return (
-            <div className="tjv3-legacy-embed">
-              <ErrorBoundary name="LegacyPlaybook">
-                <SetupPlaybookPage />
-              </ErrorBoundary>
-            </div>
-          )
-        }
         return (
           <ErrorBoundary name="PlaybookV3">
-            <PlaybookV3Page
-              dataEnabled
-              onOpenLegacy={() => setLegacyPlaybookFallback(true)}
-            />
+            <PlaybookV3Page dataEnabled />
           </ErrorBoundary>
         )
       case 'reports':
