@@ -6,8 +6,10 @@ import { getDailyChargesSummary } from '@/lib/endpoints'
 import { todaySessionDate } from '@/utils/tradeDates'
 import type { TradesV3Period } from '../trades/types'
 import { filterByPeriod, computePerformance, groupBySetup, groupByExchange, groupByProductType, buildChargesStatus, type GroupMetrics } from './utils/analyticsMetrics'
+import { RegimePerformancePanel } from './components/RegimePerformancePanel'
 
 type AnalyticsPeriod = TradesV3Period
+type AnalyticsTab = 'overview' | 'regime'
 
 const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
   { value: 'today', label: 'Today' },
@@ -36,6 +38,7 @@ function periodToRange(period: AnalyticsPeriod): [string, string] {
 
 export function AnalyticsV3Page({ dataEnabled = true }: { dataEnabled?: boolean }) {
   const { trades, isLoading, error, refresh } = useTradesV3Data(dataEnabled)
+  const [tab, setTab] = useState<AnalyticsTab>('overview')
   const [period, setPeriod] = useState<AnalyticsPeriod>('month')
   const [start, end] = useMemo(() => periodToRange(period), [period])
 
@@ -64,6 +67,33 @@ export function AnalyticsV3Page({ dataEnabled = true }: { dataEnabled?: boolean 
   return (
     <Page title="Analytics" subtitle="Performance overview. Gross P&L from trades; net P&L only when daily charges are complete.">
       <Stack gap="lg">
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
+          {([['overview', 'Overview'], ['regime', 'By Regime']] as [AnalyticsTab, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value)}
+              style={{
+                padding: '0.375rem 0.875rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                background: tab === value ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                color: tab === value ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'regime' ? (
+          <RegimePerformancePanel />
+        ) : (
+        <>
         {/* Period filter */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {PERIODS.map((p) => (
@@ -124,6 +154,8 @@ export function AnalyticsV3Page({ dataEnabled = true }: { dataEnabled?: boolean 
         </Panel>
 
         {filtered.length === 0 && <EmptyState title="No trades" description="No non-deleted trades found for this period." />}
+        </>
+        )}
       </Stack>
     </Page>
   )
