@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { TradeDetailPage } from '@/pages/TradeDetailPage'
 import { PartialExitForm } from '@/components/lifecycle/PartialExitForm'
 
 let operationalDashboardMock: any = {
@@ -278,13 +277,6 @@ describe('Phase 0 frontend smoke tests', () => {
     expect(screen.getByText('Recent trades')).toBeInTheDocument()
   })
 
-  it('renders Trade Detail page', () => {
-    renderWithQueryClient(<TradeDetailPage tradeId={1} />)
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-    expect(screen.getAllByRole('heading', { name: 'RELIANCE' }).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Dynamic Chart' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Uploaded Images' })).toBeInTheDocument()
-  })
 
 
   it('renders Partial Exit form', () => {

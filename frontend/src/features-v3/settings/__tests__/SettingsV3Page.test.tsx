@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
@@ -118,18 +117,6 @@ describe('SettingsV3Page', () => {
 
     render(wrap(<SettingsV3Page />))
     expect(await screen.findByText(/Failed to load AI configuration/i)).toBeInTheDocument()
-  })
-
-  it('renders legacy fallback when callback supplied', async () => {
-    mocks.getAiProviders.mockResolvedValue(providers())
-    mocks.getAiConfig.mockResolvedValue(config())
-
-    const onOpenLegacy = vi.fn()
-    render(wrap(<SettingsV3Page onOpenLegacy={onOpenLegacy} />))
-    const button = await screen.findByText(/Open legacy settings/i)
-    const user = userEvent.setup()
-    await user.click(button)
-    expect(onOpenLegacy).toHaveBeenCalled()
   })
 
   it('does not surface NaN/undefined/null/[object Object]', async () => {

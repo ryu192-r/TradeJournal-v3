@@ -54,8 +54,6 @@ const LifecycleV3Page = lazy(() =>
 const SetupPlaybookPage = lazy(() =>
   import('@/components/playbook/SetupPlaybookPage').then((m) => ({ default: m.SetupPlaybookPage })),
 )
-const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
-const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
 
 function ViewFallback() {
   return (
@@ -80,25 +78,11 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     openDetailTrade,
   } = useAppStore()
   const [sectionOverride, setSectionOverride] = useState<V3PreviewSectionId | null>(null)
-  const [legacyDetailFallback, setLegacyDetailFallback] = useState(false)
   const [legacyPlaybookFallback, setLegacyPlaybookFallback] = useState(false)
-  const [legacySettingsFallback, setLegacySettingsFallback] = useState(false)
-
-  useEffect(() => {
-    if (tradeFormMode !== 'detail') {
-      setLegacyDetailFallback(false)
-    }
-  }, [tradeFormMode])
 
   useEffect(() => {
     if (activeView !== 'playbook') {
       setLegacyPlaybookFallback(false)
-    }
-  }, [activeView])
-
-  useEffect(() => {
-    if (activeView !== 'settings') {
-      setLegacySettingsFallback(false)
     }
   }, [activeView])
 
@@ -153,22 +137,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     }
 
     if (tradeFormMode === 'detail' && selectedTradeId != null) {
-      if (legacyDetailFallback) {
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="LegacyTradeDetail">
-              <TradeDetailPage tradeId={selectedTradeId} />
-            </ErrorBoundary>
-          </div>
-        )
-      }
-
       return (
         <ErrorBoundary name="TradeDetailV3">
-          <TradeDetailV3Page
-            tradeId={selectedTradeId}
-            onOpenLegacyWorkspace={() => setLegacyDetailFallback(true)}
-          />
+          <TradeDetailV3Page tradeId={selectedTradeId} />
         </ErrorBoundary>
       )
     }
@@ -241,18 +212,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           </ErrorBoundary>
         )
       case 'settings':
-        if (legacySettingsFallback) {
-          return (
-            <div className="tjv3-legacy-embed">
-              <ErrorBoundary name="LegacySettings">
-                <SettingsPage />
-              </ErrorBoundary>
-            </div>
-          )
-        }
         return (
           <ErrorBoundary name="SettingsV3">
-            <SettingsV3Page onOpenLegacy={() => setLegacySettingsFallback(true)} />
+            <SettingsV3Page />
           </ErrorBoundary>
         )
       case 'capital':

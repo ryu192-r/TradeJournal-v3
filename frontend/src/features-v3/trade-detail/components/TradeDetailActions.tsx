@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Cluster, Panel } from '@/new-ui'
-import { ExternalLink, Pencil, Scissors, XCircle, Shield, Layers, Trash2 } from 'lucide-react'
+import { Pencil, Scissors, XCircle, Shield, Layers, Trash2 } from 'lucide-react'
 import type { PositionAction } from '../../position-actions'
 
 interface TradeDetailActionsProps {
@@ -8,8 +8,6 @@ interface TradeDetailActionsProps {
   onEdit?: () => void
   onDelete?: () => void
   isDeleting?: boolean
-  onOpenLegacyWorkspace?: () => void
-  showLegacyWorkspace?: boolean
   isTradeOpen?: boolean
   onPositionAction?: (action: PositionAction) => void
 }
@@ -19,8 +17,6 @@ export function TradeDetailActions({
   onEdit,
   onDelete,
   isDeleting,
-  onOpenLegacyWorkspace,
-  showLegacyWorkspace = true,
   isTradeOpen = false,
   onPositionAction,
 }: TradeDetailActionsProps) {
@@ -73,12 +69,6 @@ export function TradeDetailActions({
               Cancel
             </Button>
           </>
-        )}
-        {showLegacyWorkspace && onOpenLegacyWorkspace && (
-          <Button variant="ghost" onClick={onOpenLegacyWorkspace}>
-            <ExternalLink aria-hidden="true" size={14} />
-            Legacy workspace
-          </Button>
         )}
       </Cluster>
     </Panel>

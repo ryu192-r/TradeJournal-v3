@@ -2,7 +2,6 @@ import type { ApiTrade, PartialExit, PyramidEntry, StopHistoryEntry, TimelineEve
 
 export interface TradeDetailV3PageProps {
   tradeId: number
-  onOpenLegacyWorkspace?: () => void
 }
 
 export interface TradeDetailV3Data {

@@ -26,7 +26,7 @@ import { TradeSummaryPanel } from './components/TradeSummaryPanel'
 import { buildTradeDetailTimeline } from './utils/tradeDetailV3Timeline'
 import './trade-detail.css'
 
-export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetailV3PageProps) {
+export function TradeDetailV3Page({ tradeId }: TradeDetailV3PageProps) {
   const closeTradeForm = useAppStore((state) => state.closeTradeForm)
   const openEditTrade = useAppStore((state) => state.openEditTrade)
   const data = useTradeDetailV3Data(tradeId)
@@ -153,7 +153,6 @@ export function TradeDetailV3Page({ tradeId, onOpenLegacyWorkspace }: TradeDetai
           onEdit={() => openEditTrade(trade.id)}
           onDelete={() => deleteTradeMut.mutate()}
           isDeleting={deleteTradeMut.isPending}
-          onOpenLegacyWorkspace={onOpenLegacyWorkspace}
           isTradeOpen={!trade.exit_price}
           onPositionAction={openAction}
         />
