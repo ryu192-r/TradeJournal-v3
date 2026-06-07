@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   useTradesV3Data: vi.fn(),
   useSetupsQuery: vi.fn(),
   useUpdateSetupMutation: vi.fn(),
+  useCreateSetupMutation: vi.fn(),
+  useArchiveSetupMutation: vi.fn(),
+  useSeedSetupsMutation: vi.fn(),
   openDetailTrade: vi.fn(),
   openReviewTrade: vi.fn(),
 }))
@@ -20,6 +23,9 @@ vi.mock('../../trades/hooks/useTradesV3Data', () => ({ useTradesV3Data: mocks.us
 vi.mock('@/hooks/useSetupPlaybookQuery', () => ({
   useSetupsQuery: mocks.useSetupsQuery,
   useUpdateSetupMutation: mocks.useUpdateSetupMutation,
+  useCreateSetupMutation: mocks.useCreateSetupMutation,
+  useArchiveSetupMutation: mocks.useArchiveSetupMutation,
+  useSeedSetupsMutation: mocks.useSeedSetupsMutation,
 }))
 vi.mock('@/store/toastStore', () => ({
   useToastStore: (sel: (s: { addToast: () => void }) => unknown) => sel({ addToast: vi.fn() }),
@@ -68,9 +74,15 @@ beforeEach(() => {
   mocks.useTradesV3Data.mockReset()
   mocks.useSetupsQuery.mockReset()
   mocks.useUpdateSetupMutation.mockReset()
+  mocks.useCreateSetupMutation.mockReset()
+  mocks.useArchiveSetupMutation.mockReset()
+  mocks.useSeedSetupsMutation.mockReset()
   mocks.openDetailTrade.mockReset()
   mocks.openReviewTrade.mockReset()
   mocks.useUpdateSetupMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mocks.useCreateSetupMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mocks.useArchiveSetupMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mocks.useSeedSetupsMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 })
 
 describe('PlaybookV3Page', () => {
@@ -167,7 +179,7 @@ describe('PlaybookV3Page', () => {
     mocks.useSetupsQuery.mockReturnValue(setupsResponse([]))
     const onOpenLegacy = vi.fn()
     render(wrap(<PlaybookV3Page onOpenLegacy={onOpenLegacy} />))
-    expect(screen.getByText(/Open legacy playbook/i)).toBeInTheDocument()
+    expect(screen.getByText(/Analytics \(legacy\)/i)).toBeInTheDocument()
   })
 
   it('shows no NaN, undefined, null, or [object Object] for empty data', () => {
