@@ -1,19 +1,17 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Eye, MoreHorizontal, PanelLeft, Sparkles } from 'lucide-react'
+import { Eye, MoreHorizontal, PanelLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/appStore'
 import { useAuthStore } from '@/store/authStore'
 import {
   advancedNavigationItems,
-  filterNavigationSections,
-  isViewVisibleInMode,
   mobileBottomNavigationItems,
   mobileMoreNavigationItems,
+  navigationSections,
   type ActiveView,
   type NavigationItem,
   viewMeta,
 } from '@/app/navigation'
-import { interfaceModeLabel, isProMode } from '@/app/interfaceMode'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 
 const V3_PREVIEW_HREF = '/v3-preview'
@@ -91,10 +89,10 @@ export function Sidebar() {
 }
 
 export function DesktopSidebar() {
-  const { sidebarOpen, toggleSidebar, activeView, navMode } = useAppStore()
+  const { sidebarOpen, toggleSidebar, activeView } = useAppStore()
   const user = useAuthStore((s) => s.user)
   const selectView = useNavSelect()
-  const sections = filterNavigationSections(navMode)
+  const sections = navigationSections
 
   return (
     <>
@@ -123,7 +121,7 @@ export function DesktopSidebar() {
           <div className="min-w-0">
             <div className="font-display text-[1.1rem] font-medium leading-none tracking-[-0.025rem] text-text-heading">TradeJournal</div>
             <div className="mt-1 text-[10px] font-data uppercase tracking-wider text-text-faint">
-              {interfaceModeLabel(navMode)}
+              TradeJournal v3
             </div>
           </div>
         </div>
@@ -140,7 +138,6 @@ export function DesktopSidebar() {
                     key={item.id}
                     item={item}
                     activeView={activeView}
-                    navMode={navMode}
                     onSelect={selectView}
                   />
                 ))}
@@ -184,19 +181,16 @@ export function DesktopSidebar() {
 function NavListButton({
   item,
   activeView,
-  navMode,
   onSelect,
 }: {
   item: NavigationItem
   activeView: ActiveView
-  navMode: 'simple' | 'pro'
   onSelect: (view: ActiveView) => void
 }) {
   const Icon = item.icon
   const isActive = isNavItemActive(item, activeView)
   const isComingSoon = item.comingSoon || !item.view
   const isSelectable = item.view && isSelectableView(item.view)
-  const showProBadge = item.view && isProMode(navMode) && !item.simple
 
   return (
     <button
@@ -220,41 +214,30 @@ function NavListButton({
       <Icon className="h-[15px] w-[15px] shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="truncate">{item.label}</div>
-        {item.purpose && isProMode(navMode) && (
-          <div className="mt-0.5 truncate text-[10px] font-data text-current/70">
-            {item.purpose}
-          </div>
-        )}
       </div>
-      {item.comingSoon ? (
+      {item.comingSoon && (
         <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-text-faint">
           Soon
         </span>
-      ) : showProBadge ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/15 bg-accent-faint px-2 py-0.5 text-[9px] font-data uppercase tracking-wider text-accent">
-          <Sparkles className="h-2.5 w-2.5" />
-          Pro
-        </span>
-      ) : null}
+      )}
     </button>
   )
 }
 
 export function MobileBottomNav() {
-  const { activeView, navMode } = useAppStore()
+  const { activeView } = useAppStore()
   const selectView = useNavSelect()
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const bottomHasActive = mobileBottomNavigationItems.some((item) => isMobileBottomActive(item, activeView))
   const moreActive = !bottomHasActive
   const advancedMoreItems = useMemo(() => {
-    if (!isProMode(navMode)) return []
     const reservedViews = new Set(
       [...mobileBottomNavigationItems, ...mobileMoreNavigationItems]
         .map((item) => item.view)
         .filter((view): view is ActiveView => Boolean(view))
     )
-    return advancedNavigationItems.filter((item) => item.view && !reservedViews.has(item.view) && isViewVisibleInMode(item.view, navMode))
-  }, [navMode])
+    return advancedNavigationItems.filter((item) => item.view && !reservedViews.has(item.view))
+  }, [])
 
   return (
     <>

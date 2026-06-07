@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getAiConfig, getAiMentors, getAiProviders, saveAiConfig, testAiConnection } from '@/lib/endpoints'
-import type { AIProviderInfo, AiConfigSaveRequest, MentorInfo, TestResponse } from '@/types/ai'
+import { getAiConfig, getAiProviders, saveAiConfig, testAiConnection } from '@/lib/endpoints'
+import type { AIProviderInfo, AiConfigSaveRequest, TestResponse } from '@/types/ai'
 
 export interface AiSettingsForm {
   provider: string
@@ -15,13 +15,11 @@ export interface AiSettingsForm {
   timeout: number
   maxRetries: number
   temperature: number
-  personality: Record<string, number>
 }
 
 export interface UseAiSettingsState {
   form: AiSettingsForm
   providers: Record<string, AIProviderInfo>
-  mentors: MentorInfo[]
   loaded: boolean
   loading: boolean
   loadError: string | null
@@ -37,7 +35,6 @@ export interface UseAiSettingsState {
   setTimeout: (n: number) => void
   setMaxRetries: (n: number) => void
   setTemperature: (n: number) => void
-  setPersonality: (key: string, value: number) => void
   save: () => Promise<void>
   test: () => Promise<void>
   reload: () => void
@@ -53,13 +50,11 @@ const DEFAULT_FORM: AiSettingsForm = {
   timeout: 60,
   maxRetries: 3,
   temperature: 0.3,
-  personality: {},
 }
 
 export function useAiSettingsState(enabled = true): UseAiSettingsState {
   const [form, setForm] = useState<AiSettingsForm>(DEFAULT_FORM)
   const [providers, setProviders] = useState<Record<string, AIProviderInfo>>({})
-  const [mentors, setMentors] = useState<MentorInfo[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -77,7 +72,7 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
       setLoading(true)
       setLoadError(null)
       let hadError = false
-      const [providersData, configData, mentorsData] = await Promise.all([
+      const [providersData, configData] = await Promise.all([
         getAiProviders().catch(() => {
           hadError = true
           return {} as Record<string, AIProviderInfo>
@@ -86,27 +81,16 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
           hadError = true
           return null
         }),
-        getAiMentors().catch(() => {
-          hadError = true
-          return [] as MentorInfo[]
-        }),
       ])
       if (cancelled) return
 
       setProviders(providersData)
-      setMentors(mentorsData)
       if (hadError) {
         setLoadError('Failed to load AI configuration. Backend may be unreachable.')
       }
 
       const providerKeys = Object.keys(providersData)
       const defaultProvider = providerKeys.length > 0 ? providerKeys[0] : ''
-      const personality: Record<string, number> = {}
-      const sourcePersonality = configData?.personality ?? null
-      for (const m of mentorsData) {
-        const value = sourcePersonality?.[m.key]
-        personality[m.key] = typeof value === 'number' && Number.isFinite(value) ? value : 50
-      }
 
       setForm({
         provider: configData?.provider || defaultProvider,
@@ -121,7 +105,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
         timeout: configData?.timeout ?? 60,
         maxRetries: configData?.max_retries ?? 3,
         temperature: configData?.temperature ?? 0.3,
-        personality,
       })
       setLoaded(true)
       setLoading(false)
@@ -134,7 +117,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
   }, [enabled, reloadToken])
 
   // When provider changes (after initial load), align base URL & default model
-  // for non-custom providers without overriding intentional user choices.
   useEffect(() => {
     if (!loaded) return
     if (form.provider === 'custom') return
@@ -161,9 +143,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
   const setTimeoutValue = useCallback((n: number) => setForm((p) => ({ ...p, timeout: n })), [])
   const setMaxRetries = useCallback((n: number) => setForm((p) => ({ ...p, maxRetries: n })), [])
   const setTemperature = useCallback((n: number) => setForm((p) => ({ ...p, temperature: n })), [])
-  const setPersonality = useCallback((key: string, value: number) => {
-    setForm((p) => ({ ...p, personality: { ...p.personality, [key]: value } }))
-  }, [])
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -180,7 +159,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
         timeout: form.timeout,
         max_retries: form.maxRetries,
         temperature: form.temperature,
-        personality: form.personality,
       }
       await saveAiConfig(payload)
       setForm((prev) => ({
@@ -224,7 +202,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
   return {
     form,
     providers,
-    mentors,
     loaded,
     loading,
     loadError,
@@ -240,7 +217,6 @@ export function useAiSettingsState(enabled = true): UseAiSettingsState {
     setTimeout: setTimeoutValue,
     setMaxRetries,
     setTemperature,
-    setPersonality,
     save,
     test,
     reload,

@@ -14,56 +14,42 @@ describe('navigateActionTarget', () => {
     navigateActionTarget(
       { view: 'review', tab: 'queue', trade_id: 7 },
       { setActiveView, openDetailTrade },
-      'simple'
     )
     expect(openDetailTrade).toHaveBeenCalledWith(7)
     expect(setActiveView).not.toHaveBeenCalled()
   })
 
-  it('routes review queue tab in simple mode', () => {
+  it('routes review queue tab', () => {
     navigateActionTarget(
       { view: 'review', tab: 'queue' },
       { setActiveView, openDetailTrade },
-      'simple'
     )
     expect(setActiveView).toHaveBeenCalledWith('review')
     expect(sessionStorage.getItem('tjv3-review-analytics-tab-v1')).toBe('queue')
   })
 
-  it('falls back pro-only risk view to dashboard in simple mode', () => {
-    navigateActionTarget(
-      { view: 'risk' },
-      { setActiveView, openDetailTrade },
-      'simple'
-    )
-    expect(setActiveView).toHaveBeenCalledWith('dashboard')
-  })
-
-  it('allows risk view in pro mode', () => {
-    navigateActionTarget(
-      { view: 'risk' },
-      { setActiveView, openDetailTrade },
-      'pro'
-    )
-    expect(setActiveView).toHaveBeenCalledWith('risk')
-  })
-
-  it('falls back edge-center to dashboard in simple mode', () => {
+  it('routes edge-center view directly', () => {
     navigateActionTarget(
       { view: 'edge-center' },
       { setActiveView, openDetailTrade },
-      'simple'
     )
-    expect(setActiveView).toHaveBeenCalledWith('dashboard')
+    expect(setActiveView).toHaveBeenCalledWith('edge-center')
   })
 
-  it('clamps pro-only analytics tab to queue in simple mode', () => {
+  it('redirects analytics view to review', () => {
+    navigateActionTarget(
+      { view: 'analytics' },
+      { setActiveView, openDetailTrade },
+    )
+    expect(setActiveView).toHaveBeenCalledWith('review')
+  })
+
+  it('stores review tab from analytics redirect', () => {
     navigateActionTarget(
       { view: 'review', tab: 'equity' },
       { setActiveView, openDetailTrade },
-      'simple'
     )
     expect(setActiveView).toHaveBeenCalledWith('review')
-    expect(sessionStorage.getItem('tjv3-review-analytics-tab-v1')).toBe('queue')
+    expect(sessionStorage.getItem('tjv3-review-analytics-tab-v1')).toBe('equity')
   })
 })

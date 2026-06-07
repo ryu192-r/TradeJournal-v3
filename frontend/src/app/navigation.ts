@@ -8,19 +8,14 @@ import {
   ClipboardList,
   Cpu,
   LayoutDashboard,
-  Lightbulb,
   Radar,
-  Shield,
   Sparkles,
   TrendingUp,
-  Globe,
   Settings,
   Upload,
   Wallet,
   FileText,
 } from 'lucide-react'
-
-export type NavMode = 'simple' | 'pro'
 
 export type ActiveView =
   | 'dashboard'
@@ -29,7 +24,6 @@ export type ActiveView =
   | 'trades'
   | 'playbook'
   | 'review'
-  | 'ideas'
   | 'capital'
   | 'perf-os'
   | 'sa-notes'
@@ -38,8 +32,6 @@ export type ActiveView =
   | 'calendar'
   | 'reports'
   | 'lifecycle'
-  | 'risk'
-  | 'market'
   | 'recommendations'
   | 'coaching-intelligence'
   | 'edge-center'
@@ -50,7 +42,6 @@ export type NavigationItem = {
   label: string
   icon: LucideIcon
   view?: ActiveView
-  simple?: boolean
   mobile?: boolean
   purpose?: string
   comingSoon?: boolean
@@ -67,7 +58,6 @@ const dashboardItem: NavigationItem = {
   label: 'Dashboard',
   icon: LayoutDashboard,
   view: 'dashboard',
-  simple: true,
   mobile: true,
   purpose: 'Command center: P&L, open risk, recent trades, and what needs attention.',
 }
@@ -77,7 +67,6 @@ const tradesItem: NavigationItem = {
   label: 'Trades',
   icon: Briefcase,
   view: 'trades',
-  simple: true,
   mobile: true,
   purpose: 'Log, filter, and manage every position.',
 }
@@ -87,7 +76,6 @@ const calendarItem: NavigationItem = {
   label: 'Calendar',
   icon: CalendarDays,
   view: 'calendar',
-  simple: true,
   mobile: true,
   purpose: 'Month view of trading days and session patterns.',
 }
@@ -97,7 +85,6 @@ const reviewItem: NavigationItem = {
   label: 'Review',
   icon: TrendingUp,
   view: 'review',
-  simple: true,
   mobile: true,
   purpose: 'Review queue for trades that need notes, grades, or cleanup.',
 }
@@ -115,7 +102,6 @@ const playbookItem: NavigationItem = {
   label: 'Playbook',
   icon: ClipboardList,
   view: 'playbook',
-  simple: true,
   purpose: 'Setups, tactics, and the rule base behind your edge.',
 }
 
@@ -124,8 +110,7 @@ const settingsItem: NavigationItem = {
   label: 'Settings',
   icon: Settings,
   view: 'settings',
-  simple: true,
-  purpose: 'Theme, AI providers, navigation mode, and preferences.',
+  purpose: 'Theme, AI providers, and preferences.',
 }
 
 export const primaryNavigationItems = [
@@ -148,13 +133,6 @@ export const desktopNavigationItems = [
 ] satisfies NavigationItem[]
 
 export const advancedNavigationItems = [
-  {
-    id: 'ideas',
-    label: 'Ideas',
-    icon: Lightbulb,
-    view: 'ideas',
-    purpose: 'Capture setups before they become live trades.',
-  },
   {
     id: 'capital',
     label: 'Capital',
@@ -196,20 +174,6 @@ export const advancedNavigationItems = [
     icon: Brain,
     view: 'lifecycle',
     purpose: 'Emotions, execution grades, and behavioral drift.',
-  },
-  {
-    id: 'risk',
-    label: 'Risk',
-    icon: Shield,
-    view: 'risk',
-    purpose: 'Portfolio heat, stops, and concentration.',
-  },
-  {
-    id: 'market',
-    label: 'Market Context',
-    icon: Globe,
-    view: 'market',
-    purpose: 'Regime, breadth, and live quotes vs your results.',
   },
   {
     id: 'edge-center',
@@ -256,7 +220,6 @@ export const mobileMoreNavigationItems = [
     label: 'Import / Export',
     icon: Upload,
     view: 'trades',
-    simple: true,
     purpose: 'Open Trades; broker import and CSV export live there.',
   },
 ] satisfies NavigationItem[]
@@ -288,24 +251,7 @@ export const viewMeta = Object.fromEntries(
             purpose: item.purpose ?? '',
             section: section.label,
             icon: item.icon,
-            simple: Boolean(item.simple),
           },
         ])
     )
-) as Record<ActiveView, { label: string; purpose: string; section: string; icon: LucideIcon; simple: boolean }>
-
-export function isViewVisibleInMode(view: ActiveView, mode: NavMode) {
-  if (mode === 'pro') return true
-  return viewMeta[view]?.simple ?? false
-}
-
-export function filterNavigationSections(mode: NavMode): NavigationSection[] {
-  return navigationSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter(
-        (item) => item.comingSoon || !item.view || isViewVisibleInMode(item.view, mode)
-      ),
-    }))
-    .filter((section) => section.items.length > 0)
-}
+) as Record<ActiveView, { label: string; purpose: string; section: string; icon: LucideIcon }>

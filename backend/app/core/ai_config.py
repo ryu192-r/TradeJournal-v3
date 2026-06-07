@@ -119,21 +119,6 @@ _DEFAULT_CONFIG = {
     "timeout": 60.0,
     "max_retries": 3,
     "temperature": 0.3,
-    "personality": {
-        "minervini": 50,
-        "manas_arora": 50,
-        "chartitude": 50,
-        "quallamagie": 50,
-        "pradeep_bonde": 50,
-    },
-}
-
-MENTORS = {
-    "minervini": {"name": "Mark Minervini", "description": "SEPA methodology, momentum, risk management"},
-    "manas_arora": {"name": "Manas Arora", "description": "Indian markets, price action, discipline"},
-    "chartitude": {"name": "Chartitude", "description": "Technical analysis, chart patterns, patience"},
-    "quallamagie": {"name": "QuallaMagie", "description": "Quantitative edge, data-driven, systematic"},
-    "pradeep_bonde": {"name": "Pradeep Bonde", "description": "Swing trading, trend following, psychology"},
 }
 
 
@@ -212,8 +197,6 @@ def _sanitize(cfg: dict[str, Any]) -> dict[str, Any]:
         cfg["temperature"] = float(cfg.get("temperature", _DEFAULT_CONFIG["temperature"]))
     except (TypeError, ValueError):
         cfg["temperature"] = _DEFAULT_CONFIG["temperature"]
-    personality = cfg.get("personality")
-    cfg["personality"] = personality if isinstance(personality, dict) else _DEFAULT_CONFIG["personality"]
     return cfg
 
 
@@ -291,7 +274,6 @@ def _setting_to_config(setting: Any) -> dict[str, Any]:
             "timeout": setting.timeout,
             "max_retries": setting.max_retries,
             "temperature": setting.temperature,
-            "personality": setting.personality,
         }
     )
 
@@ -304,7 +286,6 @@ def _apply_config_to_setting(setting: Any, cfg: dict[str, Any]) -> None:
     setting.timeout = cfg["timeout"]
     setting.max_retries = cfg["max_retries"]
     setting.temperature = cfg["temperature"]
-    setting.personality = cfg.get("personality")
 
 
 def _env_fallback() -> dict[str, Any]:
@@ -319,5 +300,4 @@ def _env_fallback() -> dict[str, Any]:
         "timeout": settings.OLLAMA_TIMEOUT,
         "max_retries": settings.OLLAMA_MAX_RETRIES,
         "temperature": 0.3,
-        "personality": _DEFAULT_CONFIG["personality"],
     }

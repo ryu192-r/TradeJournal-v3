@@ -32,7 +32,8 @@ import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
 import type { DailyDashboard, WorkflowPhase } from '@/types/performanceOs'
 import { useAppStore } from '@/store/appStore'
-import { isProDashboardWidget } from '@/app/interfaceMode'
+// isProDashboardWidget removed — all widgets accessible (simple/pro toggle killed in Phase 1)
+function isProDashboardWidget(_id: string): boolean { return false }
 import { cn } from '@/lib/utils'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -807,8 +808,7 @@ export function DashboardPage() {
   const syncQuotes = useSyncLiveQuotesMutation()
   const queryClient = useQueryClient()
   const setActiveView = useAppStore((s) => s.setActiveView)
-  const navMode = useAppStore((s) => s.navMode)
-  const isPro = navMode === 'pro'
+  const isPro = true
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<WidgetPreference[]>(getInitialWidgetPrefs)
 

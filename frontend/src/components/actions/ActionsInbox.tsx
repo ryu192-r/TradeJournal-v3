@@ -112,7 +112,6 @@ function useIsLargeScreen() {
 }
 
 function InboxPanel({
-  navMode,
   isLoading,
   isError,
   isFetching,
@@ -124,7 +123,6 @@ function InboxPanel({
   onItemClick,
   onOpenEdge,
 }: {
-  navMode: 'simple' | 'pro'
   isLoading: boolean
   isError: boolean
   isFetching: boolean
@@ -174,9 +172,7 @@ function InboxPanel({
         <div>
           <h2 className="text-base font-display text-text-heading">Actions</h2>
           <p className="text-[length:var(--text-xs)] text-text-muted mt-0.5">
-            {navMode === 'pro'
-              ? 'Reviews, journal, risk, and intelligence prompts'
-              : 'Reviews, journal, and risk alerts'}
+            Reviews, journal, risk, and intelligence prompts
           </p>
         </div>
         <button
@@ -218,24 +214,23 @@ function InboxPanel({
 export function ActionsInbox() {
   const [open, setOpen] = useState(false)
   const isLargeScreen = useIsLargeScreen()
-  const navMode = useAppStore((s) => s.navMode)
   const tradeFormMode = useAppStore((s) => s.tradeFormMode)
   const setActiveView = useAppStore((s) => s.setActiveView)
   const openDetailTrade = useAppStore((s) => s.openDetailTrade)
 
-  const { data, isLoading, isError, refetch, isFetching } = useActionsInboxQuery(navMode)
+  const { data, isLoading, isError, refetch, isFetching } = useActionsInboxQuery()
 
   const handleItemClick = useCallback(
     (item: ActionItem) => {
-      navigateActionTarget(item.target, { setActiveView, openDetailTrade }, navMode)
+      navigateActionTarget(item.target, { setActiveView, openDetailTrade })
       setOpen(false)
     },
-    [setActiveView, openDetailTrade, navMode]
+    [setActiveView, openDetailTrade]
   )
 
   const badgeCount = Math.min(99, data?.open_count ?? 0)
   const sections = data?.sections ?? []
-  const showEdgeLink = navMode === 'pro'
+  const showEdgeLink = true
 
   if (tradeFormMode !== 'list') {
     return null
@@ -243,7 +238,6 @@ export function ActionsInbox() {
 
   const panel = (
     <InboxPanel
-      navMode={navMode}
       isLoading={isLoading}
       isError={isError}
       isFetching={isFetching}
@@ -254,7 +248,7 @@ export function ActionsInbox() {
       onRetry={() => refetch()}
       onItemClick={handleItemClick}
       onOpenEdge={() => {
-        navigateActionTarget({ view: 'edge-center' }, { setActiveView, openDetailTrade }, navMode)
+        navigateActionTarget({ view: 'edge-center' }, { setActiveView, openDetailTrade })
         setOpen(false)
       }}
     />

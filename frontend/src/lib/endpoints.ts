@@ -231,10 +231,6 @@ export function saveAiConfig(config: AiConfigSaveRequest) {
   return apiClient.put<AiConfigResponse>('/ai/config', config).then(r => r.data)
 }
 
-export function getAiMentors() {
-  return apiClient.get<{ mentors: import('@/types/ai').MentorInfo[] }>('/ai/mentors').then(r => r.data.mentors)
-}
-
 // ───────────────────────── Capital Dashboard ─────────────────────────
 
 export function getCapitalDashboard() {

@@ -1,9 +1,4 @@
-import type { ActiveView, NavMode } from '@/app/navigation'
-import {
-  canAccessView,
-  getSimpleFallbackView,
-  reviewTabsForMode,
-} from '@/app/interfaceMode'
+import type { ActiveView } from '@/app/navigation'
 import {
   isReviewAnalyticsTabId,
   storeReviewTab,
@@ -11,42 +6,44 @@ import {
 } from '@/app/reviewAnalytics'
 import type { ActionTarget } from '@/types/actionsInbox'
 
+const ALL_REVIEW_TABS: ReviewAnalyticsTabId[] = [
+  'overview',
+  'mistakes',
+  'setups',
+  'time',
+  'risk',
+  'equity',
+  'queue',
+]
+
 type NavigateHandlers = {
   setActiveView: (view: ActiveView) => void
   openDetailTrade: (id: number) => void
 }
 
-function resolveReviewTab(tab: string | undefined, navMode: NavMode): ReviewAnalyticsTabId {
-  const allowed = reviewTabsForMode(navMode)
-  if (tab && isReviewAnalyticsTabId(tab) && allowed.includes(tab)) {
+function resolveReviewTab(tab: string | undefined): ReviewAnalyticsTabId {
+  if (tab && isReviewAnalyticsTabId(tab) && ALL_REVIEW_TABS.includes(tab)) {
     return tab
   }
-  return allowed.includes('queue') ? 'queue' : allowed[0] ?? 'overview'
+  return 'queue'
 }
 
-function resolveView(view: string | undefined, navMode: NavMode): ActiveView {
+function resolveView(view: string | undefined): ActiveView {
   const raw = (view ?? 'dashboard') as ActiveView
-  if (raw === 'analytics') {
-    return 'review'
-  }
-  if (canAccessView(raw, navMode)) {
-    return raw
-  }
-  return getSimpleFallbackView(raw)
+  if (raw === 'analytics') return 'review'
+  return raw
 }
 
 /**
  * Map backend ActionTarget to Zustand view + optional tab/trade.
- * Pro-only views fall back safely in Simple Mode (e.g. risk → dashboard).
  */
 export function navigateActionTarget(
   target: ActionTarget,
   handlers: NavigateHandlers,
-  navMode: NavMode = 'simple'
 ) {
   const tradeId = target.trade_id ?? undefined
   const tab = target.tab ?? undefined
-  const view = resolveView(target.view ?? undefined, navMode)
+  const view = resolveView(target.view ?? undefined)
 
   if (tradeId != null) {
     handlers.openDetailTrade(tradeId)
@@ -56,7 +53,6 @@ export function navigateActionTarget(
   if (view === 'review' || target.view === 'analytics') {
     const reviewTab = resolveReviewTab(
       target.view === 'analytics' ? 'overview' : tab,
-      navMode
     )
     storeReviewTab(reviewTab)
     handlers.setActiveView('review')

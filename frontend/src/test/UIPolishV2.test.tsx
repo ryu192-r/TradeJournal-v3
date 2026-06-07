@@ -80,7 +80,7 @@ describe('UI polish v2', () => {
   })
 
   it('renders mobile nav core links', () => {
-    useAppStore.setState({ navMode: 'simple' })
+    useAppStore.setState({})
     render(<Sidebar />)
     expect(screen.getAllByRole('button', { name: 'Dashboard' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('button', { name: 'Trades' }).length).toBeGreaterThan(0)

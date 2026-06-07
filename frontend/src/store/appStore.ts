@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ActiveView, NavMode } from '@/app/navigation'
-import { canAccessView, getSimpleFallbackView, normalizeNavMode } from '@/app/interfaceMode'
+import type { ActiveView } from '@/app/navigation'
 import { storeReviewTab } from '@/app/reviewAnalytics'
 
 interface Position {
@@ -25,9 +24,6 @@ interface AppState {
   sidebarOpen: boolean
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
-
-  navMode: NavMode
-  setNavMode: (mode: NavMode) => void
 
   activeView: ActiveView
   setActiveView: (view: AppState['activeView']) => void
@@ -73,29 +69,10 @@ export const useAppStore = create<AppState>()(
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-      navMode: 'simple',
-      setNavMode: (mode) => {
-        const normalized = normalizeNavMode(mode)
-        let { activeView } = get()
-        if (normalized === 'simple' && !canAccessView(activeView, 'simple')) {
-          activeView = getSimpleFallbackView(activeView)
-        }
-        set({ navMode: normalized, activeView, tradeFormMode: 'list', selectedTradeId: null })
-      },
-
       activeView: 'dashboard',
       setActiveView: (view) => {
-        const { navMode } = get()
-        let resolved: ActiveView = view
         if (view === 'review') storeReviewTab('queue')
-        if (!canAccessView(resolved, navMode)) {
-          // V3 first-class views bypass simple-mode gating
-          const v3FirstClass: ActiveView[] = ['analytics', 'reports', 'calendar', 'journal', 'capital', 'lifecycle', 'charges']
-          if (!v3FirstClass.includes(view)) {
-            resolved = getSimpleFallbackView(resolved)
-          }
-        }
-        set({ activeView: resolved, tradeFormMode: 'list', selectedTradeId: null })
+        set({ activeView: view, tradeFormMode: 'list', selectedTradeId: null })
       },
 
       tradeFormMode: 'list',
@@ -124,14 +101,10 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'app-storage',
-      partialize: (state) => ({ navMode: state.navMode, theme: state.theme, activeView: state.activeView }),
+      partialize: (state) => ({ theme: state.theme, activeView: state.activeView }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme)
-          state.navMode = normalizeNavMode(state.navMode)
-          if (!canAccessView(state.activeView, state.navMode)) {
-            state.activeView = getSimpleFallbackView(state.activeView)
-          }
         }
       },
     }

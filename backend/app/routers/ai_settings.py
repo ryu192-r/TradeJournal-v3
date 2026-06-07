@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from app.core.ai_config import AI_PROVIDERS, MENTORS, get_ai_config, save_ai_config
+from app.core.ai_config import AI_PROVIDERS, get_ai_config, save_ai_config
 from app.core.ai_url_security import AIBaseURLValidationError
 from app.core.ai_provider_client import AIProviderClient
 from app.db.database import get_db
@@ -45,12 +45,6 @@ class AIConfigResponse(BaseModel):
     temperature: float
     has_api_key: bool
     personality: Optional[dict[str, int]] = None
-
-
-class MentorInfo(BaseModel):
-    key: str
-    name: str
-    description: str
 
 
 class ProviderInfo(BaseModel):
@@ -96,17 +90,6 @@ def get_config(
         has_api_key=bool(cfg.get("api_key")),
         personality=cfg.get("personality"),
     )
-
-
-@router.get("/mentors", summary="List available mentor personalities")
-def get_mentors():
-    """Return the list of available mentor personalities for the AI coach."""
-    return {
-        "mentors": [
-            MentorInfo(key=k, name=v["name"], description=v["description"])
-            for k, v in MENTORS.items()
-        ]
-    }
 
 
 @router.get(

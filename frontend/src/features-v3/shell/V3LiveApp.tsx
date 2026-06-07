@@ -1,5 +1,3 @@
-import { canAccessView } from '@/app/interfaceMode'
-import { ProModeGate } from '@/components/layout/ProModeGate'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingState } from '@/components/ui'
 import { useAppStore } from '@/store/appStore'
@@ -57,19 +55,12 @@ const SetupPlaybookPage = lazy(() =>
 )
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
-const TradeIdeasPage = lazy(() =>
-  import('@/components/ideas/TradeIdeasPage').then((m) => ({ default: m.TradeIdeasPage })),
-)
 const AICoachPage = lazy(() => import('@/components/coach/AICoachPage').then((m) => ({ default: m.AICoachPage })))
 const PerformanceOSPage = lazy(() =>
   import('@/pages/PerformanceOSPage').then((m) => ({ default: m.PerformanceOSPage })),
 )
 const DailySANotesPage = lazy(() =>
   import('@/pages/DailySANotesPage').then((m) => ({ default: m.DailySANotesPage })),
-)
-const RiskPage = lazy(() => import('@/pages/RiskPage').then((m) => ({ default: m.RiskPage })))
-const MarketContextPage = lazy(() =>
-  import('@/pages/MarketContextPage').then((m) => ({ default: m.MarketContextPage })),
 )
 const RecommendationsPage = lazy(() =>
   import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })),
@@ -98,7 +89,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     activeView,
     tradeFormMode,
     selectedTradeId,
-    navMode,
     setActiveView,
     closeTradeForm,
     openCreateTrade,
@@ -131,15 +121,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
     () => activeViewToV3Section(activeView, tradeFormMode, sectionOverride),
     [activeView, tradeFormMode, sectionOverride],
   )
-  const isV3FirstClassView =
-    activeView === 'analytics' ||
-    activeView === 'reports' ||
-    activeView === 'calendar' ||
-    activeView === 'journal' ||
-    activeView === 'capital' ||
-    activeView === 'lifecycle' ||
-    activeView === 'charges'
-  const viewBlocked = !canAccessView(activeView, navMode) && !isV3FirstClassView
 
   const handleSectionChange = useCallback(
     (section: V3PreviewSectionId) => {
@@ -170,10 +151,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
   }, [openCreateTrade])
 
   const renderContent = () => {
-    if (viewBlocked) {
-      return <ProModeGate view={activeView} />
-    }
-
     if (tradeFormMode === 'create') {
       return (
         <ErrorBoundary name="TradeFormV3Create">
@@ -293,14 +270,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
             <SettingsV3Page onOpenLegacy={() => setLegacySettingsFallback(true)} />
           </ErrorBoundary>
         )
-      case 'ideas':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Ideas">
-              <TradeIdeasPage />
-            </ErrorBoundary>
-          </div>
-        )
       case 'capital':
         return (
           <ErrorBoundary name="CapitalV3">
@@ -348,22 +317,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           <ErrorBoundary name="LifecycleV3">
             <LifecycleV3Page />
           </ErrorBoundary>
-        )
-      case 'risk':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Risk">
-              <RiskPage />
-            </ErrorBoundary>
-          </div>
-        )
-      case 'market':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="MarketContext">
-              <MarketContextPage />
-            </ErrorBoundary>
-          </div>
         )
       case 'recommendations':
         return (

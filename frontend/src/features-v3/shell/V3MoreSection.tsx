@@ -1,24 +1,19 @@
-import { Button, DataList, DataRow, Page, Stack, Value } from '@/new-ui'
+import { Button, DataList, DataRow, Page, Stack } from '@/new-ui'
 import type { ActiveView } from '@/app/navigation'
 import { useAppStore } from '@/store/appStore'
-import { canAccessView } from '@/app/interfaceMode'
 import { viewMeta } from '@/app/navigation'
 
 const MORE_VIEWS: ActiveView[] = [
-  'ideas',
   'coach',
   'perf-os',
   'sa-notes',
-  'risk',
-  'market',
   'recommendations',
   'coaching-intelligence',
   'edge-center',
 ]
 
 export function V3MoreSection() {
-  const { navMode, setActiveView } = useAppStore()
-  const accessibleViews = MORE_VIEWS.filter((view) => canAccessView(view, navMode))
+  const { setActiveView } = useAppStore()
 
   return (
     <Page
@@ -27,8 +22,9 @@ export function V3MoreSection() {
     >
       <Stack gap="lg">
         <DataList>
-          {accessibleViews.map((view) => {
+          {MORE_VIEWS.map((view) => {
             const meta = viewMeta[view]
+            if (!meta) return null
             return (
               <DataRow
                 key={view}
@@ -43,13 +39,6 @@ export function V3MoreSection() {
             )
           })}
         </DataList>
-
-        {accessibleViews.length === 0 && (
-          <DataRow
-            title="No extra views in Simple mode"
-            trailing={<Value value="Switch to Pro in Settings" />}
-          />
-        )}
       </Stack>
     </Page>
   )

@@ -3,7 +3,6 @@ import { AccountSettingsPanel } from './components/AccountSettingsPanel'
 import { AppPreferencesPanel } from './components/AppPreferencesPanel'
 import { SystemStatusPanel } from './components/SystemStatusPanel'
 import { AiProviderSettingsPanel } from './components/AiProviderSettingsPanel'
-import { AiPersonalityPanel } from './components/AiPersonalityPanel'
 import { SettingsFallbackPanel } from './components/SettingsFallbackPanel'
 import { useAiSettingsState } from './hooks/useAiSettingsState'
 
@@ -25,7 +24,6 @@ export function SettingsV3Page({ onOpenLegacy }: SettingsV3PageProps) {
         <AppPreferencesPanel />
         <SystemStatusPanel />
         <AiProviderSettingsPanel state={aiState} />
-        <AiPersonalityPanel state={aiState} />
         {onOpenLegacy && <SettingsFallbackPanel onOpenLegacy={onOpenLegacy} />}
       </Stack>
     </Page>

@@ -4,23 +4,20 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { SettingsV3Page } from '../SettingsV3Page'
-import type { AIProviderInfo, AiConfigResponse, MentorInfo } from '@/types/ai'
+import type { AIProviderInfo, AiConfigResponse } from '@/types/ai'
 
 const mocks = vi.hoisted(() => ({
   getAiProviders: vi.fn(),
   getAiConfig: vi.fn(),
-  getAiMentors: vi.fn(),
   saveAiConfig: vi.fn(),
   testAiConnection: vi.fn(),
   logout: vi.fn(),
   toggleTheme: vi.fn(),
-  setNavMode: vi.fn(),
 }))
 
 vi.mock('@/lib/endpoints', () => ({
   getAiProviders: mocks.getAiProviders,
   getAiConfig: mocks.getAiConfig,
-  getAiMentors: mocks.getAiMentors,
   saveAiConfig: mocks.saveAiConfig,
   testAiConnection: mocks.testAiConnection,
 }))
@@ -36,14 +33,10 @@ vi.mock('@/store/appStore', () => ({
   useAppStore: (sel: (s: {
     theme: 'dark' | 'light'
     toggleTheme: typeof mocks.toggleTheme
-    navMode: 'simple' | 'pro'
-    setNavMode: typeof mocks.setNavMode
   }) => unknown) =>
     sel({
       theme: 'dark',
       toggleTheme: mocks.toggleTheme,
-      navMode: 'simple',
-      setNavMode: mocks.setNavMode,
     }),
 }))
 
@@ -63,16 +56,9 @@ function config(overrides: Partial<AiConfigResponse> = {}): AiConfigResponse {
     timeout: 60,
     max_retries: 3,
     temperature: 0.3,
-    personality: { minervini: 60, manas: 40 },
+    personality: null,
     ...overrides,
   }
-}
-
-function mentors(): MentorInfo[] {
-  return [
-    { key: 'minervini', name: 'Minervini', description: 'Discipline-first stops.' },
-    { key: 'manas', name: 'Manas Arora', description: 'Setup-first conviction.' },
-  ]
 }
 
 function wrap(ui: ReactElement) {
@@ -90,7 +76,6 @@ describe('SettingsV3Page', () => {
   it('renders all expected sections', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     render(wrap(<SettingsV3Page />))
 
@@ -105,7 +90,6 @@ describe('SettingsV3Page', () => {
   it('renders profile fields read-only honestly', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     render(wrap(<SettingsV3Page />))
     expect(await screen.findByText('trader@example.com')).toBeInTheDocument()
@@ -116,7 +100,6 @@ describe('SettingsV3Page', () => {
   it('masks the stored API key (no real value rendered)', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config({ has_api_key: true }))
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     render(wrap(<SettingsV3Page />))
     // Wait for AI panel to load.
@@ -129,20 +112,9 @@ describe('SettingsV3Page', () => {
     expect(screen.queryByText(/sk-/)).toBeNull()
   })
 
-  it('renders mentor personality sliders when mentors load', async () => {
-    mocks.getAiProviders.mockResolvedValue(providers())
-    mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
-
-    render(wrap(<SettingsV3Page />))
-    expect(await screen.findByLabelText(/Minervini influence/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Manas Arora influence/i)).toBeInTheDocument()
-  })
-
   it('renders load error message when AI endpoints fail', async () => {
     mocks.getAiProviders.mockRejectedValue(new Error('boom'))
     mocks.getAiConfig.mockRejectedValue(new Error('boom'))
-    mocks.getAiMentors.mockRejectedValue(new Error('boom'))
 
     render(wrap(<SettingsV3Page />))
     expect(await screen.findByText(/Failed to load AI configuration/i)).toBeInTheDocument()
@@ -151,7 +123,6 @@ describe('SettingsV3Page', () => {
   it('renders legacy fallback when callback supplied', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     const onOpenLegacy = vi.fn()
     render(wrap(<SettingsV3Page onOpenLegacy={onOpenLegacy} />))
@@ -164,7 +135,6 @@ describe('SettingsV3Page', () => {
   it('does not surface NaN/undefined/null/[object Object]', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     render(wrap(<SettingsV3Page />))
     await screen.findByText('Settings')
@@ -177,7 +147,6 @@ describe('SettingsV3Page', () => {
   it('does not render fake provider sync or AI status', async () => {
     mocks.getAiProviders.mockResolvedValue(providers())
     mocks.getAiConfig.mockResolvedValue(config())
-    mocks.getAiMentors.mockResolvedValue(mentors())
 
     render(wrap(<SettingsV3Page />))
     await screen.findByText('Settings')

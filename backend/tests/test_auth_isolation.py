@@ -14,16 +14,6 @@ TRADE = {
     "entry_time": "2025-01-13T09:30:00",
 }
 
-IDEA = {
-    "symbol": "TATASTEEL",
-    "direction": "LONG",
-    "thesis": "Strong momentum",
-    "confidence": "HIGH",
-    "entry_price": 150.0,
-    "stop_price": 145.0,
-    "target_price": 165.0,
-}
-
 
 def _auth(client, email_suffix: str) -> str:
     resp = client.post(
@@ -137,50 +127,6 @@ def test_user_b_cannot_pyramid_user_a_trade(client):
     # Should be 404 (trade not found for user B), but if pyramid returns
     # a different error, at minimum it should NOT allow the operation
     assert resp_b.status_code in (400, 404), f"Expected 400/404 got {resp_b.status_code}"
-
-
-# ─── Trade Ideas ───────────────────────────────────────────
-
-
-def test_user_b_cannot_read_user_a_idea(client):
-    token_a = _auth(client, "read-idea-a")
-    token_b = _auth(client, "read-idea-b")
-
-    r = client.post(
-        "/api/v1/ideas/",
-        json=IDEA,
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    assert r.status_code in (200, 201), r.text
-    body = r.json()
-    idea_id = body.get("data", body)["id"]
-
-    resp_b = client.get(
-        f"/api/v1/ideas/{idea_id}",
-        headers={"Authorization": f"Bearer {token_b}"},
-    )
-    assert resp_b.status_code == 404, f"Expected 404 got {resp_b.status_code}: {resp_b.text}"
-
-
-def test_user_b_cannot_update_user_a_idea(client):
-    token_a = _auth(client, "update-idea-a")
-    token_b = _auth(client, "update-idea-b")
-
-    r = client.post(
-        "/api/v1/ideas/",
-        json=IDEA,
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    assert r.status_code in (200, 201), r.text
-    body = r.json()
-    idea_id = body.get("data", body)["id"]
-
-    resp_b = client.put(
-        f"/api/v1/ideas/{idea_id}",
-        json={"status": "active"},
-        headers={"Authorization": f"Bearer {token_b}"},
-    )
-    assert resp_b.status_code == 404
 
 
 # ─── Daily Journal ─────────────────────────────────────────
