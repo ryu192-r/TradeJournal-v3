@@ -233,7 +233,7 @@ cd frontend && npm run build           # production build
 | Bot | — | Telegram bot, depends on postgres |
 
 ## AI Coach
-- **Page**: `frontend/src/components/coach/AICoachPage.tsx` — 7 tabs (Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Check, Trade Review, History)
+- **Page**: `frontend/src/features-v3/coach/CoachV3Page.tsx` — 5 tabs (Daily Briefing, Weekly Review, Ask, Trade Review, History). Patterns & Rule Check tabs dropped. (Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Check, Trade Review, History)
 - **Types**: `frontend/src/types/coach.ts`
 - **Providers** (8 total in `backend/app/core/ai_config.py`):
   - Ollama Local (`FORMAT_OLLAMA` — native `/api/chat` endpoint)
