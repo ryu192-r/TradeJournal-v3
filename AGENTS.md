@@ -38,7 +38,7 @@ cd frontend && npm run build           # production build
 ## Key architecture
 - **Architecture doc**: `docs/ARCHITECTURE.md` — full file map, every endpoint, every component
 - **Auth gate**: `App.tsx` checks `isAuthenticated` — all pages require login
-- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `ideas`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`, `journal`, `calendar`, `reports`, `lifecycle`, `risk`, `market`. Navigation supports Simple/Advanced mode; Simple hides lower-frequency views from the sidebar, not from the code.
+- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`, `journal`, `calendar`, `reports`, `lifecycle`, `charges`. No simple/pro toggle — `NavMode` and `interfaceMode.ts` removed in Phase 1.
 - **View code-splitting**: `App.tsx` lazy-loads all major views with `React.lazy`/`Suspense`; keep heavy pages (analytics/recharts, coach, trades) out of the initial bundle.
 - **Mobile bottom nav**: Dashboard | Trades | **+** (FAB, create trade) | Analytics | Review. Replaces old grid layout. `frontend/src/components/layout/Sidebar.tsx:162-215`.
 - **Data refresh**: React Query refetches on mount/window focus/reconnect. `placeholderData: (previousData) => previousData` on ALL hooks prevents blank states during refetch.

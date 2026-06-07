@@ -120,7 +120,7 @@ Uses live quotes from `LiveQuote` table. Returns 0 for open positions without li
 
 ## AI Coach Personality
 
-The AI Coach acts as a personalized trading mentor. Its personality blends traits of renowned traders: Mark Minervini, Manas Arora, Chartitude, QuallaMagie, Pradeep Bonde. Customizable via 0-100% sliders in Settings page.
+The AI Coach acts as a personalized trading mentor. Uses the configured AI provider (Ollama, OpenAI, Anthropic, etc.) for reviews, pattern detection, and coaching.
 
 ## Single-User Design
 

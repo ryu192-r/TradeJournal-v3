@@ -1,7 +1,7 @@
 # V3 Finish Plan
 
 ## Status
-Active — 2026-06-07
+Active — 2026-06-07. Phase 1 complete (commit `8b479d0`).
 
 Owner: ryu192-r. Tracked in GitHub issues (epic + one issue per phase).
 
@@ -76,7 +76,7 @@ cd frontend && npm run build
 | #  | Phase                              | Summary                                                                                         | Risk     |
 |----|------------------------------------|-------------------------------------------------------------------------------------------------|----------|
 | 0  | Foundation                         | ADRs published, lint rule "no tokens in slice CSS"                                              | none     |
-| 1  | Demolition Round 1                 | Delete `TradeIdeas` (page+router+ActiveView), `RiskPage`, `MarketContextPage`, simple/pro toggle, `interfaceMode.ts`, mentor personality (panel + `/ai/mentors`) | low      |
+| 1  | Demolition Round 1 ✅               | Delete `TradeIdeas` (page+router+ActiveView), `RiskPage`, `MarketContextPage`, simple/pro toggle, `interfaceMode.ts`, mentor personality (panel + `/ai/mentors`) | low      |
 | 2  | Cockpit absorbs Edge               | New Edge feed section in `CockpitV3Page` from `edge_command_center`. Delete `EdgeCommandCenterPage`. Frontend stops calling `/recommendations` and `/coaching-intelligence`. | medium   |
 | 3  | Coach V3 native port               | `features-v3/coach/CoachV3Page` with 5 tabs (drop Pattern + Rule Check). Delete `AICoachPage`, `RecommendationsPage`, `CoachingIntelligencePage`. Cherry-pick `trade_review_v2` fields into `/coach/trade-review`. Remove `trade_review_v2` router. | high     |
 | 4  | Journal merge                      | Add `bias_notes` and `market_snapshot` fields to `daily_journal`. Port `JournalV3Page` to top-strip + pre-market bias + post-market notes/mood. Delete `DailySANotesPage`, `PerformanceOSPage`, `performance_os` router. Stop reading/writing `discipline_rating` and `DailyWorkflow`/`WeeklyReview`/`MonthlyReview`/`TradeIdea` (tables retained for deferred drop). | high     |

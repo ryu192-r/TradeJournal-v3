@@ -60,10 +60,7 @@ TradeJournal-v3/
 │       │   ├── coach/           # AICoachPage (7 tabs)
 │       │   ├── review/          # TradeReviewStream
 │       │   ├── playbook/        # SetupPlaybookPage
-│       │   ├── risk/            # RiskCommandCenter, PortfolioHeatGauge
-│       │   ├── ideas/           # TradeIdeasPage
-│       │   ├── journal/         # DailyJournalForm
-│       │   └── market/          # MarketContext
+│       │   └── journal/         # DailyJournalForm
 │       ├── hooks/               # React Query hooks per domain
 │       ├── lib/                 # api.ts, endpoints.ts, queryInvalidation.ts, utils.ts
 │       ├── store/               # Zustand: appStore, authStore, toastStore
@@ -103,7 +100,6 @@ TradeJournal-v3/
 | `Account` | `accounts` | name, initial_balance, current_balance, breakeven_threshold |
 | `CapitalEvent` | `capital_events` | type(deposit/withdrawal/adjustment/etc), amount, trade_id |
 | `SetupPlaybook` | `setup_playbook` | name, is_active(VARCHAR), trade_count, win_rate, avg_r |
-| `TradeIdea` | `trade_ideas` | symbol, thesis, confidence, status, traded_trade_id |
 | `DailyJournal` | `daily_journals` | date(unique), pre/post notes, mood_rating, discipline_rating |
 | `DailyWorkflow` | `daily_workflows` | date, phase, checklist_items, watchlist_symbols |
 | `WeeklyReview` | `weekly_reviews` | week_start, trade_count, pnl_summary, notes |
@@ -140,9 +136,9 @@ TradeJournal-v3/
 | `setup_playbook.py` | `/setups` | CRUD, seed, list active |
 | `export.py` | `/export` | CSV export, backup |
 | `analytics.py` | `/analytics` | Full dashboard payload, setup performance, streaks |
-| `trade_ideas.py` | `/ideas` | CRUD, convert to trade |
+| `trade_ideas.py` | `/ideas` | unregistered — CRUD, convert to trade (deferred deletion) |
 | `daily_journal.py` | `/journal` | GET/PUT by date, weekly stats |
-| `ai_settings.py` | `/ai` | Config, providers, mentors, test |
+| `ai_settings.py` | `/ai` | Config, providers, test |
 | `tier_config.py` | `/tier-config` | GET list, PUT save |
 | `market_context.py` | `/market` | Snapshots, sync quotes, live quotes, regime |
 | `lifecycle_analytics.py` | `/lifecycle` | Emotion summary, grades, behavioral, revenge, overtrading |
@@ -189,19 +185,16 @@ TradeJournal-v3/
 | `EditTradePage` | `trades (edit)` | Edit trade form |
 | `TradeDetailPage` | `trades (detail)` | Full trade detail view |
 | `SetupPlaybookPage` | `playbook` | Manage setups, tactics, rules |
-| `TradeIdeasPage` | `ideas` | Idea capture and convert-to-trade |
 | `CapitalPage` | `capital` | Account, capital events, tiers |
 | `ReviewStream` | `review` | Sequential trade review with notes/tags |
-| `SettingsPage` | `settings` | Theme, AI providers, mentors |
+| `SettingsPage` | `settings` | Theme, AI providers |
 | `AICoachPage` | `coach` | 7 tabs: Daily, Weekly, Ask, Patterns, Rules, Review, History |
-| `PerformanceOSPage` | `perf-os` | Daily workflow, weekly/monthly reviews |
-| `DailySANotesPage` | `sa-notes` | Pre-market + post-market journaling |
+| `PerformanceOSPage` | `perf-os` | Daily workflow, weekly/monthly reviews (legacy, Phase 4 port) |
+| `DailySANotesPage` | `sa-notes` | Pre-market + post-market journaling (legacy, Phase 4 port) |
 | `JournalPage` | `journal` | Journal view and write |
 | `CalendarPage` | `calendar` | Monthly calendar with daily P&L |
 | `ReportsPage` | `reports` | Weekly/monthly reports |
 | `LifecyclePage` | `lifecycle` | Emotion, grade, behavioral analytics |
-| `RiskPage` | `risk` | Risk command center |
-| `MarketContextPage` | `market` | NIFTY, VIX, breadth, regime |
 
 ---
 
@@ -339,8 +332,8 @@ computeCapPct(pnlValue, netEquity) → number | null
 
 ```
 appStore.activeView ∈ {dashboard, analytics, trades, playbook, review,
-                       ideas, capital, settings, coach, perf-os, sa-notes,
-                       journal, calendar, reports, lifecycle, risk, market}
+                       capital, settings, coach, perf-os, sa-notes,
+                       journal, calendar, reports, lifecycle, charges}
 
 When activeView === 'trades':
     tradeFormMode ∈ {list, create, edit, detail}
