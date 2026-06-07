@@ -1,7 +1,7 @@
 # V3 Finish Plan
 
 ## Status
-Active — 2026-06-07. Phase 1 complete (commit `8b479d0`). Phase 2 complete (commit `397a989`). Phase 3 complete (commit `e11fe1c`)..
+Active — 2026-06-07. Phase 1 complete (commit `8b479d0`). Phase 2 complete (commit `397a989`). Phase 3 complete (commit `e11fe1c`). Phases 4-5 complete (81dc754).
 
 Owner: ryu192-r. Tracked in GitHub issues (epic + one issue per phase).
 
@@ -80,7 +80,7 @@ cd frontend && npm run build
 | 2  | Cockpit absorbs Edge               | New Edge feed section in `CockpitV3Page` from `edge_command_center`. Delete `EdgeCommandCenterPage`. Frontend stops calling `/recommendations` and `/coaching-intelligence`. | medium   |
 | 3  | Coach V3 native port ✅             | `features-v3/coach/CoachV3Page` with 5 tabs (drop Pattern + Rule Check). Delete `AICoachPage`, `RecommendationsPage`, `CoachingIntelligencePage`. Cherry-pick `trade_review_v2` fields into `/coach/trade-review`. Remove `trade_review_v2` router. | high     |
 | 4  | Journal merge ✅                      | Add `bias_notes` and `market_snapshot` fields to `daily_journal`. Port `JournalV3Page` to top-strip + pre-market bias + post-market notes/mood. Delete `DailySANotesPage`, `PerformanceOSPage`, `performance_os` router. Stop reading/writing `discipline_rating` and `DailyWorkflow`/`WeeklyReview`/`MonthlyReview`/`TradeIdea` (tables retained for deferred drop). | high     |
-| 5  | Analytics "By Regime" tab          | Tab in `AnalyticsV3Page` fed by `market_regime/performance`                                     | low      |
+| 5  | Analytics “By Regime” tab ✅        | Tab in `AnalyticsV3Page` fed by `market_regime/performance`                                     | low      |
 | 6  | Close 3 legacy fallbacks           | Audit `TradeDetailV3` / `PlaybookV3` / `SettingsV3` vs legacy. Ship missing features. Delete fallback toggles and legacy pages. | medium each |
 | 7  | Design system swap                 | Wire `new-ui` everywhere. Drop `Glass*`, `SharedUI`, `StateComponents`. Keep mobile/PWA carve-outs. Audit slice CSS for token leaks. Ship slice-by-slice. | medium (broad)   |
 | 8  | Nav consolidation                  | `v3Navigation` adopts the 5-group structure. Drop `app/navigation.ts` duplicates. Shrink `ActiveView` union. | low      |
