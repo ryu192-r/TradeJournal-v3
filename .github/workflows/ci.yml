@@ -57,5 +57,11 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      - name: Vitest unit tests
+        run: npm test
+
+      - name: Slice CSS token audit (warn-only until Phase 7)
+        run: npm run lint:css
+
       - name: Vite build
         run: npx vite build

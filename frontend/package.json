@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
+    "lint:css": "node ../scripts/audit-slice-css.mjs",
+    "lint:css:strict": "node ../scripts/audit-slice-css.mjs --strict",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
