@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent, type DragEvent as ReactDragEvent } from 'react'
 import { Upload, FileText, Download, X, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-react'
-import { GlassButton } from '@/components/ui/GlassButton'
-import { GlassSelect } from '@/components/ui/GlassSelect'
+import { Button } from '@/new-ui'
 import { useToastStore } from '@/store/toastStore'
 import { getBrokerTemplate, importBrokerCsv, previewBrokerImport } from '@/lib/endpoints'
 import type { BrokerInfo, BrokerImportResult } from '@/types'
@@ -165,13 +164,19 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
             <p className="text-[length:var(--text-sm)] text-text-muted">
               Import trades from your broker's CSV export. Select your broker to continue.
             </p>
-            <GlassSelect
-              label="Broker"
-              options={BROKER_OPTIONS_STATIC.map((b) => ({ value: b.id, label: b.name }))}
-              placeholder="Choose your broker..."
-              value={broker}
-              onChange={handleBrokerChange}
-            />
+            <div className="w-full">
+              <label className="block text-xs font-medium text-text-muted mb-1.5">Broker</label>
+              <select
+                value={broker}
+                onChange={handleBrokerChange}
+                style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--color-border)', background: 'var(--color-bg-muted)', color: 'var(--color-text)', fontSize: '0.875rem' }}
+              >
+                <option value="">Choose your broker...</option>
+                {BROKER_OPTIONS_STATIC.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
@@ -186,9 +191,9 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
                   {BROKER_OPTIONS_STATIC.find((b) => b.id === broker)?.name}
                 </span>
               </div>
-              <GlassButton variant="ghost" size="sm" onClick={() => { setStep('select'); setBroker(''); setFile(null) }}>
+              <Button variant="ghost" size="sm" onClick={() => { setStep('select'); setBroker(''); setFile(null) }}>
                 Change
-              </GlassButton>
+              </Button>
             </div>
 
             <button
@@ -247,11 +252,11 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
             )}
 
             <div className="flex items-center justify-end gap-3 pt-2">
-              <GlassButton variant="ghost" size="sm" onClick={handleClose}>
+              <Button variant="ghost" size="sm" onClick={handleClose}>
                 Cancel
-              </GlassButton>
-              <GlassButton
-                variant="accent"
+              </Button>
+              <Button
+                variant="primary"
                 size="sm"
                 disabled={!file || isPreviewing}
                 onClick={async () => {
@@ -281,7 +286,7 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
                     Preview &amp; Review
                   </>
                 )}
-              </GlassButton>
+              </Button>
             </div>
           </div>
         )}
@@ -350,11 +355,11 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
               </div>
             )}
             <div className="flex items-center justify-end gap-3 pt-2">
-              <GlassButton variant="ghost" size="sm" onClick={() => { setStep('upload'); setResult(null); setError('') }}>
+              <Button variant="ghost" size="sm" onClick={() => { setStep('upload'); setResult(null); setError('') }}>
                 Back
-              </GlassButton>
-              <GlassButton
-                variant="accent"
+              </Button>
+              <Button
+                variant="primary"
                 size="sm"
                 disabled={isUploading || result.skipped === result.total}
                 onClick={handleImport}
@@ -370,7 +375,7 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
                     Import {result.total - result.skipped} trades
                   </>
                 )}
-              </GlassButton>
+              </Button>
             </div>
           </div>
         )}
@@ -452,17 +457,17 @@ export function BrokerImportModal({ open, onClose, onImported, onImportComplete 
 
             <div className="flex items-center justify-end gap-3 pt-2">
               {result.status === 'error' ? (
-                <GlassButton variant="accent" size="sm" onClick={() => { setStep('upload'); setResult(null); setError('') }}>
+                <Button variant="primary" size="sm" onClick={() => { setStep('upload'); setResult(null); setError('') }}>
                   Retry
-                </GlassButton>
+                </Button>
               ) : (
                 <>
-                  <GlassButton variant="ghost" size="sm" onClick={handleClose}>
+                  <Button variant="ghost" size="sm" onClick={handleClose}>
                     Close
-                  </GlassButton>
-                  <GlassButton variant="accent" size="sm" onClick={() => { setStep('upload'); setFile(null); setResult(null); setError('') }}>
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={() => { setStep('upload'); setFile(null); setResult(null); setError('') }}>
                     Import More
-                  </GlassButton>
+                  </Button>
                 </>
               )}
             </div>

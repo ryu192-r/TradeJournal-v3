@@ -7,7 +7,7 @@ import { InstallPrompt } from '@/components/ui/InstallPrompt'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { lazy, Suspense, useEffect } from 'react'
 import { mark } from '@/utils/performance'
-import { LoadingState } from '@/components/ui'
+import { LoadingState } from '@/new-ui'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const V3PreviewRoute = lazy(() => import('@/features-v3/preview/V3PreviewRoute').then((m) => ({ default: m.V3PreviewRoute })))
@@ -19,7 +19,7 @@ const V3LiveApp = lazy(() => import('@/features-v3/shell/V3LiveApp').then((m) =>
 function ViewFallback() {
   return (
     <div className="px-[var(--page-px)] py-[var(--page-py)]">
-      <LoadingState variant="page" />
+      <LoadingState label="Loading…" />
     </div>
   )
 }

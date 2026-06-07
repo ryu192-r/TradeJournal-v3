@@ -1,7 +1,7 @@
 import { useEdgeCommandCenterQuery } from '@/hooks/useEdgeCommandCenterQuery'
 import { Card } from '@/components/ui/Card'
-import { PageHeader, SectionTitle } from '@/components/ui/SharedUI'
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui'
+import { Section } from '@/new-ui'
+import { EmptyState, ErrorState, LoadingState } from '@/new-ui'
 import { EdgePriorityCard } from './EdgePriorityCard'
 import { EdgeSetupFocusCard } from './EdgeSetupFocusCard'
 import { EdgeReviewQueue } from './EdgeReviewQueue'
@@ -30,29 +30,29 @@ export function EdgeCommandCenter() {
   const { data, isLoading, error, refetch } = useEdgeCommandCenterQuery()
 
   if (isLoading && !data) {
-    return <LoadingState variant="page" />
+    return <LoadingState label="Loading edge data…" />
   }
 
   if (error && !data) {
     return (
       <ErrorState
         title="Edge Command Center unavailable"
-        message={(error as Error).message || 'Could not load unified intelligence.'}
+        description={(error as Error).message || 'Could not load unified intelligence.'}
         onRetry={() => refetch()}
       />
     )
   }
 
   if (!data) {
-    return <EmptyState title="No command center data" message="Try again in a moment." />
+    return <EmptyState title="No command center data" description="Try again in a moment." />
   }
 
   return (
     <div className="space-y-[var(--page-gap)] min-w-0 overflow-x-hidden">
-      <PageHeader
-        title="Edge Command Center"
-        subtitle="What to focus on, avoid, and review — composed from your trading data"
-      />
+      <div>
+        <h1 className="font-display text-[length:var(--heading-size)] text-text-heading">Edge Command Center</h1>
+        <p className="mt-1 text-sm text-text-muted">What to focus on, avoid, and review — composed from your trading data</p>
+      </div>
 
       <Card className="border-accent/20 bg-accent/5">
         <p className="text-[10px] uppercase tracking-wider text-text-faint mb-1">Today</p>
@@ -71,30 +71,27 @@ export function EdgeCommandCenter() {
       </div>
 
       {data.priorities.length > 0 && (
-        <section className="min-w-0">
-          <SectionTitle title="Priorities" />
+        <Section title="Priorities">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
             {data.priorities.map((p) => (
               <EdgePriorityCard key={p.id} priority={p} />
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
       {data.setup_focus.length > 0 && (
-        <section className="min-w-0">
-          <SectionTitle title="Setup focus" />
+        <Section title="Setup focus">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
             {data.setup_focus.map((s) => (
               <EdgeSetupFocusCard key={s.setup} item={s} />
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
       {data.playbook_edge && (data.playbook_edge.highest_expectancy || data.playbook_edge.lowest_expectancy) && (
-        <section className="min-w-0">
-          <SectionTitle title="Playbook edge" />
+        <Section title="Playbook edge">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
             {data.playbook_edge.highest_expectancy && (
               <div className="rounded-xl border border-profit/20 bg-profit-muted/5 p-3">
@@ -117,23 +114,21 @@ export function EdgeCommandCenter() {
               </div>
             )}
           </div>
-        </section>
+        </Section>
       )}
 
-      <section className="min-w-0">
-        <SectionTitle title="Review queue" />
+      <Section title="Review queue">
         <div className="mt-2">
           <EdgeReviewQueue items={data.review_queue} />
         </div>
-      </section>
+      </Section>
 
       {data.workflow && (
-        <section className="min-w-0">
-          <SectionTitle title="Workflow" />
+        <Section title="Workflow">
           <div className="mt-2">
             <EdgeWorkflowCard workflow={data.workflow} />
           </div>
-        </section>
+        </Section>
       )}
 
       <EdgeDataQualityCard quality={data.data_quality} />

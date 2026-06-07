@@ -1,5 +1,5 @@
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { LoadingState } from '@/components/ui'
+import { LoadingState } from '@/new-ui'
 import { useAppStore } from '@/store/appStore'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CockpitV3Page } from '../cockpit'
@@ -58,7 +58,7 @@ const SetupPlaybookPage = lazy(() =>
 function ViewFallback() {
   return (
     <div className="tjv3-live-fallback">
-      <LoadingState variant="page" />
+      <LoadingState label="Loading…" />
     </div>
   )
 }

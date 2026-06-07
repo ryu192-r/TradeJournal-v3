@@ -17,7 +17,7 @@ import { useActionsInboxQuery } from '@/hooks/useActionsInboxQuery'
 import { useAppStore } from '@/store/appStore'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { CARD_COMPACT } from '@/components/layout/layoutTokens'
-import { EmptyState, ErrorState } from '@/components/ui/StateComponents'
+import { EmptyState, ErrorState } from '@/new-ui'
 import type { ActionItem, ActionInboxSection } from '@/types/actionsInbox'
 import { navigateActionTarget } from '@/components/actions/navigateActionTarget'
 
@@ -147,9 +147,8 @@ function InboxPanel({
     if (isError) {
       return (
         <ErrorState
-          compact
           title="Couldn't load actions"
-          message="Your list will show up once the connection is back. Tap Retry to try again."
+          description="Your list will show up once the connection is back. Tap Retry to try again."
           onRetry={onRetry}
         />
       )
@@ -157,7 +156,7 @@ function InboxPanel({
 
     if (sections.length === 0) {
       return (
-        <EmptyState compact title={EMPTY_TITLE} message={EMPTY_MESSAGE} icon={Bell} />
+        <EmptyState title={EMPTY_TITLE} description={EMPTY_MESSAGE} icon={<Bell size={20} />} />
       )
     }
 
