@@ -177,14 +177,6 @@ vi.mock('@/hooks/useTradesQuery', () => ({
   }),
 }))
 
-vi.mock('@/hooks/useCoachingIntelligenceQuery', () => ({
-  useCoachingIntelligenceDashboardQuery: () => ({ data: null }),
-}))
-
-vi.mock('@/hooks/useTradeReviewV2Query', () => ({
-  useTradeReviewV2Query: () => ({ data: null, isLoading: false, isError: false }),
-}))
-
 vi.mock('@/hooks/useJournalMutation', () => ({
   useWeeklyJournalStatsQuery: () => ({ data: null }),
   useWeeklyJournalsQuery: () => ({ data: [] }),
@@ -226,10 +218,6 @@ vi.mock('@/hooks/useTradeMutation', () => ({
     error: null,
   }),
   useDeleteTradeMutation: () => ({ mutate: vi.fn(), isPending: false }),
-}))
-
-vi.mock('@/hooks/useTradeReviewMutation', () => ({
-  useTradeReviewMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/components/trades/ChartImageGallery', () => ({

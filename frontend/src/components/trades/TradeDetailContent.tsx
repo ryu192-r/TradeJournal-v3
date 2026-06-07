@@ -6,16 +6,14 @@ import {
 import { ChartImageGallery } from '@/components/trades/ChartImageGallery'
 import { TradeLightweightChart } from '@/components/charts/TradeLightweightChart'
 import { LifecycleReviewPanel } from '@/components/lifecycle/LifecycleReviewPanel'
-import { useTradeReviewMutation } from '@/hooks/useTradeReviewMutation'
-import { useTradeReviewV2Query } from '@/hooks/useTradeReviewV2Query'
-import { TradeReviewV2Card } from '@/components/trade-review-v2/TradeReviewV2Card'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { generateTradeReview } from '@/lib/endpoints'
 import { useDeleteTradeMutation } from '@/hooks/useTradeMutation'
 import { useAppStore } from '@/store/appStore'
 import { useToastStore } from '@/store/toastStore'
 import { formatCurrency, formatPrice, formatQuantity, formatDateTime } from '@/utils/format'
 import { calculateTradeMetrics } from '@/utils/calculations'
 import { StatusBadge, SectionHeader, ResponsiveTabs, EmptyState } from '@/components/ui'
-import { ErrorState } from '@/components/ui/StateComponents'
 import { CARD, SECTION_LABEL } from '@/components/layout/layoutTokens'
 import type { ApiTrade } from '@/types'
 import type { TradeReviewResponse } from '@/types/coach'
@@ -383,8 +381,11 @@ interface TradeDetailContentProps {
 
 export function TradeDetailContent({ trade }: TradeDetailContentProps) {
   const [inlineReview, setInlineReview] = useState<TradeReviewResponse | null>(null)
-  const reviewMut = useTradeReviewMutation()
-  const reviewV2 = useTradeReviewV2Query(trade.id)
+  const qc = useQueryClient()
+  const reviewMut = useMutation<TradeReviewResponse, Error, number>({
+    mutationFn: generateTradeReview,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['coach-reviews'] }),
+  })
   const deleteMut = useDeleteTradeMutation()
   const openEditTrade = useAppStore((s) => s.openEditTrade)
   const closeTradeForm = useAppStore((s) => s.closeTradeForm)
@@ -425,7 +426,7 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
 
   const handleTradeReview = () => {
     reviewMut.mutate(trade.id, {
-      onSuccess: (data) => setInlineReview(data),
+      onSuccess: (data: TradeReviewResponse) => setInlineReview(data),
     })
   }
 
@@ -440,8 +441,6 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
       },
     })
   }
-
-  const mistakeTags = reviewV2.data?.mistake_tags ?? []
 
   return (
     <div className="space-y-[var(--page-gap)] pb-[max(var(--page-py),env(safe-area-inset-bottom))]">
@@ -505,21 +504,6 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
               {trade.review_notes || <span className="text-text-faint italic">No review notes yet</span>}
             </p>
           </div>
-          {mistakeTags.length > 0 && (
-            <div>
-              <div className={SECTION_LABEL}>
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Mistakes
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {mistakeTags.map((t) => (
-                  <span key={t.tag} className="text-[length:var(--text-xs)] px-2.5 py-1 rounded-full bg-loss-muted/30 text-loss">
-                    {t.tag.replace(/_/g, ' ')}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
           <div>
             <div className={SECTION_LABEL}>
               <Tag className="w-3.5 h-3.5" />
@@ -537,25 +521,6 @@ export function TradeDetailContent({ trade }: TradeDetailContentProps) {
       </DetailSection>
 
       <DetailSection title="Review" icon={ClipboardCheck}>
-        {reviewV2.isLoading && (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-5 h-5 text-accent animate-spin" />
-            <span className="ml-2 text-xs text-text-muted">Loading review...</span>
-          </div>
-        )}
-        {reviewV2.isError && (
-          <ErrorState
-            title="Review unavailable"
-            message="Deterministic review could not load."
-            compact
-          />
-        )}
-        {reviewV2.data && (
-          <div className="min-w-0 overflow-x-hidden">
-            <TradeReviewV2Card review={reviewV2.data} />
-          </div>
-        )}
-
         {!isOpen && (
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center justify-between mb-3">

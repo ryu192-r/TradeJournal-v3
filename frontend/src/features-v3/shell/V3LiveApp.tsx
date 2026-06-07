@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/appStore'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CockpitV3Page } from '../cockpit'
 import { TradesV3Page } from '../trades'
+import { CoachV3Page } from '../coach'
 import { V3MoreSection } from './V3MoreSection'
 import { V3Shell } from './V3Shell'
 import type { V3PreviewSectionId, V3ShellMode } from './V3Shell.types'
@@ -55,7 +56,6 @@ const SetupPlaybookPage = lazy(() =>
 )
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
-const AICoachPage = lazy(() => import('@/components/coach/AICoachPage').then((m) => ({ default: m.AICoachPage })))
 const PerformanceOSPage = lazy(() =>
   import('@/pages/PerformanceOSPage').then((m) => ({ default: m.PerformanceOSPage })),
 )
@@ -269,11 +269,9 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         )
       case 'coach':
         return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="AICoach">
-              <AICoachPage />
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary name="CoachV3">
+            <CoachV3Page />
+          </ErrorBoundary>
         )
       case 'perf-os':
         return (

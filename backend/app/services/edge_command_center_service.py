@@ -30,7 +30,6 @@ from app.schemas.edge_command_center import (
     RegimeCommandCenter,
 )
 from app.schemas.recommendations import RecommendationDashboardResponse, TradingRecommendation
-from app.schemas.trade_review_v2 import TradeReviewBatchResponse, TradeReviewV2Response
 from app.services.coaching_intelligence_service import (
     get_coaching_intelligence_dashboard,
     get_setup_confidence_scores,
@@ -38,7 +37,6 @@ from app.services.coaching_intelligence_service import (
 )
 from app.services.recommendation_service import get_recommendation_dashboard
 from app.services.setup_edge_service import get_all_setup_edges, get_top_setup_edge, get_weakest_setup_edge
-from app.services.trade_review_v2_service import review_trades_batch_v2
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +89,9 @@ def _safe_coaching(db: Session, user_id: int) -> tuple[Optional[CoachingIntellig
     return _safe_call("coaching", get_coaching_intelligence_dashboard, db, user_id)
 
 
-def _safe_review_batch(db: Session, user_id: int) -> tuple[Optional[TradeReviewBatchResponse], Optional[str]]:
-    return _safe_call("trade_review_v2", review_trades_batch_v2, db, user_id, limit=20, only_closed=True)
+def _safe_review_batch(db: Session, user_id: int) -> tuple[None, None]:
+    # trade_review_v2 removed in Phase 3 — review queue now fed by coach reviews only
+    return None, None
 
 
 def _safe_workflow(db: Session, user_id: int) -> tuple[Optional[DailyWorkflow], Optional[str]]:
@@ -158,7 +157,7 @@ def _build_setup_focus(
     return cards[:6]
 
 
-def _review_severity(review: TradeReviewV2Response) -> str:
+def _review_severity(review: Any) -> str:
     tags = {t.tag for t in review.mistake_tags}
     if tags & CRITICAL_MISTAKE_TAGS:
         return "critical"
@@ -169,7 +168,7 @@ def _review_severity(review: TradeReviewV2Response) -> str:
     return "info"
 
 
-def _review_reason(review: TradeReviewV2Response) -> str:
+def _review_reason(review: Any) -> str:
     if review.mistake_tags:
         top = review.mistake_tags[0]
         return top.explanation
@@ -179,7 +178,7 @@ def _review_reason(review: TradeReviewV2Response) -> str:
 
 
 def _build_review_queue(
-    batch: Optional[TradeReviewBatchResponse],
+    batch: Optional[Any],
     prompts: list[TradeReviewPrompt],
     seen_trade_ids: set[int],
 ) -> list[EdgeReviewQueueItem]:
@@ -240,7 +239,7 @@ def _dedupe_priority_key(p: EdgePriority) -> str:
 def _build_priorities(
     recs: Optional[RecommendationDashboardResponse],
     coaching: Optional[CoachingIntelligenceDashboard],
-    batch: Optional[TradeReviewBatchResponse],
+    batch: Optional[Any],
     review_queue: list[EdgeReviewQueueItem],
     workflow_status: Optional[EdgeWorkflowStatus],
 ) -> list[EdgePriority]:

@@ -674,20 +674,6 @@ export function updateMonthlyReview(month: string, payload: import('@/types/perf
   return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
 }
 
-// ────────────────────────── Trade Review V2 ──────────────────────────
-
-export function getTradeReviewV2(tradeId: number) {
-  return apiClient
-    .get<import('@/types/tradeReviewV2').TradeReviewV2Response>(`/trade-review-v2/${tradeId}`)
-    .then((r) => r.data)
-}
-
-export function getTradeReviewBatchV2(params?: { limit?: number; only_closed?: boolean }) {
-  return apiClient
-    .get<import('@/types/tradeReviewV2').TradeReviewBatchResponse>('/trade-review-v2/batch', { params })
-    .then((r) => r.data)
-}
-
 // ────────────────────────── Edge Command Center ──────────────────────────
 
 export function getEdgeCommandCenter(params?: { period_start?: string; period_end?: string }) {
