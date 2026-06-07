@@ -21,13 +21,6 @@ import type {
   AskCoachRequest, PatternDetectionResponse, RuleReminderResponse,
 } from '@/types/coach'
 import type { CalendarMonthPayload, DeterministicReportPayload } from '@/types'
-import type {
-  CoachingIntelligenceDashboard,
-  WeeklyCoachingPlan,
-  SetupConfidenceScore,
-  BehavioralDriftSignal,
-  TradeReviewPrompt,
-} from '@/types/coachingIntelligence'
 
 // ────────────────────────── Trades ──────────────────────────
 
@@ -584,19 +577,7 @@ export function seedMarketSnapshots(snapshots: Record<string, unknown>[]) {
   return apiClient.post<{ added: number; skipped: number; errors: string[]; total: number }>('/market/seed', { snapshots }).then(r => r.data)
 }
 
-// ────────────────────────── Recommendations ──────────────────────────
-
-export function getRecommendationDashboard(params?: { period_start?: string; period_end?: string }) {
-  return apiClient
-    .get<import('@/types/recommendations').RecommendationDashboardResponse>('/recommendations/dashboard', { params })
-    .then(r => r.data)
-}
-
-export function getRecommendationSummary(params?: { period_start?: string; period_end?: string }) {
-  return apiClient
-    .get<import('@/types/recommendations').RecommendationSummary>('/recommendations/summary', { params })
-    .then(r => r.data)
-}
+// ────────────────────────── Market (context + regime) ──────────────────────────
 
 export function getMarketPerformanceCorrelation(fromDate?: string, toDate?: string) {
   const params = new URLSearchParams()
@@ -691,30 +672,6 @@ export function getMonthlyReview(month: string) {
 
 export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
   return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
-}
-
-// ────────────────────────── Coaching Intelligence ──────────────────────────
-
-export function getCoachingIntelligenceDashboard() {
-  return apiClient.get<CoachingIntelligenceDashboard>('/coaching-intelligence/dashboard').then(r => r.data)
-}
-
-export function getWeeklyCoachingPlan(weekStart?: string) {
-  const params = weekStart ? { week_start: weekStart } : undefined
-  return apiClient.get<WeeklyCoachingPlan>('/coaching-intelligence/weekly-plan', { params }).then(r => r.data)
-}
-
-export function getSetupConfidenceScores(params?: { period_start?: string; period_end?: string }) {
-  return apiClient.get<SetupConfidenceScore[]>('/coaching-intelligence/setup-scores', { params }).then(r => r.data)
-}
-
-export function getBehavioralDrift(params?: { lookback_days?: number; baseline_days?: number }) {
-  return apiClient.get<BehavioralDriftSignal[]>('/coaching-intelligence/behavioral-drift', { params }).then(r => r.data)
-}
-
-export function getTradeReviewPrompts(limit?: number) {
-  const params = limit ? { limit } : undefined
-  return apiClient.get<TradeReviewPrompt[]>('/coaching-intelligence/trade-review-prompts', { params }).then(r => r.data)
 }
 
 // ────────────────────────── Trade Review V2 ──────────────────────────

@@ -6,6 +6,7 @@ import { CalendarSnapshot } from './components/CalendarSnapshot'
 import { ChargesIntelligence } from './components/ChargesIntelligence'
 import { CockpitCommandHeader } from './components/CockpitCommandHeader'
 import { CockpitDrawerPreview } from './components/CockpitDrawerPreview'
+import { CockpitEdgeFeed } from './components/CockpitEdgeFeed'
 import { CockpitPerformanceDeck } from './components/CockpitPerformanceDeck'
 import { OpenRiskBoard } from './components/OpenRiskBoard'
 import { ReviewActionCenter } from './components/ReviewActionCenter'
@@ -92,6 +93,8 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
         />
 
         <CockpitPerformanceDeck metrics={metrics} />
+
+        <CockpitEdgeFeed dataEnabled={dataEnabled} />
 
         {!dataEnabled && (
           <Panel

@@ -1,3 +1,5 @@
+# DEPRECATED — Phase 2 (2026-06-07). Router unregistered from base.py.
+# Data folded into /edge-command-center. File retained for deferred deletion.
 """Coaching Intelligence Router — deterministic adaptive coaching endpoints."""
 
 from datetime import date, datetime

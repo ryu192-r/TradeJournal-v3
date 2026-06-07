@@ -13,7 +13,6 @@ from datetime import date, datetime, timedelta
 import pytest
 
 from app.models.user import User
-from app.services.recommendation_service import get_recommendation_dashboard
 
 
 # ─── helpers ─────────────────────────────────────────────────────
@@ -229,37 +228,6 @@ def test_qa2_command_center_unfavorable_warning(client, auth_user_token):
 # ─── Test 3: Recommendations (20+ sample) ────────────────────────
 
 
-def test_qa3_regime_focus_and_pause_recommendations(client, auth_user_token, db_session):
-    """20+ wins in bull + 20+ losses in range → focus + pause recommendations."""
-    base = date(2025, 10, 1)
-    _seed_bull_wins(client, auth_user_token, 22, base, prefix="WIN")
-    _seed_range_losses(client, auth_user_token, 22, base + timedelta(days=60), prefix="LOSS")
-
-    user = db_session.query(User).filter_by(email="pytest@example.com").first()
-    dash = get_recommendation_dashboard(db_session, user.id)
-    _assert_no_nan(json.loads(dash.model_dump_json()))
-
-    titles = [r.title for r in dash.recommendations]
-    focus = [r for r in dash.recommendations if "Favor" in r.title and "trending bull" in r.title.lower()]
-    pause = [r for r in dash.recommendations if "Pause" in r.title and "range bound" in r.title.lower()]
-
-    assert focus, f"Expected focus recommendation, got titles: {titles}"
-    assert pause, f"Expected pause recommendation, got titles: {titles}"
-    assert focus[0].action_type == "increase_focus"
-    assert pause[0].action_type == "pause_setup"
-    assert focus[0].related_setup == "Breakout"
-    assert pause[0].related_setup == "Breakout"
-
-    # API path
-    resp = client.get("/api/v1/recommendations/dashboard", headers=_headers(auth_user_token))
-    assert resp.status_code == 200
-    api_body = resp.json()
-    _assert_no_nan(api_body)
-    api_titles = [r["title"] for r in api_body["recommendations"]]
-    assert any("Favor" in t for t in api_titles)
-    assert any("Pause" in t for t in api_titles)
-
-
 # ─── Test 4: Playbook Intelligence ───────────────────────────────
 
 
@@ -335,9 +303,3 @@ def test_qa5_fresh_user_graceful_empty(client):
     _assert_no_nan(edge.json())
     assert edge.json()["market_regime"] is None
     assert not any(p["id"] == "market-regime-current" for p in edge.json()["priorities"])
-
-    recs = client.get("/api/v1/recommendations/dashboard", headers=_headers(token))
-    assert recs.status_code == 200
-    _assert_no_nan(recs.json())
-    regime_recs = [r for r in recs.json()["recommendations"] if "regime" in r.get("id", "").lower() or "trending" in r.get("title", "").lower()]
-    assert regime_recs == []

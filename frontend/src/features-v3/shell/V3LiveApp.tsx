@@ -62,15 +62,6 @@ const PerformanceOSPage = lazy(() =>
 const DailySANotesPage = lazy(() =>
   import('@/pages/DailySANotesPage').then((m) => ({ default: m.DailySANotesPage })),
 )
-const RecommendationsPage = lazy(() =>
-  import('@/pages/RecommendationsPage').then((m) => ({ default: m.RecommendationsPage })),
-)
-const CoachingIntelligencePage = lazy(() =>
-  import('@/pages/CoachingIntelligencePage').then((m) => ({ default: m.CoachingIntelligencePage })),
-)
-const EdgeCommandCenterPage = lazy(() =>
-  import('@/pages/EdgeCommandCenterPage').then((m) => ({ default: m.EdgeCommandCenterPage })),
-)
 
 function ViewFallback() {
   return (
@@ -317,30 +308,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           <ErrorBoundary name="LifecycleV3">
             <LifecycleV3Page />
           </ErrorBoundary>
-        )
-      case 'recommendations':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="Recommendations">
-              <RecommendationsPage />
-            </ErrorBoundary>
-          </div>
-        )
-      case 'coaching-intelligence':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="CoachingIntelligence">
-              <CoachingIntelligencePage />
-            </ErrorBoundary>
-          </div>
-        )
-      case 'edge-center':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="EdgeCenter">
-              <EdgeCommandCenterPage />
-            </ErrorBoundary>
-          </div>
         )
       default:
         return (

@@ -1,6 +1,5 @@
 import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
 import { useIntelligenceDashboardQuery } from '@/hooks/useIntelligenceDashboardQuery'
-import { useCoachingIntelligenceDashboardQuery } from '@/hooks/useCoachingIntelligenceQuery'
 import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
 import { useDailyDashboard } from '@/hooks/usePerformanceOS'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
@@ -8,7 +7,7 @@ import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
 import { formatCurrency, formatPercent, parseDecimal } from '@/utils/format'
 import {
   TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle,
-  Brain, Shield, BookOpen, BarChart3, Eye, LineChart as LineChartIcon, Sparkles,
+  Brain, Shield, BookOpen, BarChart3, Eye, LineChart as LineChartIcon,
   CheckCircle2, ListChecks, SlidersHorizontal, ArrowUp,
   ArrowDown, PanelTopClose, PanelTopOpen, X,
 } from 'lucide-react'
@@ -16,7 +15,6 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PageShell } from '@/components/layout/PageShell'
 import { PageHeader, SyncBadge, LastUpdated, CollapsibleSection, KpiCard } from '@/components/ui/SharedUI'
 import { EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton } from '@/components/ui/StateComponents'
-import { RecommendationSummaryStrip } from '@/components/recommendations/RecommendationSummaryStrip'
 import { EdgeCommandCenterCompact } from '@/components/edge/EdgeCommandCenterCompact'
 import {
   CompactKpiRow,
@@ -629,7 +627,7 @@ function WorkflowCard({ dashboard, onOpenPerformanceOS }: { dashboard?: DailyDas
   )
 }
 
-function IntelligenceCards({ intelligence, coaching }: { intelligence?: IntelligenceDashboardPayload; coaching?: import('@/types/coachingIntelligence').CoachingIntelligenceDashboard }) {
+function IntelligenceCards({ intelligence }: { intelligence?: IntelligenceDashboardPayload }) {
   const setups = getPlaybookSetups(intelligence)
   const bestSetup = setups[0]
   const behavioral = intelligence?.behavioral
@@ -669,13 +667,6 @@ function IntelligenceCards({ intelligence, coaching }: { intelligence?: Intellig
       detail: lifecycle?.discipline_score != null ? `${formatPercent(lifecycle.discipline_score)} discipline` : 'Grade trades to unlock trend',
       icon: Brain,
       tone: lifecycle?.avg_grade_score != null && lifecycle.avg_grade_score >= 3.5 ? 'text-profit' : 'text-text-heading',
-    },
-    {
-      label: 'Weekly Coaching Focus',
-      value: coaching?.weekly_plan?.primary_focus ?? coaching?.next_best_actions[0] ?? 'No coaching data',
-      detail: coaching?.weekly_plan?.headline ?? 'Open coaching intelligence for a weekly plan',
-      icon: Sparkles,
-      tone: coaching?.weekly_plan?.primary_focus ? 'text-accent' : 'text-text-heading',
     },
   ]
 
@@ -802,7 +793,6 @@ function WidgetControls({
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: intelligenceData } = useIntelligenceDashboardQuery()
-  const { data: coachingData } = useCoachingIntelligenceDashboardQuery()
   const { data: dailyDashboard } = useDailyDashboard()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
   const syncQuotes = useSyncLiveQuotesMutation()
@@ -940,12 +930,12 @@ export function DashboardPage() {
     open: <CompactOpenPositions trades={openTrades} quoteMap={quoteMap} />,
     alerts: <AlertZone alerts={dashboardAlerts} />,
     edge: <EdgeCommandCenterCompact />,
-    intelstrip: <RecommendationSummaryStrip />,
+    intelstrip: <EdgeCommandCenterCompact />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,
     live: <LiveDashboard trades={openTrades} quoteMap={quoteMap} />,
     workflow: <WorkflowCard dashboard={dailyDashboard} onOpenPerformanceOS={() => setActiveView('perf-os')} />,
     risk: riskPayload ? <RiskCommandCenter data={riskPayload} /> : <RiskSkeleton />,
-    intelligence: <IntelligenceCards intelligence={intelligenceData} coaching={coachingData} />,
+    intelligence: <IntelligenceCards intelligence={intelligenceData} />,
     deep: (
       <div className="space-y-[var(--page-gap)]">
         <CollapsibleSection title="Lifecycle Intelligence" icon={Brain} summary={lifecycleSummary(intelligenceData)}>

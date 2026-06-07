@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Cpu,
   LayoutDashboard,
-  Radar,
   Sparkles,
   TrendingUp,
   Settings,
@@ -32,9 +31,6 @@ export type ActiveView =
   | 'calendar'
   | 'reports'
   | 'lifecycle'
-  | 'recommendations'
-  | 'coaching-intelligence'
-  | 'edge-center'
   | 'charges'
 
 export type NavigationItem = {
@@ -174,27 +170,6 @@ export const advancedNavigationItems = [
     icon: Brain,
     view: 'lifecycle',
     purpose: 'Emotions, execution grades, and behavioral drift.',
-  },
-  {
-    id: 'edge-center',
-    label: 'Edge Center',
-    icon: Radar,
-    view: 'edge-center',
-    purpose: 'Full focus, avoid, review queue, and next best action.',
-  },
-  {
-    id: 'recommendations',
-    label: 'Intelligence',
-    icon: Brain,
-    view: 'recommendations',
-    purpose: 'Data-driven recommendations from your history.',
-  },
-  {
-    id: 'coaching-intelligence',
-    label: 'Coaching Intel',
-    icon: Sparkles,
-    view: 'coaching-intelligence',
-    purpose: 'Weekly coaching synthesis from journals and trades.',
   },
   {
     id: 'coach',

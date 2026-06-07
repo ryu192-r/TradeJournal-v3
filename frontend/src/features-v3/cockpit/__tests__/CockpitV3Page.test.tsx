@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   useCockpitV3Data: vi.fn(),
   useDailyChargesSummary: vi.fn(),
   useRiskDashboardQuery: vi.fn(),
+  useEdgeCommandCenterQuery: vi.fn(),
 }))
 
 vi.mock('../hooks/useCockpitV3Data', () => ({
@@ -22,6 +23,10 @@ vi.mock('../hooks/useDailyChargesSummary', () => ({
 
 vi.mock('@/hooks/useRiskDashboardQuery', () => ({
   useRiskDashboardQuery: mocks.useRiskDashboardQuery,
+}))
+
+vi.mock('@/hooks/useEdgeCommandCenterQuery', () => ({
+  useEdgeCommandCenterQuery: mocks.useEdgeCommandCenterQuery,
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {
@@ -55,6 +60,7 @@ describe('CockpitV3Page', () => {
     mocks.useCockpitV3Data.mockReturnValue(data())
     mocks.useDailyChargesSummary.mockReturnValue({ data: null, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
     mocks.useRiskDashboardQuery.mockReturnValue({ data: undefined, isLoading: false, error: null })
+    mocks.useEdgeCommandCenterQuery.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })
   })
 
   it('renders loading state safely', () => {

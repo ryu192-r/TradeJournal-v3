@@ -7,9 +7,6 @@ const MORE_VIEWS: ActiveView[] = [
   'coach',
   'perf-os',
   'sa-notes',
-  'recommendations',
-  'coaching-intelligence',
-  'edge-center',
 ]
 
 export function V3MoreSection() {

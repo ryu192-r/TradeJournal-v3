@@ -1,24 +1,17 @@
-import { ArrowRight, Radar } from 'lucide-react'
+import { useState } from 'react'
+import { Radar } from 'lucide-react'
 import { useEdgeCommandCenterQuery } from '@/hooks/useEdgeCommandCenterQuery'
-import { useAppStore } from '@/store/appStore'
 
 const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
 
 export function EdgeCommandCenterCompact() {
+  const [expanded, setExpanded] = useState(false)
   const { data, isError, isLoading } = useEdgeCommandCenterQuery()
-  const setActiveView = useAppStore((s) => s.setActiveView)
 
   if (isError) {
     return (
       <div className={CARD}>
         <p className="text-[length:var(--text-xs)] text-text-muted">Edge summary unavailable.</p>
-        <button
-          type="button"
-          onClick={() => setActiveView('edge-center')}
-          className="mt-2 text-[length:var(--text-xs)] text-accent cursor-pointer"
-        >
-          Open Edge Center →
-        </button>
       </div>
     )
   }
@@ -34,6 +27,7 @@ export function EdgeCommandCenterCompact() {
   if (!data) return null
 
   const topRisk = data.summary.risk_warnings[0] ?? data.priorities.find((p) => p.severity === 'critical')?.summary
+  const extraPriorities = data.priorities.slice(1)
 
   return (
     <div className={`${CARD} border-accent/20`}>
@@ -48,13 +42,25 @@ export function EdgeCommandCenterCompact() {
       {topRisk && (
         <p className="text-[10px] text-loss mt-2 break-words line-clamp-2">⚠ {topRisk}</p>
       )}
-      <button
-        type="button"
-        onClick={() => setActiveView('edge-center')}
-        className="mt-3 inline-flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-accent hover:underline cursor-pointer"
-      >
-        Open Edge Center <ArrowRight className="w-3 h-3" />
-      </button>
+      {expanded && extraPriorities.length > 0 && (
+        <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+          {extraPriorities.slice(0, 4).map((p) => (
+            <div key={p.id}>
+              <p className="text-[length:var(--text-xs)] font-medium text-text-heading">{p.title}</p>
+              <p className="text-[10px] text-text-muted">{p.summary}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.priorities.length > 1 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-[length:var(--text-xs)] font-medium text-accent hover:underline cursor-pointer"
+        >
+          {expanded ? 'Show less ↑' : `${data.priorities.length - 1} more priorities ↓`}
+        </button>
+      )}
     </div>
   )
 }
