@@ -12,7 +12,7 @@ Five roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, 
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` (glossary + lifecycle + formulas) + `docs/adr/` (20+ ADRs) + `docs/ARCHITECTURE.md` (full file map). See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` (glossary + lifecycle + formulas) + `docs/adr/` (24 ADRs, see `docs/adr/README.md`) + `docs/ARCHITECTURE.md` (full file map). See `docs/agents/domain.md`.
 
 ### Architecture reference
 
@@ -38,9 +38,10 @@ cd frontend && npm run build           # production build
 ## Key architecture
 - **Architecture doc**: `docs/ARCHITECTURE.md` — full file map, every endpoint, every component
 - **Auth gate**: `App.tsx` checks `isAuthenticated` — all pages require login
-- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `capital`, `settings`, `coach`, `perf-os`, `sa-notes`, `journal`, `calendar`, `reports`, `lifecycle`, `charges`. No simple/pro toggle — `NavMode` and `interfaceMode.ts` removed in Phase 1.
-- **View code-splitting**: `App.tsx` lazy-loads all major views with `React.lazy`/`Suspense`; keep heavy pages (analytics/recharts, coach, trades) out of the initial bundle.
-- **Mobile bottom nav**: Dashboard | Trades | **+** (FAB, create trade) | Analytics | Review. Replaces old grid layout. `frontend/src/components/layout/Sidebar.tsx:162-215`.
+- **View switching**: Zustand `appStore.activeView` (not URL router). Sub-views via `tradeFormMode` (`list|create|edit|detail`). Active views: `dashboard`, `analytics`, `trades`, `playbook`, `review`, `capital`, `settings`, `coach`, `journal`, `calendar`, `reports`, `lifecycle`, `charges`. No simple/pro toggle — `NavMode` and `interfaceMode.ts` removed in Phase 1.
+- **V3 shell**: `App.tsx` mounts `features-v3/shell/V3LiveApp` (the live shell). `V3LiveApp` maps `activeView` → a V3 section via `v3ViewMapping.ts` and renders the matching slice from `features-v3/*`. Legacy `pages/*` are gone (Phase 9) — only `pages/LoginPage.tsx` remains.
+- **View code-splitting**: `V3LiveApp` lazy-loads all heavy slices with `React.lazy`/`Suspense` (analytics/recharts, coach, trades, charges, reports, etc.) to keep the shell chunk small.
+- **Mobile bottom nav**: Cockpit | Trades | **+** (FAB, create trade) | Journal | Review. Driven by `v3MobileNavigationItems` in `features-v3/shell/v3Navigation.tsx`; rendered by `V3MobileNav`.
 - **Data refresh**: React Query refetches on mount/window focus/reconnect. `placeholderData: (previousData) => previousData` on ALL hooks prevents blank states during refetch.
 - **Routes**: Register in `backend/app/routers/base.py`, prefix `/api/v1`. **Order matters**: `broker_import` router must come before `trades` router or `/{trade_id}` shadows `/brokers`
 - **Models**: Define in `backend/app/models/`, import in `__init__.py` so `Base.metadata.create_all` picks them up
@@ -51,7 +52,7 @@ cd frontend && npm run build           # production build
 - **DB**: Alembic runs on startup (`main.py:19-28`). `create_all` fallback only runs in DEBUG/test mode if migrations fail. Prod migration drift fails loudly. Tests override to SQLite (`conftest.py:6-9`). Engine uses `pool_pre_ping=True`.
 - **Theme**: CSS variables via `data-theme="dark"|"light"` attr on root. Fonts: Newsreader (display), Inter (body), JetBrains Mono (data/mono)
 - **Fluid layout**: Page containers use `clamp()` CSS variables (`--page-px`, `--page-py`, `--page-gap`, `--heading-size`, `--cell-px`, `--cell-py`, `--text-sm`, `--text-xs`) defined in `index.css`. Use `text-[length:var(--x)]` not `text-[var(--x)]` (Tailwind treats `var()` as color by default).
-- **Standard card**: `const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
+- **Design system**: `frontend/src/new-ui/` is canonical (token-driven primitives — see ADR-023). Slice CSS is layout/grid/gap only; tokens (colors, radii, fonts, shadows) come from `new-ui/tokens`, never redefined per-slice. Cards use the `Card`/`Panel` primitives from `@/new-ui`.
 - **Dynamic tiers**: `tier_configs` table, editable via TierEditor on Capital page
 - **Direction**: All trades are LONG (Indian equities — no shorting). DB column defaults to `"LONG"`, removed from UI. PnL = `(exit - entry) * qty - fees`
 - **Status auto-computed**: Derived from `exit_price` everywhere — no exit = open, has exit = closed. `Trade._auto_set_status()` model method called from `compute_pnl()` (which runs on every insert/update via `before_update` hook and manually in `merge_or_create`). Preserves `"deleted"` status. Old `draft`/`reviewed`/`analytics` values backfilled via `_backfill_trade_statuses()` on startup. Frontend `getStatus()`/`getStatusLabel()` use `exit_price` as source of truth. List filter uses `exit_price IS NULL/NOT NULL`.
@@ -81,16 +82,19 @@ cd frontend && npm run build           # production build
 - `Trade.compute_pnl()` now auto-computes BOTH `pnl` AND `r_multiple` using shared module
 - `r_multiple` is NO longer a user-editable field in the trade form
 
-## Design System (Shared UI Components)
-- `SharedUI.tsx`: SyncBadge, LastUpdated, SectionHeader, SectionTitle, MetricCard, KpiCard, CollapsibleSection, PageHeader, StatusBadge, InlineBadge, Tabs, AlertRow, SafeAreaPadding
-- `StateComponents.tsx`: EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton
-- `GlassButton.tsx`: Primary/accent/danger/ghost variants
-- `GlassInput.tsx`, `GlassSelect.tsx`, `GlassTextarea.tsx`: Form inputs
-- `GlassCard.tsx`: Standard card (uses CSS vars, not dead `.glass` class)
-- `GlassBadge.tsx`: Inline badge chips
-- `BottomSheet.tsx`: Slide-up mobile modal
-- `PullToRefresh.tsx`: Mobile pull-to-refresh
-- **Always use these** instead of creating ad-hoc styles.
+## Design System (`frontend/src/new-ui/` — canonical)
+`new-ui` is the single canonical design system (ADR-023). Token-driven primitives organized as:
+- `primitives/`: Button, Card, Panel, Surface, Badge, Chip, Divider
+- `layout/`: AppCanvas, Page, Stack, Cluster, Grid, Section, SplitPane
+- `feedback/`: EmptyState, LoadingState, ErrorState, Skeleton
+- `data-display/`: Value, MoneyValue, PercentValue, RMultipleValue, Metric, MetricCard, DataRow, DataList, TableShell
+- `overlays/`: Drawer, Sheet
+- `navigation/`: NavItem, SegmentedControl, Tabs
+- `tokens/`: colors, radii, fonts, shadows — the single source for visual tokens.
+
+**Rules**: import from `@/new-ui`. Never redefine tokens per-slice; slice CSS is layout/grid/gap only. The legacy `Glass*`, `SharedUI.tsx`, and `StateComponents.tsx` were dropped from the live render tree in Phase 7 (a few dead files linger in `components/ui/` pending removal — do not import them).
+
+**Carve-outs** (retained in `components/ui/`, no new-ui equivalent yet): `BottomSheet`, `PullToRefresh`, `InstallPrompt`, `ErrorBoundary`, plus `components/actions/ActionsInbox`.
 
 ## Rate limiter
 - `RateLimiter` middleware in `main.py`. Enabled by default in Docker; set `RATE_LIMIT_OFF=true` in `.env` only when intentionally disabling it. Tests set this.
@@ -154,11 +158,11 @@ cd frontend && npm run build           # production build
 - `MarketCandle` cache table with unique on `(symbol, timeframe, timestamp, source)`
 - Intraday timeframes show friendly "Switch to 1D" message when no provider configured
 
-## Discipline rating
-- 1-5 field in daily journal post-market step (separate from mood). Stored in `DailyJournal.discipline_rating`.
+## Discipline rating (DEPRECATED)
+- Legacy 1-5 field formerly in the daily journal post-market step. No longer written or read by the V3 journal (`features-v3/journal/`). The `DailyJournal.discipline_rating` column remains in the DB but is slated for a deferred destructive migration (see V3_FINISH_PLAN). Journal now uses `bias_notes` instead.
 
-## Review stream
-- `TradeReviewStream` supports back navigation, re-review filter (Unreviewed/All Trades), bulk mode (batch notes/tags on selected trades).
+## Review queue
+- `features-v3/review/ReviewV3Page` — per-trade review queue with Unreviewed/All filter and note/tag/grade capture. (The legacy `TradeReviewStream` was retired in the V3 migration.)
 
 ## Execution grades
 - A–F per dimension (entry_quality, sizing_quality, stop_quality, patience, rule_adherence, exit_quality, overall_grade). Stored in `execution_grades` table. Logged via trade detail modal lifecycle section.
@@ -185,7 +189,7 @@ cd frontend && npm run build           # production build
   - `parse_zerodha_csv()` — auto-detects column names
   - `parse_dhan_csv()` — Dhan tradebook. Aggregates BUY/SELL legs by qty before pairing (handles partial fills).
   - `parse_generic_csv()` — app's own CSV. Required: `symbol, entry_price, quantity, entry_time`. `direction` optional, defaults LONG.
-- **Frontend**: `BrokerImportModal` on TradesPage — broker select → file upload → preview (greyed-out skip indicators) → confirm import
+- **Frontend**: `ImportV3Page` (`features-v3/import/`), reached via the topbar **Import** action. Embeds `BrokerImportModal` — broker select → file upload → preview (greyed-out skip indicators) → confirm import
 - **Skip**: imports skip existing trades for same `(symbol, date)` instead of merging
 
 ## Testing quirks
@@ -199,15 +203,14 @@ cd frontend && npm run build           # production build
 - **CSS**: Tailwind utility classes + CSS variables (`var(--accent)`, `var(--bg-card)`, etc.) — **never** use hardcoded hex/rgba colors
 - **Don't**: create new files unless necessary
 - **Design**: `rounded-2xl` = 14px, `.animate-card-in` for card entrance
-- **Component pattern**: Shared UI components in `frontend/src/components/ui/` (SharedUI.tsx, StateComponents.tsx, GlassBadge.tsx, PullToRefresh.tsx). Use these instead of creating new ones.
-- **Card class**: `CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'`
+- **Component pattern**: import primitives from `@/new-ui` (Card, Panel, Button, Badge, etc.). Do not create ad-hoc cards/states or import the dead `Glass*`/`SharedUI`/`StateComponents`.
 
 ## Key Documentation Files
 - `docs/ARCHITECTURE.md` — complete file map, all models, routers, services, components
 - `CONTEXT.md` — domain glossary, trade lifecycle, formulas
 - `docs/PROJECT_OVERVIEW.md` — user-facing overview, features, deployment
 - `docs/FEATURE_ROADMAP.md` — completed and planned features
-- `docs/adr/` — 20 Architecture Decision Records
+- `docs/adr/` — 24 Architecture Decision Records (index: `docs/adr/README.md`)
 
 ## Environment variables (key ones)
 - `DATABASE_URL` — PostgreSQL connection string (or SQLite for tests)
@@ -233,7 +236,7 @@ cd frontend && npm run build           # production build
 | Bot | — | Telegram bot, depends on postgres |
 
 ## AI Coach
-- **Page**: `frontend/src/features-v3/coach/CoachV3Page.tsx` — 5 tabs (Daily Briefing, Weekly Review, Ask, Trade Review, History). Patterns & Rule Check tabs dropped. (Daily Briefing, Weekly Review, Ask Coach, Pattern Detection, Rule Check, Trade Review, History)
+- **Page**: `frontend/src/features-v3/coach/CoachV3Page.tsx` — 5 tabs (Daily Briefing, Weekly Review, Ask, Trade Review, History). Patterns & Rule Check tabs dropped.
 - **Types**: `frontend/src/types/coach.ts`
 - **Providers** (8 total in `backend/app/core/ai_config.py`):
   - Ollama Local (`FORMAT_OLLAMA` — native `/api/chat` endpoint)
@@ -241,7 +244,7 @@ cd frontend && npm run build           # production build
   - OpenAI, DeepSeek, Anthropic, Google (all `FORMAT_OPENAI`)
   - Custom (user-defined base URL + model)
   - OpenCode Zen (`FORMAT_OPENAI` — 12 models, 5 free)
-- **Personality**: 5 mentor profiles (Minervini, Manas Arora, Chartitude, QuallaMagie, Pradeep Bonde). Each has 0-100 weight. `GET /ai/mentors`. Editable via sliders in Settings page.
+- **Mentor personality (REMOVED)**: the 5-mentor personality blend and `GET /ai/mentors` were removed in Phase 1. No mentor sliders in Settings.
 - **Endpoints** in `backend/app/routers/coach.py`:
   - `POST /coach/review/daily` — daily AI review
   - `POST /coach/review/weekly` — weekly AI review
@@ -268,7 +271,7 @@ cd frontend && npm run build           # production build
   - Creates `adjustment` event if delta ≠ 0 (audit trail, not silent overwrite)
   - Auto-sync on all trade mutations: create, update, delete, pyramid, merge, CSV import, broker import
   - Manual: `POST /capital-events/accounts/{id}/reconcile`
-- **Frontend** (`frontend/src/pages/CapitalPage.tsx`):
+- **Frontend** (`frontend/src/features-v3/capital/CapitalV3Page.tsx`):
   - Edit starting capital (pencil icon on NetEquityCard)
   - Deposit/Withdraw modals in CapitalEventsManager
   - Delete capital events (trash icon per row)
@@ -278,16 +281,13 @@ cd frontend && npm run build           # production build
 - **Dashboard** (`backend/app/routers/capital_dashboard.py`): filters `Trade.status != "deleted"` for PnL and deployed capital
 - **Equity curve**: includes trade PnL (not just capital events)
 
-## Performance OS / Daily SA Notes
-- **Performance OS** (`frontend/src/pages/PerformanceOSPage.tsx`): Weekly review workflow, monthly reviews, daily SA (Super Analyzer) notes
-- **Daily SA Notes** (`frontend/src/pages/DailySANotesPage.tsx`): Pre-market and post-market guided journaling with discipline rating
+## Performance OS / Daily SA Notes (REMOVED)
+- The standalone Performance OS and Daily SA Notes pages were removed during the V3 migration (Phases 1–9). Their workflows are not part of the V3 surface. Backend `daily_workflows`, `weekly_reviews`, `monthly_reviews` tables are retained but no longer read/written — pending a deferred destructive migration (see V3_FINISH_PLAN). The per-trade Review queue (`features-v3/review/`) covers the review workflow.
 
 ## Shared UI components
-- `frontend/src/components/ui/SharedUI.tsx` — SyncBadge, LastUpdated, SectionHeader, SectionTitle, MetricCard, KpiCard, CollapsibleSection, PageHeader, StatusBadge, InlineBadge, Tabs, AlertRow, SafeAreaPadding
-- `frontend/src/components/ui/StateComponents.tsx` — EmptyState, ErrorState, SectionSkeleton, CardSkeleton, MetricSkeleton
-- `frontend/src/components/ui/GlassBadge.tsx` — GlassBadge (accent/profit/loss/neutral variants)
-- `frontend/src/components/ui/PullToRefresh.tsx` — mobile pull-to-refresh wrapper
-- Use these instead of creating ad-hoc loading/error states.
+- **Canonical**: `frontend/src/new-ui/` (see Design System section above). Import everything from `@/new-ui`.
+- **Carve-outs** still in `components/ui/`: `BottomSheet`, `PullToRefresh`, `InstallPrompt`, `ErrorBoundary` (no new-ui equivalent yet).
+- Legacy `SharedUI.tsx`, `StateComponents.tsx`, and `Glass*` files are dead (no live importers) and pending deletion — do not import them.
 
 ## Nginx proxy config
 - `/api/v1/coach/` — `proxy_read_timeout 180s` (AI LLM calls can take 30-120s)

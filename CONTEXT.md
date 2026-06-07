@@ -37,8 +37,8 @@
 | **Milestone** | Auto-tracked capital/profit goals. |
 | **Exit Reason** | Why a trade was closed: `stop_loss`, `target`, `manual`, `trailing`, `system`, `breakeven`. Auto-detected when possible (exit at stop_price → `stop_loss`, exit at target_price → `target`), but user can override. |
 | **Breakeven Threshold** | Configurable ±₹ amount on Account model. Trades with PnL within this range are classified as `breakeven`. |
-| **Discipline Rating** | A 1-5 self-assessment in daily journal post-market step. Separate from mood. |
-| **Coach Personality** | A blend of 5 mentor profiles (Minervini, Manas Arora, Chartitude, QuallaMagie, Pradeep Bonde) each weighted 0-100%. |
+| **Discipline Rating** *(deprecated)* | Legacy 1-5 self-assessment from the old daily journal post-market step. No longer written or read by the V3 journal (which uses `bias_notes`). The `DailyJournal.discipline_rating` column remains pending a deferred destructive migration. |
+| **Coach Personality** *(removed)* | The former blend of 5 mentor profiles was removed in the V3 migration (Phase 1). No mentor weighting; `GET /ai/mentors` is gone. |
 | **Live Quote** | Cached NSE stock price. Updated via `POST /market/sync-quotes`. Used for unrealized PnL computation and live position dashboard. |
 | **Quote Freshness** | Per-quote status exposed as `fresh`, `stale`, `failed`, or `not_synced` so UI surfaces provider failure or old data instead of treating every cached quote as live. |
 | **Risk Command Center** | Dashboard section showing portfolio heat, deployed capital, open risk, positions without stops, and risk warnings. |
@@ -49,7 +49,10 @@
 | **Cap %** | PnL as percentage of current net equity: `pnl / net_equity * 100`. |
 | **SL Inline Edit** | Click the SL cell in trades table to open a compact form with price + type dropdown. Saves to both `trade.stop_price` and `stop_history`. |
 | **Playbook Stats Sync** | `_update_setup_stats(db, setup_name)` recomputes `trade_count`, `win_rate`, `avg_r` after every trade create/update/delete/pyramid. |
-| **Navigation Mode** | Simple/Advanced sidebar preference. Simple mode hides lower-frequency views, while `activeView` still supports all registered app views. |
+| **Navigation** *(simple/pro removed)* | Single sidebar config in 5 groups (Today / Insight / Money / AI / System). The old simple/advanced `NavMode` toggle was removed in Phase 1; `activeView` supports all registered V3 views. |
+| **Cockpit** | The V3 command center (the `dashboard` view, `features-v3/cockpit/`). Shows KPIs, equity, live positions, risk, and the deterministic **Edge feed**. |
+| **Edge Feed** | Deterministic "what to focus on / avoid / review" signal strip composed from trading data (ADR-024). Lives **inside the Cockpit** (`CockpitEdgeFeed`), not as a standalone page. |
+| **new-ui** | The canonical, token-driven design system (`frontend/src/new-ui/`, ADR-023). All slices import primitives from `@/new-ui`; visual tokens come from `new-ui/tokens`. Legacy `Glass*`/`SharedUI`/`StateComponents` are retired. |
 | **Calculation Module** | Single-source-of-truth for all trade math. Backend: `backend/app/utils/calculations.py`. Frontend: `frontend/src/utils/calculations.ts`. Both are direction-aware (LONG/SHORT) and handle all edge cases gracefully. |
 | **Trade Card View** | Responsive mobile trade list: auto-switches to cards below 768px with manual toggle. Each card shows symbol, status, P&L, R-multiple, entry/exit/qty. |
 
