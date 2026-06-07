@@ -83,7 +83,7 @@ cd frontend && npm run build
 | 5  | Analytics “By Regime” tab ✅        | Tab in `AnalyticsV3Page` fed by `market_regime/performance`                                     | low      |
 | 6  | Close 3 legacy fallbacks 🔶         | Audit `TradeDetailV3` / `PlaybookV3` / `SettingsV3` vs legacy. Ship missing features. Delete fallback toggles and legacy pages. **TradeDetail + Settings closed; Playbook CRUD ported, analytics deferred (#66).** | medium each |
 | 7  | Design system swap ✅               | Wire `new-ui` everywhere. Drop `Glass*`, `SharedUI`, `StateComponents`. Keep mobile/PWA carve-outs. Audit slice CSS for token leaks. Ship slice-by-slice. **All live-code consumers migrated (d63ea7a). Remaining Glass* in dead pages — Phase 9 cleanup.** | medium (broad) |
-| 8  | Nav consolidation                  | `v3Navigation` adopts the 5-group structure. Drop `app/navigation.ts` duplicates. Shrink `ActiveView` union. | low      |
+| 8  | Nav consolidation ✅               | `v3Navigation` adopts the 5-group structure. Drop `app/navigation.ts` duplicates. Shrink `ActiveView` union. **5-group live (ccdbaa6). Coach in V3 nav. Import → topbar. Mobile nav updated.** | low |
 | 9  | Old pages cleanup                  | Delete `pages/{Dashboard,Trades,TradeDetail,Journal,Capital,Calendar,Lifecycle}.tsx` and legacy `Sidebar`. | low      |
 | 10 | Docs                               | Update `AGENTS.md`, `ARCHITECTURE.md`, refresh `CONTEXT.md`. Confirm ADRs 022/023/024 accepted. | low      |
 
