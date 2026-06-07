@@ -1,3 +1,5 @@
+# DEPRECATED — Phase 4 (2026-06-07). Router unregistered from base.py.
+# Journal merge complete. File retained for deferred deletion.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

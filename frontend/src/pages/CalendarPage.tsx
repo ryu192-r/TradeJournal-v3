@@ -242,7 +242,7 @@ function DayDetail({ day }: { day?: CalendarDay }) {
             )}
           </div>
           <button
-            onClick={() => setActiveView('sa-notes')}
+            onClick={() => setActiveView('journal')}
             className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 transition-colors cursor-pointer"
           >
             <ExternalLink className="w-3 h-3" />

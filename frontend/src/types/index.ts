@@ -157,6 +157,7 @@ export interface DailyJournal {
   date: string
   pre_trade_notes: string | null
   post_trade_notes: string | null
+  bias_notes: string | null
   trade_count: number | null
   total_pnl: string | null
   avg_r_multiple: string | null
@@ -184,9 +185,9 @@ export interface DailyJournalPayload {
   date: string
   pre_trade_notes?: string | null
   post_trade_notes?: string | null
+  bias_notes?: string | null
   trade_count?: number | null
   mood_rating?: number | null
-  discipline_rating?: number | null
   mood_notes?: string | null
   rules_followed?: string | null
   rules_violated?: string | null

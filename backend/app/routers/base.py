@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, playbook_edge, market_context, market_regime, performance_os, operational_dashboard, calendar, reports, charts, edge_command_center, actions_inbox, daily_charges, pyramid_entries
+from app.routers import health, trades, dhan, dhan_webhook, capital_events, accounts, capital_dashboard, coach, setup_playbook, export, analytics, daily_journal, auth, ai_settings, tier_config, broker_import, risk_dashboard, trade_timeline, partial_exit, emotion_log, execution_grade, lifecycle_analytics, playbook_intelligence, playbook_edge, market_context, market_regime, operational_dashboard, calendar, reports, charts, edge_command_center, actions_inbox, daily_charges, pyramid_entries
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, tags=["auth"])
@@ -28,7 +28,6 @@ api_router.include_router(playbook_intelligence.router, tags=["playbook-intellig
 api_router.include_router(playbook_edge.router, tags=["playbook-edge"])
 api_router.include_router(market_context.router, tags=["market-context"])
 api_router.include_router(market_regime.router, tags=["market-regime"])
-api_router.include_router(performance_os.router, tags=["performance-os"])
 api_router.include_router(operational_dashboard.router, tags=["dashboard"])
 api_router.include_router(calendar.router, tags=["calendar"])
 api_router.include_router(reports.router, tags=["reports"])

@@ -5,8 +5,6 @@ import { viewMeta } from '@/app/navigation'
 
 const MORE_VIEWS: ActiveView[] = [
   'coach',
-  'perf-os',
-  'sa-notes',
 ]
 
 export function V3MoreSection() {

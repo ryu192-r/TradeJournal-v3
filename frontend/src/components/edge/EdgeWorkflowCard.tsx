@@ -30,7 +30,7 @@ export function EdgeWorkflowCard({ workflow }: { workflow: EdgeWorkflowStatus })
       {!workflow.is_complete && (
         <button
           type="button"
-          onClick={() => setActiveView('perf-os')}
+          onClick={() => setActiveView('journal')}
           className="mt-3 text-[length:var(--text-xs)] font-medium text-accent hover:underline cursor-pointer"
         >
           Open Performance OS →

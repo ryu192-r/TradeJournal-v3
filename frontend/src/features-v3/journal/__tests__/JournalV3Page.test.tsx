@@ -24,7 +24,7 @@ vi.mock('@/hooks/useJournalMutation', () => ({
 function journal(o: Partial<DailyJournal> = {}): DailyJournal {
   return {
     id: 1, date: '2025-06-02', pre_trade_notes: 'Watch RELIANCE breakout', post_trade_notes: null,
-    trade_count: null, total_pnl: null, avg_r_multiple: null, win_rate: null,
+    bias_notes: null, trade_count: null, total_pnl: null, avg_r_multiple: null, win_rate: null,
     mood_rating: 4, discipline_rating: 5, mood_notes: null, rules_followed: null,
     rules_violated: null, lessons_learned: null, ...o,
   }

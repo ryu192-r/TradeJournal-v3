@@ -1,14 +1,13 @@
 import { useOperationalDashboardQuery } from '@/hooks/useOperationalDashboardQuery'
 import { useIntelligenceDashboardQuery } from '@/hooks/useIntelligenceDashboardQuery'
 import { useLiveQuotesQuery, useSyncLiveQuotesMutation } from '@/hooks/useMarketContextQuery'
-import { useDailyDashboard } from '@/hooks/usePerformanceOS'
 import { RiskCommandCenter } from '@/components/risk/RiskCommandCenter'
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard'
 import { formatCurrency, formatPercent, parseDecimal } from '@/utils/format'
 import {
   TrendingUp, Wallet, Activity, Target, Flame, AlertTriangle,
   Brain, Shield, BookOpen, BarChart3, Eye, LineChart as LineChartIcon,
-  CheckCircle2, ListChecks, SlidersHorizontal, ArrowUp,
+  CheckCircle2, SlidersHorizontal, ArrowUp,
   ArrowDown, PanelTopClose, PanelTopOpen, X,
 } from 'lucide-react'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
@@ -28,8 +27,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNo
 import { mark, measure } from '@/utils/performance'
 import type { IntelligenceDashboardPayload, OperationalDashboardPayload } from '@/types'
 import type { RiskDashboardPayload } from '@/types/riskDashboard'
-import type { DailyDashboard, WorkflowPhase } from '@/types/performanceOs'
-import { useAppStore } from '@/store/appStore'
 // isProDashboardWidget removed — all widgets accessible (simple/pro toggle killed in Phase 1)
 function isProDashboardWidget(_id: string): boolean { return false }
 import { cn } from '@/lib/utils'
@@ -102,12 +99,6 @@ const WIDGET_LABELS: Record<DashboardWidgetId, string> = {
   deep: 'Deep Sections',
 }
 
-const PHASE_LABELS: Record<WorkflowPhase, string> = {
-  pre_market: 'Pre-Market',
-  execution: 'Execution',
-  review: 'Review',
-  behavior: 'Behavior',
-}
 
 function normalizeWidgetPrefs(raw: unknown): WidgetPreference[] {
   if (!Array.isArray(raw)) return DEFAULT_WIDGET_PREFS
@@ -566,67 +557,6 @@ function marketSummary(intelligence?: IntelligenceDashboardPayload) {
   )
 }
 
-function WorkflowCard({ dashboard, onOpenPerformanceOS }: { dashboard?: DailyDashboard; onOpenPerformanceOS: () => void }) {
-  const workflow = dashboard?.workflow
-  const progress = dashboard?.phase_progress
-  const phase = workflow?.phase ?? progress?.current_phase ?? 'pre_market'
-  const checklist = workflow?.checklist_items ?? []
-  const completedItems = checklist.filter((item) => item.checked).length
-  const totalItems = checklist.length
-  const nextItem = checklist.find((item) => !item.checked)
-  const openPositions = dashboard?.open_positions?.length ?? 0
-  const todayTrades = dashboard?.today_trades?.length ?? 0
-  const doneCount = progress?.completed?.filter(Boolean).length ?? 0
-  const allDone = Boolean(progress?.all_done)
-
-  const phaseTone =
-    phase === 'pre_market' ? 'text-blue-400' :
-    phase === 'execution' ? 'text-gold' :
-    phase === 'review' ? 'text-profit' :
-    'text-accent'
-
-  return (
-    <div className={CARD}>
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <ListChecks className="h-4 w-4 text-accent" />
-            <h2 className="font-display text-[length:var(--text-sm)] text-text-heading">Daily Workflow</h2>
-          </div>
-          <div className="mt-1 text-[length:var(--text-sm)] text-text-muted">
-            {allDone ? 'Trading day closed out.' : nextItem?.label ?? 'Keep the daily loop moving.'}
-          </div>
-        </div>
-        <button
-          onClick={onOpenPerformanceOS}
-          className="shrink-0 min-h-10 rounded-lg border border-border px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent cursor-pointer"
-        >
-          Open
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-bg-elevated p-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Phase</div>
-          <div className={cn('mt-1 font-data text-sm font-semibold', phaseTone)}>{PHASE_LABELS[phase]}</div>
-        </div>
-        <div className="rounded-xl border border-border bg-bg-elevated p-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Progress</div>
-          <div className="mt-1 font-data text-sm font-semibold text-text-heading">{doneCount}/4 phases</div>
-        </div>
-        <div className="rounded-xl border border-border bg-bg-elevated p-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Checklist</div>
-          <div className="mt-1 font-data text-sm font-semibold text-text-heading">{completedItems}/{totalItems || 0} done</div>
-        </div>
-        <div className="rounded-xl border border-border bg-bg-elevated p-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Session</div>
-          <div className="mt-1 font-data text-sm font-semibold text-text-heading">{todayTrades} trades, {openPositions} open</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function IntelligenceCards({ intelligence }: { intelligence?: IntelligenceDashboardPayload }) {
   const setups = getPlaybookSetups(intelligence)
   const bestSetup = setups[0]
@@ -793,11 +723,9 @@ function WidgetControls({
 export function DashboardPage() {
   const { data, isLoading, error, isFetching } = useOperationalDashboardQuery()
   const { data: intelligenceData } = useIntelligenceDashboardQuery()
-  const { data: dailyDashboard } = useDailyDashboard()
   const { data: liveQuotes } = useLiveQuotesQuery(60_000)
   const syncQuotes = useSyncLiveQuotesMutation()
   const queryClient = useQueryClient()
-  const setActiveView = useAppStore((s) => s.setActiveView)
   const isPro = true
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [widgetPrefs, setWidgetPrefs] = useState<WidgetPreference[]>(getInitialWidgetPrefs)
@@ -933,7 +861,7 @@ export function DashboardPage() {
     intelstrip: <EdgeCommandCenterCompact />,
     equity: <EquitySection capital={dashboardData.capital} equityCurve={equityCurve} />,
     live: <LiveDashboard trades={openTrades} quoteMap={quoteMap} />,
-    workflow: <WorkflowCard dashboard={dailyDashboard} onOpenPerformanceOS={() => setActiveView('perf-os')} />,
+    workflow: null,
     risk: riskPayload ? <RiskCommandCenter data={riskPayload} /> : <RiskSkeleton />,
     intelligence: <IntelligenceCards intelligence={intelligenceData} />,
     deep: (

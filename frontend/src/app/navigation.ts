@@ -6,7 +6,6 @@ import {
   Briefcase,
   CalendarDays,
   ClipboardList,
-  Cpu,
   LayoutDashboard,
   Sparkles,
   TrendingUp,
@@ -24,8 +23,6 @@ export type ActiveView =
   | 'playbook'
   | 'review'
   | 'capital'
-  | 'perf-os'
-  | 'sa-notes'
   | 'settings'
   | 'journal'
   | 'calendar'
@@ -137,25 +134,11 @@ export const advancedNavigationItems = [
     purpose: 'Account balance, deposits, withdrawals, reconciliation.',
   },
   {
-    id: 'perf-os',
-    label: 'Performance OS',
-    icon: Cpu,
-    view: 'perf-os',
-    purpose: 'Daily workflow: pre-market to execution to review.',
-  },
-  {
     id: 'journal',
     label: 'Journal',
     icon: BookOpen,
     view: 'journal',
     purpose: 'Daily notes and weekly journal rollups.',
-  },
-  {
-    id: 'sa-notes',
-    label: 'SA Notes',
-    icon: ClipboardList,
-    view: 'sa-notes',
-    purpose: 'Structured pre/post-market note templates.',
   },
   {
     id: 'reports',

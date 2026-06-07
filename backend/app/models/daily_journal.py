@@ -15,6 +15,7 @@ class DailyJournal(Base):
     # Pre/post market notes
     pre_trade_notes = Column(Text, nullable=True)
     post_trade_notes = Column(Text, nullable=True)
+    bias_notes = Column(Text, nullable=True)  # Phase 4: pre-market directional bias
 
     # Auto-aggregated metrics from day's trades
     trade_count = Column(Integer, nullable=True)

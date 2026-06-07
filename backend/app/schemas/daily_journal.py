@@ -16,12 +16,12 @@ class DailyJournalCreate(BaseModel):
     date: date
     pre_trade_notes: str | None = None
     post_trade_notes: str | None = None
+    bias_notes: str | None = None
     trade_count: int | None = None
     total_pnl: Decimal | None = None
     avg_r_multiple: Decimal | None = None
     win_rate: Decimal | None = Field(None, ge=0, le=100)
     mood_rating: int | None = Field(None, ge=1, le=5)
-    discipline_rating: int | None = Field(None, ge=1, le=5)
     mood_notes: str | None = None
     rules_followed: str | None = None
     rules_violated: str | None = None
@@ -31,12 +31,12 @@ class DailyJournalCreate(BaseModel):
 class DailyJournalUpdate(BaseModel):
     pre_trade_notes: str | None = None
     post_trade_notes: str | None = None
+    bias_notes: str | None = None
     trade_count: int | None = None
     total_pnl: Decimal | None = None
     avg_r_multiple: Decimal | None = None
     win_rate: Decimal | None = None
     mood_rating: int | None = None
-    discipline_rating: int | None = None
     mood_notes: str | None = None
     rules_followed: str | None = None
     rules_violated: str | None = None
@@ -64,6 +64,7 @@ class DailyJournalResponse(BaseModel):
     date: date
     pre_trade_notes: str | None = None
     post_trade_notes: str | None = None
+    bias_notes: str | None = None
     trade_count: int | None = None
     total_pnl: Decimal | None = None
     avg_r_multiple: Decimal | None = None

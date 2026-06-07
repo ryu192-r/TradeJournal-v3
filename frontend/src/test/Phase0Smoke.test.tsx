@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { PerformanceOSPage } from '@/pages/PerformanceOSPage'
 import { TradeDetailPage } from '@/pages/TradeDetailPage'
 import { PartialExitForm } from '@/components/lifecycle/PartialExitForm'
 
@@ -287,11 +286,6 @@ describe('Phase 0 frontend smoke tests', () => {
     expect(screen.getByRole('button', { name: 'Uploaded Images' })).toBeInTheDocument()
   })
 
-  it('renders Performance OS daily workflow', () => {
-    renderWithQueryClient(<PerformanceOSPage />)
-    expect(screen.getByRole('heading', { name: 'Performance OS' })).toBeInTheDocument()
-    expect(screen.getByText('Risk plan ready')).toBeInTheDocument()
-  })
 
   it('renders Partial Exit form', () => {
     renderWithQueryClient(<PartialExitForm tradeId={1} entryPrice={100} currentQty={10} onClose={vi.fn()} />)

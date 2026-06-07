@@ -30,6 +30,11 @@ export function JournalDayEditor({ date }: JournalDayEditorProps) {
     >
       <Stack gap="md">
         <TextField
+          label="Bias notes (pre-market)"
+          value={editor.form.bias_notes}
+          onChange={(v) => editor.setField('bias_notes', v)}
+        />
+        <TextField
           label="Pre-trade notes"
           value={editor.form.pre_trade_notes}
           onChange={(v) => editor.setField('pre_trade_notes', v)}
@@ -44,11 +49,6 @@ export function JournalDayEditor({ date }: JournalDayEditorProps) {
           label="Mood"
           value={editor.form.mood_rating}
           onChange={(v) => editor.setField('mood_rating', v)}
-        />
-        <RatingField
-          label="Discipline"
-          value={editor.form.discipline_rating}
-          onChange={(v) => editor.setField('discipline_rating', v)}
         />
 
         <TextField

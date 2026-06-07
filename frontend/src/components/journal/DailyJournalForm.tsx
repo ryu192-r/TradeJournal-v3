@@ -246,7 +246,6 @@ export function DailyJournalForm({
       pre_trade_notes: data.preTradeNotes?.trim() || null,
       post_trade_notes: data.postTradeNotes?.trim() || null,
       mood_rating: data.moodRating ?? null,
-      discipline_rating: data.disciplineRating ?? null,
       mood_notes: data.moodNotes?.trim() || null,
       rules_followed: data.rulesFollowed != null ? String(data.rulesFollowed) : null,
       rules_violated: data.rulesViolated != null ? String(data.rulesViolated) : null,

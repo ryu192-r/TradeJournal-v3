@@ -56,12 +56,6 @@ const SetupPlaybookPage = lazy(() =>
 )
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const TradeDetailPage = lazy(() => import('@/pages/TradeDetailPage').then((m) => ({ default: m.TradeDetailPage })))
-const PerformanceOSPage = lazy(() =>
-  import('@/pages/PerformanceOSPage').then((m) => ({ default: m.PerformanceOSPage })),
-)
-const DailySANotesPage = lazy(() =>
-  import('@/pages/DailySANotesPage').then((m) => ({ default: m.DailySANotesPage })),
-)
 
 function ViewFallback() {
   return (
@@ -273,14 +267,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
             <CoachV3Page />
           </ErrorBoundary>
         )
-      case 'perf-os':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="PerfOS">
-              <PerformanceOSPage />
-            </ErrorBoundary>
-          </div>
-        )
       case 'journal':
         return (
           <ErrorBoundary name="JournalV3">
@@ -292,14 +278,6 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
           <ErrorBoundary name="CalendarV3">
             <CalendarV3Page dataEnabled />
           </ErrorBoundary>
-        )
-      case 'sa-notes':
-        return (
-          <div className="tjv3-legacy-embed">
-            <ErrorBoundary name="SANotes">
-              <DailySANotesPage />
-            </ErrorBoundary>
-          </div>
         )
       case 'lifecycle':
         return (

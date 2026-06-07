@@ -627,53 +627,6 @@ export function getRegimeMatrix() {
   return apiClient.get<import('@/types/marketRegime').SetupRegimeMatrix>('/market-regime/matrix').then(r => r.data)
 }
 
-// ────────────────────────── Performance OS ──────────────────────────
-
-export function ensureWorkflow(date?: string) {
-  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>('/perf-os/workflow', { date: date || undefined }).then(r => r.data)
-}
-
-export function getDailyDashboard(date?: string) {
-  const path = date ? `/perf-os/workflow/${date}` : '/perf-os/workflow/today'
-  return apiClient.get<import('@/types/performanceOs').DailyDashboard>(path).then(r => r.data)
-}
-
-export function updateDailyWorkflow(date: string, payload: import('@/types/performanceOs').DailyWorkflowUpdate) {
-  return apiClient.put<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}`, payload).then(r => r.data)
-}
-
-export function advanceWorkflowPhase(date: string) {
-  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/advance`).then(r => r.data)
-}
-
-export function resetWorkflow(date: string) {
-  return apiClient.post<import('@/types/performanceOs').DailyWorkflow>(`/perf-os/workflow/${date}/reset`).then(r => r.data)
-}
-
-export function enrichWeeklyReview(weekStart?: string) {
-  return apiClient.post<import('@/types/performanceOs').WeeklyReviewDetail>('/perf-os/enrich/weekly', { week_start: weekStart || undefined }).then(r => r.data)
-}
-
-export function getWeeklyReview(weekStart: string) {
-  return apiClient.get<import('@/types/performanceOs').WeeklyReviewDetail>(`/perf-os/weekly/${weekStart}`).then(r => r.data)
-}
-
-export function updateWeeklyReview(weekStart: string, payload: import('@/types/performanceOs').WeeklyReviewUpdate) {
-  return apiClient.put<import('@/types/performanceOs').WeeklyReview>(`/perf-os/weekly/${weekStart}`, payload).then(r => r.data)
-}
-
-export function enrichMonthlyReview(month?: string) {
-  return apiClient.post<import('@/types/performanceOs').MonthlyReviewDetail>('/perf-os/enrich/monthly', { month: month || undefined }).then(r => r.data)
-}
-
-export function getMonthlyReview(month: string) {
-  return apiClient.get<import('@/types/performanceOs').MonthlyReviewDetail>(`/perf-os/monthly/${month}`).then(r => r.data)
-}
-
-export function updateMonthlyReview(month: string, payload: import('@/types/performanceOs').MonthlyReviewUpdate) {
-  return apiClient.put<import('@/types/performanceOs').MonthlyReview>(`/perf-os/monthly/${month}`, payload).then(r => r.data)
-}
-
 // ────────────────────────── Edge Command Center ──────────────────────────
 
 export function getEdgeCommandCenter(params?: { period_start?: string; period_end?: string }) {
