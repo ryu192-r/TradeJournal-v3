@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiTrade } from '@/types'
 import { TradesV3Page } from '../TradesV3Page'
@@ -55,6 +57,11 @@ function data(overrides: Partial<TradesV3Data> = {}): TradesV3Data {
   }
 }
 
+function renderWithQueryClient(ui: ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+}
+
 describe('TradesV3Page', () => {
   beforeEach(() => {
     mocks.useTradesV3Data.mockReturnValue(data())
@@ -62,13 +69,13 @@ describe('TradesV3Page', () => {
 
   it('renders loading state safely', () => {
     mocks.useTradesV3Data.mockReturnValue(data({ isLoading: true }))
-    render(<TradesV3Page />)
+    renderWithQueryClient(<TradesV3Page />)
 
     expect(screen.getByLabelText('Loading Trades v3')).toBeInTheDocument()
   })
 
   it('renders empty safe state', () => {
-    render(<TradesV3Page />)
+    renderWithQueryClient(<TradesV3Page />)
 
     expect(screen.getByRole('heading', { name: 'Trades', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('No trades found')).toBeInTheDocument()
@@ -76,7 +83,7 @@ describe('TradesV3Page', () => {
   })
 
   it('renders demo preview mode without protected API calls', () => {
-    render(<TradesV3Page dataEnabled={false} />)
+    renderWithQueryClient(<TradesV3Page dataEnabled={false} />)
 
     expect(mocks.useTradesV3Data).toHaveBeenCalledWith(false)
     expect(screen.getByText('Demo preview mode')).toBeInTheDocument()
@@ -90,7 +97,7 @@ describe('TradesV3Page', () => {
       total: 1,
     }))
 
-    render(<TradesV3Page />)
+    renderWithQueryClient(<TradesV3Page />)
 
     expect(screen.getAllByText('Gross P&L').length).toBeGreaterThan(0)
     await user.click(screen.getAllByRole('button', { name: /RELIANCE/ })[0])
