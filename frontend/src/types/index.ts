@@ -5,6 +5,7 @@ export type TradeDirection = 'LONG'
 export type TradeStatus = 'OPEN' | 'CLOSED' | 'MISSED'
 
 export type BackendTradeStatus = 'open' | 'closed' | 'deleted'
+export type EntryContext = 'planned' | 'opportunistic_valid' | 'impulse' | 'unclear'
 export type SetupType =
   | 'EP'
   | 'Momentum Burst'
@@ -73,6 +74,7 @@ export interface ApiTrade {
   review_notes?: string | null
   review_tags?: string[] | null
   exit_reason?: string | null
+  entry_context?: EntryContext | null
   created_at?: string
   updated_at?: string
   remaining_qty?: string | null
@@ -123,6 +125,7 @@ export interface ApiTradeUpdatePayload {
   r_multiple?: string | null
   status?: BackendTradeStatus
   exit_reason?: string | null
+  entry_context?: EntryContext | null
   review_notes?: string | null
   review_tags?: string[] | null
 }

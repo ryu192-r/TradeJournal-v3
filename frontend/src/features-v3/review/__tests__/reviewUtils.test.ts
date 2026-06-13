@@ -70,6 +70,15 @@ describe('filterReviewTrades', () => {
     expect(filterReviewTrades(trades, 'untagged').map((t) => t.id)).toEqual([5])
   })
 
+  it('unclassified filter returns trades with null entry_context', () => {
+    const mixed = [
+      trade({ id: 10, entry_context: null }),
+      trade({ id: 11, entry_context: 'planned' }),
+      trade({ id: 12, entry_context: 'impulse' }),
+    ]
+    expect(filterReviewTrades(mixed, 'unclassified').map((t) => t.id)).toEqual([10])
+  })
+
   it('excludes deleted and open everywhere', () => {
     const ids = filterReviewTrades(trades, 'pending').map((t) => t.id)
     expect(ids).not.toContain(3)
@@ -84,17 +93,17 @@ describe('filterReviewTrades', () => {
 })
 
 describe('summarizeReview', () => {
-  it('counts pending/reviewed/total of reviewable trades', () => {
+  it('counts pending/reviewed/unclassified/total of reviewable trades', () => {
     const trades = [
       trade({ id: 1, review_notes: null }),
-      trade({ id: 2, review_notes: 'x' }),
+      trade({ id: 2, review_notes: 'x', entry_context: 'planned' }),
       trade({ id: 3, status: 'open', exit_price: null }),
       trade({ id: 4, status: 'deleted' }),
     ]
-    expect(summarizeReview(trades)).toEqual({ pending: 1, reviewed: 1, total: 2 })
+    expect(summarizeReview(trades)).toEqual({ pending: 1, reviewed: 1, unclassified: 1, total: 2 })
   })
 
   it('handles empty', () => {
-    expect(summarizeReview([])).toEqual({ pending: 0, reviewed: 0, total: 0 })
+    expect(summarizeReview([])).toEqual({ pending: 0, reviewed: 0, unclassified: 0, total: 0 })
   })
 })

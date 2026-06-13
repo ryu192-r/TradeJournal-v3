@@ -3,11 +3,12 @@ import { isDeletedTrade, getTradeGrossPnl, hasMissingSetup } from '../../trades/
 import { tradeMatchesPeriod } from '../../trades/utils/tradesV3Filters'
 import { isReviewable, isReviewed } from './reviewStatus'
 
-export type ReviewFilter = 'pending' | 'reviewed' | 'today' | 'week' | 'winners' | 'losers' | 'untagged'
+export type ReviewFilter = 'pending' | 'reviewed' | 'today' | 'week' | 'winners' | 'losers' | 'untagged' | 'unclassified'
 
 export const REVIEW_FILTER_OPTIONS: { value: ReviewFilter; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'reviewed', label: 'Reviewed' },
+  { value: 'unclassified', label: 'Unclassified' },
   { value: 'today', label: 'Today' },
   { value: 'week', label: 'This week' },
   { value: 'winners', label: 'Winners' },
@@ -27,6 +28,7 @@ export function filterReviewTrades(trades: ApiTrade[], filter: ReviewFilter, tod
       case 'winners': return (getTradeGrossPnl(t) ?? 0) > 0
       case 'losers': return (getTradeGrossPnl(t) ?? 0) < 0
       case 'untagged': return hasMissingSetup(t)
+      case 'unclassified': return t.entry_context == null
       default: return true
     }
   })
@@ -35,11 +37,13 @@ export function filterReviewTrades(trades: ApiTrade[], filter: ReviewFilter, tod
 export interface ReviewSummary {
   pending: number
   reviewed: number
+  unclassified: number
   total: number
 }
 
 export function summarizeReview(trades: ApiTrade[]): ReviewSummary {
   const reviewable = trades.filter((t) => !isDeletedTrade(t) && isReviewable(t))
   const reviewed = reviewable.filter(isReviewed).length
-  return { pending: reviewable.length - reviewed, reviewed, total: reviewable.length }
+  const unclassified = reviewable.filter((t) => t.entry_context == null).length
+  return { pending: reviewable.length - reviewed, reviewed, unclassified, total: reviewable.length }
 }

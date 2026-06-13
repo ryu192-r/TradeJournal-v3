@@ -37,6 +37,7 @@ class TradeBase(BaseModel):
     target_price: Optional[Decimal] = Field(None, description="Target profit price")
     r_multiple: Optional[Decimal] = Field(None, description="Risk multiple")
     exit_reason: Optional[str] = Field(None, description="Exit reason: stop_loss, target, manual, trailing, system")
+    entry_context: Optional[str] = Field(None, description="Entry context: planned, opportunistic_valid, impulse, unclear")
     import_source: Optional[str] = Field(None, description="Source of import (broker_csv, dhan_sync, dhan_webhook)")
     import_fingerprint: Optional[str] = Field(None, description="SHA-256 fingerprint for deduplication")
     external_order_id: Optional[str] = Field(None, description="Broker order/trade ID")
@@ -92,6 +93,16 @@ class TradeBase(BaseModel):
             raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
         return v
 
+    @field_validator("entry_context")
+    @classmethod
+    def validate_entry_context(cls, v):
+        if v is None:
+            return v
+        allowed = {"planned", "opportunistic_valid", "impulse", "unclear"}
+        if v not in allowed:
+            raise ValueError(f"entry_context must be one of: {', '.join(sorted(allowed))}")
+        return v
+
     @field_validator("entry_time", "exit_time")
     @classmethod
     def strip_to_ist(cls, v):
@@ -140,6 +151,7 @@ class TradeUpdate(BaseModel):
     review_tags: Optional[List[str]] = None
     exit_notes: Optional[str] = None
     exit_reason: Optional[str] = None
+    entry_context: Optional[str] = None
     exchange: Optional[str] = None
     segment: Optional[str] = None
     product_type: Optional[str] = None
@@ -162,6 +174,16 @@ class TradeUpdate(BaseModel):
         allowed = {"original", "breakeven", "trailing", "manual", "risk_free", "profit_locked"}
         if v not in allowed:
             raise ValueError(f"stop_loss_status must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("entry_context")
+    @classmethod
+    def validate_entry_context_update(cls, v):
+        if v is None:
+            return v
+        allowed = {"planned", "opportunistic_valid", "impulse", "unclear"}
+        if v not in allowed:
+            raise ValueError(f"entry_context must be one of: {', '.join(sorted(allowed))}")
         return v
 
     @field_validator("entry_time", "exit_time")
@@ -241,6 +263,7 @@ class TradeResponse(BaseModel):
     review_tags: Optional[List[str]] = None
     exit_notes: Optional[str] = None
     exit_reason: Optional[str] = None
+    entry_context: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     remaining_qty: Optional[Decimal] = None
