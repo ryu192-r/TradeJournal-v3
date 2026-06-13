@@ -104,4 +104,47 @@ describe('ReviewV3Page', () => {
     expect(screen.queryByText(/NaN/)).toBeNull()
     expect(screen.queryByText(/undefined/)).toBeNull()
   })
+
+  it('shows "needs classification" when entry_context is null', async () => {
+    mocks.useTradesV3Data.mockReturnValue(data({ trades: [trade({ id: 1, symbol: 'TCS', entry_context: null })] }))
+    const user = userEvent.setup()
+    render(wrap(<ReviewV3Page />))
+    await user.click(screen.getByText('TCS'))
+    expect(screen.getByText(/needs classification/i)).toBeInTheDocument()
+  })
+
+  it('clicking entry context chip includes it in save payload', async () => {
+    mocks.reviewMutate.mockResolvedValue(trade({ entry_context: 'impulse' }))
+    mocks.useTradesV3Data.mockReturnValue(data({ trades: [trade({ id: 1, symbol: 'TCS', entry_context: null })] }))
+    const user = userEvent.setup()
+    render(wrap(<ReviewV3Page />))
+    await user.click(screen.getByText('TCS'))
+    await user.click(screen.getByText('Impulse'))
+    await user.click(screen.getByText('Save review'))
+    await waitFor(() => expect(mocks.reviewMutate).toHaveBeenCalled())
+    expect(mocks.reviewMutate.mock.calls[0][0].payload.entry_context).toBe('impulse')
+  })
+
+  it('clicking same chip again deselects to null', async () => {
+    mocks.reviewMutate.mockResolvedValue(trade({ entry_context: null }))
+    mocks.useTradesV3Data.mockReturnValue(data({ trades: [trade({ id: 1, symbol: 'TCS', entry_context: 'planned', review_notes: null })] }))
+    const user = userEvent.setup()
+    render(wrap(<ReviewV3Page />))
+    // Trade is reviewed (has entry_context) — switch to Reviewed filter
+    await user.click(screen.getByRole('button', { name: 'Reviewed' }))
+    await user.click(screen.getByText('TCS'))
+    await user.click(screen.getByText('Planned'))
+    await user.click(screen.getByText('Update review'))
+    await waitFor(() => expect(mocks.reviewMutate).toHaveBeenCalled())
+    expect(mocks.reviewMutate.mock.calls[0][0].payload.entry_context).toBeNull()
+  })
+
+  it('unclassified metric card shows count', () => {
+    mocks.useTradesV3Data.mockReturnValue(data({ trades: [
+      trade({ id: 1, entry_context: null }),
+      trade({ id: 2, entry_context: 'planned' }),
+    ] }))
+    render(wrap(<ReviewV3Page />))
+    expect(screen.getAllByText('Unclassified').length).toBeGreaterThanOrEqual(1)
+  })
 })

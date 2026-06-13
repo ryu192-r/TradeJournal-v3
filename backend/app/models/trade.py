@@ -50,6 +50,10 @@ class Trade(Base):
     exit_reason = Column(String(20))  # stop_loss, target, manual, trailing, system
     exit_notes = Column(Text)
 
+    # Entry context classification (review): planned, opportunistic_valid, impulse, unclear
+    # NULL = unclassified (not yet reviewed)
+    entry_context = Column(String(20), nullable=True)
+
     # Import identity (idempotency + dedup)
     import_source = Column(String(30))
     import_fingerprint = Column(String(64))

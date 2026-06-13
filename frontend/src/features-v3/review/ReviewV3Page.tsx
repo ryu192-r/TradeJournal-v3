@@ -51,6 +51,7 @@ export function ReviewV3Page({ dataEnabled = true }: ReviewV3PageProps) {
         <Grid minColumnWidth="10rem">
           <MetricCard label="Pending" value={<Value value={String(summary.pending)} />} />
           <MetricCard label="Reviewed" value={<Value value={String(summary.reviewed)} />} />
+          <MetricCard label="Unclassified" value={<Value value={String(summary.unclassified)} />} />
           <MetricCard label="Reviewable trades" value={<Value value={String(summary.total)} />} />
         </Grid>
 
