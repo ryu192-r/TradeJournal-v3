@@ -172,3 +172,59 @@ class MonthlyReviewDetailResponse(MonthlyReviewResponse):
     weekly_summaries: list[dict] = []
     top_emotions: list[dict] = []
     setup_performance: list[dict] = []
+
+
+# ────────────────────────── Improvement Action ──────────────────────────
+
+from typing import Literal
+
+ImprovementActionStatus = Literal["suggested", "active", "kept", "broken", "retired"]
+ImprovementContractType = Literal[
+    "no_early_entry", "max_trades", "cooldown_after_loss", "stop_not_widened", "manual_check"
+]
+
+
+class ImprovementActionCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    status: ImprovementActionStatus = "suggested"
+    due_session: Optional[date] = None
+    contract_type: ImprovementContractType = "manual_check"
+    contract_params: dict = Field(default_factory=dict)
+    source_evidence: dict = Field(default_factory=dict)
+
+
+class ImprovementActionUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    status: Optional[ImprovementActionStatus] = None
+    due_session: Optional[date] = None
+    contract_type: Optional[ImprovementContractType] = None
+    contract_params: Optional[dict] = None
+    source_evidence: Optional[dict] = None
+
+
+class SelectFocusRequest(BaseModel):
+    date: date
+
+
+class ImprovementActionResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    status: ImprovementActionStatus
+    due_session: Optional[date] = None
+    contract_type: ImprovementContractType
+    contract_params: dict
+    source_evidence: dict
+    is_daily_focus: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DailyFocusResponse(BaseModel):
+    date: date
+    focus: Optional[ImprovementActionResponse] = None
+    backlog: list[ImprovementActionResponse] = []

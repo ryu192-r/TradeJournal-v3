@@ -678,3 +678,36 @@ export function deleteDailyCharges(date: string) {
 export function getDailyChargesSummary(startDate: string, endDate: string) {
   return apiClient.get<import('@/types').DailyChargesSummary>(`/daily-charges/summary?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`).then(r => r.data)
 }
+
+
+// ────────────────────────── Improvement Actions / Daily Focus (ADR-025) ──────────────────────────
+
+type IA = import('@/types/performanceOs').ImprovementAction
+
+export function listImprovementActions(status?: import('@/types/performanceOs').ImprovementActionStatus) {
+  return apiClient.get<IA[]>('/improvement/actions', { params: status ? { status } : undefined }).then(r => r.data)
+}
+
+export function createImprovementAction(payload: import('@/types/performanceOs').ImprovementActionCreate) {
+  return apiClient.post<IA>('/improvement/actions', payload).then(r => r.data)
+}
+
+export function updateImprovementAction(id: number, payload: import('@/types/performanceOs').ImprovementActionUpdate) {
+  return apiClient.put<IA>(`/improvement/actions/${id}`, payload).then(r => r.data)
+}
+
+export function deleteImprovementAction(id: number) {
+  return apiClient.delete(`/improvement/actions/${id}`).then(() => {})
+}
+
+export function selectDailyFocus(id: number, date: string) {
+  return apiClient.post<IA>(`/improvement/actions/${id}/select-focus`, { date }).then(r => r.data)
+}
+
+export function clearDailyFocus(id: number) {
+  return apiClient.post<IA>(`/improvement/actions/${id}/clear-focus`).then(r => r.data)
+}
+
+export function getDailyFocus(date: string) {
+  return apiClient.get<import('@/types/performanceOs').DailyFocus>(`/improvement/daily-focus/${date}`).then(r => r.data)
+}

@@ -27,6 +27,7 @@ Index of all ADRs for TradeJournal v3. Each ADR captures one significant decisio
 | [022](022-v3-finish-feature-consolidation.md) | V3 Finish — Feature Consolidation and Culls | Accepted |
 | [023](023-new-ui-canonical-design-system.md) | `new-ui` as Canonical Design System | Accepted |
 | [024](024-cockpit-absorbs-edge.md) | Cockpit Absorbs the Deterministic Intelligence Feed | Accepted |
+| [025](025-trading-improvement-loop.md) | Trading Improvement Loop (Improvement Actions + Daily Focus Action) | Accepted |
 
 > Note: ADR-014 was never created (numbering gap).
 

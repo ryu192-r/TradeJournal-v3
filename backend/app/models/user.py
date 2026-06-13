@@ -23,6 +23,7 @@ class User(Base):
     daily_workflows = relationship("DailyWorkflow", back_populates="user")
     weekly_reviews = relationship("WeeklyReview", back_populates="user")
     monthly_reviews = relationship("MonthlyReview", back_populates="user")
+    improvement_actions = relationship("ImprovementAction", back_populates="user", cascade="all, delete-orphan")
     market_snapshots = relationship("MarketSnapshot", back_populates="user")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     ai_provider_setting = relationship("AIProviderSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")

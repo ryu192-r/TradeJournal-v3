@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   useDailyChargesSummary: vi.fn(),
   useRiskDashboardQuery: vi.fn(),
   useEdgeCommandCenterQuery: vi.fn(),
+  useDailyFocus: vi.fn(),
 }))
 
 vi.mock('../hooks/useCockpitV3Data', () => ({
@@ -27,6 +28,15 @@ vi.mock('@/hooks/useRiskDashboardQuery', () => ({
 
 vi.mock('@/hooks/useEdgeCommandCenterQuery', () => ({
   useEdgeCommandCenterQuery: mocks.useEdgeCommandCenterQuery,
+}))
+
+vi.mock('../hooks/useImprovementActions', () => ({
+  useDailyFocus: mocks.useDailyFocus,
+  useCreateImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useSelectDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
+  useClearDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {
@@ -61,6 +71,7 @@ describe('CockpitV3Page', () => {
     mocks.useDailyChargesSummary.mockReturnValue({ data: null, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
     mocks.useRiskDashboardQuery.mockReturnValue({ data: undefined, isLoading: false, error: null })
     mocks.useEdgeCommandCenterQuery.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })
+    mocks.useDailyFocus.mockReturnValue({ data: { date: todaySessionDate(), focus: null, backlog: [] }, isLoading: false, isError: false })
   })
 
   it('renders loading state safely', () => {

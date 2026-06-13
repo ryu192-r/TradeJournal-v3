@@ -57,6 +57,13 @@
 | **new-ui** | The canonical, token-driven design system (`frontend/src/new-ui/`, ADR-023). All slices import primitives from `@/new-ui`; visual tokens come from `new-ui/tokens`. Legacy `Glass*`/`SharedUI`/`StateComponents` are retired. |
 | **Calculation Module** | Single-source-of-truth for all trade math. Backend: `backend/app/utils/calculations.py`. Frontend: `frontend/src/utils/calculations.ts`. Both are direction-aware (LONG/SHORT) and handle all edge cases gracefully. |
 | **Trade Card View** | Responsive mobile trade list: auto-switches to cards below 768px with manual toggle. Each card shows symbol, status, P&L, R-multiple, entry/exit/qty. |
+| **Trading Improvement Loop** | A feedback cycle that turns trade, journal, and review evidence into a specific lesson, an Improvement Action, and a later check of whether behavior improved (ADR-025). |
+| **Improvement Action** | The core unit of the Trading Improvement Loop: a trackable behavior change with a title, supporting evidence, a due trading session, a status, and a contract type. |
+| **Improvement Action Status** | Lifecycle state of an Improvement Action: `suggested`, `active`, `kept`, `broken`, or `retired`. Tracks behavior adherence, not task completion. |
+| **Daily Focus Action** | The single Improvement Action selected for a trading date (`is_daily_focus`). One per `due_session` date; selecting a new one resolves any prior focus for that date. |
+| **Improvement Backlog** | Approved or suggested Improvement Actions (`suggested`/`active`) that are not the current Daily Focus Action. Preserves useful ideas without overloading the session. |
+| **Verifiable Behavior Contract** | An Improvement Action phrased so adherence can be checked from evidence. Contract types: `no_early_entry`, `max_trades`, `cooldown_after_loss`, `stop_not_widened`, `manual_check`. |
+| **Manual-Check Action** | An Improvement Action (`manual_check`) whose adherence cannot be checked from available evidence and depends on user confirmation. Allowed, but less preferred than verifiable contracts. |
 
 ## Capital Flow
 

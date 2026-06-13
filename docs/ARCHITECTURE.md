@@ -113,6 +113,7 @@ TradeJournal-v3/
 | `DailyWorkflow` | `daily_workflows` | date, phase, checklist_items, watchlist_symbols |
 | `WeeklyReview` | `weekly_reviews` | week_start, trade_count, pnl_summary, notes |
 | `MonthlyReview` | `monthly_reviews` | month, trade_count, pnl_summary, notes |
+| `ImprovementAction` | `improvement_actions` | title, status, due_session, contract_type, contract_params, source_evidence, is_daily_focus (ADR-025) |
 | `CoachReview` | `coach_reviews` | review_type, content, period, summary_stats |
 | `LiveQuote` | `live_quotes` | symbol, ltp, change_pct, volume, updated_at |
 | `MarketSnapshot` | `market_snapshots` | date, nifty_close, india_vix, breadth, regime |
@@ -155,6 +156,7 @@ TradeJournal-v3/
 | `lifecycle_analytics.py` | `/lifecycle` | Emotion summary, grades, behavioral, revenge, overtrading |
 | `playbook_intelligence.py` | `/playbook/intelligence` | Overview, per-setup intelligence |
 | `performance_os.py` | `/perf-os` | Workflow CRUD, weekly/monthly reviews |
+| `improvement_actions.py` | `/improvement` | Improvement Action CRUD, Daily Focus select/clear, `/improvement/daily-focus/{date}` (ADR-025) |
 | `calendar.py` | `/calendar` | Month view with daily P&L |
 | `reports.py` | `/reports` | Weekly/monthly deterministic reports |
 | `charts.py` | `/trades/{id}/chart-data` | OHLCV candle data for TradeLightweightChart |

@@ -179,6 +179,12 @@ cd frontend && npm run build           # production build
 - **DashboardPage** shows: KPI cards → **Equity section** (Realized Equity card + Total Equity with Unrealized card + equity curve chart) → Live positions → Risk Command Center → Streaks + Alerts → Collapsible intelligence sections.
 - **Equity curve**: Recharts `AreaChart` showing daily realized equity (initial + capital events + closed PnL + partial exits).
 
+## Trading Improvement Loop (ADR-025)
+- **Backend**: `ImprovementAction` model (`improvement_actions` table) is the core unit. Router `improvement_actions.py` at prefix `/improvement` (NOT the deprecated `/perf-os`): `GET|POST /improvement/actions`, `GET|PUT|DELETE /improvement/actions/{id}`, `POST /improvement/actions/{id}/select-focus|clear-focus`, `GET /improvement/daily-focus/{date}` → `{focus, backlog}`.
+- **Statuses**: suggested/active/kept/broken/retired. **Contract types**: no_early_entry/max_trades/cooldown_after_loss/stop_not_widened/manual_check.
+- **Daily Focus Action**: exactly one per `due_session` date (`is_daily_focus`). `select-focus` clears any prior focus for that date and promotes a `suggested` action to `active`.
+- **Frontend**: `DailyFocusPanel` (`features-v3/cockpit/components/`) renders inside the Cockpit after the Edge feed; hooks in `features-v3/cockpit/hooks/useImprovementActions.ts`. Manual-first — no suggestion/verification engine, no AI dependency.
+
 ## Broker trade import
 - **Router**: `backend/app/routers/broker_import.py` — at `/api/v1/trades`, registered **before** trades router
   - `GET /trades/brokers` — list supported brokers
