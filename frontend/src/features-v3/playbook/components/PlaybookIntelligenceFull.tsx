@@ -23,7 +23,11 @@ import type {
   PlaybookOverviewSetup, SetupIntelligenceResponse, TacticPerformance, RecentTrade,
 } from '@/types'
 
-const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
+// Canonical new-ui card surface (tjv3-card = Card primitive styling: --tj-surface,
+// --tj-border, --tj-radius-panel, --tj-shadow-subtle, --tj-space-card padding).
+// Used as a class (not the <Card> component) because some of these surfaces are
+// rendered on <button> elements for accessibility.
+const CARD = 'tjv3-card animate-card-in'
 
 function ScoreChip({ label, value, suffix }: { label: string; value: string | number | null; suffix?: string }) {
   if (value == null) return null

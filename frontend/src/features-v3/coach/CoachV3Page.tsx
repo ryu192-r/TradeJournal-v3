@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Calendar, Clock, History, Loader2, MessageSquare, Sparkles, Target, Trash2 } from 'lucide-react'
-import { EmptyState, ErrorState, Page, Panel, Skeleton, Stack } from '@/new-ui'
+import { Button, Card, EmptyState, ErrorState, Page, Panel, Skeleton, Stack, Tabs } from '@/new-ui'
 import {
   generateDailyReview, generateWeeklyReview,
   askCoach, listCoachReviews, deleteCoachReview, generateTradeReview,
@@ -246,12 +246,11 @@ export function CoachV3Page() {
                   <input type="date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)}
                     className="rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
                 </div>
-                <button type="button" onClick={handleDaily} disabled={loading}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+                <Button variant="primary" onClick={handleDaily} disabled={loading}>
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate</>}
-                </button>
+                </Button>
               </div>
-              {dailyResult && <div className="p-4 rounded-xl border border-border bg-bg-elevated/20"><Markdown text={dailyResult} /></div>}
+              {dailyResult && <Card variant="muted"><Markdown text={dailyResult} /></Card>}
             </Stack>
           </Panel>
         )
@@ -271,12 +270,11 @@ export function CoachV3Page() {
                   <input type="date" value={weekEnd} onChange={(e) => setWeekEnd(e.target.value)}
                     className="rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-xs text-text-heading focus:outline-none focus:border-accent/50" />
                 </div>
-                <button type="button" onClick={handleWeekly} disabled={loading}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+                <Button variant="primary" onClick={handleWeekly} disabled={loading}>
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate</>}
-                </button>
+                </Button>
               </div>
-              {weeklyResult && <div className="p-4 rounded-xl border border-border bg-bg-elevated/20"><Markdown text={weeklyResult} /></div>}
+              {weeklyResult && <Card variant="muted"><Markdown text={weeklyResult} /></Card>}
             </Stack>
           </Panel>
         )
@@ -289,12 +287,11 @@ export function CoachV3Page() {
                 placeholder="e.g. Why do I tend to lose on reversal setups? or What can I improve about my exit timing?"
                 className="w-full rounded-lg border border-border bg-bg-elevated/50 px-3 py-2 text-[length:var(--text-sm)] text-text-heading placeholder:text-text-faint focus:outline-none focus:border-accent/50 transition-all resize-none" />
               <div className="flex justify-end">
-                <button type="button" onClick={handleAsk} disabled={loading || !question.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+                <Button variant="primary" onClick={handleAsk} disabled={loading || !question.trim()}>
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Thinking...</> : <><MessageSquare className="w-4 h-4" /> Ask Coach</>}
-                </button>
+                </Button>
               </div>
-              {askResult && <div className="p-4 rounded-xl border border-border bg-bg-elevated/20"><Markdown text={askResult} /></div>}
+              {askResult && <Card variant="muted"><Markdown text={askResult} /></Card>}
             </Stack>
           </Panel>
         )
@@ -320,11 +317,9 @@ export function CoachV3Page() {
                       ))}
                   </select>
                 </div>
-                <button type="button" onClick={handleTradeReview}
-                  disabled={!reviewTradeId || reviewLoading}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[length:var(--text-sm)] font-medium bg-accent text-white hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50">
+                <Button variant="primary" onClick={handleTradeReview} disabled={!reviewTradeId || reviewLoading}>
                   {reviewLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</> : <><Target className="w-4 h-4" /> Review Trade</>}
-                </button>
+                </Button>
               </div>
               {reviewLoading && (
                 <div className="flex items-center gap-2 py-6 justify-center">
@@ -389,24 +384,23 @@ export function CoachV3Page() {
     <Page title="AI Coach" subtitle="Personalized trading insights powered by AI">
       <Stack gap="lg">
         {/* Tab bar */}
-        <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
-          {TABS.map((t) => {
+        <Tabs
+          ariaLabel="AI Coach sections"
+          value={tab}
+          onChange={(v) => { setTab(v as Tab); setError(null) }}
+          items={TABS.map((t) => {
             const Icon = t.icon
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => { setTab(t.id); setError(null) }}
-                className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-[length:var(--text-xs)] font-medium transition-colors cursor-pointer ${
-                  tab === t.id ? 'bg-accent text-white' : 'bg-bg-elevated/50 text-text-muted hover:text-text-heading hover:bg-bg-card-h'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {t.label}
-              </button>
-            )
+            return {
+              value: t.id,
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </span>
+              ),
+            }
           })}
-        </div>
+        />
 
         {/* Error banner */}
         {error && (

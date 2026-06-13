@@ -25,7 +25,7 @@ export function SetupRegimePerformanceSection({ regimePerf }: { regimePerf: Setu
       {(best || worst) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {best && regimePerf.best_regime && (
-            <div className="rounded-xl border border-border p-3">
+            <div className="tjv3-card tjv3-card--muted p-3">
               <div className="text-[10px] text-text-muted font-data flex items-center gap-1">
                 <TrendingUp className="w-3 h-3 text-profit" /> Best regime
               </div>
@@ -35,7 +35,7 @@ export function SetupRegimePerformanceSection({ regimePerf }: { regimePerf: Setu
             </div>
           )}
           {worst && regimePerf.worst_regime && (
-            <div className="rounded-xl border border-border p-3">
+            <div className="tjv3-card tjv3-card--muted p-3">
               <div className="text-[10px] text-text-muted font-data flex items-center gap-1">
                 <TrendingDown className="w-3 h-3 text-loss" /> Worst regime
               </div>

@@ -8,12 +8,14 @@
 | **Initial Balance** | Starting capital set by user. Does not change unless user edits it. |
 | **Current Balance** | Actual available cash. Synced via reconciliation. |
 | **Capital Event** | A ledger entry affecting the account. Types: `deposit`, `withdrawal`, `profit`, `fee`, `adjustment`, `trade_deletion`, `pyramid`. |
-| **Net Equity (Realized)** | `initial_balance + SUM(all capital events) + SUM(closed trade PnL) + SUM(partial exit realized PnL from open trades)`. Snapshot of total value from closed positions and capital flows. |
+| **Net Equity (Realized)** | `initial_balance + SUM(capital events EXCEPT 'adjustment') + SUM(closed trade PnL) + SUM(partial exit realized PnL from open trades)`. Snapshot of total value from closed positions and capital flows. **Excludes `adjustment` events** — they are reconciliation artifacts that already encode realized PnL, so summing them on top of realized PnL would double-count. (One canonical formula; there is no separate "all events" view — `risk_dashboard`'s former `all events + realized` computation double-counted and was a bug.) |
 | **Total Equity (Unrealized)** | `net_equity + unrealized_pnl`. Includes mark-to-market of open positions using live NSE prices via `LiveQuote` table. |
 | **Unrealized PnL** | `SUM((ltp - entry_price) * remaining_qty - proportional_fees)` for all open positions with live quotes. |
 | **Equity Curve** | Daily running total of realized equity: starting from `initial_balance`, adding capital events (deposits/withdrawals), closed trade PnL, and partial exit PnL per day. |
 | **Deployed Capital** | `sum(entry_price * remaining_qty)` for all open trades. Capital locked in positions. |
 | **Available Capital** | `net_equity - deployed_capital`. Cash available for new trades. |
+| **Account Equity** *(module)* | The single deep module that computes an account's money snapshot. Interface: `equity_snapshot(db, user_id) -> EquitySnapshot`. Built on the realized-PnL seam (`utils/pnl_helpers`) and `LiveQuote`. Every consumer (reconcile, operational/capital/risk dashboards, actions inbox) reads it instead of recomputing. Backend: `backend/app/services/account_equity.py`. |
+| **Equity Snapshot** | The value `Account Equity` returns: `initial_balance`, `capital_flow` (sum of non-`adjustment` events), `realized_pnl`, `net_equity`, `deployed_capital`, `available_capital`, `unrealized_pnl`, `total_equity`. One computation, many readers. |
 | **Reconciliation** | Process to sync `current_balance` with computed value. Creates `adjustment` event for any delta. |
 | **Trade** | A position in a symbol. Status is auto-computed: Open (no exit_price) or Closed (has exit_price). |
 | **Open Trade** | Trade with no exit price (`exit_price IS NULL`). Consumes deployed capital. Can be pyramided. Badge: neutral grey. |
@@ -86,17 +88,20 @@ if delta != 0: create adjustment event with amount = delta
 
 ## Net Equity Formulas
 
-### Operational Dashboard (realized only)
+### Net Equity (Realized) — canonical, single formula
 ```
-net_equity = initial_balance + SUM(all capital_events) + SUM(closed_trade_pnl) + SUM(partial_exit_realized_pnl)
+net_equity = initial_balance
+           + SUM(capital_event.amount WHERE event_type != 'adjustment')
+           + SUM(closed_trade_pnl)
+           + SUM(partial_exit_realized_pnl from open trades)
 ```
-Note: uses ALL capital event types (deposit, withdrawal, adjustment, trade_deletion, pyramid, profit, fee).
+- **Include** all user-originated events: `deposit`, `withdrawal`, `profit`, `fee` (amounts are signed; withdrawals/fees stored negative).
+- **Exclude** `adjustment` — a reconciliation artifact. `current_balance` is maintained as `initial + SUM(all events)`, so the accumulated `adjustment` events already absorb `realized − deployed`. Adding realized PnL on top of them double-counts.
+- `trade_deletion` and `pyramid` event types appear in the schema's valid-set but are **vestigial** — nothing creates them. Soft-deleted trades drop out of realized PnL via `status != 'deleted'`; pyramids live in `PyramidEntry`/`TradeTimeline`.
+- Realized PnL must come from the realized-PnL seam (`utils/pnl_helpers.get_realized_pnl_events`), not re-queried per consumer.
 
-### Capital Dashboard (deposits/withdrawals only for curve)
-```
-net_equity = initial_balance + (deposits - withdrawals) + realized_pnl
-```
-Note: equity curve only includes deposit/withdrawal events, not adjustments (which are reconciliation artifacts).
+### Equity Curve (time-series, separate concern)
+The daily equity **curve** is a running total seeded at `initial_balance`, adding only `deposit`/`withdrawal` events plus realized PnL per day. It deliberately omits `adjustment` (artifact) and `profit`/`fee` (rare, undated relative to the curve) so the line tracks external cash flow + trading result. This is a presentation choice for the chart, not a second net-equity definition.
 
 ### Total Equity (unrealized)
 ```

@@ -323,50 +323,32 @@ def _compute_behavior_crossover(db: Session, trades: list[Trade]) -> dict:
 
 
 def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) -> list[dict]:
-    if not playbook.tactics:
-        tactic_trades: dict[str, list] = defaultdict(list)
-        for t in trades:
-            if t.tactic:
-                tactic_trades[t.tactic].append(t)
+    """Break down performance by the trade's actual executed tactic.
 
-        results = []
-        for tactic_name, tactic_trades_list in tactic_trades.items():
-            closed = [t for t in tactic_trades_list if t.exit_price is not None and t.pnl is not None]
-            if not closed:
-                results.append({"tactic": tactic_name, "trade_count": len(tactic_trades_list), "closed_count": 0})
-                continue
-            pnls = [t.pnl for t in closed]
-            wins = [p for p in pnls if p > 0]
-            results.append({
-                "tactic": tactic_name,
-                "trade_count": len(tactic_trades_list),
-                "closed_count": len(closed),
-                "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
-                "avg_pnl": round(sum(pnls) / len(pnls), 2) if pnls else None,
-                "total_pnl": round(sum(pnls), 2),
-            })
-        return results
+    Trades are tagged with a tactic from the global tactic vocabulary (ORB, PDH,
+    Intraday Reversal, ...), which is independent of the per-setup playbook
+    ``tactics`` definitions. We group by the real ``trade.tactic`` value so every
+    tactic the trader actually used shows up with its own stats.
 
-    tactic_names = [t.get("name") if isinstance(t, dict) else t.name for t in playbook.tactics]
-    tactic_trades = {name: [] for name in tactic_names}
-    uncategorized = []
+    Previously this matched trade tactics against the playbook's free-form tactic
+    names and dumped everything that didn't match into an "Other" bucket — which
+    meant tagged trades (ORB, Intraday Reversal, ...) all showed as "Other"
+    whenever a setup's playbook tactics differed from the global vocabulary.
 
+    The ``playbook`` argument is retained for call-site compatibility.
+    """
+    tactic_trades: dict[str, list] = defaultdict(list)
     for t in trades:
-        if t.tactic and t.tactic in tactic_names:
+        if t.tactic:
             tactic_trades[t.tactic].append(t)
-        else:
-            uncategorized.append(t)
 
     results = []
-    for name in tactic_names:
-        t_list = tactic_trades[name]
+    for tactic_name, t_list in tactic_trades.items():
         closed = [t for t in t_list if t.exit_price is not None and t.pnl is not None]
-        if not t_list:
-            continue
-        pnls = [t.pnl for t in closed] if closed else []
+        pnls = [t.pnl for t in closed]
         wins = [p for p in pnls if p > 0]
         results.append({
-            "tactic": name,
+            "tactic": tactic_name,
             "trade_count": len(t_list),
             "closed_count": len(closed),
             "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
@@ -374,19 +356,7 @@ def _compute_tactic_performance(trades: list[Trade], playbook: SetupPlaybook) ->
             "total_pnl": round(sum(pnls), 2) if pnls else None,
         })
 
-    if uncategorized:
-        closed = [t for t in uncategorized if t.exit_price is not None and t.pnl is not None]
-        pnls = [t.pnl for t in closed] if closed else []
-        wins = [p for p in pnls if p > 0]
-        results.append({
-            "tactic": "Other",
-            "trade_count": len(uncategorized),
-            "closed_count": len(closed),
-            "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else None,
-            "avg_pnl": round(sum(pnls) / len(pnls), 2) if pnls else None,
-            "total_pnl": round(sum(pnls), 2) if pnls else None,
-        })
-
+    results.sort(key=lambda r: r["trade_count"], reverse=True)
     return results
 
 

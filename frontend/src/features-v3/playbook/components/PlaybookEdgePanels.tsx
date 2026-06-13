@@ -1,7 +1,8 @@
 import type { SetupEdgeMetrics, SetupConditionBreakdown } from '@/types/playbookEdge'
 import { Badge } from '@/new-ui'
 
-const CARD = 'bg-card rounded-2xl border border-border p-[var(--page-px)] animate-card-in'
+// Canonical new-ui card surface (tjv3-card = Card primitive styling).
+const CARD = 'tjv3-card animate-card-in'
 
 const STATUS_STYLES = {
   FOCUS: 'success',
