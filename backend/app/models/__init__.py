@@ -16,7 +16,7 @@ from .emotion_log import EmotionLog
 from .execution_grade import ExecutionGrade
 from .market_snapshot import MarketSnapshot
 from .live_quote import LiveQuote
-from .performance_os import DailyWorkflow, WeeklyReview, MonthlyReview
+from .performance_os import DailyWorkflow, WeeklyReview, MonthlyReview, ImprovementAction
 from .refresh_token import RefreshToken
 from .webhook_event import WebhookEvent
 from .market_candle import MarketCandle
@@ -46,6 +46,7 @@ __all__ = [
     'DailyWorkflow',
     'WeeklyReview',
     'MonthlyReview',
+    'ImprovementAction',
     'RefreshToken',
     'WebhookEvent',
     'MarketCandle',

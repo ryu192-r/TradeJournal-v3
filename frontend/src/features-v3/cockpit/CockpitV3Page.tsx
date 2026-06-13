@@ -8,6 +8,7 @@ import { CockpitCommandHeader } from './components/CockpitCommandHeader'
 import { CockpitDrawerPreview } from './components/CockpitDrawerPreview'
 import { CockpitEdgeFeed } from './components/CockpitEdgeFeed'
 import { CockpitPerformanceDeck } from './components/CockpitPerformanceDeck'
+import { DailyFocusPanel } from './components/DailyFocusPanel'
 import { OpenRiskBoard } from './components/OpenRiskBoard'
 import { ReviewActionCenter } from './components/ReviewActionCenter'
 import { RiskIntelligencePanel } from './components/RiskIntelligencePanel'
@@ -95,6 +96,8 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
         <CockpitPerformanceDeck metrics={metrics} />
 
         <CockpitEdgeFeed dataEnabled={dataEnabled} />
+
+        <DailyFocusPanel dataEnabled={dataEnabled} />
 
         {!dataEnabled && (
           <Panel
