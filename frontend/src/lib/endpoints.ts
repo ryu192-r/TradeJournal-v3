@@ -10,11 +10,6 @@ import type {
   SetupPlaybookItem, SetupPlaybookListResponse,
   SetupPlaybookCreatePayload, SetupPlaybookUpdatePayload,
 } from '@/types/setupPlaybook'
-import type {
-  TradeIdeaItem, TradeIdeaListResponse,
-  TradeIdeaCreatePayload, TradeIdeaUpdatePayload,
-  ConvertToTradePayload, ConvertToTradeResponse, TradeIdeaStatus,
-} from '@/types/tradeIdea'
 import type { AiConfigResponse, AIProviderInfo, AiConfigSaveRequest, TestResponse } from '@/types/ai'
 import type {
   CoachReviewResponse, CoachReviewListResponse,
@@ -179,36 +174,7 @@ export function seedSetups() {
 }
 
 // ────────────────────────── Ideas ──────────────────────────
-
-export function listIdeas(status?: TradeIdeaStatus, symbol?: string, direction?: string, confidence?: string) {
-  const params = new URLSearchParams()
-  if (status) params.append('status', status)
-  if (symbol) params.append('symbol', symbol)
-  if (direction) params.append('direction', direction)
-  if (confidence) params.append('confidence', confidence)
-  const qs = params.toString()
-  return apiClient.get<TradeIdeaListResponse>('/ideas/' + (qs ? `?${qs}` : '')).then(r => r.data)
-}
-
-export function getIdea(id: number) {
-  return apiClient.get<TradeIdeaItem>(`/ideas/${id}`).then(r => r.data)
-}
-
-export function createIdea(payload: TradeIdeaCreatePayload) {
-  return apiClient.post<TradeIdeaItem>('/ideas/', payload).then(r => r.data)
-}
-
-export function updateIdea(id: number, payload: TradeIdeaUpdatePayload) {
-  return apiClient.put<TradeIdeaItem>(`/ideas/${id}`, payload).then(r => r.data)
-}
-
-export async function deleteIdea(id: number): Promise<void> {
-  await apiClient.delete(`/ideas/${id}`)
-}
-
-export function convertIdeaToTrade(id: number, payload: ConvertToTradePayload) {
-  return apiClient.post<ConvertToTradeResponse>(`/ideas/${id}/trade`, payload).then(r => r.data)
-}
+// Removed in issue #67 — trade_ideas table + /ideas router dropped.
 
 // ────────────────────────── AI ──────────────────────────
 
