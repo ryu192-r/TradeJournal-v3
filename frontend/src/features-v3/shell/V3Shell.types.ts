@@ -15,6 +15,7 @@ export type V3PreviewSectionId =
   | 'settings'
   | 'charges'
   | 'coach'
+  | 'improvement'
   | 'more'
 
 export interface V3NavigationItem {
