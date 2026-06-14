@@ -10,9 +10,21 @@ export function EstimateVsActualCard({ comparison }: EstimateVsActualCardProps) 
   const { estimated, actual, difference, differencePct, status } = comparison
 
   const statusStyles: Record<string, { bg: string; color: string; label: string }> = {
-    close: { bg: 'rgba(34,197,94,0.1)', color: 'var(--color-profit)', label: DHAN_ESTIMATE_COPY.comparison.close },
-    review: { bg: 'rgba(234,179,8,0.1)', color: 'var(--color-warning)', label: DHAN_ESTIMATE_COPY.comparison.review },
-    large: { bg: 'rgba(239,68,68,0.1)', color: 'var(--color-loss)', label: DHAN_ESTIMATE_COPY.comparison.large },
+    close: {
+      bg: 'color-mix(in srgb, var(--color-profit) 10%, transparent)',
+      color: 'var(--color-profit)',
+      label: DHAN_ESTIMATE_COPY.comparison.close,
+    },
+    review: {
+      bg: 'color-mix(in srgb, var(--color-warning) 10%, transparent)',
+      color: 'var(--color-warning)',
+      label: DHAN_ESTIMATE_COPY.comparison.review,
+    },
+    large: {
+      bg: 'color-mix(in srgb, var(--color-loss) 10%, transparent)',
+      color: 'var(--color-loss)',
+      label: DHAN_ESTIMATE_COPY.comparison.large,
+    },
   }
 
   const s = statusStyles[status]

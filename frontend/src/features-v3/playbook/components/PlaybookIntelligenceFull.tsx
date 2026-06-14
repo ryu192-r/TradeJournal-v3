@@ -289,7 +289,7 @@ function BehaviorCrossoverSection({ behavior }: { behavior: SetupIntelligenceRes
           <div className="text-[length:var(--text-xs)] text-text-muted mb-2 font-medium">Grade performance</div>
           <div className="space-y-1">
             {behavior.grade_breakdown.map((g) => {
-              const gradeColor = g.grade === 'A' || g.grade === 'B' ? 'text-profit' : g.grade === 'F' ? 'text-loss' : 'text-amber-400'
+              const gradeColor = g.grade === 'A' || g.grade === 'B' ? 'text-profit' : g.grade === 'F' ? 'text-loss' : 'text-gold'
               return (
                 <div key={g.grade} className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0">
                   <span className={`font-bold font-data text-base ${gradeColor}`}>{g.grade}</span>
@@ -420,7 +420,7 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">
-            <Target className="w-4 h-4 text-emerald-400" />
+            <Target className="w-4 h-4 text-profit" />
             <h4 className="text-xs font-medium text-text-heading">Performance</h4>
           </div>
           <PerformanceSection perf={data.performance} />
@@ -428,7 +428,7 @@ function SetupDetailPanel({ setupName, onClose }: { setupName: string; onClose: 
 
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-blue-400" />
+            <Clock className="w-4 h-4 text-accent" />
             <h4 className="text-xs font-medium text-text-heading">Ideal Hold Time</h4>
           </div>
           <HoldTimeSection holdTime={data.hold_time} />

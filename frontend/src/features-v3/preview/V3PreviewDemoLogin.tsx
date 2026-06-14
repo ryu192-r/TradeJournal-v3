@@ -92,15 +92,15 @@ const inputStyle = {
   marginTop: '0.4rem',
   border: '1px solid var(--tj-border)',
   borderRadius: 'var(--tj-radius-md)',
-  background: 'rgba(148, 163, 184, 0.08)',
+  background: 'color-mix(in srgb, var(--tj-text-secondary) 8%, transparent)',
   color: 'var(--tj-text-primary)',
   padding: '0.6rem 0.7rem',
 } as const
 
 const errorStyle = {
-  border: '1px solid rgba(251, 113, 133, 0.32)',
+  border: '1px solid color-mix(in srgb, var(--tj-loss) 32%, transparent)',
   borderRadius: 'var(--tj-radius-md)',
-  background: 'rgba(251, 113, 133, 0.1)',
-  color: '#fecdd3',
+  background: 'color-mix(in srgb, var(--tj-loss) 10%, transparent)',
+  color: 'var(--tj-loss)',
   padding: '0.6rem 0.7rem',
 } as const
