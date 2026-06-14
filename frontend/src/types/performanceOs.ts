@@ -194,3 +194,15 @@ export interface DailyFocus {
   focus: ImprovementAction | null
   backlog: ImprovementAction[]
 }
+
+export type VerificationResultKind = 'kept' | 'broken' | 'manual'
+
+export interface VerificationResult {
+  action_id: number
+  contract_type: ImprovementContractType
+  session: string | null
+  result: VerificationResultKind
+  summary: string
+  evidence: Record<string, unknown>
+  requires_confirmation: boolean
+}

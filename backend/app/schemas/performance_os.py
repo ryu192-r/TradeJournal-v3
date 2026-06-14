@@ -228,3 +228,20 @@ class DailyFocusResponse(BaseModel):
     date: date
     focus: Optional[ImprovementActionResponse] = None
     backlog: list[ImprovementActionResponse] = []
+
+
+
+class VerificationResultResponse(BaseModel):
+    """Preselected verification outcome for a Daily Focus Action.
+
+    `result`: 'kept' | 'broken' | 'manual'. 'manual' means the engine could not
+    decide (manual_check, missing params, or unknown contract type) and the
+    user must pick. `requires_confirmation` is True only for the 'manual' case.
+    """
+    action_id: int
+    contract_type: str
+    session: Optional[date] = None
+    result: str
+    summary: str
+    evidence: dict
+    requires_confirmation: bool

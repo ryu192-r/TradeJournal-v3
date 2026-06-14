@@ -715,3 +715,10 @@ export function getDailyFocus(date: string) {
 export function generateImprovementSuggestions(days = 30) {
   return apiClient.post<IA[]>('/improvement/suggestions/generate', null, { params: { days } }).then(r => r.data)
 }
+
+export function verifyImprovementAction(id: number, session?: string) {
+  return apiClient.get<import('@/types/performanceOs').VerificationResult>(
+    `/improvement/actions/${id}/verify`,
+    { params: session ? { session } : undefined },
+  ).then(r => r.data)
+}

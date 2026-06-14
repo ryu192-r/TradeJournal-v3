@@ -10,6 +10,7 @@ import { CockpitEdgeFeed } from './components/CockpitEdgeFeed'
 import { CockpitPerformanceDeck } from './components/CockpitPerformanceDeck'
 import { DailyFocusPanel } from './components/DailyFocusPanel'
 import { SuggestionsPanel } from './components/SuggestionsPanel'
+import { VerifyFocusPanel } from './components/VerifyFocusPanel'
 import { OpenRiskBoard } from './components/OpenRiskBoard'
 import { ReviewActionCenter } from './components/ReviewActionCenter'
 import { RiskIntelligencePanel } from './components/RiskIntelligencePanel'
@@ -99,6 +100,8 @@ export function CockpitV3Page({ dataEnabled = true }: CockpitV3PageProps) {
         <CockpitEdgeFeed dataEnabled={dataEnabled} />
 
         <DailyFocusPanel dataEnabled={dataEnabled} />
+
+        <VerifyFocusPanel dataEnabled={dataEnabled} />
 
         <SuggestionsPanel dataEnabled={dataEnabled} />
 

@@ -39,6 +39,7 @@ vi.mock('../hooks/useImprovementActions', () => ({
   useSelectDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
   useClearDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
   useGenerateSuggestions: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useVerifyImprovementAction: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {
