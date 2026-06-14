@@ -32,11 +32,13 @@ vi.mock('@/hooks/useEdgeCommandCenterQuery', () => ({
 
 vi.mock('../hooks/useImprovementActions', () => ({
   useDailyFocus: mocks.useDailyFocus,
+  useImprovementActions: () => ({ data: [], isLoading: false }),
   useCreateImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
-  useUpdateImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateImprovementAction: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useDeleteImprovementAction: () => ({ mutate: vi.fn(), isPending: false }),
   useSelectDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
   useClearDailyFocus: () => ({ mutate: vi.fn(), isPending: false }),
+  useGenerateSuggestions: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 function trade(overrides: Partial<ApiTrade>): ApiTrade {

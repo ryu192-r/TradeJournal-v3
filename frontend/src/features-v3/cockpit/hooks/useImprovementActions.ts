@@ -6,13 +6,17 @@ import {
   selectDailyFocus,
   clearDailyFocus,
   getDailyFocus,
+  generateImprovementSuggestions,
+  listImprovementActions,
 } from '@/lib/endpoints'
 import type {
   ImprovementActionCreate,
   ImprovementActionUpdate,
+  ImprovementActionStatus,
 } from '@/types/performanceOs'
 
 const DAILY_FOCUS_KEY = 'daily-focus'
+const ACTIONS_KEY = 'improvement-actions'
 
 export function useDailyFocus(date: string, enabled = true) {
   return useQuery({
@@ -26,7 +30,28 @@ export function useDailyFocus(date: string, enabled = true) {
 
 function useInvalidateFocus() {
   const qc = useQueryClient()
-  return () => qc.invalidateQueries({ queryKey: [DAILY_FOCUS_KEY] })
+  return () => {
+    void qc.invalidateQueries({ queryKey: [DAILY_FOCUS_KEY] })
+    void qc.invalidateQueries({ queryKey: [ACTIONS_KEY] })
+  }
+}
+
+export function useImprovementActions(status?: ImprovementActionStatus, enabled = true) {
+  return useQuery({
+    queryKey: [ACTIONS_KEY, status ?? 'all'],
+    queryFn: () => listImprovementActions(status),
+    enabled,
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+export function useGenerateSuggestions() {
+  const invalidate = useInvalidateFocus()
+  return useMutation({
+    mutationFn: (days: number = 30) => generateImprovementSuggestions(days),
+    onSuccess: invalidate,
+  })
 }
 
 export function useCreateImprovementAction() {

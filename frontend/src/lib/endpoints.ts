@@ -711,3 +711,7 @@ export function clearDailyFocus(id: number) {
 export function getDailyFocus(date: string) {
   return apiClient.get<import('@/types/performanceOs').DailyFocus>(`/improvement/daily-focus/${date}`).then(r => r.data)
 }
+
+export function generateImprovementSuggestions(days = 30) {
+  return apiClient.post<IA[]>('/improvement/suggestions/generate', null, { params: { days } }).then(r => r.data)
+}
