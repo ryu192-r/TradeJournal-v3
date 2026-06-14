@@ -112,7 +112,7 @@ export function ChargesLedgerPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(0,0,0,0.4)',
+            background: 'var(--tj-backdrop)',
           }}
           onClick={() => setDeleteConfirmDate(null)}
         >

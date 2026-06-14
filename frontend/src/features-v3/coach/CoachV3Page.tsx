@@ -38,7 +38,7 @@ function Markdown({ text }: { text: string }) {
 const VERDICT_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   excellent_execution: { bg: 'bg-profit-muted/20 border-profit/30', text: 'text-profit', label: 'Excellent Execution' },
   good_execution: { bg: 'bg-profit-muted/10 border-profit/20', text: 'text-profit', label: 'Good Execution' },
-  flawed_but_profitable: { bg: 'bg-amber-500/10 border-amber-400/30', text: 'text-amber-400', label: 'Flawed but Profitable' },
+  flawed_but_profitable: { bg: 'bg-gold-faint border-gold/30', text: 'text-gold', label: 'Flawed but Profitable' },
   poor_execution: { bg: 'bg-loss-muted/10 border-loss/20', text: 'text-loss', label: 'Poor Execution' },
   disaster: { bg: 'bg-loss-muted/20 border-loss/40', text: 'text-loss', label: 'Disaster' },
 }
@@ -69,22 +69,22 @@ function TradeReviewResult({ review }: { review: TradeReviewResponse }) {
               <span className="text-[length:var(--text-xs)] text-text-muted w-32 min-w-[8rem]">{label}</span>
               <div className="flex-1 h-2 bg-bg-elevated rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${score >= 7 ? 'bg-profit' : score >= 4 ? 'bg-amber-400' : 'bg-loss'}`}
+                  className={`h-full rounded-full transition-all ${score >= 7 ? 'bg-profit' : score >= 4 ? 'bg-gold' : 'bg-loss'}`}
                   style={{ width: `${(score / maxScore) * 100}%` }}
                 />
               </div>
-              <span className={`text-xs font-data w-6 text-right ${score >= 7 ? 'text-profit' : score >= 4 ? 'text-amber-400' : 'text-loss'}`}>{score}</span>
+              <span className={`text-xs font-data w-6 text-right ${score >= 7 ? 'text-profit' : score >= 4 ? 'text-gold' : 'text-loss'}`}>{score}</span>
             </div>
           ))}
           <div className="flex items-center gap-3 pt-2 border-t border-border">
             <span className="text-[length:var(--text-xs)] font-medium text-text-heading w-32 min-w-[8rem]">Overall</span>
             <div className="flex-1 h-2.5 bg-bg-elevated rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${review.scores.overall >= 7 ? 'bg-profit' : review.scores.overall >= 4 ? 'bg-amber-400' : 'bg-loss'}`}
+                className={`h-full rounded-full ${review.scores.overall >= 7 ? 'bg-profit' : review.scores.overall >= 4 ? 'bg-gold' : 'bg-loss'}`}
                 style={{ width: `${(review.scores.overall / maxScore) * 100}%` }}
               />
             </div>
-            <span className={`text-sm font-bold font-data w-6 text-right ${review.scores.overall >= 7 ? 'text-profit' : review.scores.overall >= 4 ? 'text-amber-400' : 'text-loss'}`}>{review.scores.overall}</span>
+            <span className={`text-sm font-bold font-data w-6 text-right ${review.scores.overall >= 7 ? 'text-profit' : review.scores.overall >= 4 ? 'text-gold' : 'text-loss'}`}>{review.scores.overall}</span>
           </div>
         </div>
       </Panel>
