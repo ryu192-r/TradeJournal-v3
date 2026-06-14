@@ -50,6 +50,9 @@ const CapitalV3Page = lazy(() =>
 const LifecycleV3Page = lazy(() =>
   import('../lifecycle').then((m) => ({ default: m.LifecycleV3Page })),
 )
+const ImprovementV3Page = lazy(() =>
+  import('../improvement').then((m) => ({ default: m.ImprovementV3Page })),
+)
 
 function ViewFallback() {
   return (
@@ -204,6 +207,12 @@ export function V3LiveApp({ mode = 'live' }: V3LiveAppProps) {
         return (
           <ErrorBoundary name="CoachV3">
             <CoachV3Page />
+          </ErrorBoundary>
+        )
+      case 'improvement':
+        return (
+          <ErrorBoundary name="ImprovementV3">
+            <ImprovementV3Page dataEnabled />
           </ErrorBoundary>
         )
       case 'journal':

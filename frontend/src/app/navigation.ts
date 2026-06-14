@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Receipt,
   Sparkles,
+  Target,
   TrendingUp,
   Settings,
   Upload,
@@ -30,6 +31,7 @@ export type ActiveView =
   | 'reports'
   | 'lifecycle'
   | 'charges'
+  | 'improvement'
 
 export type NavigationItem = {
   id: string
@@ -83,6 +85,14 @@ const reviewItem: NavigationItem = {
   purpose: 'Review queue for trades that need notes, grades, or cleanup.',
 }
 
+const improvementItem: NavigationItem = {
+  id: 'improvement',
+  label: 'Improvement',
+  icon: Target,
+  view: 'improvement',
+  purpose: 'Trading Improvement Loop command center: Now, Focus, Next Move, Backlog.',
+}
+
 const analyticsItem: NavigationItem = {
   id: 'analytics',
   label: 'Analytics',
@@ -121,6 +131,7 @@ export const desktopNavigationItems = [
   tradesItem,
   calendarItem,
   reviewItem,
+  improvementItem,
   analyticsItem,
   playbookItem,
   settingsItem,
@@ -207,7 +218,7 @@ export const navigationSections: NavigationSection[] = [
   {
     id: 'today',
     label: 'Today',
-    items: [dashboardItem, tradesItem, calendarItem, journalItem, reviewItem],
+    items: [dashboardItem, tradesItem, calendarItem, journalItem, reviewItem, improvementItem],
   },
   {
     id: 'insight',
