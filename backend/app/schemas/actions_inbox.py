@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 ActionSeverity = Literal["info", "warning", "critical"]
 ActionStatus = Literal["open", "dismissed", "completed"]
-ActionSource = Literal["trade", "journal", "risk", "system", "edge", "review"]
+ActionSource = Literal["trade", "journal", "risk", "system", "edge", "review", "improvement"]
 ActionTier = Literal["simple", "pro"]
 ActionType = Literal[
     "trade_review",
@@ -19,6 +19,7 @@ ActionType = Literal[
     "suggestion",
     "notification",
     "system",
+    "focus_reminder",
 ]
 
 

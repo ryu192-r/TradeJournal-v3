@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.models.daily_journal import DailyJournal
+from app.models.performance_os import ImprovementAction
 from app.models.trade import Trade
 from app.schemas.actions_inbox import (
     ActionInboxSection,
@@ -249,6 +250,72 @@ def _journal_rule_actions(db: Session, user_id: int, created_at: str) -> list[Ac
     ]
 
 
+def _improvement_focus_reminders(db: Session, user_id: int, created_at: str) -> list[ActionItem]:
+    """Reminder-only items for the Improvement Loop (issue #73).
+
+    Read-only — never creates or owns Improvement Actions. Two kinds:
+      1. Today's Daily Focus is set + still active → "Focus today" reminder.
+      2. Active focus from a past session that was never reviewed (status still
+         'active' after its due_session date) → "Overdue review" reminder.
+
+    Both reminders navigate to the Improvement page (view='improvement').
+    """
+    today = date.today()
+    items: list[ActionItem] = []
+
+    today_focus = (
+        db.query(ImprovementAction)
+        .filter(
+            ImprovementAction.user_id == user_id,
+            ImprovementAction.is_daily_focus.is_(True),
+            ImprovementAction.due_session == today,
+            ImprovementAction.status == "active",
+        )
+        .first()
+    )
+    if today_focus is not None:
+        items.append(ActionItem(
+            id=f"improvement-focus-{today_focus.id}-{today.isoformat()}",
+            type="focus_reminder",
+            title=f"Today's Focus: {today_focus.title}",
+            description=(today_focus.description or "Verify the contract at end of session.")[:500],
+            severity="info",
+            source="improvement",
+            created_at=created_at,
+            target=ActionTarget(view="improvement"),
+            tier="simple",
+        ))
+
+    overdue = (
+        db.query(ImprovementAction)
+        .filter(
+            ImprovementAction.user_id == user_id,
+            ImprovementAction.is_daily_focus.is_(True),
+            ImprovementAction.status == "active",
+            ImprovementAction.due_session.isnot(None),
+            ImprovementAction.due_session < today,
+        )
+        .all()
+    )
+    for action in overdue:
+        items.append(ActionItem(
+            id=f"improvement-overdue-{action.id}-{action.due_session.isoformat()}",
+            type="focus_reminder",
+            title=f"Overdue review: {action.title}",
+            description=(
+                f"Daily Focus from {action.due_session.isoformat()} is still active. "
+                "Mark it kept or broken in the Improvement page."
+            ),
+            severity="warning",
+            source="improvement",
+            created_at=created_at,
+            target=ActionTarget(view="improvement"),
+            tier="simple",
+        ))
+
+    return items
+
+
 def _collect_all_items(db: Session, user_id: int) -> list[ActionItem]:
     created_at = _now_iso()
     items: list[ActionItem] = []
@@ -420,6 +487,9 @@ def _collect_all_items(db: Session, user_id: int) -> list[ActionItem]:
     for item in _journal_rule_actions(db, user_id, created_at):
         add(item)
 
+    for item in _improvement_focus_reminders(db, user_id, created_at):
+        add(item)
+
     return items
 
 
@@ -431,6 +501,7 @@ def _filter_by_mode(items: list[ActionItem], mode: InterfaceMode) -> list[Action
 
 def _build_sections(items: list[ActionItem]) -> list[ActionInboxSection]:
     order = [
+        ("focus_reminder", "Improvement loop"),
         ("trade_review", "Pending trade reviews"),
         ("workflow", "Daily workflow"),
         ("journal", "Journal"),

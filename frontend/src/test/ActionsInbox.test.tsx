@@ -164,4 +164,51 @@ describe('ActionsInbox', () => {
       expect(openDetailTrade).toHaveBeenCalledWith(42)
     })
   })
+
+  it('focus_reminder navigates to improvement view', async () => {
+    const reminderResponse: ActionsInboxResponse = {
+      generated_at: '2025-05-31T12:00:00Z',
+      interface_mode: 'simple',
+      open_count: 1,
+      items: [
+        {
+          id: 'improvement-focus-1-2026-06-14',
+          type: 'focus_reminder',
+          title: "Today's Focus: Wait for confirmation",
+          severity: 'info',
+          status: 'open',
+          source: 'improvement',
+          created_at: '2026-06-14T09:00:00Z',
+          target: { view: 'improvement' },
+          tier: 'simple',
+        },
+      ],
+      sections: [
+        {
+          id: 'focus_reminder',
+          title: 'Improvement loop',
+          items: [
+            {
+              id: 'improvement-focus-1-2026-06-14',
+              type: 'focus_reminder',
+              title: "Today's Focus: Wait for confirmation",
+              severity: 'info',
+              status: 'open',
+              source: 'improvement',
+              created_at: '2026-06-14T09:00:00Z',
+              target: { view: 'improvement' },
+              tier: 'simple',
+            },
+          ],
+        },
+      ],
+    }
+    inboxState = { ...inboxState, data: reminderResponse }
+    renderInbox()
+    fireEvent.click(screen.getByRole('button', { name: /actions, 1 pending/i }))
+    fireEvent.click(screen.getByRole('button', { name: /today's focus: wait for confirmation/i }))
+    await waitFor(() => {
+      expect(setActiveView).toHaveBeenCalledWith('improvement')
+    })
+  })
 })

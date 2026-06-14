@@ -35,6 +35,7 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   suggestion: Sparkles,
   notification: ClipboardList,
   system: Bell,
+  focus_reminder: Sparkles,
 }
 
 function severityClass(severity?: string) {
