@@ -22,7 +22,9 @@ from app.schemas.performance_os import (
     ImprovementActionResponse,
     DailyFocusResponse,
     SelectFocusRequest,
+    VerificationResultResponse,
 )
+from app.services.contract_verifier import verify_contract
 from app.services.suggestion_engine import generate_suggestions, DEFAULT_WINDOW_DAYS
 from app.utils.logging import get_logger
 
@@ -218,3 +220,32 @@ def generate_improvement_suggestions(
     """
     created = generate_suggestions(db, current_user.id, window_days=days)
     return [ImprovementActionResponse.model_validate(a) for a in created]
+
+
+# ────────────────────────── Verification engine ──────────────────────────
+
+@router.get("/actions/{action_id}/verify", response_model=VerificationResultResponse)
+def verify_improvement_action(
+    action_id: int,
+    session: Optional[date_type] = Query(None, description="Override the session date (defaults to action's due_session)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Preselect kept/broken for an Improvement Action's Behavior Contract.
+
+    Evaluates the contract against real evidence (trades, stop history) for the
+    given session and returns a `VerificationResult`. Does NOT mutate the action;
+    the user confirms or overrides via PUT status='kept'|'broken'.
+    """
+    action = _get_owned_action(db, action_id, current_user.id)
+    target = session or action.due_session
+    result = verify_contract(db, action, session)
+    return VerificationResultResponse(
+        action_id=action.id,
+        contract_type=action.contract_type,
+        session=target,
+        result=result.result,
+        summary=result.summary,
+        evidence=result.evidence,
+        requires_confirmation=result.requires_confirmation,
+    )

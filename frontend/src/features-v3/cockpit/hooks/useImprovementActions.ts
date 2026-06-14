@@ -8,6 +8,7 @@ import {
   getDailyFocus,
   generateImprovementSuggestions,
   listImprovementActions,
+  verifyImprovementAction,
 } from '@/lib/endpoints'
 import type {
   ImprovementActionCreate,
@@ -92,5 +93,12 @@ export function useClearDailyFocus() {
   return useMutation({
     mutationFn: (id: number) => clearDailyFocus(id),
     onSuccess: invalidate,
+  })
+}
+
+export function useVerifyImprovementAction() {
+  return useMutation({
+    mutationFn: ({ id, session }: { id: number; session?: string }) =>
+      verifyImprovementAction(id, session),
   })
 }
