@@ -23,6 +23,7 @@ from app.schemas.performance_os import (
     DailyFocusResponse,
     SelectFocusRequest,
 )
+from app.services.suggestion_engine import generate_suggestions, DEFAULT_WINDOW_DAYS
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -196,3 +197,24 @@ def get_daily_focus(
         focus=ImprovementActionResponse.model_validate(focus) if focus else None,
         backlog=[ImprovementActionResponse.model_validate(a) for a in backlog],
     )
+
+
+# ────────────────────────── Suggestion engine ──────────────────────────
+
+@router.post("/suggestions/generate", response_model=list[ImprovementActionResponse])
+def generate_improvement_suggestions(
+    days: int = Query(DEFAULT_WINDOW_DAYS, ge=1, le=365, description="Lookback window in days"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Run the deterministic suggestion engine.
+
+    Scans the user's recent journal `rules_violated` and execution grades, then
+    creates new `suggested` Improvement Actions. Stable dedup means re-running
+    will not create duplicates. Returns only the newly-created actions.
+
+    The user must approve a suggestion (PUT status='active' or select-focus)
+    before it counts as an active behavior contract.
+    """
+    created = generate_suggestions(db, current_user.id, window_days=days)
+    return [ImprovementActionResponse.model_validate(a) for a in created]
