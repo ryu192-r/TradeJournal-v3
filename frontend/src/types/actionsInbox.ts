@@ -1,6 +1,6 @@
 export type ActionSeverity = 'info' | 'warning' | 'critical'
 export type ActionStatus = 'open' | 'dismissed' | 'completed'
-export type ActionSource = 'trade' | 'journal' | 'risk' | 'system' | 'edge' | 'review'
+export type ActionSource = 'trade' | 'journal' | 'risk' | 'system' | 'edge' | 'review' | 'improvement'
 export type ActionTier = 'simple' | 'pro'
 export type ActionType =
   | 'trade_review'
@@ -11,6 +11,7 @@ export type ActionType =
   | 'suggestion'
   | 'notification'
   | 'system'
+  | 'focus_reminder'
 
 export type ActionTarget = {
   view?: string | null
