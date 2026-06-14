@@ -110,9 +110,7 @@ TradeJournal-v3/
 | `CapitalEvent` | `capital_events` | type(deposit/withdrawal/adjustment/etc), amount, trade_id |
 | `SetupPlaybook` | `setup_playbook` | name, is_active(VARCHAR), trade_count, win_rate, avg_r |
 | `DailyJournal` | `daily_journals` | date(unique), pre/post notes, mood_rating, discipline_rating |
-| `DailyWorkflow` | `daily_workflows` | date, phase, checklist_items, watchlist_symbols |
-| `WeeklyReview` | `weekly_reviews` | week_start, trade_count, pnl_summary, notes |
-| `MonthlyReview` | `monthly_reviews` | month, trade_count, pnl_summary, notes |
+| `DailyWorkflow` | `daily_workflows` | date, phase, checklist_items, watchlist_symbols (legacy; no live router — read-only via calendar/edge) |
 | `ImprovementAction` | `improvement_actions` | title, status, due_session, contract_type, contract_params, source_evidence, is_daily_focus (ADR-025) |
 | `CoachReview` | `coach_reviews` | review_type, content, period, summary_stats |
 | `LiveQuote` | `live_quotes` | symbol, ltp, change_pct, volume, updated_at |
@@ -125,7 +123,7 @@ TradeJournal-v3/
 
 ## 3. Backend Routers
 
-> **V3 deprecations**: `performance_os`, `coaching_intelligence`, and `recommendations` routers are marked `# DEPRECATED` — their V3 frontend surfaces were removed (Phases 1–4). They are no longer read/written by the live app. The backing tables (`daily_workflows`, `weekly_reviews`, `monthly_reviews`, `trade_ideas`) and the `daily_journal.discipline_rating` column remain pending a deferred destructive migration.
+> **V3 deprecations**: `coaching_intelligence` and `recommendations` routers are marked `# DEPRECATED` — their V3 frontend surfaces were removed (Phases 1–4). They are no longer read/written by the live app. **Issue #67 (scope C, migration `f1a2b3c4d5e6`) dropped the dead tables `trade_ideas`, `weekly_reviews`, `monthly_reviews`** and removed their models/router/schemas/service. **Still deferred**: the `daily_workflows` table and the `daily_journal.discipline_rating` column remain because they are still read by live `calendar`, `reports`, and `edge_command_center` surfaces — their removal awaits an intentional redesign of those reads.
 
 | Router File | Prefix | Key Endpoints |
 |-------------|--------|-------------|
@@ -148,14 +146,15 @@ TradeJournal-v3/
 | `setup_playbook.py` | `/setups` | CRUD, seed, list active |
 | `export.py` | `/export` | CSV export, backup |
 | `analytics.py` | `/analytics` | Full dashboard payload, setup performance, streaks |
-| `trade_ideas.py` | `/ideas` | unregistered — CRUD, convert to trade (deferred deletion) |
+| `trade_ideas.py` | `/ideas` | removed — dropped in issue #67 (table `trade_ideas` dropped) |
 | `daily_journal.py` | `/journal` | GET/PUT by date, weekly stats |
+
 | `ai_settings.py` | `/ai` | Config, providers, test |
 | `tier_config.py` | `/tier-config` | GET list, PUT save |
 | `market_context.py` | `/market` | Snapshots, sync quotes, live quotes, regime |
 | `lifecycle_analytics.py` | `/lifecycle` | Emotion summary, grades, behavioral, revenge, overtrading |
 | `playbook_intelligence.py` | `/playbook/intelligence` | Overview, per-setup intelligence |
-| `performance_os.py` | `/perf-os` | Workflow CRUD, weekly/monthly reviews |
+| `performance_os.py` | `/perf-os` | removed in issue #67 — `weekly_reviews`/`monthly_reviews` tables dropped; `daily_workflows` retained (read by calendar/edge) |
 | `improvement_actions.py` | `/improvement` | Improvement Action CRUD, Daily Focus select/clear, `/improvement/daily-focus/{date}` (ADR-025) |
 | `calendar.py` | `/calendar` | Month view with daily P&L |
 | `reports.py` | `/reports` | Weekly/monthly deterministic reports |

@@ -24,3 +24,6 @@ test.db
 
 # AI config
 backend/app/core/ai_config.json
+
+# Database backups (contain user data — never commit)
+backups/
