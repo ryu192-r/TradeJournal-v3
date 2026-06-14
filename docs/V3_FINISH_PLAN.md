@@ -87,7 +87,9 @@ cd frontend && npm run build
 | 9  | Old pages cleanup ✅               | Delete `pages/{Dashboard,Trades,TradeDetail,Journal,Capital,Calendar,Lifecycle}.tsx` and legacy `Sidebar`. **34 files deleted (−8496 lines). pages/ = LoginPage only (16df693).** | low |
 | 10 | Docs ✅                             | Update `AGENTS.md`, `ARCHITECTURE.md`, refresh `CONTEXT.md`. Confirm ADRs 022/023/024 accepted. **Done — docs match V3 reality, ADR index added, deferred-migration issue #67 filed.** | low |
 
-After Phase 10 (and a 1–2 week confidence window), a follow-up alembic migration drops the deferred tables/columns: `daily_workflows`, `weekly_reviews`, `monthly_reviews`, `trade_ideas`, `daily_journal.discipline_rating`. Backups taken before drop.
+After Phase 10 (and a 1–2 week confidence window), a follow-up alembic migration drops the deferred tables/columns. Backups taken before drop.
+
+**Issue #67 — partial execution (scope C, migration `f1a2b3c4d5e6`, 2026-06-14):** dropped the three genuinely-dead tables `trade_ideas`, `weekly_reviews`, `monthly_reviews` and removed their models, dead `performance_os` router, schemas, `trade_idea` service, relationships, and tests. A pre-flight re-audit found `daily_workflows` and `daily_journal.discipline_rating` are **still read by live surfaces** (`calendar`, `reports`, `edge_command_center`), so those two were intentionally **kept deferred** — their removal awaits an intentional redesign of those reads, not just a drop. Full + targeted pg_dumps taken before applying (gitignored `backups/`); migration round-trip (upgrade/downgrade/upgrade) verified on a prod-schema clone before the prod apply.
 
 ## Risks and safeguards
 

@@ -184,7 +184,7 @@ Single-call payload returning:
 | SetupPlaybook | `setup_playbook` | name, is_active(VARCHAR), trade_count, win_rate, avg_r |
 | LiveQuote | `live_quotes` | symbol, ltp, change_pct, volume |
 | DailyJournal | `daily_journals` | date, pre/post notes, mood, discipline_rating |
-| Others | — | TradeIdea, CoachReview, MarketSnapshot, Milestone, TierConfig, User, DailyWorkflow, WeeklyReview, MonthlyReview |
+| Others | — | CoachReview, MarketSnapshot, Milestone, TierConfig, User, DailyWorkflow, ImprovementAction |
 
 ---
 

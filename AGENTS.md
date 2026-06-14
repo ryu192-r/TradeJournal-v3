@@ -288,7 +288,7 @@ cd frontend && npm run build           # production build
 - **Equity curve**: includes trade PnL (not just capital events)
 
 ## Performance OS / Daily SA Notes (REMOVED)
-- The standalone Performance OS and Daily SA Notes pages were removed during the V3 migration (Phases 1–9). Their workflows are not part of the V3 surface. Backend `daily_workflows`, `weekly_reviews`, `monthly_reviews` tables are retained but no longer read/written — pending a deferred destructive migration (see V3_FINISH_PLAN). The per-trade Review queue (`features-v3/review/`) covers the review workflow.
+- The standalone Performance OS and Daily SA Notes pages were removed during the V3 migration (Phases 1–9). Their workflows are not part of the V3 surface. The `weekly_reviews` and `monthly_reviews` tables (plus `trade_ideas`) were dropped in issue #67 (migration `f1a2b3c4d5e6`). The `daily_workflows` table is **retained** — still read by `calendar` and `edge_command_center` — and remains deferred along with `daily_journal.discipline_rating` (read by `reports`/`calendar`). The per-trade Review queue (`features-v3/review/`) covers the review workflow.
 
 ## Shared UI components
 - **Canonical**: `frontend/src/new-ui/` (see Design System section above). Import everything from `@/new-ui`.
